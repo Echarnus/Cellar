@@ -85,14 +85,20 @@ public enum SystemEnvironment {
                 hint: "Apple's Game Porting Toolkit (D3DMetal) needs macOS 14 (Sonoma) or later."))
         }
 
-        // Rosetta 2
+        // Rosetta 2 (with the Intel-app/Rosetta-sunset horizon surfaced)
         if !isAppleSilicon {
             checks.append(.init("Rosetta 2", .info, "n/a on Intel"))
-        } else if rosettaWorks {
-            checks.append(.init("Rosetta 2", .ok, "installed & functional"))
-        } else {
+        } else if !rosettaWorks {
             checks.append(.init("Rosetta 2", .fail, "not installed",
                 hint: "Install with: softwareupdate --install-rosetta --agree-to-license"))
+        } else if version.majorVersion >= 28 {
+            checks.append(.init("Rosetta 2", .warn, "general Rosetta removed in macOS \(version.majorVersion)",
+                hint: "The x86_64 runner now depends on Apple's retained gaming-only Rosetta subset. "
+                    + "Prefer a native ARM64 runner if one is available (cellar runner list)."))
+        } else {
+            checks.append(.init("Rosetta 2", .ok, "installed & functional",
+                hint: "macOS may show an 'Intel app support ending' notice for the runner — harmless: "
+                    + "Rosetta works through macOS 27, and Apple keeps a gaming subset after."))
         }
 
         // Homebrew (arm)

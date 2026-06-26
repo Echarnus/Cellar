@@ -47,6 +47,10 @@ generalized into a per-game profile system, then given a native GUI.
 ## Known risks tracked across phases
 
 - **Rosetta sunset** — general-purpose Rosetta is removed in macOS 28 (fall 2027); Apple keeps a
-  gaming-focused subset. Plan for native-ARM Wine builds; warn at runtime on macOS 28+.
+  gaming-focused subset (which this GPTK/Wine use case falls under). macOS already shows an "Intel app
+  support ending" notice for the x86_64 GPTK runner — harmless on macOS 26/27. `cellar doctor`
+  surfaces the timeline. **Migration target:** add a native **ARM64EC Wine** runner (Wine 10+ ARM64EC,
+  native-ARM CrossOver preview, GPTK 4 / Metal 4) as it matures into a free build; the x86_64 game
+  code still runs via the retained Rosetta/ARM64EC x86 emulation regardless.
 - **GPTK license** — keep D3DMetal user-supplied; keep the DXVK/MoltenVK path fully functional.
 - **Maintenance** — upstream fixes, community-owned profiles, small core (lessons from Whisky's end).
