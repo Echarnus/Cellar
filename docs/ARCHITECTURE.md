@@ -72,9 +72,16 @@ Steam-on-Linux does, using Wine + D3DMetal and per-game profiles.
 
 ## The Planet Coaster 2 path (worked example)
 
-1. `cellar prefix create pc2 --backend d3dmetal --runner wine-cx-11`
-2. `cellar runner install wine-cx-11` — prebuilt LGPL Wine 11
-3. `cellar gptk import ~/Downloads/Game_Porting_Toolkit*.dmg` — user-supplied D3DMetal
-4. `cellar install-steam pc2` — Windows Steam inside the bottle (bypasses the greyed-out Mac Install
-   button; satisfies PC2's live-session Denuvo **Anti-tamper** DRM, which runs untouched in the layer)
-5. log into Steam-in-bottle → install PC2 normally → `cellar launch planet-coaster-2`
+1. `cellar setup` — installs the **GPTK runner** (Wine 7.7 + D3DMetal, fetched from Gcenx),
+   creates the `planet-coaster-2` bottle, runs `wineboot --init`, sets Windows 10, and installs the
+   **Windows Steam client** into the bottle (pinning client updates via `steam.cfg`).
+2. `cellar steam open planet-coaster-2` — Steam opens inside the bottle with the load-bearing macOS
+   flags (`-cef-force-32bit -allosarches -no-cef-sandbox`). Log in (Steam Guard/2FA works). This
+   bypasses the greyed-out Mac Install button — the bottle *is* Windows to Steam.
+3. Install PC2 from the in-bottle Steam (`steam://install/2688950`). Denuvo **Anti-tamper** DRM runs
+   untouched inside the layer.
+4. `cellar launch planet-coaster-2` — launches via `steam://rungameid/2688950` with the D3DMetal env
+   (`D3DM_SUPPORT_DXR`, `ROSETTA_ADVERTISE_AVX`, msync). D3DMetal is the builtin renderer in the GPTK
+   Wine build — **no `WINEDLLOVERRIDES` needed**.
+5. Optional `cellar steam add planet-coaster-2` — emits `~/Applications/Planet Coaster 2.app` and a
+   non-Steam shortcut so it shows in the native Steam library.

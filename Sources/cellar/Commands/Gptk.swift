@@ -5,19 +5,20 @@ import Foundation
 struct Gptk: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "gptk",
-        abstract: "Import Apple's D3DMetal (Game Porting Toolkit) from a .dmg you downloaded.",
+        abstract: "[Advanced] Import Apple's own D3DMetal from a Game Porting Toolkit .dmg.",
         discussion: """
-        Apple's D3DMetal is proprietary and licensed for personal/non-commercial use; Cellar
-        never bundles or redistributes it. Download the Game Porting Toolkit .dmg from
-        https://developer.apple.com/games/game-porting-toolkit/ (free Apple ID), then point
-        this command at it. Cellar copies the framework into its local cache only.
+        Most users don't need this: `cellar runner install gptk` already provides a Wine build
+        with D3DMetal (redistributed by Gcenx under Apple's non-commercial grant). This command is
+        for users who prefer to supply Apple's *own* D3DMetal from a .dmg they downloaded from
+        https://developer.apple.com/games/game-porting-toolkit/ (free Apple ID). Cellar copies it
+        into a local cache only and never redistributes it.
         """,
         subcommands: [Import.self],
         defaultSubcommand: Import.self
     )
 
     struct Import: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Import D3DMetal from a GPTK .dmg. [Phase 1]")
+        static let configuration = CommandConfiguration(abstract: "Import D3DMetal from a GPTK .dmg. [Phase 2]")
 
         @Argument(help: "Path to the Game Porting Toolkit .dmg.")
         var dmg: String
@@ -27,12 +28,12 @@ struct Gptk: ParsableCommand {
             guard FileManager.default.fileExists(atPath: path) else {
                 throw CellarError.invalidArgument("No file at \(path)")
             }
-            print(Term.yellow("Not yet implemented (Phase 1)."))
-            print("""
-              Will mount \(path), copy D3DMetal.framework + libd3dshared.dylib into
-              \(Paths.d3dmetalCache.path), then detach the image. The binaries stay on your
-              machine only and are never committed or uploaded.
-            """)
+            print(Term.yellow("Not yet implemented (Phase 2).")
+                + " For now, use the bundled D3DMetal: cellar runner install gptk")
+            print(Term.dim("""
+              When implemented, this will mount \(path), copy D3DMetal.framework + libd3dshared.dylib
+              into \(Paths.d3dmetalCache.path), then detach. The binaries stay on your machine only.
+            """))
         }
     }
 }

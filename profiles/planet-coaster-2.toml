@@ -24,9 +24,10 @@ online                      = "single-player core + online co-op / async multipl
 status                      = "experimental"   # mixed Apple Silicon reports; validate on M5 / macOS 26
 notes                       = "CrossOver 26 lists PC2 as enabled (Wine 11 + D3DMetal 3.0). No M5 benchmarks yet."
 
+# Runner: Game Porting Toolkit (Wine + Apple D3DMetal). Installed via `cellar runner install gptk`.
+# D3DMetal is the builtin renderer in this Wine build — no WINEDLLOVERRIDES needed.
 [runner]
-# Prefer a prebuilt LGPL Wine 11 (Gcenx wine-crossover). Installed via `cellar runner install`.
-id              = "wine-cx-11"
+id              = "gptk"
 windows_version = "win10"
 
 [graphics]

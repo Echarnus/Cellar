@@ -7,9 +7,10 @@ Cellar assembles a [Wine](https://www.winehq.org/) runner plus a graphics-transl
 driven by a community **profile database**. The first supported profile is **Planet Coaster 2**;
 the engine itself is general — adding a new game means adding a profile, not rebuilding the layer.
 
-> **Status:** Phase 0 (bootstrap). The `doctor`, `prefix`, and `profiles` commands work today.
-> Runner download, GPTK import, Steam-in-bottle install, and launch land in Phase 1.
-> See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** Phase 1 (working). `cellar setup` installs the runner, creates the bottle, initialises
+> the Wine prefix, and installs Windows Steam — verified end-to-end on an Apple M5 / macOS 26. You log
+> into the in-bottle Steam, install your game, and `cellar launch` it. PC2 itself is marked
+> `experimental` until validated on M5. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -44,12 +45,15 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full stack.
 
 Cellar is **GPL-3.0** and is built to **stay** free and legal:
 
-- **Apple's D3DMetal is never bundled.** It's proprietary (Apple's license permits personal /
-  non-commercial use only). You download Apple's Game Porting Toolkit `.dmg` yourself and run
-  `cellar gptk import` — Cellar copies it into your local cache and never redistributes it.
+- **Cellar never bundles Apple's D3DMetal in its own releases.** D3DMetal is proprietary, but Apple's
+  license permits non-commercial *distribution*. So it reaches your machine at runtime via the
+  **Gcenx Game Porting Toolkit** runner (`cellar runner install gptk`) — a non-commercial
+  redistribution under Apple's grant, the same model Heroic uses — or, if you prefer, from your own
+  Apple download (`cellar gptk import`). Either way it's never part of Cellar's source or artifacts.
 - **No DRM circumvention, ever.** Planet Coaster 2 ships **Denuvo Anti-tamper** (DRM, *not*
   anti-cheat). Cellar runs it **through** the layer, untouched. We never strip or crack DRM.
-- **Owned games only.** Any game files come from *your* authenticated account.
+- **Owned games only.** Any game files come from *your* authenticated account, via the in-bottle
+  Windows Steam client.
 - **Trademark-safe.** Cellar is not affiliated with or endorsed by Apple, Valve, CodeWeavers, or
   Frontier Developments. See [NOTICE](NOTICE).
 
@@ -82,18 +86,27 @@ cp .build/release/cellar /usr/local/bin/cellar
 cellar doctor
 ```
 
-## Usage (Phase 0)
+## Usage
+
+The minimal-setup path to Planet Coaster 2:
 
 ```sh
-cellar doctor                          # environment diagnostics
-cellar profiles list                   # list available game profiles
-cellar profiles show planet-coaster-2  # inspect the PC2 profile
-cellar prefix create pc2 --backend d3dmetal
-cellar prefix list
+cellar doctor                       # check your machine (Apple Silicon, Rosetta, disk…)
+cellar setup                        # install runner + bottle + Windows Steam (Planet Coaster 2)
+cellar steam open  planet-coaster-2 # opens Steam in the bottle — log in (Steam Guard/2FA works)
+cellar steam install planet-coaster-2  # opens the install dialog for PC2 (or install from the UI)
+cellar launch      planet-coaster-2 # play (routes through Steam so DRM/auth work)
 ```
 
-Coming in Phase 1: `cellar runner install`, `cellar gptk import`, `cellar install-steam`,
-`cellar launch planet-coaster-2`.
+Surface it like a native game:
+
+```sh
+cellar steam add planet-coaster-2   # generates ~/Applications/Planet Coaster 2.app
+                                    # and a non-Steam shortcut (quit Steam first)
+```
+
+Other commands: `cellar runner list/install`, `cellar prefix list`, `cellar profiles list/show`,
+`cellar steam enable-windows-platform` (advanced).
 
 ---
 

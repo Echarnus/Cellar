@@ -132,12 +132,12 @@ public enum SystemEnvironment {
                 hint: "Optional; only used for repo workflows."))
         }
 
-        // D3DMetal (user-supplied Apple GPTK)
-        if d3dmetalImported {
-            checks.append(.init("D3DMetal (GPTK)", .ok, "imported"))
+        // GPTK runner (Wine + Apple D3DMetal) — the modern-DX path
+        if RunnerManager.find(id: "gptk") != nil {
+            checks.append(.init("GPTK runner", .ok, "installed (Wine + D3DMetal)"))
         } else {
-            checks.append(.init("D3DMetal (GPTK)", .info, "not imported",
-                hint: "Download Apple's Game Porting Toolkit .dmg, then: cellar gptk import <path-to.dmg>"))
+            checks.append(.init("GPTK runner", .info, "not installed",
+                hint: "Install it with: cellar runner install gptk   (or just run: cellar setup)"))
         }
 
         // Disk

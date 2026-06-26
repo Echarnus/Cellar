@@ -12,16 +12,20 @@ generalized into a per-game profile system, then given a native GUI.
 - [x] Licensing & legal scaffolding (GPL-3.0, THIRD_PARTY_LICENSES, NOTICE, docs/LEGAL)
 - [x] Seed profile: `planet-coaster-2`
 
-## Phase 1 — Single-game PC2 runner (MVP)
+## Phase 1 — Single-game PC2 runner (MVP) ✅ (working)
 
-- [ ] `cellar runner install <id>` — download/pin a prebuilt LGPL Wine 11 (Gcenx wine-crossover)
-- [ ] Initialize the Wine prefix (`wineboot`) inside a bottle
-- [ ] `cellar gptk import <dmg>` — mount Apple's GPTK `.dmg`, copy D3DMetal into the local cache
-- [ ] Backend wiring: D3DMetal + DLL overrides; DXVK fallback as a switch
-- [ ] `cellar install-steam <prefix>` — install the Windows Steam client into the bottle
-- [ ] `cellar launch planet-coaster-2` — run through bottle + backend + Rosetta
-- [ ] Test target (`swift test`)
-- [ ] **Verify:** install PC2 via in-bottle Steam and boot it on M5 / macOS 26; record a perf note
+- [x] `cellar runner install <id>` — download a prebuilt runner (GPTK = Wine + D3DMetal, or Wine-Staging)
+- [x] Initialize the Wine prefix (`wineboot`) inside a bottle, set Windows 10
+- [x] D3DMetal via the GPTK runner (it's the builtin renderer — no DLL overrides needed)
+- [x] Download + silently install the Windows Steam client into the bottle (+ pin client updates)
+- [x] `cellar setup` — one-command runner → bottle → prefix → Steam (verified end-to-end on M5)
+- [x] `cellar steam open / install` — log into the in-bottle Steam, install the game
+- [x] `cellar launch planet-coaster-2` — run through the bottle's Steam (DRM/auth) + D3DMetal + Rosetta
+- [x] `cellar steam add` — generate a native `.app` + non-Steam shortcut (binary-VDF writer)
+- [x] `cellar selftest` — byte-exact checks for the binary-VDF codec, CRC32, shortcut writer
+- [ ] **Validate PC2 itself** on M5 / macOS 26 (log in, download, play) and record a perf/known-issues note
+- [ ] `cellar gptk import <dmg>` — the spotless user-supplied-D3DMetal path (moved to Phase 2)
+- [ ] Real test target (`swift test`) once full Xcode is available (selftest covers it for now)
 
 ## Phase 2 — Generalization & profile DB
 

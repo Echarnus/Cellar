@@ -6,11 +6,18 @@ verified research into each component's license and the relevant law.
 
 ## The five rules
 
-1. **Apple's D3DMetal / GPTK is always user-supplied.** Never commit it to the repo, never ship it in
-   a release artifact, never auto-download it from a third-party mirror. Apple's license permits
-   personal / non-commercial use; the spotless posture is to have the user download Apple's `.dmg`
-   themselves and import it locally (`cellar gptk import`). The fully open **DXVK → MoltenVK** path is
-   always available as a no-Apple-download alternative.
+1. **Cellar never bundles Apple's D3DMetal in its own artifacts.** It is never committed to this
+   repo and never shipped in a Cellar release. Apple's license grants personal/non-commercial use and
+   permits **distribution "solely for non-commercial purposes."** D3DMetal therefore reaches the
+   user's machine in one of two ways, both consistent with that grant:
+   - **Default (minimal setup):** `cellar runner install gptk` downloads the **Gcenx Game Porting
+     Toolkit** Wine build at runtime. Gcenx is a non-commercial project redistributing D3DMetal under
+     Apple's non-commercial grant — the same model Heroic uses. Cellar fetches it; it is not part of
+     Cellar's source or releases.
+   - **Spotless (advanced):** the user downloads Apple's own GPTK `.dmg` (free Apple ID) and imports
+     it with `cellar gptk import` (Phase 2).
+   The fully open **DXVK / DXMT** path is always available as a no-Apple-component alternative for
+   titles that don't need D3DMetal.
 
 2. **Never circumvent DRM or anti-cheat.** Planet Coaster 2 ships **Denuvo Anti-tamper** (a DRM layer
    that runs in user space) — *not* Denuvo Anti-Cheat and no kernel anti-cheat. Cellar runs DRM

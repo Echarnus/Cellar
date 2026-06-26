@@ -4,37 +4,53 @@ import CellarKit
 struct RunnerCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "runner",
-        abstract: "Manage Wine runners (the LGPL Wine builds Cellar runs games through).",
+        abstract: "Manage Wine runners (the builds Cellar runs games through).",
         subcommands: [List.self, Install.self]
     )
 
     struct List: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "List installed runners.")
+        static let configuration = CommandConfiguration(abstract: "List installed and available runners.")
 
         func run() throws {
-            let runners = try RunnerManager.list()
-            guard !runners.isEmpty else {
-                print(Term.dim("No runners installed. (Phase 1: cellar runner install wine-cx-11)"))
-                return
+            let installed = RunnerManager.installed()
+            if installed.isEmpty {
+                print(Term.dim("No runners installed. Install one: cellar runner install gptk"))
+            } else {
+                print(Term.bold("Installed:"))
+                for runner in installed {
+                    print("  \(Term.green("✓")) \(runner.spec.id)  \(Term.dim(runner.spec.displayName))")
+                }
             }
-            for runner in runners {
-                print("  \(Term.bold(runner.id))  \(Term.dim(runner.url.path))")
+            print("")
+            print(Term.bold("Available:"))
+            for spec in RunnerCatalog.all {
+                let d3d = spec.hasD3DMetal ? Term.cyan(" [D3DMetal]") : ""
+                print("  • \(spec.id)\(d3d)  \(Term.dim(spec.displayName))")
             }
         }
     }
 
     struct Install: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Download & install a Wine runner. [Phase 1]")
+        static let configuration = CommandConfiguration(
+            abstract: "Download & install a Wine runner (default: gptk).")
 
-        @Argument(help: "Runner id, e.g. 'wine-cx-11'.")
-        var id: String
+        @Argument(help: "Runner id: gptk (Wine + D3DMetal) or wine-staging (LGPL).")
+        var id: String = "gptk"
 
         func run() throws {
-            print(Term.yellow("Not yet implemented (Phase 1)."))
-            print("""
-              Will download a prebuilt, LGPL Wine 11 build (Gcenx wine-crossover) and unpack it to
-              \(Paths.runners.appendingPathComponent(id).path)
-            """)
+            guard let spec = RunnerCatalog.spec(forID: id) else {
+                let options = RunnerCatalog.all.map(\.id).joined(separator: ", ")
+                throw CellarError.invalidArgument("Unknown runner '\(id)'. Options: \(options)")
+            }
+            print(Term.bold("Installing \(spec.displayName)"))
+            print(Term.dim("  license: \(spec.license)"))
+            if spec.hasD3DMetal {
+                print(Term.dim("  note: includes Apple's D3DMetal (redistributed by Gcenx under Apple's"))
+                print(Term.dim("        non-commercial grant). Fetched at runtime; never bundled by Cellar."))
+            }
+            let install = try RunnerManager.install(spec) { print("  " + Term.dim($0)) }
+            let version = WineRunner(binary: install.wineBinary, prefix: Paths.runners).wineVersion()
+            print(Term.green("Installed.") + Term.dim("  \(version.isEmpty ? install.wineBinary.lastPathComponent : version)"))
         }
     }
 }
