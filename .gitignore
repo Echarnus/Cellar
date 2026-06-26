@@ -1,0 +1,23 @@
+# Swift / SwiftPM
+.build/
+.swiftpm/
+# Package.resolved IS committed (executable app — pins exact dependency versions for reproducible builds)
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Cellar runtime data must never be committed — especially Apple's user-supplied D3DMetal,
+# Wine runners, bottles, downloaded game files, and logs.
+/runners/
+/prefixes/
+/cache/
+/logs/
+*.dmg
+*.exe
+
+# Editors
+.vscode/
+.idea/

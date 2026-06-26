@@ -1,0 +1,36 @@
+Cellar
+Copyright (C) 2026 Cellar contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 3, as published by the Free
+Software Foundation. See the LICENSE file for the full text.
+
+------------------------------------------------------------------------------
+Trademarks & non-affiliation
+------------------------------------------------------------------------------
+
+Cellar is an independent, community project. It is NOT affiliated with,
+endorsed by, or sponsored by any of the following, and all trademarks are the
+property of their respective owners:
+
+  - Apple Inc.  (macOS, Metal, Game Porting Toolkit, D3DMetal, Rosetta)
+  - Valve Corporation  (Steam, Steam Play, Proton)
+  - CodeWeavers Inc.  (CrossOver)
+  - Frontier Developments plc  (Planet Coaster, COBRA engine)
+  - The Wine Project, the Khronos Group, and other upstream projects
+
+Product and game names are used only descriptively (nominative use) to state
+what Cellar is compatible with. No logos of the above are used.
+
+------------------------------------------------------------------------------
+Important
+------------------------------------------------------------------------------
+
+Cellar does not bundle or redistribute Apple's proprietary D3DMetal / Game
+Porting Toolkit. Users obtain it themselves from Apple under Apple's license.
+
+Cellar never circumvents DRM or anti-cheat, and is intended only for use with
+games you legally own.
+
+See THIRD_PARTY_LICENSES.md for the licenses of components Cellar uses or
+bundles, and docs/LEGAL.md for the project's compliance rules.

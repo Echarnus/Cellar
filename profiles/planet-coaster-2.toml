@@ -1,0 +1,61 @@
+# Cellar game profile — Planet Coaster 2
+# Schema version 0 (Phase 0 draft). Fields are descriptive until the Phase 2 loader lands.
+# All facts below are sourced from verified 2026 research (see docs/RESEARCH.md).
+
+[game]
+slug          = "planet-coaster-2"
+name          = "Planet Coaster 2"
+developer     = "Frontier Developments"
+steam_appid   = 2688950
+engine        = "COBRA"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2024-11-06"
+
+[compatibility]
+# No kernel anti-cheat (no EAC / BattlEye / Vanguard) — Wine/D3DMetal friendly.
+anticheat                   = "none"
+# Denuvo *Anti-tamper* (DRM, NOT anti-cheat). Runs in user space, through the layer.
+# Needs a live Steam session — which is why "Windows Steam in the bottle" is the default install.
+drm                         = "denuvo-anti-tamper"
+requires_live_steam_session = true
+requires_account            = "Frontier"
+online                      = "single-player core + online co-op / async multiplayer / cross-platform saves"
+status                      = "experimental"   # mixed Apple Silicon reports; validate on M5 / macOS 26
+notes                       = "CrossOver 26 lists PC2 as enabled (Wine 11 + D3DMetal 3.0). No M5 benchmarks yet."
+
+[runner]
+# Prefer a prebuilt LGPL Wine 11 (Gcenx wine-crossover). Installed via `cellar runner install`.
+id              = "wine-cx-11"
+windows_version = "win10"
+
+[graphics]
+# Primary path for this DX12 title on Apple Silicon.
+backend           = "d3dmetal"
+# Fallback if D3DMetal misbehaves on a given driver/title:
+fallback_backend  = "dxvk"
+metalfx_upscaling = true
+retina            = false
+
+[env]
+# Metal HUD overlay (FPS / frametime) while validating performance.
+MTL_HUD_ENABLED  = "1"
+# Enable DXR (ray tracing) translation in D3DMetal where supported.
+D3DM_SUPPORT_DXR = "1"
+
+[dll_overrides]
+# None required as a baseline; add here if a specific build needs them.
+
+[install]
+# Robust, fully-legitimate path: install Windows Steam into the bottle and let it
+# download / validate / update the owned game.
+method      = "windows-steam-in-bottle"
+steam_appid = 2688950
+# Experimental alternative (owned game only): depot download via DepotDownloader (-os windows).
+# Note: a bare depot dump may not boot because of the live-session DRM requirement.
+experimental_depot_download = false
+
+[legal]
+# Cellar never circumvents DRM; Denuvo runs untouched inside the layer.
+# Only ever used with a copy of the game you own.
+drm_circumvention = "never"
