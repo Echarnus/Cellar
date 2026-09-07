@@ -7,10 +7,12 @@ Cellar assembles a [Wine](https://www.winehq.org/) runner plus a graphics-transl
 driven by a community **profile database**. The first supported profile is **Planet Coaster 2**;
 the engine itself is general — adding a new game means adding a profile, not rebuilding the layer.
 
-> **Status:** Phase 1 (working). `cellar setup` installs the runner, creates the bottle, initialises
-> the Wine prefix, and installs Windows Steam — verified end-to-end on an Apple M5 / macOS 26. You log
-> into the in-bottle Steam, install your game, and `cellar launch` it. PC2 itself is marked
-> `experimental` until validated on M5. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** Phase 1 (working). **Planet Coaster 2 is playable on an Apple M5 / macOS 26.5** —
+> `cellar setup` installs the runner (WineForge: Wine 11.17 + D3DMetal 3.0), creates the bottle,
+> installs Windows Steam and a `Steam (<bottle>).app`; you log in, install PC2, and `cellar launch`
+> it. Menu ~55 FPS, in-park renders (a huge park is CPU-bound via Rosetta). PC2 needs Metal's
+> validation layer on as a stability workaround for a D3DMetal startup race — set in its profile.
+> See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/RESEARCH.md](docs/RESEARCH.md).
 
 ---
 
@@ -46,10 +48,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full stack.
 Cellar is **GPL-3.0** and is built to **stay** free and legal:
 
 - **Cellar never bundles Apple's D3DMetal in its own releases.** D3DMetal is proprietary, but Apple's
-  license permits non-commercial *distribution*. So it reaches your machine at runtime via the
-  **Gcenx Game Porting Toolkit** runner (`cellar runner install gptk`) — a non-commercial
-  redistribution under Apple's grant, the same model Heroic uses — or, if you prefer, from your own
-  Apple download (`cellar gptk import`). Either way it's never part of Cellar's source or artifacts.
+  license permits non-commercial *distribution*. So it reaches your machine at runtime, grafted from
+  the community WineForge / Sikarugir builds under Apple's non-commercial grant (the same model
+  Heroic uses) — never part of Cellar's source or artifacts.
 - **No DRM circumvention, ever.** Planet Coaster 2 ships **Denuvo Anti-tamper** (DRM, *not*
   anti-cheat). Cellar runs it **through** the layer, untouched. We never strip or crack DRM.
 - **Owned games only.** Any game files come from *your* authenticated account, via the in-bottle
