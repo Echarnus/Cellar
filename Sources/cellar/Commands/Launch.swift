@@ -17,6 +17,9 @@ struct Launch: ParsableCommand {
     @Flag(name: .customLong("steam"), help: "Force the Steam launch path even if a direct launch is possible.")
     var forceSteam = false
 
+    @Flag(name: .customLong("no-wait"), help: "Return immediately after launch instead of waiting for the game to exit and closing the layer.")
+    var noWait = false
+
     @Flag(name: .customLong("print-env"), help: "Print the environment the game would get and exit (debugging).")
     var printEnv = false
 
@@ -36,9 +39,16 @@ struct Launch: ParsableCommand {
 
         // Steam-free path: no live-session DRM and the exe is present → run it directly, no Steam.
         if plan.canLaunchSteamFree && !forceSteam {
-            print(Term.dim("Launching \(plan.name) directly (no Steam) — \(plan.directLaunchExe!.lastPathComponent), backend \(plan.backend)…"))
+            let exeName = plan.directLaunchExe!.lastPathComponent
+            print(Term.dim("Launching \(plan.name) directly (no Steam) — \(exeName), backend \(plan.backend)…"))
             try Game.launchDirect(plan, showHUD: hud)
-            print(Term.green("\(plan.name) launched.") + Term.dim(" Log: \(Paths.logs.path)/game-\(slug).log"))
+            print(Term.green("\(plan.name) launched."))
+            if !noWait {
+                print(Term.dim("Playing… (Cellar will close the layer when you quit the game)"))
+                SteamBottle.waitForExit(matching: exeName)
+                wine.killServer()
+                print(Term.green("\(plan.name) closed. Layer shut down."))
+            }
             return
         }
 
@@ -61,6 +71,12 @@ struct Launch: ParsableCommand {
         try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: hud, gameEnv: plan.env) {
             print("  " + Term.dim($0))
         }
-        print(Term.green("\(plan.name) is up.") + Term.dim(" Logs: \(SteamBottle.logsDirectory(in: plan.prefix).path)"))
+        print(Term.green("\(plan.name) is up."))
+        if !noWait {
+            print(Term.dim("Playing… (Cellar will close Steam when you quit the game)"))
+            SteamBottle.waitForGameExit(in: plan.prefix, appID: appID)
+            SteamBottle.shutdown(runner: wine)
+            print(Term.green("\(plan.name) closed. Steam layer shut down."))
+        }
     }
 }
