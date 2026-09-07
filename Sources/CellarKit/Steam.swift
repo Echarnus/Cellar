@@ -118,9 +118,98 @@ public enum SteamBottle {
     /// Launch an installed game through Steam (handles auth + DRM + overlay), with D3DMetal env.
     /// Steam is the parent of the game process, so the environment must be on Steam itself: if a
     /// client without the HUD/DXR env is already running, those settings apply after it restarts.
+    ///
+    /// `-silent` cold-starts the client straight to the tray — no main window, friends list or
+    /// store popups — so on a fresh launch only the game's own window appears. (If a client is
+    /// already up in the bottle, Steam just forwards the URL to it and the flag is a no-op.)
     public static func runGame(runner: WineRunner, appID: Int, showHUD: Bool = false,
                                gameEnv: [String: String] = [:]) throws {
-        try launchClient(runner: runner, extraArgs: ["steam://rungameid/\(appID)"], showHUD: showHUD, gameEnv: gameEnv)
+        try launchClient(runner: runner, extraArgs: ["-silent", "steam://rungameid/\(appID)"],
+                         showHUD: showHUD, gameEnv: gameEnv)
+    }
+
+    /// The game's install-directory name (from `appmanifest_<appid>.acf`'s `installdir`).
+    public static func installDirectory(in prefix: URL, appID: Int) -> String? {
+        let manifest = steamDirectory(in: prefix).appendingPathComponent("steamapps/appmanifest_\(appID).acf")
+        guard let text = try? String(contentsOf: manifest, encoding: .utf8),
+              let m = text.range(of: #""installdir"\s*"([^"]+)""#, options: .regularExpression) else { return nil }
+        return String(text[m]).components(separatedBy: "\"").dropLast().last
+    }
+
+    /// Whether the game's own process (not Steam) is currently running in this bottle — matched by
+    /// its install-directory path in the Windows command line.
+    public static func isGameRunning(in prefix: URL, appID: Int) -> Bool {
+        guard let dir = installDirectory(in: prefix, appID: appID) else { return false }
+        let needle = "steamapps\\\\common\\\\\(dir)\\\\"
+        return Shell.run("/bin/sh", ["-c",
+            "ps -axo command | grep -vi grep | grep -qiF \"\(needle)\""]).succeeded
+            || Shell.run("/bin/sh", ["-c",
+            "ps -axo command | grep -vi grep | grep -qiF \"common/\(dir)/\""]).succeeded
+    }
+
+    /// Launch the game and supervise startup: D3DMetal 3.0 has an intermittent race that fast-fails
+    /// the game ~5 s in (0xC0000409) before its window appears. Relaunch transparently until the
+    /// game is up, so "launch and play" just works. Steam stays running between attempts (started
+    /// once, silently), so retries are cheap.
+    public static func runGameSupervised(runner: WineRunner, appID: Int, showHUD: Bool = false,
+                                         gameEnv: [String: String] = [:], attempts: Int = 5,
+                                         progress: (String) -> Void = { _ in }) throws {
+        // Warm the client first: launching the game into a not-yet-ready Steam makes the D3DMetal
+        // race fire almost every time. Start Steam silently (tray only) with the game's env, wait
+        // for it to come up, then drive the game into the warm client.
+        if !isRunning {
+            progress("Starting Steam (silent) and waiting for it to be ready…")
+            try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv)
+            for _ in 0..<20 {
+                Thread.sleep(forTimeInterval: 2)
+                if isRunning && isClientUpdated(in: runner.prefix) { break }
+            }
+            Thread.sleep(forTimeInterval: 6) // let login settle
+        }
+
+        for attempt in 1...attempts {
+            // Clean slate: kill any half-dead game / crash-reporter from a previous attempt and let
+            // wineserver settle, or the next rungameid races even harder.
+            killGameProcesses(in: runner.prefix, appID: appID)
+            if attempt > 1 { Thread.sleep(forTimeInterval: 8) }
+
+            try launchClient(runner: runner, extraArgs: ["steam://rungameid/\(appID)"],
+                             showHUD: showHUD, gameEnv: gameEnv)
+
+            // Wait up to ~24 s for the game process to appear.
+            var appeared = false
+            for _ in 0..<12 {
+                Thread.sleep(forTimeInterval: 2)
+                if isGameRunning(in: runner.prefix, appID: appID) { appeared = true; break }
+            }
+            if !appeared {
+                progress("Attempt \(attempt): game didn't start; retrying…")
+                continue
+            }
+            // It started — did it survive the startup race? Watch for ~16 s.
+            var survived = true
+            for _ in 0..<8 {
+                Thread.sleep(forTimeInterval: 2)
+                if !isGameRunning(in: runner.prefix, appID: appID) { survived = false; break }
+            }
+            if survived {
+                if attempt > 1 { progress("Up after \(attempt) attempts.") }
+                return
+            }
+            progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
+        }
+        throw CellarError.ioFailure(
+            "Planet Coaster 2 kept hitting the D3DMetal startup race after \(attempts) attempts. Try `cellar launch` again.")
+    }
+
+    /// Kill the game's own process and its crash reporter in this bottle (not Steam itself), so a
+    /// stuck instance from a failed startup doesn't poison the next attempt.
+    public static func killGameProcesses(in prefix: URL, appID: Int) {
+        var patterns = ["crash_reporter.exe"]
+        if let dir = installDirectory(in: prefix, appID: appID) { patterns.append("common/\(dir)/") }
+        for p in patterns {
+            Shell.run("/usr/bin/pkill", ["-9", "-f", p])
+        }
     }
 
     /// Whether a given app id reports as fully installed (StateFlags=4) in its appmanifest.
