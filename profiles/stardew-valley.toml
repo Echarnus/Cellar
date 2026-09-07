@@ -1,0 +1,46 @@
+# Cellar game profile — Stardew Valley
+# The reference DRM-free title: it runs straight from its files with no Steam at all, so it
+# exercises Cellar's fully Steam-free path (DepotDownloader to fetch, direct exe launch to play).
+# Untested on M5 — config is the demonstrator for the steam-free flow.
+
+[game]
+slug          = "stardew-valley"
+name          = "Stardew Valley"
+developer     = "ConcernedApe"
+steam_appid   = 413150
+engine        = "MonoGame"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2016-02-26"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "none (DRM-free)"
+# DRM-free: no Steam needed to play. Cellar downloads it with DepotDownloader and launches the exe
+# directly — no Windows Steam client involved at all. This is the Proton-like ideal case.
+needs_live_steam            = false
+requires_account            = "none"
+online                      = "single-player + co-op"
+status                      = "untested"
+notes                       = "Reference case for the fully Steam-free path (fetch-depot + direct launch)."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxmt"
+
+[env]
+MTL_HUD_ENABLED = "1"
+
+[install]
+method      = "depot"
+steam_appid = 413150
+
+[launch]
+exe = "Stardew Valley.exe"
+
+[legal]
+drm_circumvention = "never"

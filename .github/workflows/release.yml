@@ -1,0 +1,49 @@
+name: Release
+
+# Tag a release: `git tag v0.1.0 && git push origin v0.1.0`.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (e.g. 0.1.0) for a manual build"
+        required: true
+        default: "0.0.0-manual"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Package
+        run: Scripts/package.sh "${{ steps.v.outputs.version }}"
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cellar-${{ steps.v.outputs.version }}
+          path: dist/*.zip
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Cellar ${{ steps.v.outputs.version }}
+          generate_release_notes: true
+          files: dist/*.zip
+          body: |
+            Cellar ${{ steps.v.outputs.version }} — run Windows games on Apple Silicon.
+
+            **Cellar-*.zip** is the GUI app, **cellar-*.zip** the CLI. Both are unsigned/unnotarised:
+            after unzipping, run `xattr -dr com.apple.quarantine Cellar.app` (or right-click → Open).
+            Supported games: https://echarnus.github.io/Cellar/

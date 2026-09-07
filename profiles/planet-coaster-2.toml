@@ -19,6 +19,8 @@ anticheat                   = "none"
 # Needs a live Steam session — which is why "Windows Steam in the bottle" is the default install.
 drm                         = "denuvo-anti-tamper"
 requires_live_steam_session = true
+# Denuvo + live Steam session: cannot run without the Steam client. Cellar keeps it silent.
+needs_live_steam            = true
 requires_account            = "Frontier"
 online                      = "single-player core + online co-op / async multiplayer / cross-platform saves"
 status                      = "playable"        # M5 / macOS 26.5: main menu verified via D3DMetal 3.0 (2026-09-07); in-park validation pending

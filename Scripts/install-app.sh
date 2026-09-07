@@ -14,6 +14,19 @@ APP="$HOME/Applications/Cellar.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/CellarApp"
+
+# App icon: build a multi-resolution .icns from Resources/AppIcon.png (regenerate it if missing).
+ICON_SRC="Resources/AppIcon.png"
+[ -f "$ICON_SRC" ] || swift Scripts/make-icon.swift "$ICON_SRC"
+if [ -f "$ICON_SRC" ]; then
+  ISET="$(mktemp -d)/Cellar.iconset"; mkdir -p "$ISET"
+  for s in 16 32 128 256 512; do
+    sips -z "$s" "$s"       "$ICON_SRC" --out "$ISET/icon_${s}x${s}.png"    >/dev/null
+    sips -z "$((s*2))" "$((s*2))" "$ICON_SRC" --out "$ISET/icon_${s}x${s}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns"
+  ICON_KEY='  <key>CFBundleIconFile</key><string>AppIcon</string>'
+fi
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -25,6 +38,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>0.1</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
+$ICON_KEY
 </dict></plist>
 PLIST
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true

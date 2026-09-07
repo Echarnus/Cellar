@@ -24,6 +24,9 @@ released      = "2019-11-14"
 anticheat                   = "easyanticheat (ranked only)"
 drm                         = "none (Steam + optional Xbox/Microsoft account for cross-play)"
 requires_live_steam_session = false
+# Steamworks DRM: the exe expects Steam running. Prefer the native Feral Mac port; via Cellar it
+# uses the silent-Steam path. (Set needs_live_steam = false only for DRM-free titles.)
+needs_live_steam            = true
 requires_account            = "Xbox/Microsoft (only for cross-play & cloud)"
 online                      = "single-player + campaigns offline; ranked MP needs EAC (unsupported here)"
 status                      = "untested"       # DX11 via D3DMetal should be well-behaved; not yet run on M5
@@ -47,8 +50,13 @@ retina            = false
 MTL_HUD_ENABLED = "1"
 
 [install]
-method      = "windows-steam-in-bottle"
+# DepotDownloader can fetch the Windows files directly (cellar fetch-depot); or Windows-Steam-in-bottle.
+method      = "depot"
 steam_appid = 813780
+
+[launch]
+# Direct-launch exe (used by the Steam-free path when needs_live_steam = false).
+exe = "AoE2DE_s.exe"
 
 [legal]
 drm_circumvention = "never"
