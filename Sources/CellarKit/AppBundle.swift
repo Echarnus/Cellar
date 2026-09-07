@@ -2,7 +2,8 @@ import Foundation
 
 /// Generates minimal double-clickable macOS .apps in ~/Applications whose launcher calls `cellar`:
 /// one per game (`cellar launch <slug>`, also the Steam non-Steam-shortcut target) and one per
-/// bottle for the Windows Steam client itself (`cellar steam open <slug>`).
+/// bottle for the Windows Steam client itself (`cellar steam open <slug>`). Game launchers get the
+/// game's own icon, extracted from the bottle and converted to `.icns`.
 public enum AppBundle {
     public struct Generated {
         public let app: URL
@@ -13,16 +14,18 @@ public enum AppBundle {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true)
     }
 
-    /// A game launcher: `<name>.app` → `cellar launch <slug>`.
+    /// A game launcher: `<name>.app` → `cellar launch <slug>`. Uses the game's own icon when the
+    /// bottle is known (so the app shows the game's artwork in Launchpad/Finder, not a blank tile).
     @discardableResult
-    public static func generate(name: String, slug: String, cellarBinary: String) throws -> Generated {
+    public static func generate(name: String, slug: String, cellarBinary: String,
+                                prefix: URL? = nil, appID: Int? = nil) throws -> Generated {
         try generate(name: name, identifier: "it.clercq.cellar.\(slug)",
                      cellarBinary: cellarBinary, arguments: ["launch", slug],
-                     icon: gameIcon(slug: slug))
+                     icon: resolveGameICNS(slug: slug, prefix: prefix, appID: appID))
     }
 
     /// The Windows Steam client of a bottle: `Steam (<Bottle>).app` → `cellar steam open <slug>`.
-    /// Reuses the native Steam.app icon when it is installed, so it looks like Steam in Launchpad.
+    /// Reuses the native Steam.app icon when installed, so it looks like Steam in Launchpad.
     @discardableResult
     public static func generateSteamClient(bottle: String, slug: String, cellarBinary: String) throws -> Generated {
         try generate(name: "Steam (\(bottle))", identifier: "it.clercq.cellar.steam.\(bottle)",
@@ -92,22 +95,89 @@ public enum AppBundle {
         return Generated(app: app, launcher: launcher)
     }
 
-    /// The native macOS Steam client's icon, if Steam is installed.
+    // MARK: - Icons
+
+    /// The native macOS Steam client's icon, if Steam is installed. (Its file is `Steam.icns` — the
+    /// capital matters on a case-sensitive volume.)
     static func steamIcon() -> URL? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
         let candidates = [
-            "/Applications/Steam.app/Contents/Resources/steam.icns",
-            FileManager.default.homeDirectoryForCurrentUser.path + "/Applications/Steam.app/Contents/Resources/steam.icns",
+            "/Applications/Steam.app/Contents/Resources/Steam.icns",
+            "\(home)/Applications/Steam.app/Contents/Resources/Steam.icns",
         ]
         return candidates.map { URL(fileURLWithPath: $0) }.first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    /// A user-supplied icon for a game: `<profiles>/<slug>.icns` next to the profile, if present.
-    static func gameIcon(slug: String) -> URL? {
+    /// Resolve an `.icns` for a game launcher, in order: a user-supplied icon next to the profile,
+    /// a previously-extracted cached icon, or a fresh extraction of the game's own icon from the
+    /// bottle (converted from its Windows `.ico`). Returns nil if none can be produced.
+    static func resolveGameICNS(slug: String, prefix: URL?, appID: Int?) -> URL? {
+        let fm = FileManager.default
+        // 1. user-supplied <profiles>/<slug>.icns
         for dir in Paths.profileSearchPaths {
             let icns = dir.appendingPathComponent("\(slug).icns")
-            if FileManager.default.fileExists(atPath: icns.path) { return icns }
+            if fm.fileExists(atPath: icns.path) { return icns }
+        }
+        // 2. cached extraction
+        let cached = Paths.cache.appendingPathComponent("icons/\(slug).icns")
+        if fm.fileExists(atPath: cached.path) { return cached }
+        // 3. extract from the bottle
+        guard let prefix, let ico = findGameICO(prefix: prefix, appID: appID) else { return nil }
+        try? fm.createDirectory(at: cached.deletingLastPathComponent(), withIntermediateDirectories: true)
+        return convertICOtoICNS(ico, to: cached) ? cached : nil
+    }
+
+    /// Locate a Windows `.ico` for the game inside the bottle: the game's own `game.ico` in its
+    /// install directory (from the appmanifest), else the largest desktop-shortcut icon Steam keeps
+    /// in `steam/games` (skipping Steam's own built-ins).
+    static func findGameICO(prefix: URL, appID: Int?) -> URL? {
+        let fm = FileManager.default
+        let steam = prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam")
+
+        if let appID,
+           let manifest = try? String(contentsOf: steam.appendingPathComponent("steamapps/appmanifest_\(appID).acf"), encoding: .utf8),
+           let m = manifest.range(of: #""installdir"\s*"([^"]+)""#, options: .regularExpression) {
+            let installdir = String(manifest[m]).components(separatedBy: "\"").dropLast().last ?? ""
+            for name in ["game.ico", "\(installdir).ico"] {
+                let ico = steam.appendingPathComponent("steamapps/common/\(installdir)/\(name)")
+                if fm.fileExists(atPath: ico.path) { return ico }
+            }
+        }
+
+        let gamesDir = steam.appendingPathComponent("steam/games")
+        if let entries = try? fm.contentsOfDirectory(at: gamesDir, includingPropertiesForKeys: [.fileSizeKey]) {
+            let icos = entries.filter { $0.pathExtension.lowercased() == "ico"
+                && !["SteamMovie.ico", "PlatformMenu.ico"].contains($0.lastPathComponent) }
+            return icos.max { a, b in
+                let sa = (try? a.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                let sb = (try? b.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                return sa < sb
+            }
         }
         return nil
+    }
+
+    /// Convert a Windows `.ico` to a multi-resolution macOS `.icns` via sips + iconutil.
+    @discardableResult
+    static func convertICOtoICNS(_ ico: URL, to icns: URL) -> Bool {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("cellar-icon-\(UUID().uuidString)")
+        let png = tmp.appendingPathExtension("png")
+        let iconset = tmp.appendingPathExtension("iconset")
+        defer { try? FileManager.default.removeItem(at: png); try? FileManager.default.removeItem(at: iconset) }
+
+        // Flatten the .ico to its largest PNG.
+        guard Shell.run("/usr/bin/sips", ["-s", "format", "png", ico.path, "--out", png.path]).succeeded else { return false }
+        try? FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
+        for size in [16, 32, 128, 256, 512] {
+            for (suffix, px) in [("", size), ("@2x", size * 2)] {
+                let name = "icon_\(size)x\(size)\(suffix).png"
+                Shell.run("/usr/bin/sips", ["-z", "\(px)", "\(px)", png.path,
+                                            "--out", iconset.appendingPathComponent(name).path])
+            }
+        }
+        try? FileManager.default.removeItem(at: icns)
+        return Shell.run("/usr/bin/iconutil", ["-c", "icns", iconset.path, "-o", icns.path]).succeeded
+            && FileManager.default.fileExists(atPath: icns.path)
     }
 
     /// Best-effort absolute path to the running `cellar` binary (for the .app launcher script).

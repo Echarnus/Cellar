@@ -51,7 +51,9 @@ struct Launch: ParsableCommand {
         }
 
         print(Term.dim("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…"))
-        try SteamBottle.runGame(runner: wine, appID: appID, showHUD: hud, gameEnv: plan.env)
-        print(Term.green("Sent.") + Term.dim(" Logs: \(Paths.logs.path)  and  \(SteamBottle.logsDirectory(in: plan.prefix).path)"))
+        try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: hud, gameEnv: plan.env) {
+            print("  " + Term.dim($0))
+        }
+        print(Term.green("\(plan.name) is up.") + Term.dim(" Logs: \(SteamBottle.logsDirectory(in: plan.prefix).path)"))
     }
 }
