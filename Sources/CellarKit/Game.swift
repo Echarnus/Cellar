@@ -15,8 +15,55 @@ public struct GamePlan {
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
 }
 
+/// A game's readiness, for the GUI to decide what to show (and which button to offer next).
+public struct GameSummary: Identifiable, Sendable {
+    public let slug: String
+    public let name: String
+    public let appID: Int?
+    public let iconPath: String?      // .icns, if one could be produced
+    public let runnerInstalled: Bool  // the profile's Wine runner is present
+    public let steamInstalled: Bool   // Windows Steam installed in the bottle
+    public let account: String?       // logged-in Steam account, if any
+    public let gameInstalled: Bool    // the game's files are fully installed
+    public let running: Bool          // a Windows Steam client is up in the bottle
+
+    public var id: String { slug }
+
+    /// The single most useful next action given the current state.
+    public enum NextStep: String, Sendable {
+        case setup = "Set up"          // no runner / no Steam yet
+        case login = "Log in to Steam" // Steam there, nobody logged in
+        case install = "Install"       // logged in, game not installed
+        case play = "Play"             // ready
+    }
+    public var nextStep: NextStep {
+        if !runnerInstalled || !steamInstalled { return .setup }
+        if account == nil { return .login }
+        if !gameInstalled { return .install }
+        return .play
+    }
+}
+
 /// High-level orchestration tying runners, bottles, Wine, and Steam together.
 public enum Game {
+    /// A readiness summary for every known profile — the GUI's data source.
+    public static func summaries() -> [GameSummary] {
+        ProfileStore.all().compactMap { ref in
+            guard let plan = try? plan(slug: ref.slug) else { return nil }
+            let installed = SteamBottle.isInstalled(in: plan.prefix)
+            return GameSummary(
+                slug: plan.slug,
+                name: plan.name,
+                appID: plan.appID,
+                iconPath: AppBundle.resolveGameICNS(slug: plan.slug, prefix: plan.prefix, appID: plan.appID)?.path,
+                runnerInstalled: RunnerManager.find(id: plan.runnerID) != nil,
+                steamInstalled: installed,
+                account: installed ? SteamBottle.loggedInAccount(in: plan.prefix) : nil,
+                gameInstalled: plan.appID.map { SteamBottle.isGameInstalled(in: plan.prefix, appID: $0) } ?? false,
+                running: SteamBottle.isRunning)
+        }
+    }
+
     public static func plan(slug: String) throws -> GamePlan {
         guard let ref = ProfileStore.find(slug) else {
             throw CellarError.invalidArgument("No profile '\(slug)'. Try: cellar profiles list")
