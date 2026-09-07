@@ -1,0 +1,39 @@
+# Cellar game profile — Grand Theft Auto V
+[game]
+slug          = "grand-theft-auto-v"
+name          = "Grand Theft Auto V"
+developer     = "Rockstar Games"
+steam_appid   = 271590
+engine        = "RAGE"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2015-04-14"
+
+[compatibility]
+anticheat                   = "BattlEye (GTA Online only)"
+drm                         = "Steamworks + Rockstar Social Club launcher"
+# Heavy: launches via the Rockstar Games Launcher / Social Club, needs a live Steam session, and
+# GTA Online uses BattlEye (unsupported here). Story mode is the target. Expect setup friction.
+needs_live_steam            = true
+requires_account            = "Steam + Rockstar Social Club"
+online                      = "story mode only; GTA Online needs BattlEye (unsupported here)"
+status                      = "untested"
+notes                       = "RAGE/DX11. Rockstar launcher under Wine is finicky; WineForge lists Rockstar support. Validate."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxmt"
+
+[env]
+MTL_HUD_ENABLED = "1"
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 271590
+
+[legal]
+drm_circumvention = "never"

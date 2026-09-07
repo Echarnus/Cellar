@@ -152,7 +152,7 @@ public enum SteamBottle {
     /// game is up, so "launch and play" just works. Steam stays running between attempts (started
     /// once, silently), so retries are cheap.
     public static func runGameSupervised(runner: WineRunner, appID: Int, showHUD: Bool = false,
-                                         gameEnv: [String: String] = [:], attempts: Int = 5,
+                                         gameEnv: [String: String] = [:], attempts: Int = 8,
                                          progress: (String) -> Void = { _ in }) throws {
         // Warm the client first: launching the game into a not-yet-ready Steam makes the D3DMetal
         // race fire almost every time. Start Steam silently (tray only) with the game's env, wait
@@ -200,6 +200,34 @@ public enum SteamBottle {
         }
         throw CellarError.ioFailure(
             "Planet Coaster 2 kept hitting the D3DMetal startup race after \(attempts) attempts. Try `cellar launch` again.")
+    }
+
+    /// Whether any process whose command line contains `needle` is running (case-insensitive).
+    public static func isProcessRunning(_ needle: String) -> Bool {
+        Shell.run("/bin/sh", ["-c", "ps -axo command | grep -vi grep | grep -qiF \"\(needle)\""]).succeeded
+    }
+
+    /// Block until a process matching `needle` (e.g. the game's exe name) is gone. Waits for it to
+    /// appear first, so we don't return before it has started.
+    public static func waitForExit(matching needle: String) {
+        for _ in 0..<15 { if isProcessRunning(needle) { break }; Thread.sleep(forTimeInterval: 1) }
+        while isProcessRunning(needle) { Thread.sleep(forTimeInterval: 3) }
+    }
+
+    /// Block until the game's process is gone (it has been quit), polling every few seconds.
+    public static func waitForGameExit(in prefix: URL, appID: Int) {
+        for _ in 0..<10 { if isGameRunning(in: prefix, appID: appID) { break }; Thread.sleep(forTimeInterval: 1) }
+        while isGameRunning(in: prefix, appID: appID) { Thread.sleep(forTimeInterval: 3) }
+    }
+
+    /// Shut the whole bottle down: ask Steam to exit, then stop wineserver so nothing lingers.
+    /// This is what makes "quit the game → the Steam layer closes too".
+    public static func shutdown(runner: WineRunner) {
+        if isRunning {
+            runner.runExecutable(steamExecutable(in: runner.prefix).path, args: ["-shutdown"], inheritIO: false)
+            for _ in 0..<15 { if !isRunning { break }; Thread.sleep(forTimeInterval: 2) }
+        }
+        runner.killServer()
     }
 
     /// Kill the game's own process and its crash reporter in this bottle (not Steam itself), so a

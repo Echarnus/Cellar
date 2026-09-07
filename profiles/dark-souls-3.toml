@@ -1,0 +1,42 @@
+# Cellar game profile — DARK SOULS III
+[game]
+slug          = "dark-souls-3"
+name          = "DARK SOULS III"
+developer     = "FromSoftware"
+steam_appid   = 374320
+engine        = "Dantelion"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2016-04-11"
+
+[compatibility]
+anticheat                   = "EasyAntiCheat (online only)"
+drm                         = "Steamworks"
+# Steamworks DRM + EAC for online. Single-player runs with Steam in the background; online/co-op via
+# EAC is not wired up. Needs a live Steam session.
+needs_live_steam            = true
+requires_account            = "Steam"
+online                      = "single-player offline; online needs EAC (unsupported here)"
+status                      = "untested"
+notes                       = "DX11 via D3DMetal 3.0 should suit it; validate on M5."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxmt"
+
+[env]
+MTL_HUD_ENABLED = "1"
+
+[install]
+method      = "depot"
+steam_appid = 374320
+
+[launch]
+exe = "Game/DarkSoulsIII.exe"
+
+[legal]
+drm_circumvention = "never"

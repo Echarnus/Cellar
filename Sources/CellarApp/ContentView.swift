@@ -71,31 +71,34 @@ struct ContentView: View {
                         Spacer()
                     }
 
+                    Text(hint(game)).font(.callout).foregroundStyle(.secondary)
+
                     HStack(spacing: 10) {
                         primaryButton(game)
-                        Menu("More") {
-                            Button("Set up bottle") { runner.run(["setup", "--profile", game.slug], title: "Setting up") { refresh() } }
-                            Button("Open Steam")    { runner.run(["steam", "open", game.slug], title: "Opening Steam") }
-                            Button("Install game")  { runner.run(["steam", "install", game.slug], title: "Installing") }
-                            Button("Add to Steam")  { runner.run(["steam", "add", game.slug], title: "Adding to Steam") { refresh() } }
-                            Button("Status")        { runner.run(["steam", "status", game.slug], title: "Status") }
-                        }.frame(width: 90)
                         if runner.busy {
                             ProgressView().controlSize(.small)
                             Text(runner.busyTitle).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Menu("More") {
+                            Button("Set up bottle") { runner.run(["setup", "--profile", game.slug], title: "Setting up") { refresh() } }
+                            Button("Open Steam")    { runner.run(["steam", "open", game.slug], title: "Opening Steam") }
+                            Button("Install game")  { runner.run(["steam", "install", game.slug], title: "Installing") }
+                            Button("Add to Steam library") { runner.run(["steam", "add", game.slug], title: "Adding to Steam") { refresh() } }
+                            Button("Status")        { runner.run(["steam", "status", game.slug], title: "Status") }
+                        }.menuStyle(.borderlessButton).fixedSize()
                     }
 
-                    GroupBox("Output") {
+                    Spacer()
+                    DisclosureGroup("Details") {
                         ScrollView {
                             Text(runner.log.isEmpty ? "Ready." : runner.log)
                                 .font(.system(.caption, design: .monospaced))
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(4)
-                        }
-                    }
+                        }.frame(maxHeight: 220)
+                    }.font(.callout)
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -125,6 +128,16 @@ struct ContentView: View {
         .buttonStyle(.borderedProminent)
         .tint(step == .play ? .green : .accentColor)
         .disabled(runner.busy)
+    }
+
+    /// A friendly one-liner describing what the primary button will do next.
+    private func hint(_ g: GameSummary) -> String {
+        switch g.nextStep {
+        case .setup:   return "First, Cellar installs the runtime and Steam for this game — one click, a few minutes."
+        case .login:   return "Sign in to Steam (a Steam window opens; QR with the Steam mobile app is quickest)."
+        case .install: return "Install the game — Cellar downloads it. You already own it on Steam."
+        case .play:    return "Ready. Play launches the game; Cellar closes everything when you quit."
+        }
     }
 
     private func statusLine(_ g: GameSummary) -> String {
