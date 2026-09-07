@@ -3,9 +3,12 @@
 # Requires the `cellar` CLI on PATH or ~/.local/bin for actions.
 set -e
 cd "$(dirname "$0")/.."
+# A Nix/devenv shell may export DEVELOPER_DIR/SDKROOT pointing at a non-macOS SDK; use Xcode's.
+unset DEVELOPER_DIR SDKROOT
 echo "Building CellarApp (release)…"
 swift build -c release --product CellarApp
-BIN="$(swift build -c release --product CellarApp --show-bin-path)/CellarApp"
+BIN=".build/release/CellarApp"
+[ -x "$BIN" ] || { echo "Build produced no CellarApp binary at $BIN"; exit 1; }
 
 APP="$HOME/Applications/Cellar.app"
 rm -rf "$APP"
