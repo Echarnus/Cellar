@@ -30,6 +30,26 @@ public enum ProfileStore {
         all().first { $0.slug == slug }
     }
 
+    /// The `[env]` section of a profile: environment variables applied to the game (and to the
+    /// Steam client that spawns it). Values are strings; keys are used verbatim.
+    public static func env(_ ref: ProfileRef) -> [String: String] {
+        guard let text = try? String(contentsOf: ref.url, encoding: .utf8) else { return [:] }
+        var dict: [String: String] = [:]
+        var inEnv = false
+        for rawLine in text.split(separator: "\n") {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") { inEnv = (line == "[env]"); continue }
+            guard inEnv, !line.hasPrefix("#"), line.contains("=") else { continue }
+            let parts = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count == 2 else { continue }
+            var value = parts[1]
+            if let hash = value.range(of: " #") { value = String(value[..<hash.lowerBound]) }
+            dict[parts[0]] = value.trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        }
+        return dict
+    }
+
     /// Flat scan of a profile's scalar `key = "value"` pairs (section headers ignored, last wins).
     /// Enough for Phase 1 launch needs; the full typed schema decoder arrives in Phase 2.
     public static func fields(_ ref: ProfileRef) -> [String: String] {

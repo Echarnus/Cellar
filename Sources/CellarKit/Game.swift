@@ -8,8 +8,11 @@ public struct GamePlan {
     public let runnerID: String
     public let appID: Int?
     public let backend: String
+    /// `[env]` from the profile — applied to the game and the Steam client that spawns it.
+    public let env: [String: String]
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
+    public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
 }
 
 /// High-level orchestration tying runners, bottles, Wine, and Steam together.
@@ -22,17 +25,20 @@ public enum Game {
         return GamePlan(
             slug: slug,
             name: fields["name"] ?? slug,
-            bottleName: slug,
-            runnerID: fields["id"] ?? "gptk",
+            // Several games can share one bottle (one Steam login, one download cache); a profile
+            // opts in with `bottle = "<name>"`. Default: one bottle per game.
+            bottleName: fields["bottle"] ?? slug,
+            runnerID: fields["id"] ?? RunnerCatalog.defaultID,
             appID: fields["steam_appid"].flatMap { Int($0) },
-            backend: fields["backend"] ?? "d3dmetal"
+            backend: fields["backend"] ?? "d3dmetal",
+            env: ProfileStore.env(ref)
         )
     }
 
     /// The bottle's Wine runner, if the runner is installed.
     public static func wineRunner(_ plan: GamePlan) -> WineRunner? {
         guard let install = RunnerManager.find(id: plan.runnerID) else { return nil }
-        return WineRunner(install: install, prefix: plan.prefix)
+        return WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
     }
 
     /// Minimal-setup pipeline: ensure runner → bottle → initialised prefix → Windows Steam.
@@ -49,23 +55,28 @@ public enum Game {
         guard let spec = RunnerCatalog.spec(forID: plan.runnerID) else {
             throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
         }
+        if let why = spec.deprecated {
+            progress("Warning: runner '\(spec.id)' is deprecated — \(why)")
+        }
 
         let install = try RunnerManager.install(spec, progress: progress)
-        let wine = WineRunner(install: install, prefix: plan.prefix)
+        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
 
         if !FileManager.default.fileExists(atPath: plan.prefix.path) {
             progress("Creating bottle '\(plan.bottleName)'…")
-            try PrefixManager.create(
-                name: plan.bottleName,
-                backend: GraphicsBackend(rawValue: plan.backend) ?? .d3dmetal,
-                runner: plan.runnerID)
+            try PrefixManager.create(name: plan.bottleName, backend: plan.graphicsBackend, runner: plan.runnerID)
         }
 
         let registry = plan.prefix.appendingPathComponent("system.reg")
         if !FileManager.default.fileExists(atPath: registry.path) {
-            progress("Initialising the Wine prefix…")
+            progress("Initialising the Wine prefix (64-bit + WoW64)…")
             try wine.initializePrefix()
             try wine.setWindowsVersion("win10")
+            let x86 = plan.prefix.appendingPathComponent("drive_c/Program Files (x86)")
+            guard FileManager.default.fileExists(atPath: x86.path) else {
+                throw CellarError.ioFailure(
+                    "The prefix has no 'Program Files (x86)' — the runner is not a WoW64 build, and the 32-bit Steam client can't install into it.")
+            }
         } else {
             progress("Wine prefix already initialised.")
         }

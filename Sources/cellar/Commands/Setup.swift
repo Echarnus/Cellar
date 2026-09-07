@@ -25,6 +25,10 @@ struct Setup: ParsableCommand {
 
         let wine = try Game.setUp(plan) { print("  " + Term.dim($0)) }
 
+        let steamApp = try AppBundle.generateSteamClient(
+            bottle: plan.bottleName, slug: profile, cellarBinary: AppBundle.resolveCellarBinary())
+        print("  " + Term.dim("Steam launcher: \(steamApp.app.path)"))
+
         print("")
         print(Term.green("Setup complete.") + " Next steps:")
         print("  1. " + Term.bold("cellar steam open \(profile)")
@@ -40,7 +44,7 @@ struct Setup: ParsableCommand {
         if openSteam {
             print("")
             print(Term.dim("Opening Steam in the bottle… (a window will appear; log in and install your game)"))
-            SteamBottle.launchClient(runner: wine)
+            try SteamBottle.launchClient(runner: wine)
         }
     }
 }

@@ -5,8 +5,53 @@ struct SteamCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "steam",
         abstract: "The Steam plugin: open Steam in a bottle, install games, surface them natively.",
-        subcommands: [Open.self, Install.self, Add.self, EnableWindowsPlatform.self, DisableWindowsPlatform.self]
+        subcommands: [Open.self, Install.self, Status.self, App.self, Add.self, EnableWindowsPlatform.self, DisableWindowsPlatform.self]
     )
+
+    // MARK: app (Steam client as a macOS .app)
+
+    struct App: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Create 'Steam (<bottle>).app' in ~/Applications that opens the bottle's Windows Steam.")
+        @Argument(help: "Profile slug.") var slug: String
+
+        func run() throws {
+            let plan = try Game.plan(slug: slug)
+            let bundle = try AppBundle.generateSteamClient(
+                bottle: plan.bottleName, slug: slug, cellarBinary: AppBundle.resolveCellarBinary())
+            print(Term.green("Created ") + bundle.app.path)
+        }
+    }
+
+    // MARK: status
+
+    struct Status: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Report the bottle's Steam state: client updated, who is logged in, game installed.")
+        @Argument(help: "Profile slug.") var slug: String
+
+        func run() throws {
+            let plan = try Game.plan(slug: slug)
+            let prefix = plan.prefix
+            func row(_ label: String, _ ok: Bool, _ text: String) {
+                print("  \(ok ? Term.green("✓") : Term.yellow("•")) \(label.padding(toLength: 16, withPad: " ", startingAt: 0)) \(text)")
+            }
+            print(Term.bold("Steam in bottle '\(plan.bottleName)'") + Term.dim("  (\(prefix.path))"))
+            row("runner", RunnerManager.find(id: plan.runnerID) != nil, plan.runnerID)
+            row("client", SteamBottle.isInstalled(in: prefix),
+                SteamBottle.isInstalled(in: prefix)
+                    ? (SteamBottle.isClientUpdated(in: prefix) ? "installed, self-updated" : "bootstrapper only — updates on first launch")
+                    : "not installed")
+            let account = SteamBottle.loggedInAccount(in: prefix)
+            row("account", account != nil, account ?? "nobody logged in — cellar steam open \(slug)")
+            row("running", SteamBottle.isRunning, SteamBottle.isRunning ? "yes" : "no")
+            if let appID = plan.appID {
+                let installed = SteamBottle.isGameInstalled(in: prefix, appID: appID)
+                row("game", installed, installed ? "\(plan.name) installed (AppID \(appID))" : "\(plan.name) not installed — cellar steam install \(slug)")
+            }
+            print(Term.dim("  logs: \(SteamBottle.logsDirectory(in: prefix).path)"))
+        }
+    }
 
     // MARK: open
 
@@ -19,7 +64,7 @@ struct SteamCommand: ParsableCommand {
             let plan = try Game.plan(slug: slug)
             let wine = try requireReadyBottle(plan)
             print(Term.dim("Launching Steam in bottle '\(plan.bottleName)'. A window will open — log in and install your games."))
-            SteamBottle.launchClient(runner: wine)
+            try SteamBottle.launchClient(runner: wine)
         }
     }
 
@@ -37,7 +82,7 @@ struct SteamCommand: ParsableCommand {
             }
             let wine = try requireReadyBottle(plan)
             print(Term.dim("Asking the bottle's Steam to install \(plan.name) (AppID \(appID))…"))
-            SteamBottle.installGame(runner: wine, appID: appID)
+            try SteamBottle.installGame(runner: wine, appID: appID)
         }
     }
 

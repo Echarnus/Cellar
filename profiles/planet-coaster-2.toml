@@ -21,13 +21,18 @@ drm                         = "denuvo-anti-tamper"
 requires_live_steam_session = true
 requires_account            = "Frontier"
 online                      = "single-player core + online co-op / async multiplayer / cross-platform saves"
-status                      = "experimental"   # mixed Apple Silicon reports; validate on M5 / macOS 26
-notes                       = "CrossOver 26 lists PC2 as enabled (Wine 11 + D3DMetal 3.0). No M5 benchmarks yet."
+status                      = "playable"        # M5 / macOS 26.5: main menu verified via D3DMetal 3.0 (2026-09-07); in-park validation pending
+notes                       = "Needs Wine ≥ 10.8 (GS-base switch) AND a D3DMetal-compatible Wine: WineForge. Menu ~53 FPS at 1512x982 with the Metal debug layer on (M5)."
 
-# Runner: Game Porting Toolkit (Wine + Apple D3DMetal). Installed via `cellar runner install gptk`.
-# D3DMetal is the builtin renderer in this Wine build — no WINEDLLOVERRIDES needed.
+# Runner: WineForge (Wine 11.17 + CrossOver macOS patches) + Apple D3DMetal 3.0.
+#  - GPTK (Wine 7.7): the current Steam client's web helper crash-loops.
+#  - Sikarugir Wine 10.0: Steam works, but PC2 inlines GetCurrentFiber() as `gs:[0x20]`, which on
+#    macOS Wine < 10.8 reads a Mach port instead of the fiber → access violation at startup.
+#  - Stock Wine 11: fibers fine, but D3DMetal's DLLs import the removed ntdll.__wine_unix_call.
+#  - WineForge: both fixed. D3DMetal comes from the Sikarugir template (renderer/d3dmetal), grafted
+#    into <runner>/wine/lib/d3dmetal and selected with GRAPHICS_BACKEND=d3dmetal.
 [runner]
-id              = "gptk"
+id              = "wineforge"
 windows_version = "win10"
 
 [graphics]
@@ -39,10 +44,15 @@ metalfx_upscaling = true
 retina            = false
 
 [env]
-# Metal HUD overlay (FPS / frametime) while validating performance.
-MTL_HUD_ENABLED  = "1"
-# Enable DXR (ray tracing) translation in D3DMetal where supported.
-D3DM_SUPPORT_DXR = "1"
+# Metal's API validation layer. Counter-intuitive but load-bearing: without it PC2 dies within
+# ~20 s inside D3DMetal.framework (garbage pointer in D3DMetal code) or raises its own fatal
+# 0xFDEAD; with full validation on it has survived every run (menu, in-park, 6+ min sessions).
+# Things that do NOT help: shader validation alone, the layer with its checks switched off (1 of 2
+# runs crashed), D3DM_BOUNDS_CHECK, D3DM_RETAIN_REFERENCES, D3DM_ENABLE_ASYNC_COMMIT=0, disabling
+# the Steam overlay, dropping DXR. Cost on an M5: menu 53 FPS instead of 57. Treat as a workaround
+# for a D3DMetal 3.0 race until Apple / CodeWeavers ship the real fix (CrossOver 26 lists PC2 fixes).
+MTL_DEBUG_LAYER = "1"
+MTL_DEBUG_LAYER_ERROR_MODE = "nslog"
 
 [dll_overrides]
 # None required as a baseline; add here if a specific build needs them.
