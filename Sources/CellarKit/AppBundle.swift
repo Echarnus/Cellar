@@ -111,7 +111,7 @@ public enum AppBundle {
     /// Resolve an `.icns` for a game launcher, in order: a user-supplied icon next to the profile,
     /// a previously-extracted cached icon, or a fresh extraction of the game's own icon from the
     /// bottle (converted from its Windows `.ico`). Returns nil if none can be produced.
-    static func resolveGameICNS(slug: String, prefix: URL?, appID: Int?) -> URL? {
+    public static func resolveGameICNS(slug: String, prefix: URL?, appID: Int?) -> URL? {
         let fm = FileManager.default
         // 1. user-supplied <profiles>/<slug>.icns
         for dir in Paths.profileSearchPaths {

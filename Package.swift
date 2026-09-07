@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .executable(name: "cellar", targets: ["cellar"]),
+        .executable(name: "CellarApp", targets: ["CellarApp"]),
         .library(name: "CellarKit", targets: ["CellarKit"]),
     ],
     dependencies: [
@@ -24,6 +25,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
+
+        // Phase 3: a native SwiftUI "Steam-like" front-end over the same CellarKit core. Drives the
+        // `cellar` CLI as a subprocess for actions, so it reuses every tested path.
+        .executableTarget(name: "CellarApp", dependencies: ["CellarKit"]),
     ],
     // Pragmatic: a synchronous CLI doesn't need Swift 6 strict-concurrency overhead yet.
     swiftLanguageModes: [.v5]
