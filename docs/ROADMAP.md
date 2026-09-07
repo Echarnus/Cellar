@@ -23,7 +23,7 @@ generalized into a per-game profile system, then given a native GUI.
 - [x] `cellar launch planet-coaster-2` — run through the bottle's Steam (DRM/auth) + D3DMetal + Rosetta
 - [x] `cellar steam add` — generate a native `.app` + non-Steam shortcut (binary-VDF writer)
 - [x] `cellar selftest` — byte-exact checks for the binary-VDF codec, CRC32, shortcut writer
-- [ ] **Validate PC2 itself** on M5 / macOS 26 (log in, download, play) and record a perf/known-issues note
+- [x] **Validate PC2 itself** on M5 / macOS 26 — playable via WineForge (Wine 11.17 + D3DMetal 3.0); perf + stability notes recorded (2026-09-07)
 - [ ] `cellar gptk import <dmg>` — the spotless user-supplied-D3DMetal path (moved to Phase 2)
 - [ ] Real test target (`swift test`) once full Xcode is available (selftest covers it for now)
 

@@ -138,12 +138,18 @@ public enum SystemEnvironment {
                 hint: "Optional; only used for repo workflows."))
         }
 
-        // GPTK runner (Wine + Apple D3DMetal) — the modern-DX path
-        if RunnerManager.find(id: "gptk") != nil {
-            checks.append(.init("GPTK runner", .ok, "installed (Wine + D3DMetal)"))
+        // Default runner (Wine 10 + Apple D3DMetal 3.0) — the modern-DX path
+        let defaultID = RunnerCatalog.defaultID
+        if let runner = RunnerManager.find(id: defaultID) {
+            let d3d = runner.renderer("d3dmetal") != nil ? "D3DMetal present" : "D3DMetal MISSING"
+            checks.append(.init("Runner (\(defaultID))", .ok, "installed — \(d3d)"))
         } else {
-            checks.append(.init("GPTK runner", .info, "not installed",
-                hint: "Install it with: cellar runner install gptk   (or just run: cellar setup)"))
+            checks.append(.init("Runner (\(defaultID))", .info, "not installed",
+                hint: "Install it with: cellar runner install \(defaultID)   (or just run: cellar setup)"))
+        }
+        if RunnerManager.find(id: "gptk") != nil {
+            checks.append(.init("Runner (gptk)", .warn, "installed but deprecated",
+                hint: RunnerCatalog.gptk.deprecated ?? ""))
         }
 
         // Disk

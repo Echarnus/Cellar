@@ -7,7 +7,7 @@ struct Gptk: ParsableCommand {
         commandName: "gptk",
         abstract: "[Advanced] Import Apple's own D3DMetal from a Game Porting Toolkit .dmg.",
         discussion: """
-        Most users don't need this: `cellar runner install gptk` already provides a Wine build
+        Most users don't need this: `cellar runner install sikarugir` already provides a Wine build
         with D3DMetal (redistributed by Gcenx under Apple's non-commercial grant). This command is
         for users who prefer to supply Apple's *own* D3DMetal from a .dmg they downloaded from
         https://developer.apple.com/games/game-porting-toolkit/ (free Apple ID). Cellar copies it
@@ -29,7 +29,7 @@ struct Gptk: ParsableCommand {
                 throw CellarError.invalidArgument("No file at \(path)")
             }
             print(Term.yellow("Not yet implemented (Phase 2).")
-                + " For now, use the bundled D3DMetal: cellar runner install gptk")
+                + " For now, use the bundled D3DMetal: cellar runner install sikarugir")
             print(Term.dim("""
               When implemented, this will mount \(path), copy D3DMetal.framework + libd3dshared.dylib
               into \(Paths.d3dmetalCache.path), then detach. The binaries stay on your machine only.

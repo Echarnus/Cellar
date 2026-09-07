@@ -1,0 +1,54 @@
+# Cellar game profile — Age of Empires II: Definitive Edition
+# Schema version 0 (Phase 0 draft). Fields are descriptive until the Phase 2 loader lands.
+
+[game]
+slug          = "age-of-empires-2-de"
+name          = "Age of Empires II: Definitive Edition"
+developer     = "Forgotten Empires / World's Edge"
+steam_appid   = 813780
+engine        = "Genie (DE)"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2019-11-14"
+
+# IMPORTANT: prefer the NATIVE Mac build. Feral Interactive shipped a native Apple Silicon port on
+# Steam on 2026-05-28, so the macOS Steam client installs and runs it directly — no Cellar needed,
+# no Rosetta, no D3DMetal. This profile exists only for the WINDOWS build (e.g. to match a Windows
+# save, or if you want the Windows-exclusive tooling). Use the native port unless you have a reason
+# not to.
+
+[compatibility]
+# EasyAntiCheat, but only enforced for ranked/multiplayer matchmaking. Single-player, campaigns,
+# the editor and LAN/direct multiplayer run without it. EAC has a Wine/Proton path but is not wired
+# up here, so treat online ranked as unsupported through Cellar.
+anticheat                   = "easyanticheat (ranked only)"
+drm                         = "none (Steam + optional Xbox/Microsoft account for cross-play)"
+requires_live_steam_session = false
+requires_account            = "Xbox/Microsoft (only for cross-play & cloud)"
+online                      = "single-player + campaigns offline; ranked MP needs EAC (unsupported here)"
+status                      = "untested"       # DX11 via D3DMetal should be well-behaved; not yet run on M5
+notes                       = "DX11 title — D3DMetal 3.0 handles it. Native Feral port is the recommended Mac route."
+
+# Runner: WineForge (Wine 11.17 + D3DMetal 3.0), same as Planet Coaster 2.
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DX11 → Metal directly via D3DMetal.
+backend           = "d3dmetal"
+# DXMT is a reasonable fallback for this DX11 title if D3DMetal misbehaves.
+fallback_backend  = "dxmt"
+metalfx_upscaling = false
+retina            = false
+
+[env]
+# Metal HUD overlay while validating.
+MTL_HUD_ENABLED = "1"
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 813780
+
+[legal]
+drm_circumvention = "never"
