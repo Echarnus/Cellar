@@ -2,169 +2,157 @@ import SwiftUI
 import AppKit
 import CellarKit
 
-struct ContentView: View {
-    @StateObject private var runner = CellarRunner()
-    @State private var games: [GameSummary] = []
-    @State private var selectedSlug: String?
+@MainActor
+final class Library: ObservableObject {
+    @Published var games: [GameSummary] = []
+    @Published var query = ""
+    @Published var filter: Filter = .all
+    @Published var selected: String?
 
-    private var current: GameSummary? { games.first { $0.slug == selectedSlug } }
+    enum Filter: String, CaseIterable, Identifiable {
+        case all = "All", ready = "Ready", installed = "Installed", notInstalled = "Not installed"
+        var id: String { rawValue }
+    }
+
+    func refresh() {
+        games = Game.summaries()
+        if selected == nil || !games.contains(where: { $0.slug == selected }) {
+            selected = filtered.first?.slug ?? games.first?.slug
+        }
+    }
+
+    var filtered: [GameSummary] {
+        games.filter { g in
+            (query.isEmpty || g.name.localizedCaseInsensitiveContains(query)) && {
+                switch filter {
+                case .all: return true
+                case .ready: return g.nextStep == .play
+                case .installed: return g.gameInstalled
+                case .notInstalled: return !g.gameInstalled
+                }
+            }()
+        }
+    }
+    var current: GameSummary? { games.first { $0.slug == selected } }
+}
+
+struct ContentView: View {
+    @StateObject private var lib = Library()
+    @StateObject private var runner = CellarRunner()
+    @State private var showSettings = false
 
     var body: some View {
         HSplitView {
-            sidebar.frame(minWidth: 220, maxWidth: 300)
-            detail.frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+            sidebar.frame(minWidth: 260, maxWidth: 320)
+            Group {
+                if let game = lib.current {
+                    GameDetailView(game: game, runner: runner) { lib.refresh() }.id(game.slug)
+                } else { EmptyState() }
+            }.frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 780, minHeight: 480)
-        .onAppear { refresh(); if selectedSlug == nil { selectedSlug = games.first?.slug } }
+        .frame(minWidth: 860, minHeight: 560)
+        .onAppear { lib.refresh() }
     }
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Cellar").font(.headline)
+            HStack(spacing: 8) {
+                Image(systemName: "wineglass.fill").foregroundStyle(.pink)
+                Text("Cellar").font(.system(.title3, design: .rounded).weight(.bold))
                 Spacer()
-                Button { refresh() } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.borderless)
-            }.padding(10)
-            Divider()
+                Button { lib.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(.borderless).help("Refresh")
+                Button { showSettings = true } label: { Image(systemName: "gearshape") }
+                    .buttonStyle(.borderless).help("Settings")
+            }.padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.caption)
+                TextField("Search games", text: $lib.query).textFieldStyle(.plain)
+            }
+            .padding(7).background(.quaternary, in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 12)
+
+            Picker("", selection: $lib.filter) {
+                ForEach(Library.Filter.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().padding(.horizontal, 12).padding(.vertical, 8)
+
             ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(games) { game in
-                        Button { selectedSlug = game.slug } label: {
-                            HStack(spacing: 10) {
-                                GameIcon(path: game.iconPath, size: 32)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(game.name).lineLimit(1)
-                                    Text(statusLine(game)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            .padding(6)
-                            .background(selectedSlug == game.slug ? Color.accentColor.opacity(0.15) : .clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
+                LazyVStack(spacing: 3) {
+                    ForEach(lib.filtered) { game in
+                        SidebarRow(game: game, selected: lib.selected == game.slug)
+                            .contentShape(Rectangle())
+                            .onTapGesture { lib.selected = game.slug }
+                    }
+                    if lib.filtered.isEmpty {
+                        Text("No games match.").font(.caption).foregroundStyle(.secondary).padding(.top, 20)
                     }
                 }.padding(8)
             }
-            if !runner.binaryExists {
-                Divider()
-                Text("`cellar` CLI not found. Build with `swift build -c release`.")
-                    .font(.caption).foregroundStyle(.red).padding(8)
-            }
-        }
-    }
-
-    private var detail: some View {
-        Group {
-            if let game = current {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 16) {
-                        GameIcon(path: game.iconPath, size: 88)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(game.name).font(.title.bold())
-                            Text(statusLine(game)).foregroundStyle(.secondary)
-                            if let acc = game.account {
-                                Text("Signed in as \(acc)").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                    }
-
-                    Text(hint(game)).font(.callout).foregroundStyle(.secondary)
-
-                    HStack(spacing: 10) {
-                        primaryButton(game)
-                        if runner.busy {
-                            ProgressView().controlSize(.small)
-                            Text(runner.busyTitle).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Menu("More") {
-                            Button("Set up bottle") { runner.run(["setup", "--profile", game.slug], title: "Setting up") { refresh() } }
-                            Button("Open Steam")    { runner.run(["steam", "open", game.slug], title: "Opening Steam") }
-                            Button("Install game")  { runner.run(["steam", "install", game.slug], title: "Installing") }
-                            Button("Add to Steam library") { runner.run(["steam", "add", game.slug], title: "Adding to Steam") { refresh() } }
-                            Button("Status")        { runner.run(["steam", "status", game.slug], title: "Status") }
-                        }.menuStyle(.borderlessButton).fixedSize()
-                    }
-
-                    Spacer()
-                    DisclosureGroup("Details") {
-                        ScrollView {
-                            Text(runner.log.isEmpty ? "Ready." : runner.log)
-                                .font(.system(.caption, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(4)
-                        }.frame(maxHeight: 220)
-                    }.font(.callout)
+            Divider()
+            HStack {
+                Text("\(lib.games.count) games").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if !runner.binaryExists {
+                    Label("CLI missing", systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
                 }
-                .padding(20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            } else {
-                VStack(spacing: 10) {
-                    Image(systemName: "gamecontroller").font(.system(size: 44)).foregroundStyle(.secondary)
-                    Text("Choose a game").font(.title2)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            }.padding(.horizontal, 14).padding(.vertical, 8)
         }
+        .background(.background)
     }
-
-    private func primaryButton(_ game: GameSummary) -> some View {
-        let step = game.nextStep
-        return Button {
-            switch step {
-            case .play:    runner.run(["launch", game.slug], title: "Launching")
-            case .install: runner.run(["steam", "install", game.slug], title: "Installing")
-            case .login:   runner.run(["steam", "open", game.slug], title: "Opening Steam to log in")
-            case .setup:   runner.run(["setup", "--profile", game.slug], title: "Setting up") { refresh() }
-            }
-        } label: {
-            Label(step.rawValue, systemImage: step == .play ? "play.fill" : "arrow.down.circle")
-                .frame(minWidth: 110)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(step == .play ? .green : .accentColor)
-        .disabled(runner.busy)
-    }
-
-    /// A friendly one-liner describing what the primary button will do next.
-    private func hint(_ g: GameSummary) -> String {
-        switch g.nextStep {
-        case .setup:   return "First, Cellar installs the runtime and Steam for this game — one click, a few minutes."
-        case .login:   return "Sign in to Steam (a Steam window opens; QR with the Steam mobile app is quickest)."
-        case .install: return "Install the game — Cellar downloads it. You already own it on Steam."
-        case .play:    return "Ready. Play launches the game; Cellar closes everything when you quit."
-        }
-    }
-
-    private func statusLine(_ g: GameSummary) -> String {
-        if !g.runnerInstalled { return "Runner not installed" }
-        if !g.steamInstalled { return "Bottle not set up" }
-        if g.account == nil { return "Not signed in" }
-        if !g.gameInstalled { return "Not installed" }
-        return "Ready to play"
-    }
-
-    private func refresh() { games = Game.summaries() }
 }
 
-/// A game's icon from its extracted `.icns`, with a placeholder fallback.
-struct GameIcon: View {
-    let path: String?
-    let size: CGFloat
+struct SidebarRow: View {
+    let game: GameSummary
+    let selected: Bool
+    @State private var hovering = false
     var body: some View {
-        ZStack {
-            if let path, let img = NSImage(contentsOfFile: path) {
-                Image(nsImage: img).resizable()
-            } else {
-                RoundedRectangle(cornerRadius: size * 0.22).fill(.quaternary)
-                Image(systemName: "gamecontroller.fill").foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            RemoteArt(Artwork.portrait(game.appID)) { GameIcon(path: game.iconPath, size: 34) }
+                .frame(width: 34, height: 45)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(game.name).lineLimit(1).font(.callout.weight(.medium))
+                StatusPill(game: game, compact: true)
             }
+            Spacer(minLength: 0)
         }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+        .padding(.vertical, 5).padding(.horizontal, 8)
+        .background(selected ? Color.accentColor.opacity(0.20)
+                             : (hovering ? Color.primary.opacity(0.06) : Color.clear),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hovering = h } }
+    }
+}
+
+struct StatusPill: View {
+    let game: GameSummary
+    var compact = false
+    var body: some View {
+        let (text, color) = state
+        if compact {
+            Text(text).font(.caption2).foregroundStyle(color)
+        } else {
+            Text(text).font(.caption.weight(.semibold)).foregroundStyle(.white)
+                .padding(.horizontal, 9).padding(.vertical, 3)
+                .background(color, in: Capsule())
+        }
+    }
+    private var state: (String, Color) {
+        if !game.runnerInstalled || !game.steamInstalled { return ("Set up needed", .orange) }
+        if game.account == nil { return ("Sign in", .blue) }
+        if !game.gameInstalled { return ("Not installed", .secondary) }
+        return ("Ready", .green)
+    }
+}
+
+struct EmptyState: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wineglass").font(.system(size: 52, weight: .thin)).foregroundStyle(.pink.gradient)
+            Text("Choose a game").font(.title2.weight(.semibold))
+            Text("Windows games, running on your Mac.").foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).background(.background)
     }
 }
