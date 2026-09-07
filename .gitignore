@@ -21,3 +21,7 @@ DerivedData/
 # Editors
 .vscode/
 .idea/
+
+# CI/build artifacts
+/dist/
+/site/

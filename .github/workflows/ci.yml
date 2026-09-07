@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & self-test (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: Build (release)
+        run: swift build -c release
+      - name: Self-test (VDF/CRC/shortcut codecs)
+        run: swift run -c release cellar selftest
+      - name: Generate supported-games site (sanity)
+        run: python3 Scripts/gen-site.py
