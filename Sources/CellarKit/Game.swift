@@ -10,9 +10,34 @@ public struct GamePlan {
     public let backend: String
     /// `[env]` from the profile — applied to the game and the Steam client that spawns it.
     public let env: [String: String]
+    /// Install method: `windows-steam-in-bottle` (default) or `depot` (DepotDownloader).
+    public let installMethod: String
+    /// Relative path (from the game's install dir) of the exe to run directly, e.g.
+    /// `AoE2DE_s.exe`. Enables the Steam-free launch path.
+    public let launchExe: String?
+    /// Whether the game needs a live Steam session at *runtime* (Denuvo / Steamworks DRM). When
+    /// false and `launchExe` is set, Cellar launches the exe directly with no Steam.
+    public let needsLiveSteam: Bool
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
+
+    /// Where DepotDownloader places this game's files inside the bottle.
+    public var depotGameDir: URL { prefix.appendingPathComponent("drive_c/Games/\(slug)", isDirectory: true) }
+
+    /// The absolute exe to run for a direct (Steam-free) launch, if one is configured and present.
+    public var directLaunchExe: URL? {
+        guard let launchExe else { return nil }
+        // Search the depot dir first, then a Steam-installed copy.
+        let candidates = [
+            depotGameDir.appendingPathComponent(launchExe),
+            prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam/steamapps/common").appendingPathComponent(launchExe),
+        ]
+        return candidates.first { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    /// True when this game can be launched without Steam (no live-session DRM, and the exe is present).
+    public var canLaunchSteamFree: Bool { !needsLiveSteam && directLaunchExe != nil }
 }
 
 /// A game's readiness, for the GUI to decide what to show (and which button to offer next).
@@ -59,7 +84,8 @@ public enum Game {
                 runnerInstalled: RunnerManager.find(id: plan.runnerID) != nil,
                 steamInstalled: installed,
                 account: installed ? SteamBottle.loggedInAccount(in: plan.prefix) : nil,
-                gameInstalled: plan.appID.map { SteamBottle.isGameInstalled(in: plan.prefix, appID: $0) } ?? false,
+                gameInstalled: (plan.appID.map { SteamBottle.isGameInstalled(in: plan.prefix, appID: $0) } ?? false)
+                    || plan.directLaunchExe != nil,
                 running: SteamBottle.isRunning)
         }
     }
@@ -78,7 +104,11 @@ public enum Game {
             runnerID: fields["id"] ?? RunnerCatalog.defaultID,
             appID: fields["steam_appid"].flatMap { Int($0) },
             backend: fields["backend"] ?? "d3dmetal",
-            env: ProfileStore.env(ref)
+            env: ProfileStore.env(ref),
+            installMethod: fields["method"] ?? "windows-steam-in-bottle",
+            launchExe: fields["exe"],
+            // Default to needing Steam unless a profile explicitly says otherwise — safe for DRM.
+            needsLiveSteam: (fields["needs_live_steam"] ?? "true").lowercased() != "false"
         )
     }
 
@@ -86,6 +116,41 @@ public enum Game {
     public static func wineRunner(_ plan: GamePlan) -> WineRunner? {
         guard let install = RunnerManager.find(id: plan.runnerID) else { return nil }
         return WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
+    }
+
+    /// Download the game's Windows files via DepotDownloader into the bottle (no Windows Steam
+    /// client). Ensures the runner + prefix exist first (the exe still runs through Wine). Steam
+    /// credentials are used only to authenticate the download; 2FA is prompted on the terminal.
+    public static func fetchDepot(_ plan: GamePlan, username: String, progress: (String) -> Void) throws {
+        guard let appID = plan.appID else {
+            throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid to download.")
+        }
+        guard let spec = RunnerCatalog.spec(forID: plan.runnerID) else {
+            throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
+        }
+        let install = try RunnerManager.install(spec, progress: progress)
+        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
+        if !FileManager.default.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path) {
+            progress("Initialising the Wine prefix…")
+            try wine.initializePrefix(); try wine.setWindowsVersion("win10")
+        }
+        progress("Downloading \(plan.name) (Windows depot) via DepotDownloader…")
+        try DepotTool.fetch(appID: appID, into: plan.depotGameDir, username: username)
+        progress("Downloaded to \(plan.depotGameDir.path)")
+    }
+
+    /// Launch the game's exe directly through Wine — no Steam. Only valid when `canLaunchSteamFree`.
+    public static func launchDirect(_ plan: GamePlan, showHUD: Bool = false) throws {
+        guard let wine = wineRunner(plan) else {
+            throw CellarError.invalidArgument("Runner '\(plan.runnerID)' isn't installed.")
+        }
+        guard let exe = plan.directLaunchExe else {
+            throw CellarError.invalidArgument("No launchable exe found for '\(plan.slug)'. Run: cellar fetch-depot \(plan.slug)")
+        }
+        var env = WineRunner.d3dMetalEnv(showHUD: showHUD)
+        for (k, v) in plan.env { env[k] = v }
+        try wine.spawn([exe.path], extraEnv: env,
+                       log: Paths.logs.appendingPathComponent("game-\(plan.slug).log"))
     }
 
     /// Minimal-setup pipeline: ensure runner → bottle → initialised prefix → Windows Steam.

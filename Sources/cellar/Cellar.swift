@@ -25,6 +25,7 @@ struct Cellar: ParsableCommand {
             Doctor.self,
             Setup.self,
             SteamCommand.self,
+            FetchDepot.self,
             Launch.self,
             RunnerCommand.self,
             PrefixCommand.self,

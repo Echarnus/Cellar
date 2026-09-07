@@ -1,0 +1,44 @@
+# Cellar game profile — The Elder Scrolls V: Skyrim Special Edition
+# Schema version 0. Untested on M5 — sensible defaults, validate before trusting.
+
+[game]
+slug          = "skyrim-special-edition"
+name          = "The Elder Scrolls V: Skyrim Special Edition"
+developer     = "Bethesda Game Studios"
+steam_appid   = 489830
+engine        = "Creation Engine"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2016-10-27"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "Steamworks"
+# Steamworks DRM: the exe expects a running Steam, so Cellar uses the silent-Steam path (not the
+# fully Steam-free direct launch). Downloading via DepotDownloader still works.
+needs_live_steam            = true
+requires_account            = "Steam"
+online                      = "single-player"
+status                      = "untested"
+notes                       = "DX11 via D3DMetal 3.0 should be well-behaved; SKSE/mods untested under Wine."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxmt"
+
+[env]
+MTL_HUD_ENABLED = "1"
+
+[install]
+method      = "depot"      # or windows-steam-in-bottle
+steam_appid = 489830
+
+[launch]
+exe = "SkyrimSE.exe"
+
+[legal]
+drm_circumvention = "never"
