@@ -14,9 +14,17 @@ extension Notification.Name {
 // (⌘Q to quit, About, Settings…, and the Edit menu that text fields need for cut/copy/paste).
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
+    var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = buildMainMenu()
+
+        // The gear button in the SwiftUI sidebar asks for Settings via this notification (the menu
+        // item calls showSettings directly). Settings is a separate NSWindow, not a SwiftUI .sheet:
+        // a sheet presented inside the hosted view triggers a fatal AttributeGraph cycle under
+        // NSHostingView. A top-level window is its own view graph, so it's safe.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(showSettings), name: .cellarOpenSettings, object: nil)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
@@ -49,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
             .target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide \(appName)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -87,8 +95,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return mainMenu
     }
 
-    @objc private func openSettings() {
-        NotificationCenter.default.post(name: .cellarOpenSettings, object: nil)
+    @objc private func showSettings() {
+        if settingsWindow == nil {
+            let w = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 460, height: 520),
+                styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            w.title = "Settings"
+            w.isReleasedWhenClosed = false
+            w.center()
+            w.contentView = NSHostingView(rootView: SettingsView(onClose: { [weak self] in
+                self?.settingsWindow?.close()
+            }))
+            settingsWindow = w
+        }
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func showAbout() {

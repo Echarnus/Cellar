@@ -4,7 +4,9 @@ import CellarKit
 
 struct SettingsView: View {
     @AppStorage("showHUD") private var showHUD = false
-    @Environment(\.dismiss) private var dismiss
+    /// Settings is shown in a standalone NSWindow (not a SwiftUI sheet — that crashes under
+    /// NSHostingView), so Done closes the window through this callback rather than `dismiss`.
+    var onClose: () -> Void = {}
 
     private var runnerName: String { RunnerManager.installed().first?.spec.displayName ?? "not installed" }
     private var depot: String { DepotTool.isInstalled ? "installed" : "installs on first download" }
@@ -14,7 +16,7 @@ struct SettingsView: View {
             HStack {
                 Text("Settings").font(.title2.weight(.bold))
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Done") { onClose() }.keyboardShortcut(.defaultAction)
             }.padding(20)
             Divider()
             Form {

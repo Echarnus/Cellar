@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import Combine
 import CellarKit
 
 @MainActor
@@ -40,7 +39,6 @@ final class Library: ObservableObject {
 struct ContentView: View {
     @StateObject private var lib = Library()
     @StateObject private var runner = CellarRunner()
-    @State private var showSettings = false
 
     var body: some View {
         HSplitView {
@@ -53,8 +51,6 @@ struct ContentView: View {
         }
         .frame(minWidth: 860, minHeight: 560)
         .onAppear { lib.refresh() }
-        .sheet(isPresented: $showSettings) { SettingsView() }
-        .onReceive(NotificationCenter.default.publisher(for: .cellarOpenSettings)) { _ in showSettings = true }
     }
 
     private var sidebar: some View {
@@ -65,7 +61,8 @@ struct ContentView: View {
                 Spacer()
                 Button { lib.refresh() } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.borderless).help("Refresh")
-                Button { showSettings = true } label: { Image(systemName: "gearshape") }
+                Button { NotificationCenter.default.post(name: .cellarOpenSettings, object: nil) }
+                    label: { Image(systemName: "gearshape") }
                     .buttonStyle(.borderless).help("Settings")
             }.padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
 
