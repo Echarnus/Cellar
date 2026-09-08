@@ -5,9 +5,25 @@ import CellarKit
 /// with its auto-retry, steam add) instead of reimplementing them. Streams combined output.
 @MainActor
 final class CellarRunner: ObservableObject {
+    /// Everything the CLI has printed, markers removed.
     @Published var log: String = ""
     @Published var busy: Bool = false
     @Published var busyTitle: String = ""
+    /// How far a launch has got, when the running command is one that reports it. Kept after the
+    /// command ends, so the launch window can show how it finished rather than going blank.
+    @Published private(set) var stage: LaunchStage?
+    /// The exit status of the last command, nil while one is running.
+    @Published private(set) var exitCode: Int32?
+    @Published private(set) var phase: Phase = .idle
+    /// How many times the launch has been attempted. Counted from the stages rather than scraped
+    /// out of the CLI's prose, so the launch window can say "second try" in its own words instead
+    /// of quoting a line about the D3DMetal startup race at someone who wants to play a game.
+    @Published private(set) var attempt: Int = 0
+
+    /// A launch does not end when the game starts: `cellar launch` stays alive for the whole session
+    /// so it can close the layer afterwards. Without this distinction the app spends a two-hour play
+    /// session claiming to be "Launching".
+    enum Phase { case idle, working, playing }
 
     /// Resolved on first use, never in `init`.
     ///
@@ -17,6 +33,14 @@ final class CellarRunner: ObservableObject {
     /// (skills/swift.md). Deferring it keeps view-graph evaluation free of side effects.
     private lazy var binary: String = Shell.which("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
 
+    /// The running command, so it can be called off.
+    private var process: Process?
+    /// Output received but not yet ended by a newline — held back so a marker split across two
+    /// reads is still recognised. Shown in the log regardless, or a `\r`-only progress line
+    /// (DepotDownloader's) would look like a stall.
+    private var pending: String = ""
+    private var committed: String = ""
+
     init() {}
 
     var binaryExists: Bool { FileManager.default.isExecutableFile(atPath: binary) }
@@ -24,7 +48,8 @@ final class CellarRunner: ObservableObject {
     /// Put a line in the activity log without running anything — for the steps Cellar hands back
     /// to the player (a download that needs a real terminal for its Steam Guard prompt).
     func note(_ message: String) {
-        log += "\n\(message)\n"
+        committed += "\n\(message)\n"
+        log = committed + pending
     }
 
     /// `observe` sees each chunk of output as it arrives, for a caller that has to react to
@@ -32,29 +57,82 @@ final class CellarRunner: ObservableObject {
     func run(_ args: [String], title: String, observe: (@MainActor (String) -> Void)? = nil,
              then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        busy = true; busyTitle = title
-        log += "\n$ cellar \(args.joined(separator: " "))\n"
+        busy = true; busyTitle = title; phase = .working
+        stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
+        committed += "\n$ cellar \(args.joined(separator: " "))\n"
+        log = committed + pending
 
-        Task.detached { [binary] in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: binary)
-            process.arguments = args
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binary)
+        process.arguments = args
+        self.process = process
+
+        Task.detached {
             let pipe = Pipe()
             process.standardOutput = pipe
             process.standardError = pipe
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
                 guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
-                Task { @MainActor in self.log += s; observe?(s) }
+                Task { @MainActor in self.absorb(s); observe?(s) }
             }
             try? process.run()
             process.waitUntilExit()
             pipe.fileHandleForReading.readabilityHandler = nil
             await MainActor.run {
-                self.log += "\n(exit \(process.terminationStatus))\n"
+                self.absorb("\n(exit \(process.terminationStatus))\n")
+                self.process = nil
                 self.busy = false
+                self.phase = .idle
+                self.exitCode = process.terminationStatus
                 then?()
             }
         }
+    }
+
+    /// Start a game, asking the CLI to report its steps so the launch window can follow along.
+    ///
+    /// Its own method rather than a `run(["launch", …])` at the call site: a launch is the one
+    /// command with a window watching it, and the flag that feeds that window should not be
+    /// something a future caller has to remember.
+    func launch(slug: String, showHUD: Bool, then: (@MainActor () -> Void)? = nil) {
+        guard !busy else { return }
+        run(["launch", slug, "--machine-progress"] + (showHUD ? ["--hud"] : []),
+            title: "Launching", then: then)
+        launchingSlug = slug
+    }
+
+    /// The game currently being launched, if the running command is a launch.
+    @Published private(set) var launchingSlug: String?
+
+    /// Whether the last command was called off rather than failing on its own — a non-zero exit the
+    /// player asked for is not an error to report back to them.
+    @Published private(set) var cancelled: Bool = false
+
+    /// Stop the running command. Anything it already opened — Steam, Battle.net, the game itself —
+    /// stays open; Cellar only stops waiting on it, and says so where the button lives.
+    func cancel() {
+        guard busy else { return }
+        cancelled = true
+        process?.terminate()
+    }
+
+    // MARK: - Reading the output
+
+    /// Split output into lines, lift the stage markers out, and leave the rest for the player.
+    private func absorb(_ chunk: String) {
+        pending += chunk
+        while let newline = pending.firstIndex(of: "\n") {
+            let line = String(pending[pending.startIndex..<newline])
+            pending = String(pending[pending.index(after: newline)...])
+            if let reached = LaunchMarker.stage(in: line) {
+                stage = reached
+                if reached == .starting { attempt += 1 }
+                if reached == .playing { phase = .playing }
+            } else {
+                committed += line + "\n"
+            }
+        }
+        log = committed + pending
     }
 }

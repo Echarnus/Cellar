@@ -81,12 +81,30 @@ struct GameDetailView: View {
             .keyboardShortcut(.defaultAction)
             .help(game.actionHint)
 
-            if runner.busy {
-                ProgressView().controlSize(.small)
-                Text(runner.busyTitle).font(.callout).foregroundStyle(.secondary)
-            }
+            status
             Spacer()
             overflowMenu
+        }
+    }
+
+    /// What Cellar is doing right now, beside the button that started it.
+    ///
+    /// A launch is not like the other commands: `cellar launch` stays alive for the whole session so
+    /// it can close the layer afterwards, so a plain "busy" spinner would sit there saying
+    /// "Launching" for the length of the game. Playing is its own state, and it gets said.
+    @ViewBuilder private var status: some View {
+        if runner.phase == .playing, runner.launchingSlug == game.slug {
+            Label("Playing", systemImage: "play.circle.fill")
+                .font(.callout.weight(.medium)).foregroundStyle(.green)
+                .help("\(game.name) is running. Quit the game and Cellar closes the layer.")
+        } else if runner.busy {
+            ProgressView().controlSize(.small)
+            Text(runner.busyTitle).font(.callout).foregroundStyle(.secondary)
+            if runner.launchingSlug == game.slug {
+                Button("Show progress") { LaunchSplashWindow.present(game: game, runner: runner) }
+                    .buttonStyle(.link)
+                    .help("Bring the launch window back.")
+            }
         }
     }
 
@@ -244,7 +262,10 @@ struct GameDetailView: View {
     private func primary() {
         switch game.nextStep {
         case .play:
-            act(["launch", game.slug] + (showHUD ? ["--hud"] : []), "Launching")
+            // The launch gets a window of its own: it is a minute or two of work with several
+            // steps, and a spinner beside the button reads as a hang.
+            runner.launch(slug: game.slug, showHUD: showHUD) { onChange() }
+            LaunchSplashWindow.present(game: game, runner: runner)
         case .setup:
             act(["setup", "--profile", game.slug], "Setting up")
         case .signIn:

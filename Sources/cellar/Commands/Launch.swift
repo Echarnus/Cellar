@@ -23,7 +23,22 @@ struct Launch: ParsableCommand {
     @Flag(name: .customLong("print-env"), help: "Print the environment the game would get and exit (debugging).")
     var printEnv = false
 
+    @Flag(name: .customLong("machine-progress"),
+          help: "Also print a marker line each time the launch reaches a new step, for the Cellar app's launch window.")
+    var machineProgress = false
+
+    /// Announce a step. Prose stays as it is for whoever is reading the terminal; the marker is an
+    /// extra line the app parses and hides, so neither audience is served a compromise.
+    private func report(_ stage: LaunchStage) {
+        guard machineProgress else { return }
+        print(LaunchMarker.line(stage))
+    }
+
     func run() throws {
+        // Line-buffer stdout: piped into the app (or a `tee`), the default 4 KB buffering would hold
+        // a launch's progress back until it had all happened, which is exactly the wait it describes.
+        setvbuf(stdout, nil, _IOLBF, 0)
+
         let plan = try Game.plan(slug: slug)
 
         if printEnv {
@@ -58,7 +73,7 @@ struct Launch: ParsableCommand {
             }
         }
 
-        let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore) {
+        let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore, stage: report) {
             print("  " + Term.dim($0))
         }
         print(Term.green("\(plan.name) is up."))
@@ -70,7 +85,9 @@ struct Launch: ParsableCommand {
         case .steam, .battlenet:
             print(Term.dim("Playing… (Cellar will close \(plan.store.displayName) when you quit the game)"))
         }
+        report(.playing)
         Game.waitForExitThenShutDown(plan, route: route)
+        report(.closed)
         print(Term.green("\(plan.name) closed. Layer shut down."))
     }
 }

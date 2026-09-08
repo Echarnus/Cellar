@@ -66,6 +66,11 @@ public struct GamePlan {
     /// True when this game can be launched with no store client at all.
     public var canLaunchStoreFree: Bool { !needsLiveSession && directLaunchExe != nil }
 
+    /// Who is being launched and by which route — what the launch stages are worded from.
+    public var launchContext: LaunchContext {
+        LaunchContext(game: name, store: store, throughClient: !canLaunchStoreFree)
+    }
+
     /// Command-line fragments that identify the *game's own* process, so a supervised launch never
     /// mistakes the store client for the game. Wine reports Windows command lines, hence both
     /// separators.
@@ -220,6 +225,11 @@ public struct GameSummary: Identifiable, Sendable {
 
     /// Whether playing this game will bring a store client up alongside it.
     public let needsClientAtRuntime: Bool
+
+    /// Who is being launched and by which route — what the launch window words its steps from.
+    public var launchContext: LaunchContext {
+        LaunchContext(game: name, store: store, throughClient: needsClientAtRuntime)
+    }
     /// What the profile says about the game — the app's information panel.
     public let facts: GameFacts
     /// The runtime this profile pins, for the app to show without re-reading the TOML.
@@ -562,7 +572,9 @@ public enum Game {
     /// `forceStore` skips the store-free shortcut, for debugging a title that normally runs bare.
     @discardableResult
     public static func launch(_ plan: GamePlan, showHUD: Bool = false, forceStore: Bool = false,
+                              stage: (LaunchStage) -> Void = { _ in },
                               progress: (String) -> Void = { _ in }) throws -> LaunchRoute {
+        stage(.preparing)
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
@@ -572,7 +584,15 @@ public enum Game {
         if plan.canLaunchStoreFree && !forceStore {
             let exe = plan.directLaunchExe!
             progress("Launching \(plan.name) directly (no store client) — \(exe.lastPathComponent), backend \(plan.backend)…")
+            stage(.starting)
             try launchDirect(plan, showHUD: showHUD)
+            // Watch for the process rather than declaring victory on a successful spawn: Wine
+            // returns immediately, so "it launched" is otherwise a claim about nothing.
+            stage(.waiting)
+            if !ProcessWatch.waitToAppear([exe.lastPathComponent], seconds: 40) {
+                progress("Started \(exe.lastPathComponent), but its process hasn't appeared yet — check the activity log if nothing opens.")
+            }
+            stage(.running)
             return .direct(exeName: exe.lastPathComponent)
         }
 
@@ -587,7 +607,8 @@ public enum Game {
             }
             progress("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…")
             try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: showHUD,
-                                              gameEnv: plan.env, progress: progress)
+                                              gameEnv: plan.env, progress: progress, stage: stage)
+            stage(.running)
             return .steam(appID: appID)
 
         case .battlenet:
@@ -606,7 +627,9 @@ public enum Game {
             }
             progress("Launching \(plan.name) via Battle.net (product \(product)) — runner \(plan.runnerID), backend \(plan.backend)…")
             try BattleNetBottle.runGameSupervised(runner: wine, product: product, gameNeedles: needles,
-                                                  showHUD: showHUD, gameEnv: plan.env, progress: progress)
+                                                  showHUD: showHUD, gameEnv: plan.env,
+                                                  progress: progress, stage: stage)
+            stage(.running)
             return .battlenet(product: product)
 
         case .gog:

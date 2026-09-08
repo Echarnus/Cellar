@@ -253,8 +253,10 @@ public enum BattleNetBottle {
     @discardableResult
     public static func ensureClientRunning(runner: WineRunner, showHUD: Bool = false,
                                            gameEnv: [String: String] = [:],
-                                           progress: (String) -> Void = { _ in }) throws -> Bool {
+                                           progress: (String) -> Void = { _ in },
+                                           stage: (LaunchStage) -> Void = { _ in }) throws -> Bool {
         if isRunning { return true }
+        stage(.client)
         progress("Starting Battle.net and waiting for it to be ready…")
         try launchClient(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
         let up = ProcessWatch.waitToAppear(["Battle.net.exe"], seconds: 120)
@@ -280,12 +282,14 @@ public enum BattleNetBottle {
     public static func runGameSupervised(runner: WineRunner, product: String, gameNeedles: [String],
                                          showHUD: Bool = false, gameEnv: [String: String] = [:],
                                          attempts: Int = 6,
-                                         progress: (String) -> Void = { _ in }) throws {
+                                         progress: (String) -> Void = { _ in },
+                                         stage: (LaunchStage) -> Void = { _ in }) throws {
         guard isClientUpdated(in: runner.prefix) else {
             throw CellarError.invalidArgument(
                 "Battle.net hasn't finished installing in this bottle. Run: cellar battlenet open <slug>")
         }
-        guard try ensureClientRunning(runner: runner, showHUD: showHUD, gameEnv: gameEnv, progress: progress) else {
+        guard try ensureClientRunning(runner: runner, showHUD: showHUD, gameEnv: gameEnv,
+                                      progress: progress, stage: stage) else {
             throw CellarError.ioFailure("Battle.net didn't come up. Open it manually: cellar battlenet open <slug>")
         }
 
@@ -294,7 +298,8 @@ public enum BattleNetBottle {
             cleanup: { ProcessWatch.kill(gameNeedles) },
             start: { try execLaunch(runner: runner, product: product, showHUD: showHUD, gameEnv: gameEnv) },
             isUp: { ProcessWatch.isRunningAny(gameNeedles) },
-            progress: progress)
+            progress: progress,
+            stage: stage)
     }
 
     // MARK: - Teardown

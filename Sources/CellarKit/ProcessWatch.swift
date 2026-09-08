@@ -56,6 +56,8 @@ public enum ProcessWatch {
     ///   - isUp:    whether the game's own process is alive.
     ///   - appearSeconds: how long to wait for it to show up at all.
     ///   - settleSeconds: how long it must then stay up to count as launched.
+    ///   - stage: coarse step reporting for the app's launch window; a retry legitimately goes back
+    ///     to `.starting`, which is what makes a second attempt visible rather than a stall.
     public static func superviseStart(attempts: Int,
                                       appearSeconds: Int = 24,
                                       settleSeconds: Int = 16,
@@ -63,12 +65,15 @@ public enum ProcessWatch {
                                       cleanup: () -> Void,
                                       start: () throws -> Void,
                                       isUp: () -> Bool,
-                                      progress: (String) -> Void = { _ in }) throws {
+                                      progress: (String) -> Void = { _ in },
+                                      stage: (LaunchStage) -> Void = { _ in }) throws {
         for attempt in 1...max(1, attempts) {
             cleanup()
             if attempt > 1 { Thread.sleep(forTimeInterval: backoffSeconds) }
 
+            stage(.starting)
             try start()
+            stage(.waiting)
 
             var appeared = false
             let appearDeadline = Date().addingTimeInterval(TimeInterval(appearSeconds))
