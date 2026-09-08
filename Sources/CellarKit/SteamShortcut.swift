@@ -85,6 +85,76 @@ public enum SteamShortcuts {
         return appid
     }
 
+    /// Whether a shortcut Cellar added is in the file. Used to decide whether an uninstall has a
+    /// Steam-library entry to clean up at all.
+    ///
+    /// `launcherPath` is what makes this **Cellar's** entry rather than one that merely shares a
+    /// name: a player may well have added *Planet Coaster 2* to Steam by hand, and that shortcut is
+    /// theirs. Same rule as the `.app` bundles — match on something we wrote, never on a name.
+    public static func contains(appName: String, launcherPath: String? = nil, in configDir: URL) -> Bool {
+        !matches(appName: appName, launcherPath: launcherPath, in: entriesWithExe(in: configDir)).isEmpty
+    }
+
+    /// Drop the shortcuts Cellar added under this name. Same discipline as `add`: parse, back up,
+    /// re-serialize — never splice bytes — and renumber the remaining entries, because Steam reads
+    /// the keys as a contiguous list and silently drops everything after a gap.
+    ///
+    /// Returns how many entries were removed.
+    @discardableResult
+    public static func remove(appName: String, launcherPath: String? = nil, from configDir: URL) throws -> Int {
+        let file = configDir.appendingPathComponent("shortcuts.vdf")
+        guard let data = try? Data(contentsOf: file), !data.isEmpty else { return 0 }
+        guard case .map(let root) = try BinaryVDF.parse(data),
+              let node = root.first(where: { $0.0.lowercased() == "shortcuts" }),
+              case .map(let existing) = node.1 else { return 0 }
+
+        let survivors = existing.filter { _, value in
+            !isMatch(name: name(of: value), exe: exe(of: value), appName: appName, launcherPath: launcherPath)
+        }
+        guard survivors.count != existing.count else { return 0 }
+
+        try? data.write(to: configDir.appendingPathComponent("shortcuts.vdf.cellar.bak"))
+        let renumbered = survivors.enumerated().map { index, entry in ("\(index)", entry.1) }
+        try BinaryVDF.serialize(.map([("shortcuts", .map(renumbered))])).write(to: file)
+        return existing.count - survivors.count
+    }
+
+    /// `(appname, exe)` for every shortcut in the file, or nothing when there is no file yet.
+    static func entriesWithExe(in configDir: URL) -> [(name: String, exe: String)] {
+        let file = configDir.appendingPathComponent("shortcuts.vdf")
+        guard let data = try? Data(contentsOf: file), !data.isEmpty,
+              case .map(let root)? = try? BinaryVDF.parse(data),
+              let node = root.first(where: { $0.0.lowercased() == "shortcuts" }),
+              case .map(let shortcuts) = node.1 else { return [] }
+        return shortcuts.compactMap { _, value in
+            guard let name = name(of: value) else { return nil }
+            return (name, exe(of: value) ?? "")
+        }
+    }
+
+    static func matches(appName: String, launcherPath: String?,
+                        in entries: [(name: String, exe: String)]) -> [(name: String, exe: String)] {
+        entries.filter { isMatch(name: $0.name, exe: $0.exe, appName: appName, launcherPath: launcherPath) }
+    }
+
+    /// A shortcut is Cellar's when the name matches *and* its target is the launcher Cellar
+    /// generated. With no launcher path to check against, the name alone has to do.
+    static func isMatch(name: String?, exe: String?, appName: String, launcherPath: String?) -> Bool {
+        guard name == appName else { return false }
+        guard let launcherPath else { return true }
+        return (exe ?? "").contains(launcherPath)
+    }
+
+    static func name(of entry: VDFValue) -> String? { string("appname", of: entry) }
+    static func exe(of entry: VDFValue) -> String? { string("exe", of: entry) }
+
+    static func string(_ key: String, of entry: VDFValue) -> String? {
+        guard case .map(let fields) = entry,
+              let field = fields.first(where: { $0.0.lowercased() == key }),
+              case .string(let value) = field.1 else { return nil }
+        return value
+    }
+
     public static var steamRunning: Bool {
         !Shell.run("/usr/bin/pgrep", ["-x", "steam_osx"]).stdout
             .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

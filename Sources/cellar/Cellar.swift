@@ -43,6 +43,7 @@ struct Cellar: ParsableCommand {
             Accounts.self,
             FetchDepot.self,
             Launch.self,
+            UninstallCommand.self,
             RunnerCommand.self,
             PrefixCommand.self,
             ProfileCommand.self,

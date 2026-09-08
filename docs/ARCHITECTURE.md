@@ -76,6 +76,7 @@ issued, and what the app says to the player.
 | "Installed?" | `appmanifest_<id>.acf`, `StateFlags 4` | the profile's `install_dir` + `exe` on disk | the exe on disk | the exe on disk |
 | Install a game | `steam://install/<id>` | no drivable URL — open the client | Cellar downloads + runs the installer | DepotDownloader |
 | Launch | `steam://rungameid/<id>` into a `-silent` client | `Battle.net.exe --exec="launch <product>"`, client warmed first | run the exe — nothing beside it | run the exe |
+| Uninstall | delete the install dir **inside the shared library**, plus its manifests; close the client first | delete the install dir; the client re-offers it as an install | run the game's own Inno uninstaller, then delete | delete the depot dir |
 | Public artwork | yes, per AppID | none a launcher may hotlink | yes, from the product API | none |
 
 Three consequences worth stating plainly, because they shape the UI as much as the code:
@@ -133,6 +134,30 @@ DepotDownloader only ever *draws* the QR challenge, as terminal ASCII, and print
 `SteamQRCode.swift` reads the drawing back into a module matrix and the app renders it at a scannable
 size. Format, measured not assumed: two characters per module, four-module quiet zone, one text line
 per module row. There is a round-trip case in `cellar selftest`.
+
+### Removing a game
+
+`Uninstall.swift` is the mirror image of setup, and it is deliberately the most cautious code in the
+project. A game's footprint is spread across places the player never chose — a Steam library shared
+by every Steam game, a Wine bottle, a generated `.app`, an icon in the cache, a line in the native
+Steam client's `shortcuts.vdf` — so removal is a **plan first**: `Uninstall.plan(for:scope:)` resolves
+and measures every path, records what deliberately survives, and raises blockers. Only then does
+`perform` delete anything, re-validating each path as it goes.
+
+Two scopes: `.game` (the game and what Cellar generated for it) and `.bottle` (that, plus the Wine
+prefix and the client inside it). The rules that keep it safe:
+
+- **The shared Steam install is never a target.** `isDeletable` refuses `shared/steam`, `steamapps`,
+  `steamapps/common`, every `Paths.*` root and every bottle's `drive_c` roots, and only ever allows a
+  path *inside* a directory Cellar owns. There are assertions for all of them in `cellar selftest`.
+- **The bottle's `Steam` symlink is unlinked, never followed** — it points at the shared install that
+  holds the sign-in and everybody else's games.
+- **A `.app` is deleted only if it carries Cellar's own bundle identifier**, so a game's real app of
+  the same name in `~/Applications` is left alone.
+- **A shared bottle blocks the `.bottle` scope**, naming the other profiles that live in it.
+- **A running game blocks removal; a running client is closed first**, announced before it happens.
+- Store-specific behaviour — what survives, what the client does afterwards, whether it must be
+  closed — is in `StoreDescriptor`, like every other per-store difference.
 
 ## On-disk layout
 

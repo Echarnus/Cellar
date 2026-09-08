@@ -167,6 +167,19 @@ cellar steam add planet-coaster-2   # generates ~/Applications/Planet Coaster 2.
                                     # and a non-Steam shortcut (quit Steam first)
 ```
 
+Taking a game back off the machine:
+
+```sh
+cellar uninstall planet-coaster-2 --dry-run   # what would go, what would stay, and how much
+cellar uninstall planet-coaster-2             # the game's files, its .app, its icon, its Steam entry
+cellar uninstall planet-coaster-2 --bottle    # …and the bottle: the Wine prefix and the client in it
+```
+
+Removal is a plan first: Cellar prints every path it will delete with its size, and what it keeps —
+your sign-in, the shared Steam install with everybody else's games, and the runner — then asks. It
+never follows the bottle's symlink to the shared Steam library, and it only deletes a `.app` that
+carries its own bundle identifier.
+
 Other commands: `cellar runner list/install`, `cellar prefix list`, `cellar profiles list/show`,
 `cellar fetch-depot <slug>` (client-free download), `cellar steam enable-windows-platform` (advanced).
 
