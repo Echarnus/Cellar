@@ -17,8 +17,12 @@ one matching your work; each points back at the portable guide for the full deta
 - **cellar-ux** — **anything a player sees** (the app, CLI wording, errors). Read this one first;
   the UX bar is a requirement in this repo, not a polish pass.
 - **cellar-swift** — `Sources/**` (CellarKit, the CLI, the SwiftUI app).
-- **cellar-web** — the static site / `Scripts/gen-site.py`.
+- **cellar-wine** — runners, graphics backends, bottles, launching the layer.
+- **cellar-profiles** — `profiles/*.toml`: adding a game, changing the schema.
+- **cellar-web** — the static site (the page itself).
+- **cellar-python** — `Scripts/gen-site.py`, the generator that emits it.
 - **cellar-shell** — `Scripts/*.sh`, the `.app`/DMG, releases.
+- **cellar-ci** — `.github/workflows/**`: CI, releases, Pages.
 
 ### Verifier subagent
 

@@ -22,8 +22,15 @@ landed. Key rules:
   `AGENTS.md`. Never leave a blank cover either: `GeneratedCover` draws a deterministic one.
 - **Copy:** sentence case, say what will happen in one sentence, name the window the player will see,
   and end every player-facing error with the command or button that fixes it.
-- **Accessibility:** icon-only controls get `.accessibilityLabel` + `.help`; rows combine into one
-  label that reads name, store and state; decorative art is hidden from VoiceOver.
+- **Accessibility** (Apple's HIG is the external standard): icon-only controls get
+  `.accessibilityLabel` + `.help`; rows combine into one label that reads name, store and state;
+  decorative art is hidden from VoiceOver. Contrast **≥ 4.5:1** body / **≥ 3:1** large text and UI.
+  Prefer **semantic text styles** (`.body`, `.headline`) over `.font(.system(size:))` so the app
+  follows the system text size. Everything must be reachable by keyboard — and a new window-level
+  command needs its menu item added by hand, or it is mouse-only.
+- **Not localized, deliberately — don't make it worse.** Every string is a hard-coded English
+  literal; there is no String Catalog. So never build a sentence from concatenated fragments (it
+  cannot be translated and reads badly to VoiceOver) — interpolate into a whole sentence.
 - **Verify by launching, not by compiling.** `Scripts/install-app.sh` (or `package.sh` + run
   `dist/Cellar.app`), then look at the changed screen and screenshot it.
 

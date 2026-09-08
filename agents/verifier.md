@@ -28,11 +28,26 @@ The diff (or list of changed files) and a one-line statement of intent.
 - **Web** ([`../skills/web.md`](../skills/web.md)): the change is in `gen-site.py`, not hand-edited
   HTML; the site regenerates; the Download CTA still points at the versionless `Cellar.dmg`; theme,
   responsiveness, and accessibility hold; the generator stays Python-3.9-safe.
+- **Wine/runners/bottles** ([`../skills/wine-and-runners.md`](../skills/wine-and-runners.md)): no
+  `/usr/bin/arch` wrapper; the environment is inherited *and* the caller's `WINE*`/`DYLD_*`/`D3DM*`/
+  `MTL_*`/`GST_*`/`GRAPHICS_BACKEND` stripped; `WINEDLLOVERRIDES` **merged, not assigned over**;
+  no bundled D3DMetal and nothing that circumvents DRM. Evidence that a **game actually started** —
+  plus a clean process table afterwards (no orphan `wineserver`/`Agent.exe`). A clean build is not
+  evidence about a runner.
 - **Shell/packaging** ([`../skills/shell-and-packaging.md`](../skills/shell-and-packaging.md)):
-  `set -e` + SDK-unset present; Info.plist keys correct and in sync across both scripts; zip names
-  don't collide on a case-insensitive FS; DMG stays versionless.
-- **Profile:** required fields present; DRM/anti-cheat stated honestly; `status` + tested-hardware
-  `notes` included.
+  `set -eu` (or a stated reason it is still `set -e`) + SDK-unset present; temp dirs cleaned from an
+  `EXIT` trap; Info.plist keys correct and in sync across both scripts; zip names don't collide on a
+  case-insensitive FS; DMG stays versionless.
+- **Python** ([`../skills/python.md`](../skills/python.md)): stdlib only; still Python-3.9-safe;
+  every value interpolated into HTML is escaped; `open()` carries an explicit encoding; output stays
+  deterministic.
+- **CI** ([`../skills/ci.md`](../skills/ci.md)): least-privilege `permissions:` declared;
+  third-party actions pinned to a commit SHA; no `${{ }}` interpolated into a `run:` block; trigger
+  is `pull_request`, not `pull_request_target`. Verified by an actual run, not by reading YAML.
+- **Profile** ([`../skills/profiles.md`](../skills/profiles.md)): required fields present;
+  DRM/anti-cheat stated honestly and separately; `status` matches what was actually run, with
+  tested-hardware `notes`. Parser-safe: scalars only, no `#` inside values, no duplicate key names
+  across sections, `store`/`status` spelled from the known vocabulary.
 
 **2b. UX/UI — for anything a player sees** ([`../skills/ux.md`](../skills/ux.md)):
 one obvious next action with a plain sentence under it; empty / loading / first-run / busy / error

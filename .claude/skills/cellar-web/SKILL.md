@@ -1,6 +1,6 @@
 ---
 name: cellar-web
-description: Best practices for the Cellar static site — HTML, CSS, JS. Use when editing Scripts/gen-site.py or anything about the GitHub Pages landing page. Covers the data-driven-from-profiles rule, the versionless Cellar.dmg download link, no-build-step constraint, and the Apple-calibre theme/responsive/accessibility bar.
+description: Best practices for the Cellar static site — the HTML, CSS and JS of the GitHub Pages landing page. Use when changing how the page looks or is structured. Covers the data-driven-from-profiles rule, the versionless Cellar.dmg download link, the no-build-step constraint, the Apple-calibre theme/responsive/accessibility bar, and measuring accessibility rather than eyeballing it. For the generator itself, use cellar-python.
 ---
 
 # Cellar — web / static site
@@ -16,7 +16,12 @@ The full guide is [`skills/web.md`](../../../skills/web.md); read it. Key rules:
 - **Quality bar:** semantic HTML, theme-aware via `:root` custom properties (+ `prefers-color-scheme`
   dark), responsive (no horizontal body scroll), accessible (focus states, WCAG AA contrast,
   `prefers-reduced-motion`), self-contained.
-- **Verify by rendering:** `python3 Scripts/gen-site.py`, open `site/index.html`, check title,
-  Download CTA, one card per profile, icon present, light+dark, narrow width.
+- **Verify by rendering, then measure:** `python3 Scripts/gen-site.py`, open `site/index.html`, check
+  title, Download CTA, one card per profile, icon present, light+dark, narrow width. Then *measure*
+  the accessibility claims — contrast ratios in devtools (**≥ 4.5:1** body, **≥ 3:1** large text and
+  UI), tab through every control, one `<h1>` and real `alt` text, reduced motion honoured. An
+  automated pass (axe/Lighthouse) catches these in seconds.
+- The generator's own rules — stdlib-only, Python 3.9 floor, escaping, encoding — live in
+  [`cellar-python`](../cellar-python/SKILL.md).
 
 Before reporting done, run the **cellar-verifier** agent.

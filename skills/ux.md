@@ -26,7 +26,8 @@ Ask these before calling anything done. Any "no" is a defect, not a polish item.
    learn, no `WINEPREFIX` in front of someone who wants to play Diablo.
 5. **Does it work for someone who can't see the colour?** Every meaning carried by colour is also
    carried by a mark and a word.
-6. **Is it still right in the other appearance?** Light and dark, and at the window's minimum size.
+6. **Is it still right in the other appearance?** Light and dark, at the window's minimum size, and
+   at a larger system text size.
 
 ## Honesty is a UX rule, not just an ethical one
 
@@ -80,11 +81,42 @@ Notes that are easy to get wrong:
 
 ## Accessibility
 
+Apple's [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/accessibility)
+are the external standard here; this is what it means for Cellar specifically.
+
 - Icon-only controls need `.accessibilityLabel` **and** `.help` (the tooltip).
 - Composite rows use `.accessibilityElement(children: .combine)` with a label that reads the whole
   row: name, store, state.
 - Decorative art is `.accessibilityHidden(true)` — a cover behind a title is noise to VoiceOver.
-- Don't lower contrast for style. Secondary text stays `.secondary`, not a hand-rolled grey.
+- Don't lower contrast for style. Secondary text stays `.secondary`, not a hand-rolled grey. The
+  measurable bar is WCAG AA: **≥ 4.5:1 for body text, ≥ 3:1 for large text and UI components.**
+- **Use semantic text styles** (`.body`, `.headline`, `.caption`) rather than
+  `.font(.system(size:))`. Semantic styles follow the user's system text size; a hard-coded point
+  size does not, and a player who has turned text up gets a layout that silently ignores them. The
+  app is mostly right on this already — a handful of fixed sizes remain, so don't add more.
+- **The keyboard must reach everything.** Tab order follows the visual layout, focus is always
+  visible, and anything with a menu item keeps its ⌘-shortcut. The menu bar is hand-built
+  ([`swift.md`](swift.md)), so a new window-level command needs its menu entry added by hand or it
+  becomes mouse-only.
+- Respect reduced motion. Given that the detail pane cannot animate at all under `NSHostingView`,
+  this mostly means: don't add motion to work around that constraint.
+
+## Localization — know where we stand
+
+**Cellar is not localized. Every string in the app and the CLI is a hard-coded English literal** —
+there is no `String(localized:)`, no `LocalizedStringKey`, no String Catalog anywhere in `Sources/`.
+
+That is a legitimate stage for a project at this point, but it should be a decision, not a surprise.
+Two consequences to work with today:
+
+- **Don't make it harder to fix later.** Never assemble a sentence from fragments
+  (`"Needs " + storeName + " to be running"`). Concatenated sentences cannot be translated — word
+  order differs per language — and they read badly to VoiceOver. Write whole sentences with the
+  variable interpolated in one piece.
+- **When it is time, the modern path is String Catalogs** (`Localizable.xcstrings`) with
+  `String(localized:)` / `LocalizedStringKey`, which is compiler-integrated and keeps every
+  translation in one file. Adopting it is its own change, and it touches every player-facing string
+  in both front-ends — including the release notes and the site.
 
 ## Craft details that separate this from a tool
 
@@ -106,4 +138,5 @@ Compiling proves nothing about an interface.
 3. Check the states you changed — including the empty and not-installed ones — and both appearances.
 4. Re-read every new sentence aloud. If it sounds like a log line, rewrite it.
 
-Related: [`swift.md`](swift.md) · [`web.md`](web.md) · [`../agents/verifier.md`](../agents/verifier.md)
+Related: [`swift.md`](swift.md) · [`wine-and-runners.md`](wine-and-runners.md) ·
+[`profiles.md`](profiles.md) · [`web.md`](web.md) · [`../agents/verifier.md`](../agents/verifier.md)
