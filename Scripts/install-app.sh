@@ -50,6 +50,13 @@ mkdir -p "$APP/Contents/Resources/profiles"
 cp profiles/*.toml "$APP/Contents/Resources/profiles/"
 echo "Bundled $(ls profiles/*.toml | wc -l | tr -d ' ') game profiles."
 
+# The Dock shim, which keeps a bottle's Steam/Battle.net out of the Dock while a game starts.
+# Also dropped beside the CLI's own state, because it is the `cellar` binary — not the app — that
+# spawns Wine, and the CLI may live anywhere on PATH.
+sh Scripts/build-dock-shim.sh "$APP/Contents/Resources/cellar-dock-shim.dylib"
+mkdir -p "$HOME/Library/Application Support/Cellar"
+cp "$APP/Contents/Resources/cellar-dock-shim.dylib" "$HOME/Library/Application Support/Cellar/"
+
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
 echo "Installed $APP  —  open it with:  open \"$APP\""

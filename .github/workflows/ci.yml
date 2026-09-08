@@ -20,6 +20,10 @@ jobs:
         run: swift --version
       - name: Build (release)
         run: swift build -c release
+      # SwiftPM does not build the Dock shim (it has to be universal), so nothing else here would
+      # notice if it stopped compiling.
+      - name: Build the Dock shim (universal)
+        run: sh Scripts/build-dock-shim.sh
       - name: Self-test (VDF/CRC/shortcut codecs)
         run: swift run -c release cellar selftest
       - name: Generate supported-games site (sanity)

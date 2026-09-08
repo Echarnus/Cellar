@@ -62,6 +62,10 @@ public struct StoreDescriptor: Sendable {
     public let hasSilentInstaller: Bool
     /// Where the game itself comes from, in the player's words.
     public let installLocation: String
+    /// The Windows executables that *are* the client, so Cellar can keep them out of the Dock while
+    /// a game is starting (see `DockShim`). Deliberately a list of the client's own processes and
+    /// nothing else: anything not named here — the game, a mod tool, an installer — keeps its icon.
+    public let clientProcessNames: [String]
 
     public var accentColorComponents: (red: Double, green: Double, blue: Double) {
         StoreDescriptor.components(fromHex: accentHex)
@@ -90,7 +94,8 @@ public extension GameStore {
                 accountNoun: "Steam account",
                 canDetectSignIn: true,
                 hasSilentInstaller: true,
-                installLocation: "your Steam library")
+                installLocation: "your Steam library",
+                clientProcessNames: SteamBottle.clientProcesses)
         case .battlenet:
             return StoreDescriptor(
                 store: .battlenet,
@@ -101,7 +106,8 @@ public extension GameStore {
                 accountNoun: "Battle.net account",
                 canDetectSignIn: false,
                 hasSilentInstaller: false,
-                installLocation: "the Battle.net app")
+                installLocation: "the Battle.net app",
+                clientProcessNames: BattleNetBottle.clientProcesses)
         case .standalone:
             return StoreDescriptor(
                 store: .standalone,
@@ -112,7 +118,8 @@ public extension GameStore {
                 accountNoun: "no account",
                 canDetectSignIn: false,
                 hasSilentInstaller: true,
-                installLocation: "a direct download")
+                installLocation: "a direct download",
+                clientProcessNames: [])   // no client, so nothing of Cellar's to hide
         }
     }
 

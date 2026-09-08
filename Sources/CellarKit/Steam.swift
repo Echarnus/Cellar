@@ -15,6 +15,24 @@ public enum SteamBottle {
     /// regardless — verified in webhelper.txt) or actively harmful.
     static let launchFlags: [String] = []
 
+    /// The Windows executables that make up the client itself. `steamwebhelper.exe` is the CEF
+    /// process that draws Steam's whole interface, and — verified with `lsappinfo` — the one that
+    /// actually takes the Dock icon; `steam.exe` claims one too once it has shown a window. The
+    /// rest are short-lived helpers Steam runs at startup. Used to keep the client out of the Dock
+    /// while a game is starting (`DockShim`). The game is deliberately not on this list.
+    public static let clientProcesses = [
+        "steam.exe",
+        "steamwebhelper.exe",
+        "steamservice.exe",
+        "steamsysinfo.exe",
+        "steamerrorreporter.exe",
+        "steamerrorreporter64.exe",
+        "gldriverquery.exe",
+        "gldriverquery64.exe",
+        "vulkandriverquery.exe",
+        "vulkandriverquery64.exe",
+    ]
+
     public static func steamExecutable(in prefix: URL) -> URL {
         prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam/steam.exe")
     }
@@ -100,11 +118,17 @@ public enum SteamBottle {
 
     /// Launch the in-bottle Steam client detached (for login / installing games via its UI).
     /// If a client is already up in the bottle, Steam hands the arguments (e.g. a steam:// URL) to it.
+    ///
+    /// `dock` says whether this client is the thing the player asked for. Opening Steam to sign in
+    /// is `.visible` — that window needs a Dock icon to come back to. Starting it to run a game is
+    /// `.hidden`, so the Dock shows Cellar and the game and nothing else.
     public static func launchClient(runner: WineRunner, extraArgs: [String] = [], showHUD: Bool = false,
-                                    gameEnv: [String: String] = [:]) throws {
+                                    gameEnv: [String: String] = [:],
+                                    dock: DockPresence = .visible) throws {
         var extra = WineRunner.d3dMetalEnv(showHUD: showHUD)
         for (k, v) in gameEnv { extra[k] = v }
         if showHUD { extra["MTL_HUD_ENABLED"] = "1" }
+        for (k, v) in DockShim.environment(for: .steam, dock: dock) { extra[k] = v }
         try runner.spawn([steamExecutable(in: runner.prefix).path] + launchFlags + extraArgs,
                          extraEnv: extra,
                          log: Paths.logs.appendingPathComponent("steam-\(runner.prefix.lastPathComponent).log"))
@@ -125,7 +149,7 @@ public enum SteamBottle {
     public static func runGame(runner: WineRunner, appID: Int, showHUD: Bool = false,
                                gameEnv: [String: String] = [:]) throws {
         try launchClient(runner: runner, extraArgs: ["-silent", "steam://rungameid/\(appID)"],
-                         showHUD: showHUD, gameEnv: gameEnv)
+                         showHUD: showHUD, gameEnv: gameEnv, dock: .hidden)
     }
 
     /// The game's install-directory name (from `appmanifest_<appid>.acf`'s `installdir`).
@@ -159,7 +183,8 @@ public enum SteamBottle {
         // for it to come up, then drive the game into the warm client.
         if !isRunning {
             progress("Starting Steam (silent) and waiting for it to be ready…")
-            try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv)
+            try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv,
+                             dock: .hidden)
             for _ in 0..<20 {
                 Thread.sleep(forTimeInterval: 2)
                 if isRunning && isClientUpdated(in: runner.prefix) { break }
@@ -174,7 +199,7 @@ public enum SteamBottle {
             if attempt > 1 { Thread.sleep(forTimeInterval: 8) }
 
             try launchClient(runner: runner, extraArgs: ["steam://rungameid/\(appID)"],
-                             showHUD: showHUD, gameEnv: gameEnv)
+                             showHUD: showHUD, gameEnv: gameEnv, dock: .hidden)
 
             // Wait up to ~24 s for the game process to appear.
             var appeared = false

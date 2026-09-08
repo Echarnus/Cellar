@@ -40,7 +40,7 @@ public enum BattleNetBottle {
     /// Command-line fragments that identify the client's processes. `Agent.exe` is Blizzard's
     /// update agent and `Battle.net Helper.exe` its browser subprocesses — both outlive the client
     /// and both have to go when the bottle is shut down.
-    static let clientProcesses = [
+    public static let clientProcesses = [
         "Battle.net.exe",
         "Battle.net Launcher.exe",
         "Battle.net Helper.exe",
@@ -239,10 +239,16 @@ public enum BattleNetBottle {
 
     /// Open the Battle.net client in the bottle (sign in, browse, install games).
     /// Starts the *bootstrapper*, which is what updates and then runs the client.
+    ///
+    /// `dock` says whether the client is the thing the player asked for: `.visible` when they chose
+    /// to open it (that window needs a Dock icon to come back to), `.hidden` when Cellar is only
+    /// standing it up so a game can start.
     public static func launchClient(runner: WineRunner, showHUD: Bool = false,
-                                    gameEnv: [String: String] = [:]) throws {
+                                    gameEnv: [String: String] = [:],
+                                    dock: DockPresence = .visible) throws {
         var extra = WineRunner.d3dMetalEnv(showHUD: showHUD)
         for (key, value) in gameEnv { extra[key] = value }
+        for (key, value) in DockShim.environment(for: .battlenet, dock: dock) { extra[key] = value }
         try runner.spawn([launcherExecutable(in: runner.prefix).path],
                          extraEnv: extra,
                          log: Paths.logs.appendingPathComponent("battlenet-\(runner.prefix.lastPathComponent).log"))
@@ -253,10 +259,11 @@ public enum BattleNetBottle {
     @discardableResult
     public static func ensureClientRunning(runner: WineRunner, showHUD: Bool = false,
                                            gameEnv: [String: String] = [:],
+                                           dock: DockPresence = .visible,
                                            progress: (String) -> Void = { _ in }) throws -> Bool {
         if isRunning { return true }
         progress("Starting Battle.net and waiting for it to be ready…")
-        try launchClient(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
+        try launchClient(runner: runner, showHUD: showHUD, gameEnv: gameEnv, dock: dock)
         let up = ProcessWatch.waitToAppear(["Battle.net.exe"], seconds: 120)
         if up { Thread.sleep(forTimeInterval: 8) }   // let it finish authenticating
         return up
@@ -264,9 +271,11 @@ public enum BattleNetBottle {
 
     /// Ask the running client to launch a product, e.g. `Fen` for Diablo IV.
     public static func execLaunch(runner: WineRunner, product: String, showHUD: Bool = false,
-                                 gameEnv: [String: String] = [:]) throws {
+                                 gameEnv: [String: String] = [:],
+                                 dock: DockPresence = .visible) throws {
         var extra = WineRunner.d3dMetalEnv(showHUD: showHUD)
         for (key, value) in gameEnv { extra[key] = value }
+        for (key, value) in DockShim.environment(for: .battlenet, dock: dock) { extra[key] = value }
         try runner.spawn([clientExecutable(in: runner.prefix).path, "--exec=launch \(product)"],
                          extraEnv: extra,
                          log: Paths.logs.appendingPathComponent("battlenet-exec-\(product).log"))
@@ -285,14 +294,16 @@ public enum BattleNetBottle {
             throw CellarError.invalidArgument(
                 "Battle.net hasn't finished installing in this bottle. Run: cellar battlenet open <slug>")
         }
-        guard try ensureClientRunning(runner: runner, showHUD: showHUD, gameEnv: gameEnv, progress: progress) else {
+        guard try ensureClientRunning(runner: runner, showHUD: showHUD, gameEnv: gameEnv,
+                                      dock: .hidden, progress: progress) else {
             throw CellarError.ioFailure("Battle.net didn't come up. Open it manually: cellar battlenet open <slug>")
         }
 
         try ProcessWatch.superviseStart(
             attempts: attempts,
             cleanup: { ProcessWatch.kill(gameNeedles) },
-            start: { try execLaunch(runner: runner, product: product, showHUD: showHUD, gameEnv: gameEnv) },
+            start: { try execLaunch(runner: runner, product: product, showHUD: showHUD,
+                                    gameEnv: gameEnv, dock: .hidden) },
             isUp: { ProcessWatch.isRunningAny(gameNeedles) },
             progress: progress)
     }
