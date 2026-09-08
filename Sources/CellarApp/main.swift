@@ -1,4 +1,5 @@
 import AppKit
+import CellarKit
 import SwiftUI
 
 extension Notification.Name {
@@ -21,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var accountsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // First thing, before anything can crash: this is also where a previous session that
+        // never reached applicationWillTerminate gets noticed and written down.
+        Diagnostics.processDidStart(version: Bundle.main.shortVersion)
         NSApp.mainMenu = buildMainMenu()
 
         // The gear button in the SwiftUI sidebar asks for Settings via this notification (the menu
@@ -50,6 +54,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    /// Clears the marker `processDidStart` looks for. Quitting cleanly is how the next start knows
+    /// the last one didn't.
+    func applicationWillTerminate(_ notification: Notification) {
+        Diagnostics.processWillExit()
+    }
 
     // MARK: - Menu
 
@@ -163,3 +173,11 @@ let delegate = AppDelegate()
 app.delegate = delegate
 app.setActivationPolicy(.regular)
 app.run()
+
+extension Bundle {
+    /// The version shown in About and written into the log; falls back to the library's own
+    /// version when the app runs unwrapped during development.
+    var shortVersion: String {
+        (infoDictionary?["CFBundleShortVersionString"] as? String) ?? CellarVersion.current
+    }
+}

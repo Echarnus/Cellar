@@ -47,11 +47,29 @@ final class CellarRunner: ObservableObject {
                 guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
                 Task { @MainActor in self.log += s; observe?(s) }
             }
-            try? process.run()
+            do {
+                try process.run()
+            } catch {
+                // The CLI is how the app does everything — if it can't be started, the player sees
+                // a button that does nothing, so make sure the reason is on record.
+                CellarLog.error(.app, "Could not run the cellar CLI at \(binary): "
+                    + "\(CellarLog.describe(error))")
+                await MainActor.run {
+                    self.log += "\nCellar's command-line helper isn't at \(binary).\n"
+                        + "Reinstall Cellar, or run: sh Scripts/install-app.sh\n"
+                    self.busy = false
+                    then?()
+                }
+                return
+            }
             process.waitUntilExit()
             pipe.fileHandleForReading.readabilityHandler = nil
+            let status = process.terminationStatus
+            if status != 0 {
+                CellarLog.debug(.app, "cellar \(args.joined(separator: " ")) exited with \(status).")
+            }
             await MainActor.run {
-                self.log += "\n(exit \(process.terminationStatus))\n"
+                self.log += "\n(exit \(status))\n"
                 self.busy = false
                 then?()
             }

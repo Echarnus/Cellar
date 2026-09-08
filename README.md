@@ -167,6 +167,17 @@ cellar steam add planet-coaster-2   # generates ~/Applications/Planet Coaster 2.
                                     # and a non-Steam shortcut (quit Steam first)
 ```
 
+When something goes wrong:
+
+```sh
+cellar logs                         # what Cellar just did — set-ups, launches, crashes
+cellar logs --level warn            # only the parts that went wrong
+cellar logs export                  # one text file for a bug report (redacted, on your Desktop)
+```
+
+Cellar keeps a rolling record of every set-up, launch and failure — capped at ~1.5 MB, shared by the
+app and the CLI. The app has the same export under **Settings → Diagnostics**.
+
 Other commands: `cellar runner list/install`, `cellar prefix list`, `cellar profiles list/show`,
 `cellar fetch-depot <slug>` (client-free download), `cellar steam enable-windows-platform` (advanced).
 

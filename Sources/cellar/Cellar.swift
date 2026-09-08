@@ -30,10 +30,14 @@ struct Cellar: ParsableCommand {
           cellar battlenet open diablo-4         sign in, install Diablo IV from the client
           cellar launch diablo-4                 play
 
+        When something goes wrong:
+          cellar logs                            what Cellar just did, and where it failed
+          cellar logs export                     one text file to attach to a bug report
+
         Cellar never bundles Apple's proprietary D3DMetal in its own releases, never circumvents
         DRM, and only ever works with games you own.
         """,
-        version: "0.2.0",
+        version: CellarVersion.current,
         subcommands: [
             Doctor.self,
             Setup.self,
@@ -48,7 +52,45 @@ struct Cellar: ParsableCommand {
             ProfileCommand.self,
             Gptk.self,
             SelfTest.self,
+            LogsCommand.self,
         ],
         defaultSubcommand: Doctor.self
     )
+
+    /// Stand in for ArgumentParser's generated entry point so every invocation — and, more to the
+    /// point, every failure — lands in the rolling log. The app drives this CLI for its actions, so
+    /// this one place covers both front-ends.
+    static func main() {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        // Reading the log must not write to it.
+        let quiet = arguments.first == "logs"
+        let invocation = Diagnostics.redact("cellar " + arguments.joined(separator: " "))
+        if !quiet { CellarLog.debug(.app, invocation) }
+
+        do {
+            var command = try parseAsRoot(arguments)
+            try command.run()
+        } catch {
+            // `--help` and `--version` exit through this path too; they are not failures.
+            if !quiet, exitCode(for: error) != ExitCode.success {
+                CellarLog.error(category(for: arguments.first),
+                                "\(invocation) failed: \(message(for: error))")
+            }
+            exit(withError: error)
+        }
+    }
+
+    /// File a failure under the part of Cellar the player was actually using.
+    private static func category(for subcommand: String?) -> LogCategory {
+        switch subcommand {
+        case "launch":                      return .launch
+        case "setup":                       return .setup
+        case "fetch-depot":                 return .install
+        case "steam", "battlenet", "gog":   return .store
+        case "accounts":                    return .account
+        case "runner":                      return .runner
+        case "prefix":                      return .prefix
+        default:                            return .app
+        }
+    }
 }

@@ -100,6 +100,30 @@ struct SelfTest: ParsableCommand {
         try check(decoded?.first?.count == size, "ASCII QR round-trip: \(size) module columns recovered")
         try check(decoded == matrix, "ASCII QR round-trip is module-exact")
 
+        // 6. The rolling log's line format. Every entry is written and read back through these
+        // two, so a message carrying newlines or a double space must survive the round-trip —
+        // otherwise a crash report loses the very line that explains the crash.
+        let written = LogEntry(date: Date(timeIntervalSince1970: 1_757_000_000), level: .warn,
+                               source: "cli", category: .session, subject: "planet-coaster-2",
+                               message: "exited after 12s\nerr:module:import_dll  missing")
+        guard let read = LogEntry.parse(written.line) else {
+            throw Failure(message: "FAILED: a written log line did not parse back")
+        }
+        try check(read.level == .warn && read.category == .session, "log line keeps its level and category")
+        try check(read.subject == "planet-coaster-2", "log line keeps its subject")
+        try check(read.date == written.date, "log line keeps its timestamp to the second")
+        try check(!read.message.contains("\n") && read.message.contains("err:module:import_dll"),
+                  "log message survives newlines and double spaces")
+        try check(LogEntry.parse("not a log line at all") == nil, "a junk line is skipped, not shown")
+
+        // 7. Redaction. The diagnostics report is meant to be posted in public, so these are the
+        // three shapes that must never come out the other side.
+        let secrets = Diagnostics.redact(
+            "refresh_token=abc123 --password hunter2 " + FileManager.default.homeDirectoryForCurrentUser.path + "/Games")
+        try check(!secrets.contains("abc123"), "redaction removes a token value")
+        try check(!secrets.contains("hunter2"), "redaction removes a --password value")
+        try check(secrets.contains("~/Games"), "redaction replaces the home path with ~")
+
         print(Term.green("All selftests passed."))
     }
 }

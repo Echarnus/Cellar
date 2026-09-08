@@ -167,6 +167,8 @@ public enum RunnerManager {
             progress("\(spec.displayName) already installed.")
             return RunnerInstall(spec: spec, root: dest, wineBinary: bin)
         }
+        CellarLog.info(.runner, "Installing runner \(spec.displayName) "
+            + "(\(spec.artifacts.count) artifact(s) to download).", subject: spec.id)
 
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
         for (index, artifact) in spec.artifacts.enumerated() {
@@ -174,6 +176,7 @@ public enum RunnerManager {
             let archive = Paths.cache.appendingPathComponent("\(spec.id)-\(index).\(ext)")
             if !fm.fileExists(atPath: archive.path) {
                 progress("Downloading \(artifact.url)")
+                CellarLog.debug(.runner, "Downloading \(artifact.url)", subject: spec.id)
                 try Downloader.fetch(artifact.url, to: archive)
             } else {
                 progress("Using cached \(archive.lastPathComponent)")

@@ -149,11 +149,50 @@ per module row. There is a round-trip case in `cellar selftest`.
 │   └── d3dmetal/  # user-supplied Apple D3DMetal (never in the repo)
 ├── profiles/    # user/registry-synced profiles (these win over the shipped database)
 └── logs/
+    ├── cellar.log      # the rolling event log (+ .1, .2 — the two files it rolls into)
+    ├── game-<slug>.log # Wine's own output for a direct launch
+    └── steam-*.log / battlenet-*.log   # Wine's output for a store client
 ```
 
 The profile database also ships *inside* the installed app (`Cellar.app/Contents/Resources/profiles`)
 and beside an installed CLI (`<prefix>/share/cellar/profiles`). Those are searched **last**, so a
 shipped update never overwrites a profile the player has edited by hand.
+
+## The rolling log
+
+Cellar drives Wine, a store client and a Windows game, and none of them report back. When a player
+says "it crashed", the only thing that can answer is what Cellar wrote down at the time — so it
+writes down every set-up step, launch, retry, play session and failure, from **both** the CLI and
+the app, into one file.
+
+| Piece | Where | What it does |
+|---|---|---|
+| `CellarLog` | `Sources/CellarKit/Log.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
+| `Diagnostics` | `Sources/CellarKit/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
+| `cellar logs` | `Sources/cellar/Commands/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
+| Settings → Diagnostics | `Sources/CellarApp/SettingsView.swift` | The same export, one button, saved to the Desktop. |
+
+What it records, and why each one is there:
+
+- **App started / quit.** The app writes a marker file while it runs and removes it on a clean quit,
+  so the *next* start can say the previous session ended abnormally — and look for a macOS crash
+  report filed in that window. This is the only honest way Cellar can know it crashed.
+- **A play session.** `Game.launch` records the route it took; `waitForExitThenShutDown` records how
+  long the game ran. An exit inside 90 seconds is logged as a **warning** with the tail of the Wine
+  log and any crash report from that window — Cellar cannot see a Windows exit code through Wine, so
+  it never *claims* a crash, it reports what it observed.
+- **Every progress line.** The `progress:` closures the CLI prints are wrapped, so what the player
+  read is what the log holds — set-up steps, the D3DMetal start-race retries, install progress.
+- **Every failure.** `Cellar.main` wraps the CLI's entry point, so any command that exits non-zero
+  is logged with the invocation and the error the player was shown.
+
+`cellar logs export` folds all of that plus the machine, the runners, the bottles and the tails of
+the Wine logs into one text file for a bug report. It is **redacted**: the home path becomes `~`, the
+user name becomes `<user>`, and anything shaped like a token, password or key becomes `<redacted>`.
+Sign-in *state* is reported, never account names.
+
+`CELLAR_LOG_LEVEL` sets the floor (`off` disables the file entirely); `CELLAR_LOG_STDERR=1` mirrors
+entries to stderr while developing.
 
 ## The Planet Coaster 2 path (worked example)
 

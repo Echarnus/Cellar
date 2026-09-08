@@ -117,6 +117,15 @@ public enum LaunchRoute {
     case direct(exeName: String)
     case steam(appID: Int)
     case battlenet(product: String)
+
+    /// How the route reads in the log and in a diagnostics report.
+    public var logDescription: String {
+        switch self {
+        case .direct(let exeName):    return "direct: \(exeName)"
+        case .steam(let appID):       return "via Steam, AppID \(appID)"
+        case .battlenet(let product): return "via Battle.net, product \(product)"
+        }
+    }
 }
 
 /// A game's readiness, for the GUI to decide what to show (and which button to offer next).
@@ -408,6 +417,12 @@ public enum Game {
     /// Idempotent: safe to re-run; skips steps already done.
     @discardableResult
     public static func setUp(_ plan: GamePlan, progress: (String) -> Void) throws -> WineRunner {
+        func step(_ message: String) {
+            CellarLog.debug(.setup, message, subject: plan.slug)
+            progress(message)
+        }
+        CellarLog.info(.setup, "Setting up \(plan.name) — store \(plan.store.rawValue), runner "
+            + "\(plan.runnerID), backend \(plan.backend), bottle '\(plan.bottleName)'", subject: plan.slug)
         guard SystemEnvironment.isAppleSilicon else {
             throw CellarError.invalidArgument("Cellar requires an Apple Silicon Mac.")
         }
@@ -419,20 +434,20 @@ public enum Game {
             throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
         }
         if let why = spec.deprecated {
-            progress("Warning: runner '\(spec.id)' is deprecated — \(why)")
+            step("Warning: runner '\(spec.id)' is deprecated — \(why)")
         }
 
-        let install = try RunnerManager.install(spec, progress: progress)
+        let install = try RunnerManager.install(spec, progress: step)
         let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
 
         if !FileManager.default.fileExists(atPath: plan.prefix.path) {
-            progress("Creating bottle '\(plan.bottleName)'…")
+            step("Creating bottle '\(plan.bottleName)'…")
             try PrefixManager.create(name: plan.bottleName, backend: plan.graphicsBackend, runner: plan.runnerID)
         }
 
         let registry = plan.prefix.appendingPathComponent("system.reg")
         if !FileManager.default.fileExists(atPath: registry.path) {
-            progress("Initialising the Wine prefix (64-bit + WoW64)…")
+            step("Initialising the Wine prefix (64-bit + WoW64)…")
             try wine.initializePrefix()
             try wine.setWindowsVersion("win10")
             let x86 = plan.prefix.appendingPathComponent("drive_c/Program Files (x86)")
@@ -441,19 +456,20 @@ public enum Game {
                     "The prefix has no 'Program Files (x86)' — the runner is not a WoW64 build, and the 32-bit store clients can't install into it.")
             }
         } else {
-            progress("Wine prefix already initialised.")
+            step("Wine prefix already initialised.")
         }
 
         switch plan.store {
         case .steam:
-            try SteamBottle.install(runner: wine, progress: progress)
+            try SteamBottle.install(runner: wine, progress: step)
         case .battlenet:
-            try BattleNetBottle.install(runner: wine, progress: progress)
+            try BattleNetBottle.install(runner: wine, progress: step)
         case .gog:
-            progress("No store client needed — GOG games are DRM-free, so Cellar installs and runs them directly.")
+            step("No store client needed — GOG games are DRM-free, so Cellar installs and runs them directly.")
         case .standalone:
-            progress("No store client needed — this game runs straight from its files.")
+            step("No store client needed — this game runs straight from its files.")
         }
+        CellarLog.info(.setup, "Setup finished for \(plan.name).", subject: plan.slug)
         return wine
     }
 
@@ -463,6 +479,11 @@ public enum Game {
     /// Steam credentials authenticate the download only; 2FA is prompted on the terminal.
     public static func fetchDepot(_ plan: GamePlan, credentials: DepotTool.Credentials,
                                  progress: (String) -> Void) throws {
+        func step(_ message: String) {
+            CellarLog.debug(.install, message, subject: plan.slug)
+            progress(message)
+        }
+        CellarLog.info(.install, "Downloading \(plan.name) from a Steam depot.", subject: plan.slug)
         guard let appID = plan.appID else {
             throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid to download.")
         }
@@ -477,19 +498,25 @@ public enum Game {
         guard let spec = RunnerCatalog.spec(forID: plan.runnerID) else {
             throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
         }
-        let install = try RunnerManager.install(spec, progress: progress)
+        let install = try RunnerManager.install(spec, progress: step)
         let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
         if !FileManager.default.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path) {
-            progress("Initialising the Wine prefix…")
+            step("Initialising the Wine prefix…")
             try wine.initializePrefix(); try wine.setWindowsVersion("win10")
         }
-        progress("Downloading \(plan.name) (Windows depot) via DepotDownloader…")
+        step("Downloading \(plan.name) (Windows depot) via DepotDownloader…")
         try DepotTool.fetch(appID: appID, into: plan.depotGameDir, credentials: credentials)
-        progress("Downloaded to \(plan.depotGameDir.path)")
+        step("Downloaded to \(plan.depotGameDir.path)")
+        CellarLog.info(.install, "Depot download finished.", subject: plan.slug)
     }
 
     /// Ask the store's client to install the game (or, for a standalone title, say what to run).
     public static func installGame(_ plan: GamePlan, progress: (String) -> Void = { _ in }) throws {
+        func step(_ message: String) {
+            CellarLog.debug(.install, message, subject: plan.slug)
+            progress(message)
+        }
+        CellarLog.info(.install, "Installing \(plan.name) via \(plan.store.displayName).", subject: plan.slug)
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
@@ -499,12 +526,12 @@ public enum Game {
             guard let appID = plan.appID else {
                 throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid.")
             }
-            progress("Asking the bottle's Steam to install \(plan.name) (AppID \(appID))…")
+            step("Asking the bottle's Steam to install \(plan.name) (AppID \(appID))…")
             try SteamBottle.installGame(runner: wine, appID: appID)
         case .battlenet:
             // Battle.net exposes no per-product install URL Cellar could drive, so the honest
             // move is to open the client where the player can do it in two clicks.
-            progress("Opening Battle.net — install \(plan.name) from the client, then come back.")
+            step("Opening Battle.net — install \(plan.name) from the client, then come back.")
             try BattleNetBottle.launchClient(runner: wine, gameEnv: plan.env)
         case .gog:
             guard let productID = plan.gogProductID else {
@@ -514,13 +541,13 @@ public enum Game {
             guard GOGAuth.isSignedIn else {
                 throw CellarError.invalidArgument("Not signed in to GOG. Run: cellar gog login")
             }
-            let parts = try GOGInstall.download(productID: productID, progress: progress)
-            try GOGInstall.install(setup: parts[0], slug: plan.slug, runner: wine, progress: progress)
+            let parts = try GOGInstall.download(productID: productID, progress: step)
+            try GOGInstall.install(setup: parts[0], slug: plan.slug, runner: wine, progress: step)
             guard plan.directLaunchExe != nil else {
                 throw CellarError.ioFailure(
                     "The installer finished but Cellar can't find '\(plan.launchExe ?? "the game's exe")' under C:\\Games\\\(plan.slug). Check the profile's `exe`.")
             }
-            progress("\(plan.name) is installed. Play it with: cellar launch \(plan.slug)")
+            step("\(plan.name) is installed. Play it with: cellar launch \(plan.slug)")
         case .standalone:
             throw CellarError.invalidArgument(
                 "\(plan.name) has no store client. Download it with: cellar fetch-depot \(plan.slug) --username <steam-account>")
@@ -529,6 +556,8 @@ public enum Game {
 
     /// Open the store's client in the bottle (sign in, browse, manage installs).
     public static func openStoreClient(_ plan: GamePlan, showHUD: Bool = false) throws {
+        CellarLog.info(.store, "Opening \(plan.store.displayName) in bottle '\(plan.bottleName)'.",
+                       subject: plan.slug)
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
@@ -563,6 +592,28 @@ public enum Game {
     @discardableResult
     public static func launch(_ plan: GamePlan, showHUD: Bool = false, forceStore: Bool = false,
                               progress: (String) -> Void = { _ in }) throws -> LaunchRoute {
+        // Every progress line the player reads is also kept, so a session can be reconstructed
+        // afterwards from the log alone.
+        func step(_ message: String) {
+            CellarLog.debug(.launch, message, subject: plan.slug)
+            progress(message)
+        }
+        CellarLog.info(.launch, "Launching \(plan.name) — store \(plan.store.rawValue), runner "
+            + "\(plan.runnerID), backend \(plan.backend)\(forceStore ? ", store route forced" : "")",
+            subject: plan.slug)
+        do {
+            let route = try route(plan, showHUD: showHUD, forceStore: forceStore, progress: step)
+            Diagnostics.playSessionBegan(slug: plan.slug, name: plan.name, route: route.logDescription)
+            return route
+        } catch {
+            CellarLog.failure(.launch, "\(plan.name) did not start", error, subject: plan.slug)
+            throw error
+        }
+    }
+
+    /// Pick the route and take it. Split out of `launch` so the logging above wraps every path.
+    private static func route(_ plan: GamePlan, showHUD: Bool, forceStore: Bool,
+                              progress: (String) -> Void) throws -> LaunchRoute {
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
@@ -630,14 +681,21 @@ public enum Game {
         }
         var env = WineRunner.d3dMetalEnv(showHUD: showHUD)
         for (key, value) in plan.env { env[key] = value }
-        try wine.spawn([exe.path], extraEnv: env,
-                       log: Paths.logs.appendingPathComponent("game-\(plan.slug).log"))
+        let wineLog = Paths.logs.appendingPathComponent("game-\(plan.slug).log")
+        CellarLog.debug(.launch, "Starting \(exe.lastPathComponent) directly; Wine output → "
+            + wineLog.lastPathComponent, subject: plan.slug)
+        try wine.spawn([exe.path], extraEnv: env, log: wineLog)
     }
 
     /// Block until the player quits, then take the whole layer down — the behaviour that makes
     /// Cellar feel like a game launcher rather than a pile of Wine processes.
     public static func waitForExitThenShutDown(_ plan: GamePlan, route: LaunchRoute) {
         let wine = wineRunner(plan)
+        defer {
+            Diagnostics.playSessionEnded(slug: plan.slug, name: plan.name,
+                                         processNeedles: plan.gameProcessNeedles)
+            CellarLog.debug(.session, "Layer shut down (\(route.logDescription)).", subject: plan.slug)
+        }
         switch route {
         case .direct(let exeName):
             ProcessWatch.waitToExit([exeName])
