@@ -22,6 +22,30 @@ public struct RunnerArtifact {
     public let payloadPath: String
 }
 
+/// How a runner's own Mach-O binaries are built — which decides *what* translates the x86-64
+/// game code, and therefore whether the runner survives the Rosetta sunset (macOS 28, fall 2027).
+///
+/// The game itself is an x86-64 Windows binary either way; some x86 translation is always in the
+/// loop. The question is only whether that translation is Apple's Rosetta 2 (going away as a
+/// general-purpose tool) or an emulator Cellar ships inside the Win32 layer.
+public enum RunnerArchitecture: String {
+    /// x86-64 Wine. Wine, the renderer DLLs and the game all run under **Rosetta 2**.
+    case x86_64
+    /// arm64 Wine hosting an **ARM64EC** PE world: Wine's own DLLs are native ARM, and x86-64
+    /// game code is translated by an emulator inside the layer (FEX) rather than by Rosetta.
+    case arm64ec
+
+    /// Whether Apple's Rosetta 2 has to be present for this runner to start at all.
+    public var needsRosetta: Bool { self == .x86_64 }
+
+    public var label: String {
+        switch self {
+        case .x86_64: return "x86_64 (Rosetta 2)"
+        case .arm64ec: return "arm64ec (native)"
+        }
+    }
+}
+
 /// Describes a downloadable Wine runner family (where to get it, how it's laid out).
 public struct RunnerSpec {
     public let id: String            // Cellar id, e.g. "sikarugir"
@@ -31,6 +55,12 @@ public struct RunnerSpec {
     public let hasD3DMetal: Bool
     public let license: String
     public let deprecated: String?    // why not to pick it, if applicable
+    /// Declared architecture of the runner's binaries. Defaults to `.x86_64` so a new entry has to
+    /// opt in to claiming it is native; `RunnerInstall.measuredArchitectures` checks the claim.
+    public var architecture: RunnerArchitecture = .x86_64
+    /// The in-layer x86 emulator an ARM64EC runner uses (e.g. "FEX"), when it has one.
+    /// `nil` on x86_64 runners — there the translator is Rosetta 2, outside our layer.
+    public var emulator: String? = nil
 }
 
 /// The runners Cellar knows how to install.
@@ -98,6 +128,25 @@ public enum RunnerCatalog {
         deprecated: "Wine 7.7 crash-loops the Steam web helper (steamwebhelper); use 'sikarugir'."
     )
 
+    // MARK: - The native ARM64EC runner (migration target, not yet shippable)
+    //
+    // Every runner above is `.x86_64`: Wine, the D3DMetal DLLs and the game all go through
+    // Rosetta 2. macOS 27 is the last release with general-purpose Rosetta; macOS 28 (fall 2027)
+    // keeps only a gaming-focused subset, and Apple has not said whether a Wine layer qualifies.
+    //
+    // The replacement is an arm64 Wine with an ARM64EC PE world plus FEX as the in-layer x86
+    // emulator — the same architecture CodeWeavers shipped as a CrossOver Mac ARM64 preview in
+    // July 2026. Both halves are free (Wine LGPL-2.1+, FEX MIT), so a community build is a
+    // question of packaging, not licensing. Adding it here is a catalog entry, not a rewrite:
+    // set `architecture: .arm64ec`, `emulator: "FEX"`, and point the artifacts at the build.
+    //
+    // Three upstream gates, all outside Cellar's control — see docs/ROADMAP.md Phase 5:
+    //   1. A free, prebuilt arm64 macOS Wine with the ARM64EC hook (Gcenx/Sikarugir/WineForge).
+    //   2. FEX's macOS port available as that hook (CodeWeavers' fork upstreamed, or equivalent).
+    //   3. A renderer with ARM64EC PE DLLs: Apple's D3DMetal 4 (GPTK 4 / Metal 4, macOS 27), or
+    //      DXVK + VKD3D-Proton on MoltenVK rebuilt for arm64ec — the fully-free fallback.
+    // `cellar doctor` reports which of these the installed runner already satisfies.
+
     public static let all = [wineforge, sikarugir, gptk]
     public static let defaultID = wineforge.id
     public static func spec(forID id: String) -> RunnerSpec? { all.first { $0.id == id } }
@@ -138,6 +187,23 @@ public struct RunnerInstall {
     public var isWineForgeStyle: Bool { d3dmetalRuntime != nil || dxmtRuntime != nil }
     /// Whether D3DMetal is available through either mechanism.
     public var hasD3DMetal: Bool { d3dmetalRuntime != nil || renderer("d3dmetal") != nil }
+
+    /// The architectures actually present in the installed `wine` binary, read with `lipo`.
+    /// This is the ground truth behind `spec.architecture` — a spec can claim anything, the
+    /// Mach-O header cannot.
+    public var measuredArchitectures: [String] {
+        let result = Shell.run("/usr/bin/lipo", ["-archs", wineBinary.path])
+        guard result.succeeded else { return [] }
+        return result.stdout.split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    /// Whether this install needs Rosetta 2 to run, measured rather than declared.
+    /// Falls back to the spec when `lipo` is unavailable.
+    public var needsRosetta: Bool {
+        let archs = measuredArchitectures
+        guard !archs.isEmpty else { return spec.architecture.needsRosetta }
+        return !archs.contains { $0.hasPrefix("arm64") }
+    }
 }
 
 public enum RunnerManager {
