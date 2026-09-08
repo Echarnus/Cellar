@@ -47,9 +47,10 @@ verified research into each component's license and the relevant law.
    redistribute nobody's proprietary assets" intact. The mark comes from one of two places
    (`Sources/CellarKit/StoreIcon.swift`):
 
-   - **The store's own installation on this machine** — the `.icns` inside `Steam.app`, or the `.ico`
-     that Windows Steam keeps inside the bottle Cellar set up. This is the player's own copy of the
-     store's artwork, displayed in place; nothing is redistributed, exactly as with Apple's D3DMetal.
+   - **The store's own installation on this machine** — the `.icns` inside the store's Mac app, the
+     icon Wine extracted from the Windows client's `.exe` during setup, or a loose `.ico` the client
+     ships. This is the player's own copy of the store's artwork, displayed in place; nothing is
+     redistributed, exactly as with Apple's D3DMetal.
    - **A vector shape Cellar draws itself** (`Sources/CellarApp/StoreMark.swift`) when the store is
      not installed and there is nothing to point at.
 

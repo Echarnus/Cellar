@@ -107,16 +107,62 @@ public enum StoreIcon {
         }
     }
 
+    /// The icon **Wine itself** extracted from the store client's `.exe`.
+    ///
+    /// When a Windows installer registers a Start Menu entry, `winemenubuilder` unpacks the
+    /// executable's icon resources and writes them as PNGs under
+    /// `~/.local/share/icons/hicolor/<size>/apps/`, named `<hash>_<exe name>.0.png`. That is the
+    /// client's real icon at up to 256px, already a PNG, and it costs nothing — Wine did the PE
+    /// parsing during setup.
+    ///
+    /// This is what gives **Battle.net** a real mark. Windows Steam happens to keep its logo as a
+    /// loose `.ico`; Blizzard's client does not, so without this there would be nothing to point at
+    /// short of parsing `Battle.net.exe` ourselves.
+    static func wineExtractedIcon(_ store: GameStore) -> URL? {
+        let exeNames: [String]
+        switch store {
+        case .steam:
+            exeNames = ["steam"]
+        case .battlenet:
+            exeNames = ["Battle.net", "Battle.net Launcher"]
+        // GOG has no client in a bottle, so Wine never sees a GOG executable to extract from.
+        case .gog, .standalone:
+            return nil
+        }
+
+        let fm = FileManager.default
+        let hicolor = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/share/icons/hicolor", isDirectory: true)
+        // Biggest first: the mark is drawn at up to 30pt, which is 60px on a Retina display.
+        for size in ["256x256", "128x128", "64x64", "48x48", "32x32"] {
+            let apps = hicolor.appendingPathComponent("\(size)/apps", isDirectory: true)
+            guard let entries = try? fm.contentsOfDirectory(at: apps, includingPropertiesForKeys: nil)
+            else { continue }
+            for exe in exeNames {
+                // "5026_steam.0.png" -> stem "5026_steam.0". The leading hash is Wine's, not ours.
+                let suffix = "_\(exe.lowercased()).0"
+                if let hit = entries.first(where: {
+                    $0.pathExtension.lowercased() == "png"
+                        && $0.deletingPathExtension().lastPathComponent.lowercased().hasSuffix(suffix)
+                }) { return hit }
+            }
+        }
+        return nil
+    }
+
     // MARK: - Resolution
 
     /// A file the UI can draw as this store's mark, or nil when the store isn't installed anywhere
-    /// Cellar can see. Native artwork wins over the Windows client's: it is the icon the player
-    /// already associates with the store on this machine.
+    /// Cellar can see. Sources are tried in order: the store's native Mac app (the icon the player
+    /// already associates with it), then the icon Wine extracted from the Windows client's `.exe`
+    /// during setup, then a loose `.ico` the client ships.
     ///
     /// A Windows `.ico` is converted to a PNG once and cached under `Paths.cache/store-icons/`;
     /// the cache is rebuilt whenever the source is newer, so a Steam update refreshes the mark.
     public static func mark(_ store: GameStore) -> URL? {
         if let icns = nativeICNS(store) { return icns }
+        // Already a PNG at the size we want - preferred over converting a `.ico` ourselves.
+        if let png = wineExtractedIcon(store) { return png }
         guard let ico = bottleICO(store) else { return nil }
 
         let fm = FileManager.default

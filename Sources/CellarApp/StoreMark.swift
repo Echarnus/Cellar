@@ -9,9 +9,10 @@ import CellarKit
 ///
 /// There are two ways to get one on screen, and Cellar uses both, in this order:
 ///
-/// 1. **The store's real artwork, from the copy already on this machine** — the `.icns` inside
-///    Steam.app, or the `.ico` Windows Steam keeps in the bottle Cellar itself installed. That is
-///    Valve's own mark, not an impression of it, and it costs nothing to be exact.
+/// 1. **The store's real artwork, from the copy already on this machine** — the `.icns` inside the
+///    store's Mac app, the icon Wine extracted from the Windows client's `.exe` while setting the
+///    bottle up, or a loose `.ico` the client ships. That is the storefront's own mark, not an
+///    impression of it, and it costs nothing to be exact.
 /// 2. **A vector mark drawn here**, when the store isn't installed and there is nothing to point at.
 ///
 /// What Cellar never does is **ship** anyone's logo. Every storefront's brand guidelines forbid it
