@@ -32,6 +32,12 @@ executable can't use a `@main` App scene). That host has sharp edges we've alrea
 - **No `.animation(value:)` / `.transition` on the detail pane, and no `NavigationSplitView`.** Both
   trigger a **fatal AttributeGraph precondition cycle** (Abort trap 6) on launch under
   `NSHostingView`. Use **`HSplitView`**. Only *local* animation is safe (e.g. a row's hover state).
+- **No SwiftUI `.sheet` / `.popover` in the hosted view tree.** A `.sheet(isPresented:)` triggers the
+  **same AttributeGraph crash on launch** (it animates via `NSAnimationContext`, re-entering the main
+  window's view graph). Present auxiliary UI (e.g. Settings) as a **separate `NSWindow`** hosting its
+  own `NSHostingView` — a top-level window is its own graph, so it's safe. Bridge the button/menu →
+  window with the `.cellarOpenSettings` notification; the window's view takes an `onClose` callback
+  (there's no `dismiss` environment for a plain `NSWindow`).
 - **The menu bar is built by hand** in `main.swift` — AppKit installs no default menu for a
   hand-rolled app. Keep the App menu (About, Settings… ⌘,, Quit ⌘Q), the **Edit menu**
   (cut/copy/paste/select-all — text fields need it), and the Window menu. If you add a window-level

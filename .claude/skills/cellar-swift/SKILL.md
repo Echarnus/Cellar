@@ -11,10 +11,11 @@ The full guide is [`skills/swift.md`](../../../skills/swift.md); read it. Key ru
   plain build). Swift 5 language mode — don't add async/actor machinery without cause.
 - **All logic in `CellarKit`;** the CLI and app are thin. The app drives the `cellar` CLI as a
   subprocess for actions — don't reimplement an action in a view.
-- **SwiftUI under `NSHostingView` (no `@main` scene) — do not regress:** no `NavigationSplitView` and
-  no `.animation`/`.transition` on the detail pane (fatal AttributeGraph cycle) — use `HSplitView`;
-  the menu bar is hand-built in `main.swift` (keep App/Edit/Window, ⌘Q); bridge menu→view state via
-  a `Notification`; a `@State`-gated sheet needs a matching `.sheet(isPresented:)`.
+- **SwiftUI under `NSHostingView` (no `@main` scene) — do not regress:** no `NavigationSplitView`,
+  no `.animation`/`.transition` on the detail pane, and **no SwiftUI `.sheet`/`.popover`** — all
+  trigger a fatal AttributeGraph cycle on launch. Use `HSplitView`; present auxiliary UI (Settings)
+  as a separate `NSWindow`, not a sheet. The menu bar is hand-built in `main.swift` (keep
+  App/Edit/Window, ⌘Q); bridge menu/button → window via the `.cellarOpenSettings` `Notification`.
 - **Verify** (not by reading the diff): build clean → `swift run cellar selftest` → for GUI, `sh
   Scripts/install-app.sh` and launch and exercise the path.
 
