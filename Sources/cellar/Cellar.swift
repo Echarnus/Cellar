@@ -64,8 +64,8 @@ struct Cellar: ParsableCommand {
         let arguments = Array(CommandLine.arguments.dropFirst())
         // Reading the log must not write to it.
         let quiet = arguments.first == "logs"
-        let invocation = "cellar " + Diagnostics.redactCommandLine(arguments)
-        if !quiet { CellarLog.debug(.app, invocation) }
+        let redacted = Diagnostics.redactCommandLine(arguments)
+        if !quiet { CellarLog.debug(.app, "cellar " + redacted.text) }
 
         do {
             var command = try parseAsRoot(arguments)
@@ -74,10 +74,18 @@ struct Cellar: ParsableCommand {
             // `--help` and `--version` exit through this path too; they are not failures.
             if !quiet, exitCode(for: error) != ExitCode.success {
                 CellarLog.error(category(for: arguments.first),
-                                "\(invocation) failed: \(message(for: error))")
+                                failureLine(redacted, message(for: error)))
             }
             exit(withError: error)
         }
+    }
+
+    /// Compose the line a failure is logged as. Separate from `main` so the self-test can drive it
+    /// with a *real* parse error: the reason text is generated from the same argv the invocation
+    /// came from, so it has to be scrubbed with the same secrets, or the redaction on the left of
+    /// the line is undone by the quote on the right of it.
+    static func failureLine(_ redacted: Diagnostics.RedactedCommandLine, _ reason: String) -> String {
+        "cellar \(redacted.text) failed: \(redacted.scrub(reason))"
     }
 
     /// File a failure under the part of Cellar the player was actually using.

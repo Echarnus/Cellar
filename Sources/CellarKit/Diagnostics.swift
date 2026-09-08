@@ -296,14 +296,36 @@ public enum Diagnostics {
     /// report. A list you must remember to extend is a leak waiting for the next option.
     private static let loggableOptionValues: Set<String> = [
         "profile", "backend", "runner", "level", "game", "lines", "limit", "output", "id",
-        "n", "o",
+        "l", "o",
     ]
+
+    /// A command line as the log may record it, plus the raw strings that were taken out of it.
+    ///
+    /// The second half is the point. Redacting the invocation is not enough on its own: anything
+    /// *derived* from the same argv can quote a token straight back — ArgumentParser's parse errors
+    /// name the offending token verbatim ("Unknown option '-uGluedSecretAccount'"), and that text
+    /// was being logged beside the carefully redacted invocation on the same line.
+    public struct RedactedCommandLine {
+        public let text: String
+        /// Longest first, so a whole token is replaced before the value inside it.
+        public let removed: [String]
+
+        /// Take out of `message` anything the command line hid, then apply the usual text rules.
+        public func scrub(_ message: String) -> String {
+            var out = message
+            for secret in removed where !secret.isEmpty {
+                out = out.replacingOccurrences(of: secret, with: "<redacted>")
+            }
+            return Diagnostics.redact(out)
+        }
+    }
 
     /// Render a command line for the log with every option value stripped unless it is on
     /// `loggableOptionValues`. Positional words — the subcommand and the profile slug — are kept:
     /// no command takes a credential positionally, and they are what makes a log line readable.
-    public static func redactCommandLine(_ arguments: [String]) -> String {
+    public static func redactCommandLine(_ arguments: [String]) -> RedactedCommandLine {
         var rendered: [String] = []
+        var removed: [String] = []
         var index = 0
         while index < arguments.count {
             let token = arguments[index]
@@ -319,8 +341,9 @@ public enum Diagnostics {
             let flag = token.hasPrefix("--") ? "--\(name)" : "-\(name)"
 
             // `--name=value`, `-n=value` and the glued `-nvalue` carry the value in the same token.
-            if inlineValue != nil {
+            if let inlineValue {
                 rendered.append(keepValue ? token : "\(flag)=<redacted>")
+                if !keepValue { removed += [token, inlineValue] }
                 continue
             }
 
@@ -329,10 +352,12 @@ public enum Diagnostics {
             // at worst this redacts a positional — one slug lost from one line, never a credential.
             if index < arguments.count, !arguments[index].hasPrefix("-") {
                 rendered.append(keepValue ? arguments[index] : "<redacted>")
+                if !keepValue { removed.append(arguments[index]) }
                 index += 1
             }
         }
-        return redact(rendered.joined(separator: " "))
+        return RedactedCommandLine(text: redact(rendered.joined(separator: " ")),
+                                   removed: removed.sorted { $0.count > $1.count })
     }
 
     /// Split `--name=value` / `-n=value` / `-nvalue` into its name and the value it carries inline.

@@ -138,16 +138,35 @@ struct SelfTest: ParsableCommand {
             (["gog", "login", "--future-option", "SteamAccountName"], "an option nobody listed"),
         ]
         for (arguments, shape) in commandLines {
-            let line = Diagnostics.redactCommandLine(arguments)
+            let line = Diagnostics.redactCommandLine(arguments).text
             try check(!line.contains("SteamAccountName") && line.contains("<redacted>"),
                       "command line redacts a value passed by \(shape)")
         }
 
         // …without redacting the words that make a log line worth reading.
-        let readable = Diagnostics.redactCommandLine(["launch", "witcher-3", "--level", "warn"])
+        let readable = Diagnostics.redactCommandLine(["launch", "witcher-3", "--level", "warn"]).text
         try check(readable.contains("launch") && readable.contains("witcher-3"),
                   "command line keeps the subcommand and the profile slug")
         try check(readable.contains("warn"), "command line keeps a known-safe option value")
+
+        // 9. The whole logged line, built from a *real* parse failure. ArgumentParser's own error
+        // text quotes the offending token back verbatim ("Unknown option '-uGluedSecret…'"), so a
+        // redacted invocation is worthless if the reason beside it is not scrubbed with the same
+        // secrets. Testing the formatter alone missed this; parsing for real is what catches it.
+        let failing: [([String], String)] = [
+            (["fetch-depot", "witcher-3", "-uGluedSecretAccount"], "a glued short flag"),
+            (["fetch-depot", "witcher-3", "--username"], "a flag with its value missing"),
+            (["gog", "login", "--code"], "an OAuth code flag with no value"),
+            (["fetch-depot", "witcher-3", "--nonsense=SecretAccountName"], "an unknown option"),
+        ]
+        for (arguments, shape) in failing {
+            var reason = ""
+            do { _ = try Cellar.parseAsRoot(arguments) } catch { reason = Cellar.message(for: error) }
+            try check(!reason.isEmpty, "\(shape) really does fail to parse")
+            let line = Cellar.failureLine(Diagnostics.redactCommandLine(arguments), reason)
+            try check(!line.contains("GluedSecretAccount") && !line.contains("SecretAccountName"),
+                      "the logged failure keeps no secret out of \(shape)")
+        }
 
         print(Term.green("All selftests passed."))
     }
