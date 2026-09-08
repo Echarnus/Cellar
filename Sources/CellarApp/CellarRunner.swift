@@ -33,7 +33,14 @@ final class CellarRunner: ObservableObject {
              then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
         busy = true; busyTitle = title
-        log += "\n$ cellar \(args.joined(separator: " "))\n"
+
+        // Redact once, use everywhere. `args` can carry a credential the player just pasted — the
+        // GOG sign-in hands this method their one-time OAuth code — and it reaches two places from
+        // here: the on-screen activity pane (which a player screenshots into a bug report) and the
+        // rolling log (which `cellar logs export` ships). The subprocess redacts its own
+        // invocation; this is the app's separate copy of the same command line.
+        let shown = "cellar " + Diagnostics.redactCommandLine(args).text
+        log += "\n$ \(shown)\n"
 
         Task.detached { [binary] in
             let process = Process()
@@ -52,8 +59,8 @@ final class CellarRunner: ObservableObject {
             } catch {
                 // The CLI is how the app does everything — if it can't be started, the player sees
                 // a button that does nothing, so make sure the reason is on record.
-                CellarLog.error(.app, "Could not run the cellar CLI at \(binary): "
-                    + "\(CellarLog.describe(error))")
+                CellarLog.error(.app, "Could not run the cellar CLI at "
+                    + "\(Diagnostics.redact(binary)): \(CellarLog.describe(error))")
                 await MainActor.run {
                     self.log += "\nCellar's command-line helper isn't at \(binary).\n"
                         + "Reinstall Cellar, or run: sh Scripts/install-app.sh\n"
@@ -66,7 +73,7 @@ final class CellarRunner: ObservableObject {
             pipe.fileHandleForReading.readabilityHandler = nil
             let status = process.terminationStatus
             if status != 0 {
-                CellarLog.debug(.app, "cellar \(args.joined(separator: " ")) exited with \(status).")
+                CellarLog.debug(.app, "\(shown) exited with \(status).")
             }
             await MainActor.run {
                 self.log += "\n(exit \(status))\n"
