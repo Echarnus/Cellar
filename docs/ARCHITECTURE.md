@@ -120,6 +120,12 @@ remembering: **a store that can never answer shows its games** (hiding Diablo IV
 Battle.net does not exist in this app), **a store that could answer but hasn't hides them** and says
 exactly how to let Cellar ask. That is what keeps "these are your games" a true sentence.
 
+**"Connected" and "verified" are two different facts**, and conflating them is how a false ✓ gets in:
+`StoreStatus.isConnected` says a store's games may be listed, `StoreStatus.isConnectionVerified` says
+whether Cellar *read* that connection (Steam, GOG) or was *told* it (Battle.net alone). Any surface
+that draws a mark from the first is claiming the second, so `cellar library` has three marks — `•`
+not connected, `✓` read, `·` the player's word — and `cellar selftest` holds that apart.
+
 Ownership is **cached** (`shared/libraries/<store>.json`, refreshed on sign-in, on Refresh, or after a
 day) because `Game.summaries()` runs on every library refresh and must never make a network call.
 The Steam Web API key is a credential, so it lives in the keychain beside the sign-in tokens.
