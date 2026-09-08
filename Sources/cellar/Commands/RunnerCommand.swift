@@ -20,7 +20,10 @@ struct RunnerCommand: ParsableCommand {
                 for runner in installed {
                     let renderers = ["d3dmetal", "dxmt", "dxvk", "d9vk"].filter { runner.renderer($0) != nil }
                     let extra = renderers.isEmpty ? "" : "  renderers: " + renderers.joined(separator: ", ")
-                    print("  \(Term.green("✓")) \(runner.spec.id)  \(Term.dim(runner.spec.displayName + extra))")
+                    let archs = runner.measuredArchitectures.joined(separator: "/")
+                    let arch = archs.isEmpty ? runner.spec.architecture.rawValue : archs
+                    let tag = runner.needsRosetta ? Term.yellow(" [\(arch), Rosetta]") : Term.green(" [\(arch), native]")
+                    print("  \(Term.green("✓")) \(runner.spec.id)\(tag)  \(Term.dim(runner.spec.displayName + extra))")
                 }
             }
             print("")
