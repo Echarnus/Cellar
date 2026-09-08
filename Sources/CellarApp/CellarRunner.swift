@@ -59,10 +59,13 @@ final class CellarRunner: ObservableObject {
             } catch {
                 // The CLI is how the app does everything — if it can't be started, the player sees
                 // a button that does nothing, so make sure the reason is on record.
+                // The same string on screen as in the log: this path runs through the player's home
+                // folder, and the activity pane ends up in screenshots.
+                let helperPath = Diagnostics.redact(binary)
                 CellarLog.error(.app, "Could not run the cellar CLI at "
-                    + "\(Diagnostics.redact(binary)): \(CellarLog.describe(error))")
+                    + "\(helperPath): \(CellarLog.describe(error))")
                 await MainActor.run {
-                    self.log += "\nCellar's command-line helper isn't at \(binary).\n"
+                    self.log += "\nCellar's command-line helper isn't at \(helperPath).\n"
                         + "Reinstall Cellar, or run: sh Scripts/install-app.sh\n"
                     self.busy = false
                     then?()
