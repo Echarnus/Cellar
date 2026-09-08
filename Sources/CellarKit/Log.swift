@@ -195,6 +195,11 @@ public final class CellarLog: @unchecked Sendable {
 
     /// Roll `cellar.log` → `.1` → `.2` and drop what falls off the end. Bounded by construction:
     /// a log that grows forever is one nobody can send.
+    ///
+    /// The lock is per-process. If the app and the CLI happen to cross the size threshold in the
+    /// same instant, one of them can lose a line to the other's rename — deliberately accepted:
+    /// a cross-process lock on every write would make logging a thing that can block a launch,
+    /// which is the one thing it must never be.
     private func rotateIfNeeded(_ url: URL) {
         guard let size = try? fileManager.attributesOfItem(atPath: url.path)[.size] as? Int,
               size >= Self.maxBytesPerFile else { return }

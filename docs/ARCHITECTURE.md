@@ -188,8 +188,20 @@ What it records, and why each one is there:
 
 `cellar logs export` folds all of that plus the machine, the runners, the bottles and the tails of
 the Wine logs into one text file for a bug report. It is **redacted**: the home path becomes `~`, the
-user name becomes `<user>`, and anything shaped like a token, password or key becomes `<redacted>`.
-Sign-in *state* is reported, never account names.
+user name becomes `<user>`, and sign-in *state* is reported, never account names.
+
+Command lines are redacted **fail-closed**, in `Diagnostics.redactCommandLine`: an option's value is
+kept only if the option is on a short allowlist of diagnostic ones (`--profile`, `--level`,
+`--output`…), and every other value — including options that do not exist yet — becomes
+`<redacted>`. Positional words (the subcommand, the profile slug) are kept, because no command takes
+a credential positionally and they are what makes a line readable.
+
+The first version listed *sensitive* names instead and matched only `--long` options, so
+`fetch-depot -u <steam account>` and `gog login --code <oauth code>` reached the export in
+plaintext — under an on-screen promise that they had been removed. A list you must remember to
+extend leaks every option nobody thought of; the allowlist cannot. `cellar selftest` now drives the
+real formatter in every spelling ArgumentParser accepts (`-u v`, `-uv`, `--username v`,
+`--username=v`, and an option deliberately not on any list).
 
 `CELLAR_LOG_LEVEL` sets the floor (`off` disables the file entirely); `CELLAR_LOG_STDERR=1` mirrors
 entries to stderr while developing.

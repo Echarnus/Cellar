@@ -124,6 +124,31 @@ struct SelfTest: ParsableCommand {
         try check(!secrets.contains("hunter2"), "redaction removes a --password value")
         try check(secrets.contains("~/Games"), "redaction replaces the home path with ~")
 
+        // 8. The command line as the log records it. `Cellar.main` logs every invocation, and the
+        // export folds the log into a file players are told to attach to a public bug report — so
+        // this exercises the formatter that actually runs, in every spelling ArgumentParser accepts.
+        // The first version of this only tested `redact()` against strings built from its own
+        // pattern list, and duly missed `-u <steam account>` and `gog login --code <oauth code>`.
+        let commandLines: [([String], String)] = [
+            (["fetch-depot", "witcher-3", "-u", "SteamAccountName"], "short flag"),
+            (["fetch-depot", "witcher-3", "-uSteamAccountName"], "glued short flag"),
+            (["fetch-depot", "witcher-3", "--username", "SteamAccountName"], "long flag"),
+            (["fetch-depot", "witcher-3", "--username=SteamAccountName"], "long flag with ="),
+            (["gog", "login", "--code", "SteamAccountName"], "one-time OAuth code"),
+            (["gog", "login", "--future-option", "SteamAccountName"], "an option nobody listed"),
+        ]
+        for (arguments, shape) in commandLines {
+            let line = Diagnostics.redactCommandLine(arguments)
+            try check(!line.contains("SteamAccountName") && line.contains("<redacted>"),
+                      "command line redacts a value passed by \(shape)")
+        }
+
+        // …without redacting the words that make a log line worth reading.
+        let readable = Diagnostics.redactCommandLine(["launch", "witcher-3", "--level", "warn"])
+        try check(readable.contains("launch") && readable.contains("witcher-3"),
+                  "command line keeps the subcommand and the profile slug")
+        try check(readable.contains("warn"), "command line keeps a known-safe option value")
+
         print(Term.green("All selftests passed."))
     }
 }

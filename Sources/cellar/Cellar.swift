@@ -64,7 +64,7 @@ struct Cellar: ParsableCommand {
         let arguments = Array(CommandLine.arguments.dropFirst())
         // Reading the log must not write to it.
         let quiet = arguments.first == "logs"
-        let invocation = Diagnostics.redact("cellar " + arguments.joined(separator: " "))
+        let invocation = "cellar " + Diagnostics.redactCommandLine(arguments)
         if !quiet { CellarLog.debug(.app, invocation) }
 
         do {

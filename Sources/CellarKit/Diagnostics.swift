@@ -52,13 +52,16 @@ public enum Diagnostics {
     }
 
     private static let lock = NSLock()
-    private static var current: PlaySession?
+    /// Keyed by slug, not a single slot: one process can have two games up (the app launches each
+    /// through its own `cellar launch`, but nothing stops two launches sharing a process), and the
+    /// second one must not erase the first one's start time.
+    private static var open: [String: PlaySession] = [:]
 
     /// A game is up. Remembered in-process so the matching exit can be logged with a duration —
     /// `cellar launch` starts the game and waits for it in the same process.
     public static func playSessionBegan(slug: String, name: String, route: String) {
         lock.lock()
-        current = PlaySession(slug: slug, name: name, route: route, startedAt: Date())
+        open[slug] = PlaySession(slug: slug, name: name, route: route, startedAt: Date())
         lock.unlock()
         CellarLog.info(.session, "\(name) is up (\(route)).", subject: slug)
     }
@@ -70,8 +73,7 @@ public enum Diagnostics {
     /// reports the fact (gone after 14 seconds) and what it found alongside it.
     public static func playSessionEnded(slug: String, name: String, processNeedles: [String] = []) {
         lock.lock()
-        let session = current?.slug == slug ? current : nil
-        current = nil
+        let session = open.removeValue(forKey: slug)
         lock.unlock()
 
         guard let session else {
@@ -285,6 +287,69 @@ public enum Diagnostics {
         "== \(title) " + String(repeating: "=", count: max(0, 76 - title.count))
     }
 
+    /// Option values worth keeping in the log: diagnostic, and never private. **Everything else is
+    /// redacted, including options that do not exist yet.**
+    ///
+    /// Listing the *sensitive* names instead is the wrong default, and it failed exactly as you
+    /// would expect: it matched only `--long` options, so `fetch-depot -u <steam account>` and
+    /// `gog login --code <oauth code>` went into a file players are told to attach to a public bug
+    /// report. A list you must remember to extend is a leak waiting for the next option.
+    private static let loggableOptionValues: Set<String> = [
+        "profile", "backend", "runner", "level", "game", "lines", "limit", "output", "id",
+        "n", "o",
+    ]
+
+    /// Render a command line for the log with every option value stripped unless it is on
+    /// `loggableOptionValues`. Positional words — the subcommand and the profile slug — are kept:
+    /// no command takes a credential positionally, and they are what makes a log line readable.
+    public static func redactCommandLine(_ arguments: [String]) -> String {
+        var rendered: [String] = []
+        var index = 0
+        while index < arguments.count {
+            let token = arguments[index]
+            index += 1
+
+            guard token.hasPrefix("-"), token != "-", token != "--" else {
+                rendered.append(token)
+                continue
+            }
+
+            let (name, inlineValue) = splitOption(token)
+            let keepValue = loggableOptionValues.contains(name.lowercased())
+            let flag = token.hasPrefix("--") ? "--\(name)" : "-\(name)"
+
+            // `--name=value`, `-n=value` and the glued `-nvalue` carry the value in the same token.
+            if inlineValue != nil {
+                rendered.append(keepValue ? token : "\(flag)=<redacted>")
+                continue
+            }
+
+            rendered.append(token)
+            // The value is whatever follows that is not another option. A boolean flag has none, so
+            // at worst this redacts a positional — one slug lost from one line, never a credential.
+            if index < arguments.count, !arguments[index].hasPrefix("-") {
+                rendered.append(keepValue ? arguments[index] : "<redacted>")
+                index += 1
+            }
+        }
+        return redact(rendered.joined(separator: " "))
+    }
+
+    /// Split `--name=value` / `-n=value` / `-nvalue` into its name and the value it carries inline.
+    private static func splitOption(_ token: String) -> (name: String, value: String?) {
+        if token.hasPrefix("--") {
+            let body = token.dropFirst(2)
+            guard let equals = body.firstIndex(of: "=") else { return (String(body), nil) }
+            return (String(body[body.startIndex..<equals]), String(body[body.index(after: equals)...]))
+        }
+        let body = token.dropFirst()
+        guard let first = body.first else { return ("", nil) }
+        let rest = body.dropFirst()
+        if rest.isEmpty { return (String(first), nil) }
+        if rest.hasPrefix("=") { return (String(first), String(rest.dropFirst())) }
+        return (String(first), String(rest))
+    }
+
     /// Strip what a player would not want to post in public: their home path, their short user
     /// name, and any `key=value` / `"key": "value"` pair whose key smells like a credential.
     public static func redact(_ text: String) -> String {
@@ -295,14 +360,19 @@ public enum Diagnostics {
             out = out.replacingOccurrences(of: "/Users/\(user)", with: "~")
             out = out.replacingOccurrences(of: user, with: "<user>")
         }
-        let secretKey = "(?i)(token|refresh_token|access_token|password|passwd|secret|api[_-]?key|authorization|cookie|session)"
+        let secretKey = "(?i)(token|refresh_token|access_token|password|passwd|secret|api[_-]?key|authorization|cookie|session|code|auth|pin|guard)"
         for pattern in ["\(secretKey)\\s*[=:]\\s*\"[^\"]*\"", "\(secretKey)\\s*[=:]\\s*\\S+"] {
             out = out.replacingOccurrences(of: pattern, with: "$1=<redacted>",
                                            options: [.regularExpression])
         }
-        // `--password hunter2` / `--username someone` — the space-separated form a command line uses.
+        // `--password hunter2` / `-u someone` — the space-separated forms, long and short, for text
+        // that did not come from argv (a Wine log, a pasted command). Argv itself goes through
+        // `redactCommandLine`, which is fail-closed and does not rely on this list.
         out = out.replacingOccurrences(
-            of: "(?i)(--(?:password|token|secret|api-key|username|user|account))(\\s+)\\S+",
+            of: "(?i)(--(?:password|token|secret|api[-_]?key|username|user|account|code|auth))(\\s+|=)\\S+",
+            with: "$1$2<redacted>", options: [.regularExpression])
+        out = out.replacingOccurrences(
+            of: "(?<![\\w-])(-[upkc])(\\s+|=)\\S+",
             with: "$1$2<redacted>", options: [.regularExpression])
         return out
     }
