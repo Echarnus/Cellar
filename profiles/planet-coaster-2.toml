@@ -12,6 +12,10 @@ graphics_api  = "DirectX 12"
 architecture  = "x86-64"
 released      = "2024-11-06"
 
+# Which client Cellar stands up in the bottle for this game. Steam is the default, but every
+# profile says so out loud now that Cellar speaks more than one store (see docs/ARCHITECTURE.md).
+store         = "steam"
+
 [compatibility]
 # No kernel anti-cheat (no EAC / BattlEye / Vanguard) — Wine/D3DMetal friendly.
 anticheat                   = "none"

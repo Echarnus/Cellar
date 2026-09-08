@@ -43,6 +43,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 $ICON_KEY
 </dict></plist>
 PLIST
+# Ship the profile database inside the bundle. Cellar searches this *after* the player's own
+# ~/Library/Application Support/Cellar/profiles, so shipping a new game (or a fixed profile) never
+# overwrites a profile someone has edited by hand.
+mkdir -p "$APP/Contents/Resources/profiles"
+cp profiles/*.toml "$APP/Contents/Resources/profiles/"
+echo "Bundled $(ls profiles/*.toml | wc -l | tr -d ' ') game profiles."
+
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
 echo "Installed $APP  —  open it with:  open \"$APP\""

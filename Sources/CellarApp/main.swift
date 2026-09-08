@@ -27,7 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self, selector: #selector(showSettings), name: .cellarOpenSettings, object: nil)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
+            // Comfortably above ContentView's minimum: at the minimum the detail pane's two
+            // information columns collapse into one, which is a fallback, not the intended look.
+            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false)
         window.title = "Cellar"

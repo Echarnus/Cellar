@@ -16,6 +16,14 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
 - If `Sources/**` changed, run `swift run cellar selftest` — must pass.
 
 ## 2. Per-kind demands (climb the verification ladder in AGENTS.md)
+- **UX/UI — anything a player sees** ([`skills/ux.md`](../../skills/ux.md)): one obvious next action
+  with a plain sentence under it; empty / loading / first-run / busy / error states all designed;
+  light *and* dark; readable at the window's minimum width. **Honesty:** no ✓ for a state Cellar
+  cannot actually check (Battle.net sign-in), and any step the player must do by hand is announced
+  before it happens (Battle.net's installer). Store identity carried by position + mark + word, never
+  colour alone; store marks drawn in code, never bundled logo files. Icon-only controls have both
+  `.accessibilityLabel` and `.help`. Per-store behaviour lives in `GameStore.descriptor`, not in a
+  `switch` inside a view. **Demand a screenshot of the changed screen from a launched build.**
 - **Swift/GUI** ([`skills/swift.md`](../../skills/swift.md)): logic stayed in CellarKit (not copied
   into a command/view); the app still drives the CLI for actions; **no** `NavigationSplitView` and
   **no** detail-pane `.animation`/`.transition`; the hand-built menu (App/Edit/Window, ⌘Q) is intact;
@@ -27,7 +35,9 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
 - **Shell/packaging** ([`skills/shell-and-packaging.md`](../../skills/shell-and-packaging.md)):
   `set -e` + SDK-unset present; Info.plist keys correct and in sync across both scripts; zip names
   don't collide on a case-insensitive FS; DMG stays versionless.
-- **Profile:** required fields present; DRM/anti-cheat honest; `status` + tested-hardware `notes`.
+- **Profile:** required fields present; `store` named; the store's own identifier present
+  (`steam_appid`, or `product_code` + `install_dir` + `exe`); DRM/anti-cheat honest; `status` +
+  tested-hardware `notes` — and `status = "playable"` only where somebody actually played it.
 
 ## 3. Hard project rules (AGENTS.md → *Hard project rules*)
 No bundled D3DMetal or game files; no DRM/anti-cheat circumvention; nothing gitignored is being

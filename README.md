@@ -4,8 +4,9 @@
 
 Cellar assembles a [Wine](https://www.winehq.org/) runner plus a graphics-translation backend
 (Apple's **D3DMetal**, or the open-source **DXVK → MoltenVK** path) into per-game **bottles**,
-driven by a community **profile database**. The first supported profile is **Planet Coaster 2**;
-the engine itself is general — adding a new game means adding a profile, not rebuilding the layer.
+driven by a community **profile database**. Each game names the **storefront** it came from, and
+Cellar stands that client up inside the bottle — Windows **Steam**, or Blizzard's **Battle.net**.
+The engine is general: adding a game means adding a profile, not rebuilding the layer.
 
 > **Status:** Phase 1 (working). **Planet Coaster 2 is playable on an Apple M5 / macOS 26.5** —
 > `cellar setup` installs the runner (WineForge: Wine 11.17 + D3DMetal 3.0), creates the bottle,
@@ -43,6 +44,33 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full stack.
 
 ---
 
+## Two storefronts, told apart properly
+
+A profile says `store = "steam"`, `"battlenet"` or `"standalone"`, and that decides everything
+downstream — which client `cellar setup` installs, what "installed" means, how a launch is issued,
+and what the app tells you. The differences are real, and Cellar refuses to paper over them:
+
+| | Steam | Battle.net |
+|---|---|---|
+| Installing the client | silent (`/S`) | **not silent** — Blizzard's window opens and wants a few clicks, so Cellar warns you before it does |
+| Who's signed in | readable (`loginusers.vdf`) — the app shows your account | **not published** — so Cellar shows no sign-in step and no false ✗; you sign in inside the client |
+| Games are named by | AppID (`2688950`) | product code (`Fen` = Diablo IV) |
+| Installing a game | `cellar steam install <slug>` | opens Battle.net — Blizzard exposes no install URL a launcher can drive |
+| Launching | `steam://rungameid/…` into a silent client | `Battle.net.exe --exec="launch Fen"`, client warmed first |
+
+```sh
+# Diablo IV, via Battle.net
+cellar setup --profile diablo-4     # runner + bottle + Battle.net (its installer needs a few clicks)
+cellar battlenet open diablo-4      # sign in, install the game from the client
+cellar launch diablo-4              # play — quitting the game closes the whole layer
+```
+
+In the app the library is grouped by store, each game carries its storefront's mark and name, and
+the detail page states what the profile actually knows: developer, engine, graphics API, anti-cheat,
+DRM, and an honest `status` — including "untested" when that's the truth.
+
+---
+
 ## Free and legal by design
 
 Cellar is **GPL-3.0** and is built to **stay** free and legal:
@@ -53,10 +81,11 @@ Cellar is **GPL-3.0** and is built to **stay** free and legal:
   Heroic uses) — never part of Cellar's source or artifacts.
 - **No DRM circumvention, ever.** Planet Coaster 2 ships **Denuvo Anti-tamper** (DRM, *not*
   anti-cheat). Cellar runs it **through** the layer, untouched. We never strip or crack DRM.
-- **Owned games only.** Any game files come from *your* authenticated account, via the in-bottle
-  Windows Steam client.
-- **Trademark-safe.** Cellar is not affiliated with or endorsed by Apple, Valve, CodeWeavers, or
-  Frontier Developments. See [NOTICE](NOTICE).
+- **Owned games only.** Any game files come from *your* authenticated account, through that
+  storefront's own client running unmodified in the bottle.
+- **Trademark-safe.** Cellar is not affiliated with or endorsed by Apple, Valve, Blizzard,
+  CodeWeavers, or Frontier Developments. The store marks in the app are drawn by Cellar's own code —
+  no logo files are bundled or fetched. See [NOTICE](NOTICE).
 
 Full component-by-component license matrix: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 Detailed rules: [docs/LEGAL.md](docs/LEGAL.md).

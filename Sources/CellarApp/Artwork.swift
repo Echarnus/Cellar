@@ -2,19 +2,35 @@ import SwiftUI
 import AppKit
 import CellarKit
 
-/// Steam's public CDN artwork for a game (no auth). Used to make the library look like Steam.
+/// Where a game's artwork comes from, per store.
+///
+/// Steam publishes cover and banner art for every AppID on a public CDN, which is why the library
+/// looks like a storefront for Steam titles. No other store Cellar speaks to does: Blizzard's art
+/// is not addressable by product code and is not ours to hotlink. So the chain is: art the profile
+/// declares → the store's public CDN if it has one → Cellar's own generated cover. The last link is
+/// not a placeholder to be embarrassed about; it is the design for every store but one.
 enum Artwork {
-    static func url(_ appID: Int?, _ kind: String) -> URL? {
+    static func steamCDN(_ appID: Int?, _ kind: String) -> URL? {
         guard let appID else { return nil }
         return URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\(appID)/\(kind)")
     }
-    static func portrait(_ appID: Int?) -> URL? { url(appID, "library_600x900.jpg") }
-    static func hero(_ appID: Int?) -> URL? { url(appID, "library_hero.jpg") }
-    static func logo(_ appID: Int?) -> URL? { url(appID, "logo.png") }
+
+    /// 600×900 cover. `artworkAppID` is nil for stores with no public artwork.
+    static func portrait(_ game: GameSummary) -> URL? {
+        game.artPortraitURL.flatMap(URL.init(string:))
+            ?? steamCDN(game.artworkAppID, "library_600x900.jpg")
+    }
+
+    /// Wide banner behind the detail header.
+    static func hero(_ game: GameSummary) -> URL? {
+        game.artHeroURL.flatMap(URL.init(string:))
+            ?? steamCDN(game.artworkAppID, "library_hero.jpg")
+    }
 }
 
-/// Remote image with a graceful fallback (the extracted .icns, then a glyph). AsyncImage handles
-/// fetching and URLCache handles caching.
+/// Remote image with a graceful fallback. `AsyncImage` handles fetching, `URLCache` the caching.
+/// The fallback is shown immediately while loading rather than a spinner over emptiness — for a
+/// store with no CDN the fallback *is* the artwork, and it should never flash.
 struct RemoteArt<Fallback: View>: View {
     let url: URL?
     let fallback: Fallback
@@ -24,8 +40,7 @@ struct RemoteArt<Fallback: View>: View {
         if let url {
             AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
                 switch phase {
-                case .success(let img): img.resizable()
-                case .empty: ZStack { fallback; ProgressView().controlSize(.small) }
+                case .success(let image): image.resizable()
                 default: fallback
                 }
             }
@@ -35,22 +50,55 @@ struct RemoteArt<Fallback: View>: View {
     }
 }
 
-/// A game's own icon from its extracted `.icns`, with a placeholder fallback.
-struct GameIcon: View {
-    let path: String?
-    let size: CGFloat
+/// A game's cover, in one place so the sidebar and the header can never disagree about what a
+/// game looks like: store art if there is any, the icon extracted from the bottle if not, and
+/// Cellar's generated cover otherwise. The store's badge rides along in the corner.
+struct GameCover: View {
+    let game: GameSummary
+    /// Cover width; height follows the 2:3 key-art ratio.
+    let width: CGFloat
+    var showsBadge = true
+
+    private var height: CGFloat { width * 1.5 }
+
     var body: some View {
-        ZStack {
-            if let path, let img = NSImage(contentsOfFile: path) {
-                Image(nsImage: img).resizable()
+        RemoteArt(Artwork.portrait(game)) {
+            if let path = game.iconPath, let image = NSImage(contentsOfFile: path) {
+                // An extracted .icns is square; fill the cover with it rather than letterboxing.
+                Image(nsImage: image).resizable().scaledToFill()
             } else {
-                LinearGradient(colors: [Color(.sRGB, red: 0.48, green: 0.12, blue: 0.23),
-                                        Color(.sRGB, red: 0.24, green: 0.06, blue: 0.12)],
-                               startPoint: .top, endPoint: .bottom)
-                Image(systemName: "wineglass").font(.system(size: size*0.42, weight: .medium)).foregroundStyle(.white.opacity(0.85))
+                GeneratedCover(title: game.name, store: game.store, width: width)
             }
         }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: width * 0.12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: width * 0.12, style: .continuous)
+                .strokeBorder(.white.opacity(0.10), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.28), radius: width * 0.06, y: width * 0.03)
+        .overlay(alignment: .bottomTrailing) {
+            if showsBadge {
+                StoreBadge(store: game.store, diameter: max(14, width * 0.30))
+                    .offset(x: width * 0.10, y: width * 0.10)
+            }
+        }
+    }
+}
+
+/// The wide banner behind a game's title. Falls back to a store-tinted wash of the generated
+/// cover's palette so the header is always composed, never a grey slab.
+struct GameBanner: View {
+    let game: GameSummary
+
+    var body: some View {
+        RemoteArt(Artwork.hero(game)) {
+            ZStack {
+                GeneratedCover(title: game.name, store: game.store, width: 420)
+                    .blur(radius: 60)
+                LinearGradient(colors: [game.store.tint.opacity(0.30), .clear],
+                               startPoint: .topTrailing, endPoint: .bottomLeading)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

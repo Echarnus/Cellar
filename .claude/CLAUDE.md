@@ -14,6 +14,8 @@ Everything a human or another agent needs is in `AGENTS.md` and `skills/` — ke
 `.claude/skills/` mirrors the portable [`skills/`](../skills/) as Claude-format skills. Invoke the
 one matching your work; each points back at the portable guide for the full detail:
 
+- **cellar-ux** — **anything a player sees** (the app, CLI wording, errors). Read this one first;
+  the UX bar is a requirement in this repo, not a polish pass.
 - **cellar-swift** — `Sources/**` (CellarKit, the CLI, the SwiftUI app).
 - **cellar-web** — the static site / `Scripts/gen-site.py`.
 - **cellar-shell** — `Scripts/*.sh`, the `.app`/DMG, releases.

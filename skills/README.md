@@ -6,6 +6,7 @@ these for the language you're touching. Claude Code auto-discovers its own copie
 
 | Skill | Use when you're working on |
 |---|---|
+| [`ux.md`](ux.md) | **anything a player sees** — the app, CLI wording, errors. Read this first |
 | [`swift.md`](swift.md) | `Sources/**` — CellarKit, the `cellar` CLI, or the SwiftUI app |
 | [`web.md`](web.md) | the static site / `Scripts/gen-site.py` |
 | [`shell-and-packaging.md`](shell-and-packaging.md) | `Scripts/*.sh`, the `.app`/DMG, releases |

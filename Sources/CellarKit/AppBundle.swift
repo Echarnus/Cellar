@@ -24,13 +24,27 @@ public enum AppBundle {
                      icon: resolveGameICNS(slug: slug, prefix: prefix, appID: appID))
     }
 
-    /// The Windows Steam client of a bottle: `Steam (<Bottle>).app` → `cellar steam open <slug>`.
-    /// Reuses the native Steam.app icon when installed, so it looks like Steam in Launchpad.
+    /// A bottle's store client as its own app: `Steam (<Bottle>).app` → `cellar steam open <slug>`,
+    /// `Battle.net (<Bottle>).app` → `cellar battlenet open <slug>`. Reuses the store's natively
+    /// installed icon when there is one, so it looks right in Launchpad rather than blank.
+    @discardableResult
+    public static func generateStoreClient(store: GameStore, bottle: String, slug: String,
+                                           cellarBinary: String) throws -> Generated {
+        guard store != .standalone else {
+            throw CellarError.invalidArgument("A standalone game has no store client to wrap in an app.")
+        }
+        let name = store.displayName
+        return try generate(name: "\(name) (\(bottle))",
+                            identifier: "it.clercq.cellar.\(store.rawValue).\(bottle)",
+                            cellarBinary: cellarBinary,
+                            arguments: [store.rawValue, "open", slug],
+                            icon: nativeStoreIcon(store))
+    }
+
+    /// The Windows Steam client of a bottle. Kept as the original spelling of `generateStoreClient`.
     @discardableResult
     public static func generateSteamClient(bottle: String, slug: String, cellarBinary: String) throws -> Generated {
-        try generate(name: "Steam (\(bottle))", identifier: "it.clercq.cellar.steam.\(bottle)",
-                     cellarBinary: cellarBinary, arguments: ["steam", "open", slug],
-                     icon: steamIcon())
+        try generateStoreClient(store: .steam, bottle: bottle, slug: slug, cellarBinary: cellarBinary)
     }
 
     static func generate(name: String, identifier: String, cellarBinary: String,
@@ -97,21 +111,32 @@ public enum AppBundle {
 
     // MARK: - Icons
 
-    /// The native macOS Steam client's icon, if Steam is installed. (Its file is `Steam.icns` — the
-    /// capital matters on a case-sensitive volume.)
-    static func steamIcon() -> URL? {
+    /// A store's icon from its natively installed macOS app, if the player has one. Cellar never
+    /// ships these — it points at what is already on the machine (see docs/LEGAL.md). Returns nil
+    /// when the store isn't installed natively, and the app falls back to Cellar's own icon.
+    /// (Steam's file is `Steam.icns` — the capital matters on a case-sensitive volume.)
+    static func nativeStoreIcon(_ store: GameStore) -> URL? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let candidates = [
-            "/Applications/Steam.app/Contents/Resources/Steam.icns",
-            "\(home)/Applications/Steam.app/Contents/Resources/Steam.icns",
-        ]
-        return candidates.map { URL(fileURLWithPath: $0) }.first { FileManager.default.fileExists(atPath: $0.path) }
+        let relative: [String]
+        switch store {
+        case .steam:
+            relative = ["Steam.app/Contents/Resources/Steam.icns"]
+        case .battlenet:
+            relative = ["Battle.net.app/Contents/Resources/battle.net.icns",
+                        "Battle.net.app/Contents/Resources/Battle.net.icns"]
+        case .standalone:
+            return nil
+        }
+        let roots = ["/Applications", "\(home)/Applications"]
+        return roots.flatMap { root in relative.map { URL(fileURLWithPath: "\(root)/\($0)") } }
+            .first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
     /// Resolve an `.icns` for a game launcher, in order: a user-supplied icon next to the profile,
     /// a previously-extracted cached icon, or a fresh extraction of the game's own icon from the
     /// bottle (converted from its Windows `.ico`). Returns nil if none can be produced.
-    public static func resolveGameICNS(slug: String, prefix: URL?, appID: Int?) -> URL? {
+    public static func resolveGameICNS(slug: String, prefix: URL?, appID: Int?,
+                                       installDir: String? = nil) -> URL? {
         let fm = FileManager.default
         // 1. user-supplied <profiles>/<slug>.icns
         for dir in Paths.profileSearchPaths {
@@ -122,17 +147,26 @@ public enum AppBundle {
         let cached = Paths.cache.appendingPathComponent("icons/\(slug).icns")
         if fm.fileExists(atPath: cached.path) { return cached }
         // 3. extract from the bottle
-        guard let prefix, let ico = findGameICO(prefix: prefix, appID: appID) else { return nil }
+        guard let prefix,
+              let ico = findGameICO(prefix: prefix, appID: appID, installDir: installDir) else { return nil }
         try? fm.createDirectory(at: cached.deletingLastPathComponent(), withIntermediateDirectories: true)
         return convertICOtoICNS(ico, to: cached) ? cached : nil
     }
 
     /// Locate a Windows `.ico` for the game inside the bottle: the game's own `game.ico` in its
     /// install directory (from the appmanifest), else the largest desktop-shortcut icon Steam keeps
-    /// in `steam/games` (skipping Steam's own built-ins).
-    static func findGameICO(prefix: URL, appID: Int?) -> URL? {
+    /// in `steam/games` (skipping Steam's own built-ins). Stores other than Steam keep no icon
+    /// registry, so for those the profile's `install_dir` is scanned for the biggest `.ico` it holds.
+    static func findGameICO(prefix: URL, appID: Int?, installDir: String? = nil) -> URL? {
         let fm = FileManager.default
         let steam = prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam")
+
+        if let installDir {
+            let roots = ["drive_c/Program Files (x86)/\(installDir)",
+                         "drive_c/Program Files/\(installDir)",
+                         "drive_c/Games/\(installDir)"].map { prefix.appendingPathComponent($0) }
+            if let ico = roots.compactMap({ largestICO(in: $0) }).first { return ico }
+        }
 
         if let appID,
            let manifest = try? String(contentsOf: steam.appendingPathComponent("steamapps/appmanifest_\(appID).acf"), encoding: .utf8),
@@ -144,17 +178,22 @@ public enum AppBundle {
             }
         }
 
-        let gamesDir = steam.appendingPathComponent("steam/games")
-        if let entries = try? fm.contentsOfDirectory(at: gamesDir, includingPropertiesForKeys: [.fileSizeKey]) {
-            let icos = entries.filter { $0.pathExtension.lowercased() == "ico"
-                && !["SteamMovie.ico", "PlatformMenu.ico"].contains($0.lastPathComponent) }
-            return icos.max { a, b in
-                let sa = (try? a.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-                let sb = (try? b.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-                return sa < sb
+        return largestICO(in: steam.appendingPathComponent("steam/games"),
+                          excluding: ["SteamMovie.ico", "PlatformMenu.ico"])
+    }
+
+    /// The biggest `.ico` directly inside a directory — a decent proxy for "the game's own icon",
+    /// since bundled icons are far larger than UI chrome ones.
+    static func largestICO(in directory: URL, excluding: Set<String> = []) -> URL? {
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: [.fileSizeKey]) else { return nil }
+        return entries
+            .filter { $0.pathExtension.lowercased() == "ico" && !excluding.contains($0.lastPathComponent) }
+            .max { a, b in
+                let sizeA = (try? a.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                let sizeB = (try? b.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                return sizeA < sizeB
             }
-        }
-        return nil
     }
 
     /// Convert a Windows `.ico` to a multi-resolution macOS `.icns` via sips + iconutil.

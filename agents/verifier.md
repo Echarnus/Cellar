@@ -34,6 +34,15 @@ The diff (or list of changed files) and a one-line statement of intent.
 - **Profile:** required fields present; DRM/anti-cheat stated honestly; `status` + tested-hardware
   `notes` included.
 
+**2b. UX/UI — for anything a player sees** ([`../skills/ux.md`](../skills/ux.md)):
+one obvious next action with a plain sentence under it; empty / loading / first-run / busy / error
+states all designed; light *and* dark; readable at the window's minimum width. **Honesty:** no ✓ for
+a state Cellar cannot actually check (Battle.net sign-in), and any step the player must perform by
+hand is announced before it happens (Battle.net's installer). Store identity carried by position +
+mark + word, never colour alone; store marks drawn in code, never bundled logo files. Icon-only
+controls have both `.accessibilityLabel` and `.help`. **Evidence: a screenshot of the changed screen
+from a launched build** — a diff is not evidence about an interface.
+
 **3. It enforces the hard project rules** ([`../AGENTS.md`](../AGENTS.md) → *Hard project rules*):
 no bundled D3DMetal or game files; no DRM/anti-cheat circumvention; nothing that should be gitignored
 is being committed; commit messages carry no attribution trailers.

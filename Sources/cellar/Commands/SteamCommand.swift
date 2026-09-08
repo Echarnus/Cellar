@@ -4,7 +4,12 @@ import CellarKit
 struct SteamCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "steam",
-        abstract: "The Steam plugin: open Steam in a bottle, install games, surface them natively.",
+        abstract: "The Steam plugin: open Windows Steam in a bottle, install games, surface them natively.",
+        discussion: """
+        Steam's half of the store layer. Its Battle.net counterpart is `cellar battlenet`, shaped
+        the same way — the two differ only where the stores genuinely do (Steam installs silently
+        and publishes who is signed in; Battle.net does neither).
+        """,
         subcommands: [Open.self, Install.self, Status.self, App.self, Add.self, EnableWindowsPlatform.self, DisableWindowsPlatform.self]
     )
 
@@ -17,8 +22,10 @@ struct SteamCommand: ParsableCommand {
 
         func run() throws {
             let plan = try Game.plan(slug: slug)
-            let bundle = try AppBundle.generateSteamClient(
-                bottle: plan.bottleName, slug: slug, cellarBinary: AppBundle.resolveCellarBinary())
+            try requireSteamProfile(plan)
+            let bundle = try AppBundle.generateStoreClient(
+                store: .steam, bottle: plan.bottleName, slug: slug,
+                cellarBinary: AppBundle.resolveCellarBinary())
             print(Term.green("Created ") + bundle.app.path)
         }
     }
@@ -32,6 +39,7 @@ struct SteamCommand: ParsableCommand {
 
         func run() throws {
             let plan = try Game.plan(slug: slug)
+            try requireSteamProfile(plan)
             let prefix = plan.prefix
             func row(_ label: String, _ ok: Bool, _ text: String) {
                 print("  \(ok ? Term.green("✓") : Term.yellow("•")) \(label.padding(toLength: 16, withPad: " ", startingAt: 0)) \(text)")
@@ -62,6 +70,7 @@ struct SteamCommand: ParsableCommand {
 
         func run() throws {
             let plan = try Game.plan(slug: slug)
+            try requireSteamProfile(plan)
             let wine = try requireReadyBottle(plan)
             print(Term.dim("Launching Steam in bottle '\(plan.bottleName)'. A window will open — log in and install your games."))
             try SteamBottle.launchClient(runner: wine)
@@ -77,6 +86,7 @@ struct SteamCommand: ParsableCommand {
 
         func run() throws {
             let plan = try Game.plan(slug: slug)
+            try requireSteamProfile(plan)
             guard let appID = plan.appID else {
                 throw CellarError.invalidArgument("Profile '\(slug)' has no steam_appid.")
             }
@@ -95,6 +105,7 @@ struct SteamCommand: ParsableCommand {
 
         func run() throws {
             let plan = try Game.plan(slug: slug)
+            try requireSteamProfile(plan)
             let bundle = try AppBundle.generate(
                 name: plan.name, slug: plan.slug, cellarBinary: AppBundle.resolveCellarBinary(),
                 prefix: plan.prefix, appID: plan.appID)
@@ -141,6 +152,17 @@ struct SteamCommand: ParsableCommand {
             try SteamPlatformTrick.disable()
             print(Term.green("Removed steam_dev.cfg."))
         }
+    }
+}
+
+/// Guard: this command group only makes sense for a profile that actually comes from Steam.
+/// Saying so plainly beats a confusing failure three steps later.
+private func requireSteamProfile(_ plan: GamePlan) throws {
+    guard plan.store == .steam else {
+        let alternative = plan.store == .battlenet ? "cellar battlenet open \(plan.slug)"
+                                                  : "cellar launch \(plan.slug)"
+        throw CellarError.invalidArgument(
+            "'\(plan.slug)' is a \(plan.store.displayName) game, not a Steam one. Try: \(alternative)")
     }
 }
 

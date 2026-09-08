@@ -1,7 +1,9 @@
 # Skill: Swift, SwiftUI & AppKit in Cellar
 
 Best practices for `Sources/**`. Portable guide; Claude's auto-discovered copy is
-`.claude/skills/cellar-swift/SKILL.md`. Read [`../AGENTS.md`](../AGENTS.md) first.
+`.claude/skills/cellar-swift/SKILL.md`. Read [`../AGENTS.md`](../AGENTS.md) first — and
+[`ux.md`](ux.md) before touching anything a player sees. This file covers the *mechanics*; `ux.md`
+sets the bar the result is judged against.
 
 ## Build
 
@@ -17,6 +19,9 @@ machinery unless a target genuinely needs it.
 
 ## Architecture rules
 
+- **Per-store behaviour belongs in `GameStore.descriptor`** (`Store.swift`), not in a `switch` inside
+  a view or a command. If a view needs to know that Battle.net's installer isn't silent, that fact
+  should reach it as data.
 - **All logic lives in `CellarKit`.** The CLI (`Sources/cellar`) and the app (`Sources/CellarApp`)
   are thin. Never duplicate engine logic in a command or a view — add it to CellarKit and call it.
 - **The GUI drives the CLI as a subprocess** for side-effecting actions (setup, install, launch), so
@@ -62,5 +67,5 @@ executable can't use a `@main` App scene). That host has sharp edges we've alrea
 3. Behaviour: run the CLI command, or `sh Scripts/install-app.sh` and launch the app and exercise the
    path. GUI changes are **not** verified by reading the diff.
 
-Related: [`web.md`](web.md) · [`shell-and-packaging.md`](shell-and-packaging.md) ·
+Related: [`ux.md`](ux.md) · [`web.md`](web.md) · [`shell-and-packaging.md`](shell-and-packaging.md) ·
 [`../agents/verifier.md`](../agents/verifier.md)

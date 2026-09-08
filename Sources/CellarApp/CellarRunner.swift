@@ -18,6 +18,12 @@ final class CellarRunner: ObservableObject {
 
     var binaryExists: Bool { FileManager.default.isExecutableFile(atPath: binary) }
 
+    /// Put a line in the activity log without running anything — for the steps Cellar hands back
+    /// to the player (a download that needs a real terminal for its Steam Guard prompt).
+    func note(_ message: String) {
+        log += "\n\(message)\n"
+    }
+
     func run(_ args: [String], title: String, then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
         busy = true; busyTitle = title

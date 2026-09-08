@@ -67,7 +67,7 @@ public enum SteamBottle {
         for url in installerURLs {
             let host = URL(string: url)?.host ?? url
             progress("Downloading Steam client (\(host))…")
-            if (try? Downloader.fetch(url, to: setup)) != nil, isPE(setup) {
+            if (try? Downloader.fetch(url, to: setup)) != nil, WindowsInstaller.isPortableExecutable(setup) {
                 downloaded = true
                 break
             }
@@ -204,14 +204,13 @@ public enum SteamBottle {
 
     /// Whether any process whose command line contains `needle` is running (case-insensitive).
     public static func isProcessRunning(_ needle: String) -> Bool {
-        Shell.run("/bin/sh", ["-c", "ps -axo command | grep -vi grep | grep -qiF \"\(needle)\""]).succeeded
+        ProcessWatch.isRunning(needle)
     }
 
     /// Block until a process matching `needle` (e.g. the game's exe name) is gone. Waits for it to
     /// appear first, so we don't return before it has started.
     public static func waitForExit(matching needle: String) {
-        for _ in 0..<15 { if isProcessRunning(needle) { break }; Thread.sleep(forTimeInterval: 1) }
-        while isProcessRunning(needle) { Thread.sleep(forTimeInterval: 3) }
+        ProcessWatch.waitToExit([needle])
     }
 
     /// Block until the game's process is gone (it has been quit), polling every few seconds.
@@ -247,13 +246,6 @@ public enum SteamBottle {
         guard let text = try? String(contentsOf: manifest, encoding: .utf8) else { return false }
         // StateFlags 4 == fully installed.
         return text.range(of: #""StateFlags"\s*"4""#, options: .regularExpression) != nil
-    }
-
-    private static func isPE(_ file: URL) -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: file) else { return false }
-        defer { try? handle.close() }
-        let magic = handle.readData(ofLength: 2)
-        return magic == Data([0x4D, 0x5A]) // "MZ"
     }
 }
 

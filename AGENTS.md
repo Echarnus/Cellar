@@ -14,8 +14,9 @@ already written down.
 
 A free, GPL-3.0, Proton-like layer that runs **Windows games on Apple Silicon Macs**. It assembles a
 Wine runner + a graphics-translation backend (Apple **D3DMetal**, or open-source **DXVK → MoltenVK**)
-into per-game **bottles**, driven by a **profile database**. There is a `cellar` CLI and a native
-SwiftUI app (`CellarApp`), both over one core library (`CellarKit`).
+into per-game **bottles**, driven by a **profile database**, and stands the game's own **storefront
+client** up inside the bottle — Windows **Steam**, or Blizzard's **Battle.net**. There is a `cellar`
+CLI and a native SwiftUI app (`CellarApp`), both over one core library (`CellarKit`).
 
 Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · legal boundaries: [`docs/LEGAL.md`](docs/LEGAL.md).
@@ -24,7 +25,7 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 
 | Path | What lives there |
 |---|---|
-| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, Steam, downloading, app-bundle generation. **All logic lives here.** |
+| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store clients (`Store.swift`, `Steam.swift`, `BattleNet.swift`), downloading, app-bundle generation. **All logic lives here.** |
 | `Sources/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
@@ -69,11 +70,46 @@ verifying, and if you cannot verify, say so and name what needs manual checking.
 
 The [verifier agent](agents/verifier.md) codifies these demands per kind of change.
 
+## Stores are a first-class concept
+
+A game names the storefront it came from (`store = "steam" | "battlenet" | "standalone"`), and that
+one field decides the whole pipeline: which client `cellar setup` installs, what "installed" and
+"signed in" mean, how a launch is issued, and the words the player reads. Read
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → *The store layer* for the comparison table.
+
+The differences are real, not cosmetic — the two that bite hardest:
+
+- **Battle.net has no silent installer.** Steam's takes `/S`; Blizzard's does not exist. Setup must
+  *warn the player* that a window will open, or an unexplained pause reads as a hang.
+- **Battle.net does not publish who is signed in.** Steam writes `loginusers.vdf`. So Cellar never
+  shows a Battle.net sign-in step and never a ✗ beside "account" — it folds signing in into "open the
+  client", the one screen where the player can act on it.
+
+Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarKit/Store.swift`), never as a
+special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
+branch in `Game.setUp`/`Game.launch`, and a CLI command group. Nothing else should need to know.
+
+## UX/UI is a requirement, not a finishing touch
+
+**The interface is the product.** Cellar exists to make a Windows game start on a Mac, and the only
+way anyone experiences that is the app in front of them. A change that compiles but reads like a
+developer tool has not landed. Hold every user-visible change — app, CLI wording, error text — to
+[`skills/ux.md`](skills/ux.md), which is not optional reading:
+
+- One obvious next action per screen, with a plain sentence saying what will happen.
+- Every state designed: empty, loading, first-run, busy, error; light *and* dark; minimum width.
+- **Honesty**: never a ✓ for something Cellar cannot check, never an implied promise about a step the
+  player will actually have to perform themselves.
+- Stores are told apart by **position + mark + word** together; colour never carries it alone.
+- **Verify by launching and looking**, never by reading the diff.
+
 ## Coding guidelines
 
 Match the surrounding code. Small types, clear names, comments only where intent isn't obvious. Then,
 per language:
 
+- **Anything a player sees** → [`skills/ux.md`](skills/ux.md). Read it before the language guide;
+  it is the bar the change will be judged against.
 - **Swift / SwiftUI / AppKit** → [`skills/swift.md`](skills/swift.md). Load-bearing project rules
   (AttributeGraph crash from detail-pane animation, `HSplitView` not `NavigationSplitView`, the
   hand-built menu bar, keeping logic in CellarKit) live there — read it before touching
@@ -85,10 +121,11 @@ per language:
 
 ## Adding a game
 
-A game is a `profiles/<slug>.toml` — copy `profiles/planet-coaster-2.toml`. Record verified facts
-(AppID, engine, graphics API, arch), state DRM/anti-cheat **honestly**, pick `backend` +
-`fallback_backend`, set the install `method`, and a `status` + `notes` with the hardware you tested
-on. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+A game is a `profiles/<slug>.toml` — copy the closest existing one (`planet-coaster-2` for Steam,
+`diablo-4` for Battle.net). Name its **`store`**, record verified facts (AppID *or* `product_code` +
+`install_dir` + `exe`, engine, graphics API, arch), state DRM/anti-cheat **honestly**, pick `backend`
++ `fallback_backend`, and give a `status` + `notes` naming the hardware you tested on. The app shows
+those facts verbatim, so "untested" must say so. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Git & releases
 
@@ -107,13 +144,14 @@ These are correctness *and* legality constraints. They override any convenience.
 - **Never commit game files, bottles, runners, downloaded depots, or logs.**
 - **Never add DRM or anti-cheat circumvention.** Cellar runs DRM *through* the layer, untouched.
 - **Owned games only** — game data comes from the user's own authenticated Steam account.
-- **Trademark-safe** — not affiliated with Apple, Valve, CodeWeavers, or Frontier. See
+- **Trademark-safe** — not affiliated with Apple, Valve, Blizzard, CodeWeavers, or Frontier. Store
+  marks in the UI are **drawn in code** (`StoreMark.swift`), never bundled logo files. See
   [`NOTICE`](NOTICE) and [`docs/LEGAL.md`](docs/LEGAL.md).
 
 ## AI configuration in this repo
 
 - [`AGENTS.md`](AGENTS.md) (this file) — portable guidelines, read by every agent tool.
-- [`skills/`](skills/) — portable, tool-agnostic best-practice guides (Swift, web, shell).
+- [`skills/`](skills/) — portable, tool-agnostic best-practice guides (UX, Swift, web, shell).
 - [`agents/`](agents/) — portable agent definitions (the verifier).
 - [`.claude/`](.claude/) — **Claude-specific.** Claude Code does not read `AGENTS.md` directly, so
   [`.claude/CLAUDE.md`](.claude/CLAUDE.md) `@`-imports it, and `.claude/skills/` + `.claude/agents/`

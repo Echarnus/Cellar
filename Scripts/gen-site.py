@@ -49,6 +49,12 @@ OUT = os.path.join(ROOT, "site")
 REPO = "https://github.com/Echarnus/Cellar"
 DMG = f"{REPO}/releases/latest/download/Cellar.dmg"
 
+STORES = {  # profile store → how the site labels it
+    "steam": {"label": "Steam", "cls": "steam"},
+    "battlenet": {"label": "Battle.net", "cls": "battlenet"},
+    "standalone": {"label": "No store", "cls": "standalone"},
+}
+
 STATUS = {  # profile status → (label, css class)
     "playable": ("Playable", "ok"),
     "experimental": ("Experimental", "warn"),
@@ -60,8 +66,15 @@ def load_games():
     games = []
     for path in sorted(glob.glob(os.path.join(ROOT, "profiles", "*.toml"))):
         d = parse_toml(path)
-        g, comp = d.get("game", {}), d.get("compatibility", {})
+        g, comp, art = d.get("game", {}), d.get("compatibility", {}), d.get("art", {})
         appid = g.get("steam_appid", "")
+        store = STORES.get(g.get("store", "steam"), STORES["steam"])
+        # A profile may bring its own cover; only Steam has one addressable by id.
+        portrait = art.get("art_portrait") or (
+            f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg"
+            if appid and g.get("store", "steam") == "steam" else "")
+        # `needs_live_steam` is the original spelling of `needs_live_session`; both still read.
+        needs_client = comp.get("needs_live_session", comp.get("needs_live_steam", True))
         games.append({
             "name": g.get("name", g.get("slug", "?")),
             "slug": g.get("slug", ""),
@@ -69,9 +82,11 @@ def load_games():
             "api": g.get("graphics_api", ""),
             "drm": comp.get("drm", ""),
             "status": comp.get("status", "untested"),
-            "steamfree": not comp.get("needs_live_steam", True),
+            "store": store,
+            "storekey": g.get("store", "steam"),
+            "clientfree": not needs_client,
             "installed": comp.get("status") == "playable",
-            "portrait": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg" if appid else "",
+            "portrait": portrait,
         })
     # Playable first, then by name.
     return sorted(games, key=lambda x: (x["status"] != "playable", x["name"].lower()))
@@ -80,16 +95,18 @@ def load_games():
 def card(g):
     n = html.escape
     label, cls = STATUS.get(g["status"], (g["status"], "muted"))
-    tag = '<span class="tag free">Steam-free</span>' if g["steamfree"] else '<span class="tag">Needs Steam</span>'
+    store = g["store"]
+    tag = ('<span class="tag free">No client needed</span>' if g["clientfree"]
+           else f'<span class="tag">Needs {n(store["label"])}</span>')
     art = (f'<img loading="lazy" src="{g["portrait"]}" alt="{n(g["name"])}"'
            f' onerror="this.classList.add(\'noimg\')">') if g["portrait"] else '<div class="noimg"></div>'
     return f'''
-      <article class="card" data-name="{n(g['name'].lower())}" data-status="{g['status']}" data-installed="{str(g['installed']).lower()}">
+      <article class="card" data-name="{n(g['name'].lower())}" data-status="{g['status']}" data-store="{g['storekey']}" data-installed="{str(g['installed']).lower()}">
         <div class="cover">{art}<span class="badge {cls}">{n(label)}</span></div>
         <div class="meta">
           <h3>{n(g['name'])}</h3>
           <p class="sub">{n(g['api'])} · {n(g['drm']) or '—'}</p>
-          <div class="tags">{tag}</div>
+          <div class="tags"><span class="tag store {store['cls']}">{n(store['label'])}</span>{tag}</div>
         </div>
       </article>'''
 
@@ -166,6 +183,15 @@ def render(games):
   .sub{{color:var(--muted);font-size:.82rem;margin:3px 0 9px}}
   .tag{{font-size:.72rem;padding:3px 9px;border-radius:6px;background:var(--line);color:var(--muted)}}
   .tag.free{{background:rgba(47,174,85,.16);color:#2f9c50}}
+  /* Which storefront a game comes from — the first thing that changes how you install it. */
+  .tag.store{{font-weight:600}}
+  .tag.store.steam{{background:rgba(44,127,191,.16);color:#2c7fbf}}
+  .tag.store.battlenet{{background:rgba(0,162,232,.16);color:#0080ba}}
+  .tag.store.standalone{{background:rgba(138,138,142,.18);color:var(--muted)}}
+  @media (prefers-color-scheme:dark){{
+    .tag.store.steam{{color:#7ab8e8}}
+    .tag.store.battlenet{{color:#4cc4ff}}
+  }}
   .empty{{color:var(--muted);padding:40px;text-align:center;grid-column:1/-1}}
 
   footer{{text-align:center;color:var(--muted);font-size:.85rem;padding:46px 22px 60px;border-top:1px solid var(--line);margin-top:50px}}

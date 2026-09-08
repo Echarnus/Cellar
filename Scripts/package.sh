@@ -15,14 +15,21 @@ echo "Building release (cellar + CellarApp)…"
 swift build -c release
 BINDIR="$(swift build -c release --show-bin-path)"
 
-# CLI
+# CLI. The zip carries the profile database next to the binary in the layout Cellar looks for
+# (<prefix>/bin/cellar + <prefix>/share/cellar/profiles), so an installed CLI knows the games.
 cp "$BINDIR/cellar" "$DIST/cellar"
-( cd "$DIST" && zip -q "Cellar-CLI-$VERSION.zip" cellar )
+mkdir -p "$DIST/cli/bin" "$DIST/cli/share/cellar/profiles"
+cp "$BINDIR/cellar" "$DIST/cli/bin/cellar"
+cp profiles/*.toml "$DIST/cli/share/cellar/profiles/"
+( cd "$DIST/cli" && zip -qr "../Cellar-CLI-$VERSION.zip" bin share )
 
 # GUI app
 APP="$DIST/Cellar.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINDIR/CellarApp" "$APP/Contents/MacOS/CellarApp"
+# The shipped profile database. Searched after the player's own profiles, never instead of them.
+mkdir -p "$APP/Contents/Resources/profiles"
+cp profiles/*.toml "$APP/Contents/Resources/profiles/"
 
 [ -f Resources/AppIcon.png ] || swift Scripts/make-icon.swift Resources/AppIcon.png
 ISET="$(mktemp -d)/Cellar.iconset"; mkdir -p "$ISET"
@@ -50,4 +57,5 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 ( cd "$DIST" && ditto -c -k --keepParent Cellar.app "Cellar-App-$VERSION.zip" )
+rm -rf "$DIST/cli"
 echo "Packaged into $DIST:"; ls -1 "$DIST"

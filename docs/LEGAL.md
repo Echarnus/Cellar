@@ -25,7 +25,9 @@ verified research into each component's license and the relevant law.
    technical protection measures is unlawful under the US DMCA §1201 and EU equivalents.) Titles that
    require defeating kernel anti-cheat are out of scope, not worked around.
 
-3. **Owned games only.** Any game files come exclusively from the user's own authenticated account.
+3. **Owned games only.** Any game files come exclusively from the user's own authenticated account,
+   through that storefront's own client — Valve's Steam or Blizzard's Battle.net, installed in the
+   bottle and running unmodified. Cellar issues the same commands a player would click.
    - Downloading the Windows files of a game you own (in-bottle Windows Steam, or `DepotDownloader` /
      `steamcmd` with the platform forced to Windows) is ownership-gated by Steam itself.
    - Honest framing: under the Steam Subscriber Agreement, content is **"licensed, not sold"** — you
@@ -35,9 +37,17 @@ verified research into each component's license and the relevant law.
      that gray area — which is why it's the default.
 
 4. **Trademark-safe.** "Cellar" is an original name. Names like Apple, Metal, Game Porting Toolkit,
-   Steam, Proton, CrossOver, Planet Coaster, and COBRA are used **descriptively only** (nominative
-   use) to state compatibility. No third-party logos. A prominent non-affiliation disclaimer ships in
-   [NOTICE](../NOTICE).
+   Steam, Battle.net, Blizzard, Proton, CrossOver, Planet Coaster, Diablo and COBRA are used
+   **descriptively only** (nominative use) to state compatibility. A prominent non-affiliation
+   disclaimer ships in [NOTICE](../NOTICE).
+
+   **Store marks.** Cellar labels each game with the storefront it came from, and that label carries a
+   small mark. Those marks are *drawn by Cellar's own code* as simplified vector shapes
+   (`Sources/CellarApp/StoreMark.swift`) — **no logo file is committed, bundled, or fetched**, which
+   keeps rule 1's "we redistribute nobody's proprietary assets" intact. Their use is nominative:
+   identifying which storefront a game belongs to is the information the player needs, and it does not
+   imply endorsement. If a rights-holder ever objected, the fallback is one line — swap `StoreMark`
+   for the neutral SF Symbol already named in `StoreDescriptor.symbolName`.
 
 5. **No proprietary CrossOver code.** Only CodeWeavers' publicly published **LGPL `winecx` Wine
    modifications** may be reused — never CrossOver's GUI, installer, or product code.
