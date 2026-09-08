@@ -95,6 +95,35 @@ All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing 
 about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a branch in `Game.setUp`
 and `Game.launch`, and a CLI command group.
 
+### The library gate — you see the games you own, and nothing else
+
+Cellar's library is **your games, not its catalogue**. Two questions decide whether a profile is shown
+at all, and both are answered in `StoreLibrary` / `LibraryAccess` (`Sources/CellarKit/StoreLibrary.swift`)
+so the CLI (`cellar library`) and the app cannot disagree:
+
+1. **Is the store connected?** No connection, no section — the app opens on a sign-in screen instead
+   of a list of games belonging to nobody.
+2. **Does the player own it?** Asked of the store, never inferred.
+
+The stores answer the second question very differently, and the gate is built around that rather than
+around a wish that they were the same:
+
+| | How ownership is learned | When it can't be |
+|---|---|---|
+| **GOG** | `embed.gog.com/user/data/games` — the whole owned library in one call | n/a; it always answers |
+| **Steam** | `IPlayerService/GetOwnedGames` with the player's own **Web API key**, or their **public profile** (`?xml=1`) when game details are public | falls back to the `appmanifest_*.acf` files in the shared install — games Cellar can *prove* are owned — and marks the answer `isComplete = false` |
+| **Battle.net** | there is no API. Blizzard publishes neither a sign-in state nor entitlements | permanently `.unverifiable`; connecting is the player's word (`BattleNetAccess`), and never a ✓ |
+| **Standalone** | gated by whatever the files come from — a `standalone` profile carrying a `steam_appid` is fetched from the player's Steam account, so **Steam** gates it (`GameStore.gate(for:hasSteamAppID:)`) | — |
+
+The `.unverifiable` case splits on whether the store *could* ever tell us, and this is the rule worth
+remembering: **a store that can never answer shows its games** (hiding Diablo IV would just mean
+Battle.net does not exist in this app), **a store that could answer but hasn't hides them** and says
+exactly how to let Cellar ask. That is what keeps "these are your games" a true sentence.
+
+Ownership is **cached** (`shared/libraries/<store>.json`, refreshed on sign-in, on Refresh, or after a
+day) because `Game.summaries()` runs on every library refresh and must never make a network call.
+The Steam Web API key is a credential, so it lives in the keychain beside the sign-in tokens.
+
 ### One Steam, every bottle
 
 A bottle is per-game on purpose: its own registry, its own runner, its own Wine version. The Steam
@@ -141,7 +170,8 @@ per module row. There is a round-trip case in `cellar selftest`.
 ├── runners/     # installed Wine builds
 ├── prefixes/    # one bottle per game (pfx/ + bottle.toml)
 ├── shared/
-│   └── steam/   # THE Windows Steam install — every Steam bottle symlinks to it
+│   ├── steam/   # THE Windows Steam install — every Steam bottle symlinks to it
+│   └── libraries/  # what each store says you own (ids + counts), cached; the gate reads these
 ├── tools/
 │   └── depotdownloader/   # native-arm64 DepotDownloader + its stored Steam session
 ├── cache/

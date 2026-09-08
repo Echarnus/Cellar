@@ -65,7 +65,12 @@ struct GogCommand: ParsableCommand {
             let name = try GOGAuth.signIn(authorizationCode: authCode)
             GOGAuth.cacheUsername(name)
             print(Term.green("Signed in as \(name).") + " This covers every GOG game — no per-game sign-in.")
-            print(Term.dim("  See what you own: cellar gog library"))
+            // Read the library straight away: the whole point of signing in is that your games
+            // appear, and making the player run a second command for that is a step too many.
+            if let library = try? StoreLibrary.refresh(.gog) {
+                print(Term.dim("  \(library.totalCount) games in your GOG library."))
+            }
+            print(Term.dim("  See what you own: cellar library"))
         }
     }
 
@@ -78,6 +83,9 @@ struct GogCommand: ParsableCommand {
         func run() throws {
             try GOGAuth.signOut()
             GOGAuth.cacheUsername(nil)
+            // The cached library is that account's, so it goes with the sign-in. Leaving it behind
+            // would show the next player at this Mac somebody else's games.
+            StoreLibrary.clearCache(.gog)
             print(Term.green("Signed out of GOG.") + " Installed games keep working; downloads need a sign-in.")
         }
     }

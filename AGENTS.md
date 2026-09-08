@@ -89,6 +89,13 @@ The differences are real, not cosmetic — the three that bite hardest:
   sign-in belongs to the **Accounts** screen (`cellar accounts`, ⌘⇧A), not to a game's page.
   `StoreDescriptor.authStyle` is the fact that decides which shape a store has.
 
+- **The library is gated on the store, and shows only games the player owns.** Nothing is listed
+  until a store is connected, and then only what that store confirms. The rule lives once, in
+  `LibraryAccess.isVisible` (`Sources/CellarKit/StoreLibrary.swift`), and `cellar selftest` checks
+  it — never re-implement it in a view or a command. Where a store *can* answer and hasn't yet
+  (Steam without a Web API key), its games stay hidden and the UI says how to fix it; where a store
+  *can never* answer (Battle.net), its games are shown unverified and the UI says that instead.
+
 Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarKit/Store.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
 branch in `Game.setUp`/`Game.launch`, and a CLI command group. Nothing else should need to know.

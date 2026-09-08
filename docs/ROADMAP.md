@@ -80,10 +80,19 @@ The step from "a wrapper you configure" to "a launcher you sign in to".
   scope and no download scope. It would tell Cellar a BattleTag and nothing it needs. Sign-in stays
   folded into "open the client".
 
+- ✅ **The library is gated on signing in, and shows only games you own.** Cellar lists your games,
+  not its catalogue: a store's section appears once it is connected, and holds only what the store
+  confirms you own. GOG answers exactly; Steam answers exactly once it can be asked (a Web API key —
+  `cellar steam key` — or a public profile) and otherwise confirms only what is installed and says
+  so; Battle.net can never answer, so connecting it is the player's word and its games are shown
+  unverified rather than hidden forever. `cellar library`, and the app's first-run sign-in screen.
+  Rule and cache live in `StoreLibrary` / `LibraryAccess`, checked in `cellar selftest`.
+
 Next in this direction, not yet done:
 
-- Browse the full owned library rather than curated profiles — possible for GOG today (one API call),
-  and for Steam via a Web API key. Steam and Battle.net still need a profile to *run* a game.
+- Browse the full owned library rather than curated profiles. Cellar now *reads* the owned library
+  for Steam and GOG to decide what to show; the remaining step is offering a game it has no profile
+  for. Steam and Battle.net still need a profile to *run* a game.
 - Epic Games Store: a genuine OAuth flow (as Legendary/Heroic use), but reverse-engineered against the
   launcher's own client credentials — a bigger surface and a bigger judgement call than GOG's.
 - Generate a profile from a store's metadata, so adding a game is not hand-writing TOML.

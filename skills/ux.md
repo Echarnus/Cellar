@@ -40,6 +40,13 @@ interface must say so rather than guess:
 - Battle.net's installer cannot run silently. Setup therefore *warns first* ("its window will open
   and needs a few clicks") instead of appearing to hang and being killed by an impatient player.
 
+- The same rule decides **which games are shown at all**. The library lists what a store confirms the
+  player owns; where a store could answer and hasn't been asked yet, the games stay hidden and the
+  screen says how to let Cellar ask; where a store can never answer (Battle.net), they are shown and
+  the screen says Cellar cannot check. Never fill an empty library with games nobody has claimed —
+  "these are your games" is a sentence that has to stay true. The rule is `LibraryAccess.isVisible`,
+  and it belongs there and nowhere else.
+
 The rule: **a control Cellar cannot honour must not exist, and a pause the player will notice must
 be announced before it happens.** Encode the difference in `GameStore.descriptor` so every surface
 inherits it, rather than special-casing a store in a view.

@@ -15,6 +15,11 @@ landed. Key rules:
   automatic when the player must click. Steam publishes who is signed in; Battle.net does not — so
   Battle.net has no sign-in step and its installer is announced as needing clicks. Encode the
   difference in `GameStore.descriptor`, never as a special case in a view.
+- **The library shows the player's own games, and says so honestly.** Nothing is listed until a store
+  is connected, then only what that store confirms is owned. A store that *could* answer but hasn't
+  been asked (Steam without a Web API key) hides its games and the screen says how to fix it; a store
+  that can *never* answer (Battle.net) shows them and the screen says Cellar cannot check. The rule
+  is `LibraryAccess.isVisible` in CellarKit — never a second copy in a view or command.
 - **Stores are told apart by three signals together:** position (grouped sections), mark (the store's
   real logo, drawn as vectors in `StoreMark.swift`), and word (its name, including in a11y labels).
   Colour never carries it alone — Steam and Battle.net are both blue.

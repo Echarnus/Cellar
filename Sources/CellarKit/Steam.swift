@@ -184,6 +184,32 @@ public enum SteamBottle {
         return total
     }
 
+    /// The SteamID64 of the account signed in to the shared install — the key `loginusers.vdf`
+    /// files its one entry under. It is what turns "somebody is signed in" into a question Steam
+    /// can answer about *which games they own*, so it is read separately from the account name.
+    public static var sharedSteamID64: String? {
+        let vdf = sharedInstall.appendingPathComponent("config/loginusers.vdf")
+        guard let text = try? String(contentsOf: vdf, encoding: .utf8) else { return nil }
+        // A 17-digit id in quotes at the top level. Matching on the shape rather than on position
+        // keeps this working whether or not Valve reformats the file.
+        guard let regex = try? NSRegularExpression(pattern: #""(7656119\d{10})""#),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let range = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[range])
+    }
+
+    /// AppIDs with an `appmanifest_<id>.acf` in the shared library — games Steam has actually put on
+    /// this Mac. Proof of ownership Cellar can produce without asking anybody, which is what it
+    /// falls back to when Steam will not publish the full library.
+    public static var installedAppIDs: [Int] {
+        let steamapps = sharedInstall.appendingPathComponent("steamapps", isDirectory: true)
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: steamapps.path) else { return [] }
+        return names.compactMap { name in
+            guard name.hasPrefix("appmanifest_"), name.hasSuffix(".acf") else { return nil }
+            return Int(name.dropFirst("appmanifest_".count).dropLast(".acf".count))
+        }
+    }
+
     /// The account logged into this bottle's Steam, if any (from loginusers.vdf).
     public static func loggedInAccount(in prefix: URL) -> String? {
         accountName(inSteamDirectory: steamDirectory(in: prefix))

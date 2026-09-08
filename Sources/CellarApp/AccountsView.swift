@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import CellarKit
 
 /// One window for "who am I signed in as" — the change that makes signing in a thing you do once.
@@ -27,6 +28,9 @@ struct AccountsView: View {
     @State private var steamQRCode: [[Bool]]?
     @State private var steamQRReader = SteamQRCodeReader()
     @State private var gogSignInFailed: String?
+    /// The Steam Web API key being typed. Held here and cleared on save — it goes to the keychain,
+    /// never to a view's persisted state.
+    @State private var steamKeyDraft = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,6 +41,7 @@ struct AccountsView: View {
                     steamRow
                     steamBottleWarning
                     steamDownloadsRow
+                    steamLibraryRow
                     gogRow
                     battleNetRow
                 }
@@ -51,7 +56,7 @@ struct AccountsView: View {
         // auxiliary window in this app that has never crashed. A flexible root frame inside
         // NSHostingView lets layout feed back into the view graph, and this app aborts in
         // AttributeGraph when that happens (skills/swift.md). Not worth being clever about.
-        .frame(width: 560, height: 620)
+        .frame(width: 560, height: 740)
         .background(.background)
         .onAppear(perform: refresh)
     }
@@ -111,7 +116,7 @@ struct AccountsView: View {
             actionTitle: account != nil ? "Open Steam" : "Sign in",
             busy: runner.busy) {
                 guard let slug = state.steamBottleSlug else { return }
-                runner.run(["steam", "open", slug], title: "Opening Steam", then: { refresh() })
+                runner.run(["steam", "open", slug], title: "Opening Steam", then: { changed() })
             }
     }
 
@@ -142,7 +147,7 @@ struct AccountsView: View {
                     if state.steamDownloadSession {
                         runner.run(["steam", "login", "--forget"], title: "Signing out", then: {
                             steamQRCode = nil
-                            refresh()
+                            changed()
                         })
                     } else {
                         steamQRCode = nil
@@ -159,7 +164,7 @@ struct AccountsView: View {
                             }
                         }, then: {
                             steamQRCode = nil       // the code is spent either way
-                            refresh()
+                            changed()
                         })
                     }
                 }
@@ -177,6 +182,55 @@ struct AccountsView: View {
         }
     }
 
+    /// **Your Steam library** — the row that decides which Steam games the app may show you.
+    ///
+    /// Steam has no OAuth for entitlements, and an anonymous request for a library is refused unless
+    /// the player's game details are public. A key issued to their own account answers either way.
+    /// It is optional: without it Cellar still lists the Steam games it can see installed, and says
+    /// so — it just will not pad the list with games it cannot confirm you own.
+    private var steamLibraryRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AccountRow(
+                store: .steam,
+                title: "Steam library",
+                state: state.steamLibraryState,
+                detail: state.steamLibraryDetail,
+                actionTitle: state.steamHasKey ? "Forget key" : nil,
+                busy: runner.busy) {
+                    runner.run(["steam", "key", "--forget"], title: "Forgetting the key", then: { changed() })
+                }
+
+            if !state.steamHasKey {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Paste a Steam Web API key to list every Steam game you own.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        TextField("32-character key", text: $steamKeyDraft)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.callout, design: .monospaced))
+                        Button("Save") {
+                            runner.run(["steam", "key", "--set", steamKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)],
+                                       title: "Reading your Steam library", then: {
+                                steamKeyDraft = ""
+                                changed()
+                            })
+                        }
+                        .disabled(runner.busy || steamKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).count != 32)
+                    }
+                    Button("Get a key from Steam…") {
+                        if let url = URL(string: SteamWebAPI.keyPage) { NSWorkspace.shared.open(url) }
+                    }
+                    .buttonStyle(.link).font(.callout)
+                    Text("It's free and takes a minute. Cellar keeps it in your keychain and uses it only to read your own library.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.leading, 46)
+            }
+        }
+    }
+
     /// GOG: the one store Cellar signs into itself, so it can name the account with a ✓.
     private var gogRow: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -187,19 +241,20 @@ struct AccountsView: View {
                     ? (state.gogAccount.map { AccountState.signedIn($0) } ?? .signedInUnnamed)
                     : .signedOut,
                 detail: state.gogSignedIn
-                    ? "Your whole GOG library — DRM-free, so nothing runs beside your game."
+                    ? (state.gogLibrary.map { "\($0.totalCount) games in your library, and Cellar shows the ones it supports." }
+                        ?? "Your whole GOG library — DRM-free, so nothing runs beside your game.")
                     : "Opens GOG in a window. One sign-in covers every GOG game.",
                 actionTitle: state.gogSignedIn ? "Sign out" : "Sign in",
                 busy: runner.busy) {
                     if state.gogSignedIn {
-                        runner.run(["gog", "logout"], title: "Signing out", then: { refresh() })
+                        runner.run(["gog", "logout"], title: "Signing out", then: { changed() })
                     } else {
                         gogSignInFailed = nil
                         GOGSignInWindow.present { result in
                             switch result {
                             case .code(let code):
                                 runner.run(["gog", "login", "--code", code], title: "Signing in to GOG", then: {
-                                    refresh()
+                                    changed()
                                 })
                             case .cancelled:
                                 break   // no error: closing the window is a legitimate answer
@@ -215,17 +270,27 @@ struct AccountsView: View {
         }
     }
 
-    /// Battle.net: Blizzard publishes no readable signed-in state, so this row never claims one and
-    /// offers no sign-in button — signing in is folded into opening the client, on the game's screen.
+    /// Battle.net: Blizzard publishes no readable signed-in state and no library, so this row never
+    /// claims one — the ✓ stays off however this is answered.
+    ///
+    /// It does now carry a button, and the distinction is the whole point: it does not sign anyone
+    /// in (that still happens inside Blizzard's own window, from the game's screen). It records that
+    /// the player *has* an account, which is the only way a store that publishes nothing can have
+    /// its games shown in a library that only shows games you own.
     private var battleNetRow: some View {
         AccountRow(
             store: .battlenet,
             title: "Battle.net",
             state: .unknowable,
-            detail: "Blizzard doesn't publish who is signed in, so Cellar won't guess. Sign in inside the client, from a Battle.net game.",
-            actionTitle: nil,
-            busy: runner.busy,
-            action: {})
+            detail: state.battleNetConnected
+                ? "Battle.net games are in your library. Cellar can't check which of them you own — Blizzard publishes nothing readable — so it doesn't claim to. Sign in inside the client, from a game's screen."
+                : "Blizzard doesn't publish who is signed in or what you own, so Cellar can't check either. Tell it you have an account and its games appear in your library.",
+            actionTitle: state.battleNetConnected ? "Remove" : "I have an account",
+            busy: runner.busy) {
+                runner.run(["battlenet", "connect"] + (state.battleNetConnected ? ["--forget"] : []),
+                           title: state.battleNetConnected ? "Hiding Battle.net games" : "Connecting Battle.net",
+                           then: { changed() })
+            }
     }
 
     // MARK: - Behaviour
@@ -237,6 +302,14 @@ struct AccountsView: View {
     /// blocking the main thread and then mutating `@State` in the middle of `NSHostingView`'s first
     /// layout pass, which re-enters the view graph and aborts in AttributeGraph. Hopping off and
     /// back keeps the window's first layout a plain, synchronous, side-effect-free pass.
+    /// Re-read, and tell the library window that what it may show has changed. Every action in this
+    /// window changes which games exist for this player, and the library is a separate view graph
+    /// that would otherwise never find out.
+    private func changed() {
+        refresh()
+        NotificationCenter.default.post(name: .cellarStoresChanged, object: nil)
+    }
+
     private func refresh() {
         Task.detached {
             if GOGAuth.isSignedIn, GOGAuth.cachedUsername == nil {
@@ -254,8 +327,16 @@ struct StoreAccountState {
     /// A Steam profile whose bottle is set up, so "Open Steam" has somewhere to open.
     var steamBottleSlug: String?
     var steamDownloadSession = false
+    /// Whether a Steam Web API key is stored — the difference between "your library" and "the games
+    /// Cellar happens to have seen".
+    var steamHasKey = false
+    /// The cached owned libraries, so this window can say how many games each store answered with.
+    var steamLibrary: OwnedLibrary?
     var gogSignedIn = false
     var gogAccount: String?
+    var gogLibrary: OwnedLibrary?
+    /// Battle.net's connection is the player's word — see `BattleNetAccess`.
+    var battleNetConnected = false
     /// False until the first read, so the UI never states something it hasn't checked yet.
     var isLoaded = false
 
@@ -268,9 +349,30 @@ struct StoreAccountState {
             steamBottleSlug: Game.summaries()
                 .first { $0.store == .steam && $0.runnerInstalled && $0.clientInstalled }?.slug,
             steamDownloadSession: DepotTool.hasStoredSession,
+            steamHasKey: SteamWebAPI.hasKey,
+            steamLibrary: StoreLibrary.cached(.steam),
             gogSignedIn: GOGAuth.isSignedIn,
             gogAccount: GOGAuth.cachedUsername,
+            gogLibrary: StoreLibrary.cached(.gog),
+            battleNetConnected: BattleNetAccess.isConnected,
             isLoaded: true)
+    }
+
+    /// The Steam library row's badge. A ✓ only for a library Steam actually handed over — a partial
+    /// list read off the disk is not the same claim and must not look like one.
+    var steamLibraryState: AccountState {
+        guard let steamLibrary else { return .partial("Not read yet") }
+        guard steamLibrary.isComplete else { return .partial("Installed games only") }
+        return .signedIn("\(steamLibrary.totalCount) games")
+    }
+
+    var steamLibraryDetail: String {
+        guard let steamLibrary else {
+            return "Cellar hasn't read your Steam library yet."
+        }
+        return steamLibrary.isComplete
+            ? "Read from \(steamLibrary.source). Cellar shows the ones it supports."
+            : "Cellar can only confirm the \(steamLibrary.keys.count) game\(steamLibrary.keys.count == 1 ? "" : "s") already installed, so those are all it lists."
     }
 }
 
@@ -281,6 +383,10 @@ enum AccountState {
     /// Signed in, but the store doesn't hand back a name worth showing.
     case signedInUnnamed
     case signedOut
+    /// Cellar has *part* of the answer and knows it is partial — the Steam library read off the
+    /// disk rather than from Steam. Not a ✓, because it is not the whole truth; not "not signed
+    /// in" either, because that is a different question and this row isn't asking it.
+    case partial(String)
     /// The store publishes nothing Cellar can read. Never a ✗ — see skills/ux.md.
     case unknowable
 }
@@ -333,6 +439,9 @@ struct AccountRow: View {
         case .signedOut:
             Label("Not signed in", systemImage: "circle.dashed")
                 .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+        case .partial(let summary):
+            Label(summary, systemImage: "circle.lefthalf.filled")
+                .font(.caption.weight(.medium)).foregroundStyle(.orange)
         case .unknowable:
             Label("Not published", systemImage: "questionmark.circle")
                 .font(.caption.weight(.medium)).foregroundStyle(.secondary)
@@ -344,6 +453,7 @@ struct AccountRow: View {
         case .signedIn(let name):  return "signed in as \(name)"
         case .signedInUnnamed:     return "signed in"
         case .signedOut:           return "not signed in"
+        case .partial(let summary): return summary
         case .unknowable:          return "sign-in state not published by this store"
         }
     }

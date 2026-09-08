@@ -10,9 +10,59 @@ struct SteamCommand: ParsableCommand {
         the same way — the two differ only where the stores genuinely do (Steam installs silently
         and publishes who is signed in; Battle.net does neither).
         """,
-        subcommands: [Open.self, Login.self, Share.self, Install.self, Status.self, App.self, Add.self,
+        subcommands: [Open.self, Login.self, Key.self, Share.self, Install.self, Status.self, App.self, Add.self,
                       EnableWindowsPlatform.self, DisableWindowsPlatform.self]
     )
+
+    // MARK: key (the Web API key that makes "which games do I own?" answerable)
+
+    struct Key: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Store your Steam Web API key, so Cellar can list the games you own.",
+            discussion: """
+            Steam has no OAuth for entitlements, and an anonymous request for a library is refused
+            unless the profile's game details are public. A key issued to your own account answers
+            for your own library either way — it is free, it takes one page, and Cellar keeps it in
+            your keychain beside the sign-in tokens.
+
+            Get one at https://steamcommunity.com/dev/apikey, then:
+              cellar steam key --set <key>
+              cellar library --refresh
+
+            Without a key Cellar still works; it just cannot list Steam games it has not seen
+            installed, and says so rather than showing you games you may not own.
+            """)
+
+        @Option(name: .long, help: "The 32-character key from steamcommunity.com/dev/apikey.")
+        var set: String?
+
+        @Flag(name: .long, help: "Forget the stored key.")
+        var forget = false
+
+        func run() throws {
+            if forget {
+                try SteamWebAPI.forgetKey()
+                StoreLibrary.clearCache(.steam)
+                print(Term.green("Forgotten.") + Term.dim(" Cellar will list only the Steam games it can see installed."))
+                return
+            }
+            guard let set else {
+                if SteamWebAPI.hasKey {
+                    print(Term.green("✓ ") + "A Steam Web API key is stored."
+                        + Term.dim("  Replace it with --set, remove it with --forget."))
+                } else {
+                    print(Term.yellow("• ") + "No key stored. Get one at " + SteamWebAPI.keyPage
+                        + ", then: cellar steam key --set <key>")
+                }
+                return
+            }
+            try SteamWebAPI.setKey(set)
+            print(Term.green("Saved to your keychain."))
+            if let library = try StoreLibrary.refresh(.steam, progress: { print(Term.dim("  " + $0)) }) {
+                print(Term.green("✓ ") + "\(library.totalCount) games in \(library.source).")
+            }
+        }
+    }
 
     // MARK: app (Steam client as a macOS .app)
 

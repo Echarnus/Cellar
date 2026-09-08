@@ -100,6 +100,54 @@ struct SelfTest: ParsableCommand {
         try check(decoded?.first?.count == size, "ASCII QR round-trip: \(size) module columns recovered")
         try check(decoded == matrix, "ASCII QR round-trip is module-exact")
 
+        // 5. The library gate. This decides whether somebody sees a game at all, and it is the one
+        // rule in Cellar where a bug is a *claim about the player* — "these are your games" — so it
+        // is checked against fabricated statuses rather than whatever this Mac happens to hold.
+        func status(_ store: GameStore, connected: Bool, owned: [String]? = nil, complete: Bool = true) -> StoreStatus {
+            StoreStatus(store: store, isConnected: connected, accountName: nil,
+                        library: owned.map {
+                            OwnedLibrary(keys: Set($0), totalCount: $0.count, refreshedAt: Date(),
+                                         source: "a test", isComplete: complete)
+                        })
+        }
+        let nothing = LibraryAccess(statuses: [:])
+        try check(nothing.hasNoConnection, "no credentials means no connected stores")
+        try check(!nothing.isVisible(store: .steam, key: "1"),
+                  "a game is hidden until its store is connected")
+
+        let complete = LibraryAccess(statuses: [
+            .steam: status(.steam, connected: true, owned: ["1"]),
+            .gog: status(.gog, connected: true, owned: []),
+            .battlenet: status(.battlenet, connected: true),
+        ])
+        try check(complete.isVisible(store: .steam, key: "1"), "a game Steam confirms you own is shown")
+        try check(!complete.isVisible(store: .steam, key: "2"), "a game Steam says you don't own is hidden")
+        try check(!complete.isVisible(store: .gog, key: "7"),
+                  "GOG's answer is exact, so an unowned GOG game is hidden")
+        try check(complete.isVisible(store: .battlenet, key: "Fen"),
+                  "Battle.net can never report ownership, so its games show once connected")
+
+        // A `standalone` profile that names a Steam AppID is fetched from the player's Steam
+        // account, so Steam gates it — getting this wrong would show somebody a game they don't own.
+        try check(GameStore.gate(for: .standalone, hasSteamAppID: true) == .steam,
+                  "a standalone profile with a Steam AppID is gated on Steam")
+        try check(GameStore.gate(for: .standalone, hasSteamAppID: false) == .standalone,
+                  "a standalone profile with no AppID is gated on nothing")
+        try check(GameStore.gate(for: .gog, hasSteamAppID: true) == .gog,
+                  "a real store always gates its own games")
+
+        let partial = LibraryAccess(statuses: [
+            .steam: status(.steam, connected: true, owned: ["1"], complete: false),
+        ])
+        try check(partial.isVisible(store: .steam, key: "1"),
+                  "a partial Steam answer still confirms what it lists")
+        try check(!partial.isVisible(store: .steam, key: "2"),
+                  "a game missing from a partial answer is unchecked, not owned — so it stays hidden")
+        try check(partial.status(.steam).ownership(of: "2") == .unverifiable,
+                  "and it is reported as unverifiable, never as unowned")
+        try check(partial.status(.steam).libraryNote != nil,
+                  "a partial answer always carries the sentence explaining it")
+
         print(Term.green("All selftests passed."))
     }
 }

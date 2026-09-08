@@ -32,6 +32,11 @@ public enum Paths {
     /// (the sign-in) and `steamapps/` (the games), so both are downloaded and authenticated once.
     public static var sharedSteam: URL { shared.appendingPathComponent("steam", isDirectory: true) }
 
+    /// Cached "what does this player own" answers, one file per store. Under `shared/` for the same
+    /// reason the Steam client is: an owned library belongs to the account, not to a bottle. Only
+    /// ids and counts live here — the credentials that fetch them stay in the keychain.
+    public static var storeLibraries: URL { shared.appendingPathComponent("libraries", isDirectory: true) }
+
 
     /// Run logs / diagnostics.
     public static var logs: URL { appSupport.appendingPathComponent("logs", isDirectory: true) }

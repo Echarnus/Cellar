@@ -87,6 +87,20 @@ deletes a download.
 check: your Steam account name, your GOG account name, and for Battle.net an honest "not published"
 rather than a guess.
 
+### Your games, not a catalogue
+
+**Cellar shows nothing until you connect a store**, and then shows only the games that store says you
+own. The app opens on a sign-in screen; `cellar library` is the same list in the terminal.
+
+- **GOG** answers exactly — one call returns your whole library.
+- **Steam** answers exactly once it can be asked: add your own free [Web API key](https://steamcommunity.com/dev/apikey)
+  with `cellar steam key --set <key>`, or make your profile's game details public. Until then Cellar
+  lists only the Steam games it can *prove* you own — the ones already installed — and says so
+  instead of padding the list.
+- **Battle.net** can't be asked at all: Blizzard publishes neither who is signed in nor what you own.
+  So you tell Cellar you have an account (`cellar battlenet connect`), its games appear, and Cellar
+  never claims to have checked.
+
 In the app the library is grouped by store, each game carries its storefront's mark and name, and
 the detail page states what the profile actually knows: developer, engine, graphics API, anti-cheat,
 DRM, and an honest `status` — including "untested" when that's the truth.
@@ -154,10 +168,12 @@ Signing in, wherever you are:
 
 ```sh
 cellar accounts                     # where you're signed in, across every store
+cellar library                      # the games you own — nothing appears until a store is connected
 cellar steam login                  # QR sign-in for client-free downloads (nothing typed)
+cellar steam key --set <key>        # so Cellar can list every Steam game you own
 cellar steam share                  # one Steam install for every bottle (safe to re-run)
 cellar gog login                    # OAuth, once, for your whole GOG library
-cellar gog library                  # everything you own that runs on Windows
+cellar battlenet connect            # Blizzard publishes nothing to check, so you tell Cellar
 ```
 
 Surface it like a native game:

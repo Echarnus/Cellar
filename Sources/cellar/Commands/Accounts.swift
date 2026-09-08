@@ -39,12 +39,27 @@ struct Accounts: ParsableCommand {
                 ? "QR session stored — fetch-depot won't ask again"
                 : "no stored session — cellar steam login")
 
+        // Steam's *library* is a third fact again: which games you own, which decides what the
+        // library may show you. Exact only once Cellar has a way to ask.
+        let steamLibrary = StoreLibrary.cached(.steam)
+        if let steamLibrary, steamLibrary.isComplete {
+            row(state: .yes, store: "Steam library",
+                detail: "\(steamLibrary.totalCount) games, read from \(steamLibrary.source)")
+        } else if let steamLibrary {
+            row(state: .no, store: "Steam library",
+                detail: "only the \(steamLibrary.keys.count) installed game\(steamLibrary.keys.count == 1 ? "" : "s") can be confirmed — cellar steam key --set <key>")
+        } else {
+            row(state: .no, store: "Steam library",
+                detail: "not read yet — cellar library --refresh")
+        }
+
         // GOG — a token Cellar owns, so the account name is a fact.
         if GOGAuth.isSignedIn {
             let name = (try? GOGAuth.username()) ?? GOGAuth.cachedUsername
             if let name {
                 GOGAuth.cacheUsername(name)
-                row(state: .yes, store: "GOG", detail: "signed in as \(name) — covers your whole library")
+                let owned = StoreLibrary.cached(.gog).map { " · \($0.totalCount) games" } ?? ""
+                row(state: .yes, store: "GOG", detail: "signed in as \(name) — covers your whole library\(owned)")
             } else {
                 row(state: .unknown, store: "GOG", detail: "signed in, but the session is stale — cellar gog login")
             }
@@ -53,9 +68,16 @@ struct Accounts: ParsableCommand {
         }
 
         // Battle.net — the honest row. Blizzard publishes no readable signed-in state, so this is a
-        // `·` forever and never a ✗ (see skills/ux.md, "Honesty is a UX rule").
+        // `·` forever and never a ✗ (see skills/ux.md, "Honesty is a UX rule"). Connecting it is the
+        // player's word about having an account, which is a different claim from being signed in —
+        // so it stays a `·` even then, and the detail says which of the two it is reporting.
         row(state: .unknown, store: "Battle.net",
-            detail: "Blizzard doesn't publish who is signed in — sign in inside the client")
+            detail: BattleNetAccess.isConnected
+                ? "you told Cellar you have an account — Blizzard publishes nothing to check"
+                : "Blizzard publishes nothing to check — cellar battlenet connect")
+
+        print()
+        print(Term.dim("  Which games this lets you see: cellar library"))
     }
 
     private enum State { case yes, no, unknown }

@@ -9,8 +9,40 @@ struct BattleNetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "battlenet",
         abstract: "The Battle.net plugin: open Blizzard's client in a bottle, install games, surface them natively.",
-        subcommands: [Open.self, Install.self, Status.self, App.self, Configure.self]
+        subcommands: [Connect.self, Open.self, Install.self, Status.self, App.self, Configure.self]
     )
+
+    // MARK: connect (the one store Cellar has to take the player's word for)
+
+    struct Connect: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Tell Cellar you have a Battle.net account, so its games appear in your library.",
+            discussion: """
+            Every other store answers "who is signed in?" and "what do you own?". Blizzard answers
+            neither — there is no readable sign-in state and no entitlements API (their OAuth scopes
+            are game-profile data; see docs/ROADMAP.md). So Cellar has two honest options: never show
+            a Battle.net game, or ask you.
+
+            It asks. Connecting is your word, not a check Cellar performed, which is why Battle.net
+            never gets a ✓ and why its games are listed as unverified. You still sign in inside
+            Blizzard's own window, from the game's screen: cellar battlenet open <slug>
+            """)
+
+        @Flag(name: .long, help: "Disconnect instead: hide Battle.net games again.")
+        var forget = false
+
+        func run() throws {
+            if forget {
+                try BattleNetAccess.disconnect()
+                print(Term.green("Disconnected.") + Term.dim(" Battle.net games are hidden from your library."))
+                return
+            }
+            try BattleNetAccess.connect()
+            print(Term.green("Connected.")
+                + " Battle.net games now appear in " + Term.bold("cellar library") + ".")
+            print(Term.dim("  Cellar can't check which of them you own — Blizzard publishes no library."))
+        }
+    }
 
     // MARK: status
 

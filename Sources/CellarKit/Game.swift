@@ -135,6 +135,8 @@ public struct GameSummary: Identifiable, Sendable {
     public let running: Bool           // the store's client is up
     /// Battle.net's equivalent of an AppID — how its client names this game (`Fen` = Diablo IV).
     public let productCode: String?
+    /// GOG's product id — the key GOG's owned-library call answers in.
+    public let gogProductID: Int?
     /// Steam AppID to pull public artwork with — nil for stores that publish none.
     public let artworkAppID: Int?
     public let artPortraitURL: String?
@@ -158,6 +160,17 @@ public struct GameSummary: Identifiable, Sendable {
         if store.descriptor.canDetectSignIn, account == nil { return .signIn }
         if !gameInstalled { return .install }
         return .play
+    }
+
+    /// One word for where this game stands — the app's status pill, its VoiceOver label, and the
+    /// `cellar library` listing all read it from here so they never disagree.
+    public var statusWord: String {
+        switch nextStep {
+        case .setup:   return "Set-up needed"
+        case .signIn:  return "Sign in"
+        case .install: return "Not installed"
+        case .play:    return "Ready"
+        }
     }
 
     /// The primary button's title. Store-specific on purpose: "Install" means something different
@@ -229,7 +242,7 @@ public struct GameSummary: Identifiable, Sendable {
 
     public init(slug: String, name: String, store: GameStore, appID: Int?, iconPath: String?,
                 runnerInstalled: Bool, clientInstalled: Bool, account: String?, gameInstalled: Bool,
-                running: Bool, productCode: String?, artworkAppID: Int?,
+                running: Bool, productCode: String?, gogProductID: Int? = nil, artworkAppID: Int?,
                 artPortraitURL: String?, artHeroURL: String?,
                 needsClientAtRuntime: Bool, facts: GameFacts, runnerID: String, backend: String,
                 bottleName: String) {
@@ -244,6 +257,7 @@ public struct GameSummary: Identifiable, Sendable {
         self.gameInstalled = gameInstalled
         self.running = running
         self.productCode = productCode
+        self.gogProductID = gogProductID
         self.artworkAppID = artworkAppID
         self.artPortraitURL = artPortraitURL
         self.artHeroURL = artHeroURL
@@ -275,6 +289,7 @@ public enum Game {
                 gameInstalled: isGameInstalled(plan),
                 running: storeClientRunning(plan),
                 productCode: plan.productCode,
+                gogProductID: plan.gogProductID,
                 // Only Steam publishes free cover art keyed on an app id; everything else has to
                 // bring its own URLs or fall back to Cellar's generated cover.
                 artworkAppID: plan.store == .steam ? plan.appID : nil,

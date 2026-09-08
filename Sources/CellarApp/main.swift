@@ -7,6 +7,10 @@ extension Notification.Name {
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.
     static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
+    /// Posted whenever a store is signed in to, signed out of, or connected. The library is gated on
+    /// exactly that, and Accounts is a separate window with its own view graph — so without this,
+    /// a player signs in and returns to the same empty library.
+    static let cellarStoresChanged = Notification.Name("cellar.storesChanged")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
