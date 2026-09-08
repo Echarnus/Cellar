@@ -199,6 +199,14 @@ public struct StoreStatus: Sendable {
         self.library = library
     }
 
+    /// Whether being connected is something Cellar **read**, or something the player told it.
+    ///
+    /// Battle.net is the only `false`: Cellar holds no credential for it and Blizzard publishes
+    /// nothing, so `isConnected` there is a self-report (`BattleNetAccess`). Any surface that marks
+    /// a connected store must ask this before drawing a ✓ — a checkmark on a self-report claims a
+    /// check that never happened, which is the one thing `skills/ux.md` forbids outright.
+    public var isConnectionVerified: Bool { store.descriptor.canDetectSignIn }
+
     /// Whether this game is owned, as far as the store has been willing to say.
     public func ownership(of key: String?) -> Ownership {
         guard store.canReportOwnership else { return .unverifiable }

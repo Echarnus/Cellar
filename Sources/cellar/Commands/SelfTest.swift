@@ -127,6 +127,14 @@ struct SelfTest: ParsableCommand {
         try check(complete.isVisible(store: .battlenet, key: "Fen"),
                   "Battle.net can never report ownership, so its games show once connected")
 
+        // …but being connected there is the player's word, not a check. Any surface that draws a ✓
+        // from `isConnected` alone would be claiming Cellar verified a self-report.
+        try check(!complete.status(.battlenet).isConnectionVerified,
+                  "a connected Battle.net is a self-report, so it never earns a ✓")
+        try check(complete.status(.steam).isConnectionVerified
+                    && complete.status(.gog).isConnectionVerified,
+                  "Steam and GOG connections are read from a credential, so they do")
+
         // A `standalone` profile that names a Steam AppID is fetched from the player's Steam
         // account, so Steam gates it — getting this wrong would show somebody a game they don't own.
         try check(GameStore.gate(for: .standalone, hasSteamAppID: true) == .steam,

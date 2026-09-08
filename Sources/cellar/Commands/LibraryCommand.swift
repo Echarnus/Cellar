@@ -99,11 +99,21 @@ struct LibraryCommand: ParsableCommand {
     }
 
     /// A store's line: mark, name, and the honest account/library summary beside it.
+    ///
+    /// Three marks, not two. A ✓ is only for a connection Cellar *read*; Battle.net's is the
+    /// player's own word, so it gets the same `·` `cellar accounts` gives it. A green tick directly
+    /// above "Cellar can't check which of these you own" would be the exact contradiction this whole
+    /// change exists to remove.
     private func storeHeading(_ store: GameStore, status: StoreStatus) -> String {
-        let mark = status.isConnected ? Term.green("✓") : Term.yellow("•")
+        let mark = !status.isConnected ? Term.yellow("•")
+            : status.isConnectionVerified ? Term.green("✓") : Term.dim("·")
         var detail: [String] = []
         if let account = status.accountName { detail.append("signed in as \(account)") }
-        else if status.isConnected { detail.append("connected") }
+        else if status.isConnected {
+            detail.append(status.isConnectionVerified
+                ? "connected"
+                : "you told Cellar you have an account — nothing here was checked")
+        }
         if let library = status.library, library.isComplete {
             detail.append("\(library.totalCount) game\(library.totalCount == 1 ? "" : "s") in \(library.source)")
         }
