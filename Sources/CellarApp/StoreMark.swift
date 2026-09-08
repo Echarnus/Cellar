@@ -1,23 +1,49 @@
 import SwiftUI
+import AppKit
 import CellarKit
 
-/// The storefronts' own marks, drawn as vectors.
+/// The storefronts' own marks.
 ///
 /// A generic game-controller glyph tells a player nothing; the Steam valve and the Battle.net orb
 /// are recognised instantly, and that recognition is the whole point of separating the stores.
 ///
-/// They are **drawn in code, not shipped as artwork**. Cellar's hard rule is that it redistributes
-/// nobody's proprietary assets (`AGENTS.md`, `docs/LEGAL.md`), and a bundled PNG of Valve's or
-/// Blizzard's logo would break it. Vector marks composed from primitives keep the repo asset-free,
-/// stay crisp at every size, work offline, and adapt to light and dark on their own.
+/// There are two ways to get one on screen, and Cellar uses both, in this order:
 ///
-/// Use is nominative: the mark labels which store a game came from. It is not a badge of
-/// endorsement, and Cellar says so in `NOTICE`.
+/// 1. **The store's real artwork, from the copy already on this machine** — the `.icns` inside
+///    Steam.app, or the `.ico` Windows Steam keeps in the bottle Cellar itself installed. That is
+///    Valve's own mark, not an impression of it, and it costs nothing to be exact.
+/// 2. **A vector mark drawn here**, when the store isn't installed and there is nothing to point at.
+///
+/// What Cellar never does is **ship** anyone's logo. Every storefront's brand guidelines forbid it
+/// in some form (see `StoreIcon` and `docs/LEGAL.md`), and a logo file in `Resources/` would also be
+/// artwork this GPL-3.0 repository has no right to relicense. Grafting from the player's own install
+/// is the same move Cellar makes for Apple's D3DMetal, for the same reason.
+///
+/// So the drawn marks below are not placeholders — for a store the player hasn't installed they are
+/// what ships, and they have to be good. Use is nominative either way: the mark labels which store a
+/// game came from. It is not a badge of endorsement, and Cellar says so in `NOTICE`.
 struct StoreMark: View {
     let store: GameStore
     var size: CGFloat = 14
 
     var body: some View {
+        if let image = StoreIcons.image(for: store) {
+            // Clipped to a circle so every store's mark occupies the same footprint, whichever
+            // source it came from: Steam's `.ico` is already a circle on transparency, and a
+            // macOS app icon's squircle trims to one cleanly. `StoreBadge` rings that footprint,
+            // and the ring can only sit right if the shape underneath is predictable.
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+        } else {
+            drawn
+        }
+    }
+
+    @ViewBuilder private var drawn: some View {
         switch store {
         case .steam:      SteamMark(size: size)
         case .battlenet:  BattleNetMark(size: size)
@@ -27,8 +53,31 @@ struct StoreMark: View {
     }
 }
 
-/// Valve's mark: the large valve wheel, the connecting rod, and the smaller wheel above it, on the
-/// dark navy Steam has used since 2013.
+/// Resolved store artwork, looked up once per store and kept for the life of the process.
+///
+/// `StoreMark` renders in every library row, so this has to be a dictionary lookup by the second
+/// call. The first call touches the filesystem — a handful of `fileExists` checks, and at most one
+/// `sips` conversion the very first time a bottle's `.ico` is seen. That happens once ever, not
+/// once per launch, because the converted PNG is cached on disk by `StoreIcon`.
+enum StoreIcons {
+    private static var cache: [GameStore: NSImage?] = [:]
+
+    static func image(for store: GameStore) -> NSImage? {
+        if let known = cache[store] { return known }
+        let image = StoreIcon.mark(store).flatMap { NSImage(contentsOf: $0) }
+        cache[store] = image
+        return image
+    }
+
+    /// Forget what was resolved, so a store that has just been installed starts showing its own
+    /// mark without a relaunch. Called when the library reloads after `cellar setup`.
+    static func refresh() { cache.removeAll() }
+}
+
+/// Valve's mark: the large valve wheel, the connecting rod, and the smaller wheel below it, on the
+/// dark navy Steam has used since 2013. The big wheel sits **upper-right** and the small one
+/// lower-left, with the rod running out to the lower-left edge — mirroring that reads as a
+/// dumbbell, which is the tell that a Steam logo has been drawn from memory.
 private struct SteamMark: View {
     let size: CGFloat
 
@@ -40,27 +89,28 @@ private struct SteamMark: View {
                 LinearGradient(colors: [Color(.sRGB, red: 0.16, green: 0.24, blue: 0.33, opacity: 1), navy],
                                startPoint: .topLeading, endPoint: .bottomTrailing))
 
-            // The rod, drawn first so both wheels sit on top of its ends.
+            // The rod, drawn first so both wheels sit on top of its ends. It runs from the small
+            // wheel out past the lower-left edge of the disc, as in Valve's mark.
             Capsule()
                 .fill(.white)
-                .frame(width: size * 0.46, height: size * 0.10)
+                .frame(width: size * 0.50, height: size * 0.10)
                 .rotationEffect(.degrees(-45))
+                .offset(x: -size * 0.09, y: size * 0.09)
 
-            // Lower-left valve wheel — the big one. Its hole has to stay open at 12pt, which is
+            // Upper-right valve wheel — the big one. Its hole has to stay open at 12pt, which is
             // what sets every other proportion here.
             ZStack {
-                Circle().fill(.white).frame(width: size * 0.52)
-                Circle().fill(navy).frame(width: size * 0.20)
+                Circle().fill(.white).frame(width: size * 0.44)
+                Circle().fill(navy).frame(width: size * 0.19)
             }
-            .offset(x: -size * 0.15, y: size * 0.15)
+            .offset(x: size * 0.13, y: -size * 0.13)
 
-            // Upper-right wheel, roughly half the size — the proportion that makes it read as Steam
-            // rather than as a dumbbell.
+            // Lower-left wheel, roughly half the size — the proportion that makes it read as Steam.
             ZStack {
-                Circle().fill(.white).frame(width: size * 0.28)
+                Circle().fill(.white).frame(width: size * 0.26)
                 Circle().fill(navy).frame(width: size * 0.10)
             }
-            .offset(x: size * 0.19, y: -size * 0.19)
+            .offset(x: -size * 0.14, y: size * 0.14)
         }
         .frame(width: size, height: size)
     }
@@ -100,6 +150,8 @@ private struct BattleNetMark: View {
 /// 14pt is a smudge — so the mark keeps the brand's purple and its first letter, which is what
 /// actually reads at library-row size. Purple also does real work here: Steam and Battle.net are
 /// both blue, so GOG is the one store colour can help distinguish (it still never carries it alone).
+/// GOG is also the store this is most often what ships: Cellar talks to GOG over HTTP and never
+/// stands a Galaxy client up, so there is usually no install to take real artwork from.
 private struct GOGMark: View {
     let size: CGFloat
 
@@ -120,7 +172,7 @@ private struct GOGMark: View {
 }
 
 /// No store: a plain box, so "these files are just on disk" reads as deliberately different from
-/// the two branded marks rather than as a store Cellar failed to identify.
+/// the branded marks rather than as a store Cellar failed to identify.
 private struct StandaloneMark: View {
     let size: CGFloat
 

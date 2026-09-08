@@ -63,7 +63,8 @@ public struct StoreDescriptor: Sendable {
     /// The heading a library section gets when games are grouped by store.
     public let sectionTitle: String
     /// Fallback SF Symbol, for contexts that cannot draw a real mark. The app draws each store's
-    /// own logo as vectors instead (`StoreMark`) — nothing proprietary is shipped, see docs/LEGAL.md.
+    /// own mark instead (`StoreMark`), from the store's install on this machine where there is one
+    /// (`StoreIcon`) — nothing proprietary is ever shipped, see docs/LEGAL.md.
     public let symbolName: String
     /// The store's accent, `#RRGGBB`, used for its chips, section heading and primary button. Close
     /// to each brand, and kept far enough apart in tone that two stores never read as the same

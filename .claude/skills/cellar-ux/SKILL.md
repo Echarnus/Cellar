@@ -16,10 +16,13 @@ landed. Key rules:
   Battle.net has no sign-in step and its installer is announced as needing clicks. Encode the
   difference in `GameStore.descriptor`, never as a special case in a view.
 - **Stores are told apart by three signals together:** position (grouped sections), mark (the store's
-  real logo, drawn as vectors in `StoreMark.swift`), and word (its name, including in a11y labels).
-  Colour never carries it alone — Steam and Battle.net are both blue.
-- **Marks are drawn, never bundled.** Shipping Valve's or Blizzard's artwork breaks a hard rule in
-  `AGENTS.md`. Never leave a blank cover either: `GeneratedCover` draws a deterministic one.
+  real logo), and word (its name, including in a11y labels). Colour never carries it alone — Steam and
+  Battle.net are both blue.
+- **Marks are never bundled.** Shipping Valve's or Blizzard's artwork breaks a hard rule in
+  `AGENTS.md` and those companies' own brand terms. Cellar shows the real icon from the store's
+  install on this machine (`StoreIcon.swift`) and draws its own vector when there is none
+  (`StoreMark.swift`) — that drawn fallback is what ships for an uninstalled store, so it has to be
+  right. Never leave a blank cover either: `GeneratedCover` draws a deterministic one.
 - **Copy:** sentence case, say what will happen in one sentence, name the window the player will see,
   and end every player-facing error with the command or button that fixes it.
 - **Accessibility:** icon-only controls get `.accessibilityLabel` + `.help`; rows combine into one

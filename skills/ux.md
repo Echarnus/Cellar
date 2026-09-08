@@ -52,17 +52,21 @@ It is carried by **three signals, always together** — see `Sources/CellarApp/S
 | Signal | Where |
 |---|---|
 | **Position** | The library is grouped into store sections, in a fixed order. A game's neighbours already tell you. |
-| **Mark** | The store's real logo, drawn as vectors in `StoreMark.swift`, on the cover badge, section heading, filter chip and detail lockup. |
+| **Mark** | The store's real logo — its own icon from the copy installed on this machine (`StoreIcon.swift`), else the vector Cellar draws (`StoreMark.swift`) — on the cover badge, section heading, filter chip and detail lockup. |
 | **Word** | The store's name, spelled out, beside the mark and in every accessibility label. |
 
 Notes that are easy to get wrong:
 
 - **Colour cannot carry this alone.** Steam and Battle.net are both blue. The tints in
   `StoreDescriptor.accentHex` differentiate *tone*, but the mark and the word do the work.
-- **Store marks are drawn, never bundled.** `AGENTS.md` forbids redistributing anyone's proprietary
-  assets, and a logo PNG in `Resources/` would break it. Vector marks keep the repo asset-free, stay
-  crisp at any size, and work offline. Use is nominative — labelling where a game came from, not
-  claiming endorsement (`NOTICE`).
+- **Store marks are never bundled.** `AGENTS.md` forbids redistributing anyone's proprietary assets,
+  and every store's own brand terms forbid shipping its logo besides — so a logo PNG in `Resources/`
+  is out twice over. Instead Cellar *points at the store already installed on the machine* and shows
+  its real icon (`StoreIcon.swift`), and draws its own vector when there is nothing to point at. The
+  drawn mark is therefore not a placeholder: for a store the player hasn't installed it is what ships,
+  so it has to be right — the Steam wheels sit big-upper-right, small-lower-left, and mirroring them
+  reads as a dumbbell. Use is nominative — labelling where a game came from, not claiming endorsement
+  (`NOTICE`).
 - **Never leave a blank cover.** Steam publishes key art per AppID; Battle.net publishes none a
   launcher may hotlink. `GeneratedCover` composes a deterministic gradient and monogram instead —
   deterministic because a cover that changed colour between launches would read as a bug.

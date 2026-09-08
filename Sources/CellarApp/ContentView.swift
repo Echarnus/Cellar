@@ -25,6 +25,9 @@ final class Library: ObservableObject {
     }
 
     func refresh() {
+        // A store that has just been set up now has its own artwork on disk; re-resolve so its
+        // mark upgrades from the drawn one to the store's own without needing a relaunch.
+        StoreIcons.refresh()
         games = Game.summaries()
         guard selected == nil || !games.contains(where: { $0.slug == selected }) else { return }
         let remembered = UserDefaults.standard.string(forKey: Library.lastSelectedKey)
