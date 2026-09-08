@@ -21,6 +21,7 @@ struct StoreMark: View {
         switch store {
         case .steam:      SteamMark(size: size)
         case .battlenet:  BattleNetMark(size: size)
+        case .gog:        GOGMark(size: size)
         case .standalone: StandaloneMark(size: size)
         }
     }
@@ -90,6 +91,29 @@ private struct BattleNetMark: View {
                 .stroke(.white, style: StrokeStyle(lineWidth: size * 0.13, lineCap: .round))
                 .frame(width: size * 0.28)
                 .rotationEffect(.degrees(90))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// GOG's mark: the purple disc with its initial. GOG's own logo is a wordmark, and "GOG" set at
+/// 14pt is a smudge — so the mark keeps the brand's purple and its first letter, which is what
+/// actually reads at library-row size. Purple also does real work here: Steam and Battle.net are
+/// both blue, so GOG is the one store colour can help distinguish (it still never carries it alone).
+private struct GOGMark: View {
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle().fill(
+                LinearGradient(colors: [Color(.sRGB, red: 0.72, green: 0.38, blue: 0.90, opacity: 1),
+                                        Color(.sRGB, red: 0.44, green: 0.16, blue: 0.66, opacity: 1)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing))
+            Text("G")
+                .font(.system(size: size * 0.66, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                // The glyph's own bearing sits it slightly high in the circle; nudge it back.
+                .offset(y: size * 0.01)
         }
         .frame(width: size, height: size)
     }

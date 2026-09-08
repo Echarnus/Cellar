@@ -124,7 +124,9 @@ public enum AppBundle {
         case .battlenet:
             relative = ["Battle.net.app/Contents/Resources/battle.net.icns",
                         "Battle.net.app/Contents/Resources/Battle.net.icns"]
-        case .standalone:
+        // GOG Galaxy may be installed natively, but Cellar never opens it — there is no GOG client
+        // in a bottle to give an icon to. Standalone has no client either.
+        case .gog, .standalone:
             return nil
         }
         let roots = ["/Applications", "\(home)/Applications"]

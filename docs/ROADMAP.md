@@ -60,6 +60,34 @@ generalized into a per-game profile system, then given a native GUI.
 - ⏳ Verify Diablo IV end-to-end on the M5 (install + play). The profile is `untested` until then.
 - ⏳ Further stores when a game needs one: GOG (DRM-free, closest to the standalone path), Epic.
 
+## Phase 5 — Sign in once ✅ (GOG + shared Steam)
+
+The step from "a wrapper you configure" to "a launcher you sign in to".
+
+- ✅ **One Steam install behind every bottle** (`shared/steam` + per-bottle symlink). One sign-in and
+  one 1.4 GB client for the whole library instead of one per game; a game owned once is downloaded
+  once. `cellar steam share` migrates an existing install without deleting a download.
+- ✅ **Steam QR sign-in for downloads** — Steam's own device-authorization flow, nothing typed,
+  approved in the mobile app. `cellar steam login`; the app renders the challenge as a real QR
+  (DepotDownloader only draws it in ASCII, so Cellar reads that back — `SteamQRCode.swift`).
+- ✅ **GOG, with real OAuth** — the store where signing in once genuinely covers everything: no client
+  in the bottle, no live session, DRM-free. `cellar gog login / library / install`, tokens in the
+  keychain, and a `witcher-3` reference profile.
+- ✅ **An Accounts screen** (`cellar accounts`, and ⌘⇧A in the app) — sign-in is an account-level fact,
+  so it has an account-level home instead of being rediscovered per game.
+- ❌ **Battle.net OAuth: deliberately not done.** Blizzard runs a real OAuth 2.0 provider, but its
+  scopes are game-profile data (`wow.profile`, `sc2.profile`, `d3.profile`) — there is no entitlements
+  scope and no download scope. It would tell Cellar a BattleTag and nothing it needs. Sign-in stays
+  folded into "open the client".
+
+Next in this direction, not yet done:
+
+- Browse the full owned library rather than curated profiles — possible for GOG today (one API call),
+  and for Steam via a Web API key. Steam and Battle.net still need a profile to *run* a game.
+- Epic Games Store: a genuine OAuth flow (as Legendary/Heroic use), but reverse-engineered against the
+  launcher's own client credentials — a bigger surface and a bigger judgement call than GOG's.
+- Generate a profile from a store's metadata, so adding a game is not hand-writing TOML.
+
 ## Known risks tracked across phases
 
 - **Rosetta sunset** — general-purpose Rosetta is removed in macOS 28 (fall 2027); Apple keeps a

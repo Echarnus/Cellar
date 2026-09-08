@@ -104,6 +104,9 @@ struct GameDetailView: View {
                 Button("Open Battle.net") { act(["battlenet", "open", game.slug], "Opening Battle.net") }
                 Button("Re-apply Battle.net settings") { act(["battlenet", "configure", game.slug], "Configuring") }
                 Button("Create Battle.net app in ~/Applications") { act(["battlenet", "app", game.slug], "Creating app") }
+            case .gog:
+                Button("Download and install from GOG") { act(["gog", "install", game.slug], "Installing") }
+                Button("GOG accounts…") { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
             case .standalone:
                 Button("Copy download command") { copyDownloadCommand() }
             }
@@ -129,6 +132,10 @@ struct GameDetailView: View {
             Notice(symbol: "terminal.fill", tint: .secondary,
                    title: "This download runs in Terminal",
                    detail: "Steam Guard prompts for a code, which needs a real terminal. Copy the command from the ••• menu and run it, then come back.")
+        } else if game.nextStep == .install && game.store == .gog {
+            Notice(symbol: "clock.fill", tint: game.store.tint,
+                   title: "The install runs with no window",
+                   detail: "GOG ships a normal Windows installer and Cellar runs it silently, so there is nothing to watch for a few minutes. The activity log below is the progress.")
         } else if game.nextStep == .play && game.store == .battlenet {
             Notice(symbol: "bolt.horizontal.circle.fill", tint: game.store.tint,
                    title: "Battle.net stays open while you play",
@@ -146,6 +153,8 @@ struct GameDetailView: View {
             // Each store identifies a game its own way — an AppID, a product code, or neither.
             // Showing the right one is a small honesty that saves a support round-trip.
             switch game.store {
+            case .gog:
+                Chip("DRM-free", system: "lock.open.fill")
             case .steam:
                 Chip(game.appID.map { "AppID \($0)" } ?? "No AppID", system: "number")
             case .battlenet:
@@ -239,11 +248,18 @@ struct GameDetailView: View {
         case .setup:
             act(["setup", "--profile", game.slug], "Setting up")
         case .signIn:
-            act([game.store.rawValue, "open", game.slug], "Opening \(game.store.displayName)")
+            // A store whose token Cellar holds is signed in once, for the account — so the button
+            // opens Accounts rather than pretending there is a per-game client to open.
+            if game.store.descriptor.signsInOnce {
+                NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
+            } else {
+                act([game.store.rawValue, "open", game.slug], "Opening \(game.store.displayName)")
+            }
         case .install:
             switch game.store {
             case .steam:      act(["steam", "install", game.slug], "Installing")
             case .battlenet:  act(["battlenet", "open", game.slug], "Opening Battle.net")
+            case .gog:        act(["gog", "install", game.slug], "Downloading from GOG")
             case .standalone: copyDownloadCommand()
             }
         }
@@ -257,7 +273,7 @@ struct GameDetailView: View {
     }
 
     private func act(_ args: [String], _ title: String) {
-        runner.run(args, title: title) { onChange() }
+        runner.run(args, title: title, then: { onChange() })
     }
 }
 

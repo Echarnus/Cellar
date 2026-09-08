@@ -38,7 +38,11 @@ fallback_backend  = "dxmt"
 MTL_HUD_ENABLED = "1"
 
 [install]
-method      = "depot"      # or windows-steam-in-bottle
+# Steamworks needs a live Steam client at runtime (needs_live_steam above), and Cellar now keeps one
+# shared Steam install behind every bottle — so the client is already there and already signed in.
+# A `depot` download would authenticate DepotDownloader *separately*, giving two sign-ins for one
+# game and no benefit. `depot` earns its keep only on titles with needs_live_session = false.
+method      = "windows-steam-in-bottle"
 steam_appid = 489830
 
 [launch]

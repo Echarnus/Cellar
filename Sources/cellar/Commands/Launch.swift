@@ -40,11 +40,22 @@ struct Launch: ParsableCommand {
         }
 
         // A store that can tell us nobody is signed in should say so before a launch that will
-        // stall on a login screen. Battle.net can't tell, so it doesn't pretend to.
+        // stall on a login screen. Battle.net can't tell, so it doesn't pretend to — and a store
+        // Cellar signs into itself has no client to open, so it gets its own instruction.
         if plan.store.descriptor.canDetectSignIn, Game.storeClientInstalled(plan),
            Game.signedInAccount(plan) == nil {
-            print(Term.yellow("Nobody is signed in to this bottle's \(plan.store.displayName) yet.")
-                + " Run: cellar \(plan.store.rawValue) open \(slug)  and sign in first.")
+            switch plan.store.descriptor.authStyle {
+            case .cellarHeldToken:
+                // Only worth saying when the game isn't on disk: a DRM-free game already installed
+                // runs perfectly well signed out, so warning about it would be a lie.
+                if plan.directLaunchExe == nil {
+                    print(Term.yellow("Not signed in to \(plan.store.displayName) yet.")
+                        + " Run: cellar \(plan.store.rawValue) login  and sign in first.")
+                }
+            case .inClientWindow, .none:
+                print(Term.yellow("Nobody is signed in to this bottle's \(plan.store.displayName) yet.")
+                    + " Run: cellar \(plan.store.rawValue) open \(slug)  and sign in first.")
+            }
         }
 
         let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore) {

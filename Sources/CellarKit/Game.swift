@@ -23,6 +23,8 @@ public struct GamePlan {
     public let installDir: String?
     /// Battle.net product code — `Fen` for Diablo IV. The argument to `--exec="launch …"`.
     public let productCode: String?
+    /// GOG's product id, the key to everything on their API (owned check, metadata, installers).
+    public let gogProductID: Int?
     /// Whether the game needs a live store session at *runtime* (Denuvo / Steamworks / always-online).
     /// When false and `launchExe` resolves, Cellar launches the exe directly with no client at all.
     public let needsLiveSession: Bool
@@ -168,6 +170,7 @@ public struct GameSummary: Identifiable, Sendable {
             switch store {
             case .steam:      return "Install"
             case .battlenet:  return "Open Battle.net"
+            case .gog:        return "Download"
             case .standalone: return "Download"
             }
         case .play:    return "Play"
@@ -180,6 +183,7 @@ public struct GameSummary: Identifiable, Sendable {
         case .setup:  return "wrench.and.screwdriver.fill"
         case .signIn: return "person.crop.circle.fill"
         case .install: return store == .battlenet ? "arrow.up.forward.app.fill" : "arrow.down.circle.fill"
+        // (GOG and Steam both download, so both get the download mark.)
         }
     }
 
@@ -192,11 +196,19 @@ public struct GameSummary: Identifiable, Sendable {
                 ? "Cellar installs the Windows runtime and \(store.displayName) for this game. One click, a few minutes."
                 : "Cellar installs the Windows runtime, then opens Blizzard's installer — that one needs a few clicks from you, because Battle.net ships no silent install."
         case .signIn:
-            return "Sign in to your \(store.descriptor.accountNoun). A \(store.displayName) window opens; the QR code with the mobile app is quickest."
+            // A token store is signed in once for the whole account; a client store is signed in
+            // inside its own window. Promising the wrong one is exactly the dishonesty ux.md forbids.
+            switch store.descriptor.authStyle {
+            case .cellarHeldToken:
+                return "Sign in to \(store.displayName) once — it covers every \(store.displayName) game, not just this one."
+            case .inClientWindow, .none:
+                return "Sign in to your \(store.descriptor.accountNoun). A \(store.displayName) window opens; the QR code with the mobile app is quickest."
+            }
         case .install:
             switch store {
             case .steam:      return "Install the game — Cellar asks Steam to download it. You already own it."
             case .battlenet:  return "Battle.net opens. Sign in if you haven't, then install the game from there. Cellar takes over once the files are down."
+            case .gog:        return "Cellar downloads it from your GOG library and installs it. No client, and nothing runs alongside the game."
             case .standalone: return "Cellar downloads the game's files straight from your library — no store client involved."
             }
         case .play:
@@ -276,6 +288,18 @@ public enum Game {
         }
     }
 
+    /// Bottle names belonging to profiles from one store. Cheap: it reads the profile TOMLs and
+    /// nothing else — no runner lookups, no icon extraction, no filesystem walk of the bottles.
+    public static func bottleNames(forStore store: GameStore) -> Set<String> {
+        var names: Set<String> = []
+        for ref in ProfileStore.all() {
+            let fields = ProfileStore.fields(ref)
+            guard (GameStore(profileValue: fields["store"]) ?? .default) == store else { continue }
+            names.insert(fields["bottle"] ?? ref.slug)
+        }
+        return names
+    }
+
     public static func plan(slug: String) throws -> GamePlan {
         guard let ref = ProfileStore.find(slug) else {
             throw CellarError.invalidArgument("No profile '\(slug)'. Try: cellar profiles list")
@@ -297,6 +321,7 @@ public enum Game {
             launchExe: fields["exe"],
             installDir: fields["install_dir"],
             productCode: fields["product_code"],
+            gogProductID: fields["gog_product_id"].flatMap { Int($0) },
             // Default to needing the store unless a profile explicitly says otherwise — safe for DRM.
             // `needs_live_steam` is the original spelling, kept working.
             needsLiveSession: ((fields["needs_live_session"] ?? fields["needs_live_steam"]) ?? "true")
@@ -321,6 +346,7 @@ public enum Game {
         switch store {
         case .steam:      return "windows-steam-in-bottle"
         case .battlenet:  return "battlenet-in-bottle"
+        case .gog:        return "gog-installer"
         case .standalone: return "depot"
         }
     }
@@ -339,6 +365,8 @@ public enum Game {
         switch plan.store {
         case .steam:      return SteamBottle.isInstalled(in: plan.prefix)
         case .battlenet:  return BattleNetBottle.isInstalled(in: plan.prefix)
+        // GOG needs no client in the bottle at all, so there is never one to set up.
+        case .gog:        return true
         case .standalone: return true
         }
     }
@@ -347,6 +375,7 @@ public enum Game {
         switch plan.store {
         case .steam:      return SteamBottle.isRunning
         case .battlenet:  return BattleNetBottle.isRunning
+        case .gog:        return false
         case .standalone: return false
         }
     }
@@ -356,6 +385,9 @@ public enum Game {
         switch plan.store {
         case .steam:      return SteamBottle.loggedInAccount(in: plan.prefix)
         case .battlenet:  return BattleNetBottle.rememberedAccount(in: plan.prefix)
+        // Cellar holds the GOG token itself, so this is a fact, not a guess — but read it from the
+        // cache: `summaries()` runs on every library refresh and must not make a network call.
+        case .gog:        return GOGAuth.isSignedIn ? (GOGAuth.cachedUsername ?? "your GOG account") : nil
         case .standalone: return nil
         }
     }
@@ -417,6 +449,8 @@ public enum Game {
             try SteamBottle.install(runner: wine, progress: progress)
         case .battlenet:
             try BattleNetBottle.install(runner: wine, progress: progress)
+        case .gog:
+            progress("No store client needed — GOG games are DRM-free, so Cellar installs and runs them directly.")
         case .standalone:
             progress("No store client needed — this game runs straight from its files.")
         }
@@ -427,13 +461,18 @@ public enum Game {
 
     /// Download the game's Windows files via DepotDownloader into the bottle (no store client).
     /// Steam credentials authenticate the download only; 2FA is prompted on the terminal.
-    public static func fetchDepot(_ plan: GamePlan, username: String, progress: (String) -> Void) throws {
+    public static func fetchDepot(_ plan: GamePlan, credentials: DepotTool.Credentials,
+                                 progress: (String) -> Void) throws {
         guard let appID = plan.appID else {
             throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid to download.")
         }
         guard plan.store != .battlenet else {
             throw CellarError.invalidArgument(
                 "\(plan.name) comes from Battle.net — Blizzard has no depot downloader. Install it in the client: cellar battlenet install \(plan.slug)")
+        }
+        guard plan.store != .gog else {
+            throw CellarError.invalidArgument(
+                "\(plan.name) comes from GOG, not Steam. Install it with: cellar gog install \(plan.slug)")
         }
         guard let spec = RunnerCatalog.spec(forID: plan.runnerID) else {
             throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
@@ -445,7 +484,7 @@ public enum Game {
             try wine.initializePrefix(); try wine.setWindowsVersion("win10")
         }
         progress("Downloading \(plan.name) (Windows depot) via DepotDownloader…")
-        try DepotTool.fetch(appID: appID, into: plan.depotGameDir, username: username)
+        try DepotTool.fetch(appID: appID, into: plan.depotGameDir, credentials: credentials)
         progress("Downloaded to \(plan.depotGameDir.path)")
     }
 
@@ -467,6 +506,21 @@ public enum Game {
             // move is to open the client where the player can do it in two clicks.
             progress("Opening Battle.net — install \(plan.name) from the client, then come back.")
             try BattleNetBottle.launchClient(runner: wine, gameEnv: plan.env)
+        case .gog:
+            guard let productID = plan.gogProductID else {
+                throw CellarError.invalidArgument(
+                    "Profile '\(plan.slug)' has no gog_product_id, so Cellar can't tell which GOG game it is.")
+            }
+            guard GOGAuth.isSignedIn else {
+                throw CellarError.invalidArgument("Not signed in to GOG. Run: cellar gog login")
+            }
+            let parts = try GOGInstall.download(productID: productID, progress: progress)
+            try GOGInstall.install(setup: parts[0], slug: plan.slug, runner: wine, progress: progress)
+            guard plan.directLaunchExe != nil else {
+                throw CellarError.ioFailure(
+                    "The installer finished but Cellar can't find '\(plan.launchExe ?? "the game's exe")' under C:\\Games\\\(plan.slug). Check the profile's `exe`.")
+            }
+            progress("\(plan.name) is installed. Play it with: cellar launch \(plan.slug)")
         case .standalone:
             throw CellarError.invalidArgument(
                 "\(plan.name) has no store client. Download it with: cellar fetch-depot \(plan.slug) --username <steam-account>")
@@ -492,6 +546,9 @@ public enum Game {
                     "Battle.net isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
             }
             try BattleNetBottle.launchClient(runner: wine, showHUD: showHUD, gameEnv: plan.env)
+        case .gog:
+            throw CellarError.invalidArgument(
+                "GOG has no client in the bottle — Cellar talks to GOG directly. Sign in with: cellar gog login")
         case .standalone:
             throw CellarError.invalidArgument("\(plan.name) has no store client to open.")
         }
@@ -552,6 +609,10 @@ public enum Game {
                                                   showHUD: showHUD, gameEnv: plan.env, progress: progress)
             return .battlenet(product: product)
 
+        case .gog:
+            // Reaching here means the exe isn't on disk: a DRM-free game never needs the store route.
+            throw CellarError.invalidArgument(
+                "\(plan.name) isn't installed yet. Run: cellar gog install \(plan.slug)")
         case .standalone:
             throw CellarError.invalidArgument(
                 "No launchable exe found for '\(plan.slug)'. Run: cellar fetch-depot \(plan.slug) --username <steam-account>")

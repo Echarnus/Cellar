@@ -52,15 +52,26 @@ struct Setup: ParsableCommand {
 
         switch store {
         case .steam:
-            next("cellar steam open \(profile)", "opens Steam in the bottle; sign in (Steam Guard / 2FA works).")
+            if let account = SteamBottle.sharedLoggedInAccount {
+                print("     " + Term.dim("Already signed in to Steam as \(account) — every Steam game shares it."))
+            } else {
+                next("cellar steam open \(profile)", "opens Steam; sign in once — every Steam game shares it.")
+            }
             if let appID = plan.appID {
                 next("cellar steam install \(profile)", "opens the install dialog for \(plan.name) (AppID \(appID)).")
             }
         case .battlenet:
             next("cellar battlenet open \(profile)", "opens Battle.net in the bottle; sign in, then install \(plan.name).")
             print("     " + Term.dim("Blizzard has no install URL a launcher can drive, so that download starts from inside the client."))
+        case .gog:
+            if GOGAuth.isSignedIn {
+                next("cellar gog install \(profile)", "downloads and installs it from your GOG library.")
+            } else {
+                next("cellar gog login", "signs in to GOG once, for your whole library.")
+                next("cellar gog install \(profile)", "downloads and installs it. No client, no DRM.")
+            }
         case .standalone:
-            next("cellar fetch-depot \(profile) --username <steam-account>", "downloads the game's files. No client needed.")
+            next("cellar fetch-depot \(profile)", "downloads the game's files by QR sign-in. No client needed.")
         }
         next("cellar launch \(profile)", "play.")
         if store == .steam {
@@ -68,13 +79,13 @@ struct Setup: ParsableCommand {
                 + Term.dim("   — add it to your native Steam library + ~/Applications."))
         }
 
-        if openClient && store != .standalone {
+        if openClient && store.descriptor.installsClientInBottle {
             print("")
             print(Term.dim("Opening \(store.displayName) in the bottle… (a window will appear; sign in and install your game)"))
             switch store {
             case .steam:      try SteamBottle.launchClient(runner: wine, gameEnv: plan.env)
             case .battlenet:  try BattleNetBottle.launchClient(runner: wine, gameEnv: plan.env)
-            case .standalone: break
+            case .gog, .standalone: break   // no client in the bottle to open
             }
         }
     }

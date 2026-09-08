@@ -39,9 +39,160 @@ public enum SteamBottle {
             atPath: steamDirectory(in: prefix).appendingPathComponent("steamclient64.dll").path)
     }
 
+    // MARK: - One Steam, every bottle
+
+    // A bottle is per-game on purpose: its own registry, its own runner, its own Wine version.
+    // The *Steam install* is not per-game — it is the account's. Giving each bottle its own copy
+    // meant a 1.4 GB download and a fresh sign-in for every game, and a game bought once being
+    // downloaded twice. So the client lives in `Paths.sharedSteam` and each bottle gets a symlink
+    // at the Windows path Steam expects. Every reader below (`loggedInAccount`, `isGameInstalled`,
+    // the appmanifest lookups) resolves through that link unchanged, and because the Windows path
+    // is identical in every bottle, Steam's own registry keys and `libraryfolders.vdf` stay valid.
+
+    /// The one Steam install shared by every Steam bottle.
+    public static var sharedInstall: URL { Paths.sharedSteam }
+
+    /// Whether the shared install has a real client in it (not just an empty directory).
+    public static var isSharedInstallPresent: Bool {
+        FileManager.default.fileExists(atPath: sharedInstall.appendingPathComponent("steam.exe").path)
+    }
+
+    /// Whether this bottle already points at the shared install.
+    public static func isLinkedToSharedInstall(in prefix: URL) -> Bool {
+        let path = steamDirectory(in: prefix).path
+        guard let type = try? FileManager.default.attributesOfItem(atPath: path)[.type] as? FileAttributeType,
+              type == .typeSymbolicLink else { return false }
+        return (try? FileManager.default.destinationOfSymbolicLink(atPath: path))
+            .map { URL(fileURLWithPath: $0).standardizedFileURL == sharedInstall.standardizedFileURL } ?? false
+    }
+
+    /// Point this bottle's `C:\Program Files (x86)\Steam` at the shared install.
+    ///
+    /// A bottle that already holds a real Steam directory is *adopted*, never deleted: if the shared
+    /// install doesn't exist yet this one is promoted into it (a same-volume rename, so a 36 GB
+    /// library moves instantly), and otherwise it is moved aside so the player can reclaim the space
+    /// deliberately. Cellar never removes a game download on its own.
+    @discardableResult
+    public static func linkIntoBottle(prefix: URL, progress: (String) -> Void = { _ in }) throws -> URL {
+        let fm = FileManager.default
+        if isLinkedToSharedInstall(in: prefix) { return sharedInstall }
+
+        let bottlePath = steamDirectory(in: prefix)
+        try fm.createDirectory(at: bottlePath.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fm.createDirectory(at: Paths.shared, withIntermediateDirectories: true)
+
+        // A stale symlink (pointing somewhere else, or nowhere) is just replaced.
+        let attrs = try? fm.attributesOfItem(atPath: bottlePath.path)
+        let isSymlink = (attrs?[.type] as? FileAttributeType) == .typeSymbolicLink
+        if isSymlink {
+            try fm.removeItem(at: bottlePath)
+        } else if fm.fileExists(atPath: bottlePath.path) {
+            if !isSharedInstallPresent {
+                progress("Promoting this bottle's Steam install to the shared one (no re-download, no re-sign-in)…")
+                try fm.moveItem(at: bottlePath, to: sharedInstall)
+            } else {
+                let stamp = ISO8601DateFormatter.filenameSafe.string(from: Date())
+                let aside = bottlePath.deletingLastPathComponent()
+                    .appendingPathComponent("Steam.superseded-\(stamp)")
+                progress("This bottle had its own Steam. Moving it aside — the shared install takes over.")
+                try fm.moveItem(at: bottlePath, to: aside)
+                progress("Old copy kept at \(aside.path) — delete it when you're happy: rm -rf '\(aside.path)'")
+            }
+        }
+
+        if !fm.fileExists(atPath: sharedInstall.path) {
+            try fm.createDirectory(at: sharedInstall, withIntermediateDirectories: true)
+        }
+        try fm.createSymbolicLink(at: bottlePath, withDestinationURL: sharedInstall)
+        return sharedInstall
+    }
+
+    /// Migrate an existing installation to the shared layout: link every Steam bottle, promoting
+    /// the richest existing install (a signed-in one first, then the largest) so the player keeps
+    /// their sign-in and their downloads.
+    ///
+    /// Idempotent, and safe to run when there is nothing to do.
+    @discardableResult
+    public static func adoptSharedInstall(progress: (String) -> Void = { _ in }) throws -> Int {
+        let fm = FileManager.default
+        // Only Steam bottles: a Battle.net or GOG bottle has no business gaining a Steam symlink.
+        // A bottle qualifies if a Steam profile points at it, or if it already holds a Steam install
+        // (which covers a bottle whose profile has since been renamed or removed).
+        let steamBottles = Game.bottleNames(forStore: .steam)
+        let bottles = ((try? PrefixManager.list()) ?? [])
+            .map(\.url)
+            .filter { prefix in
+                guard fm.fileExists(atPath: prefix.appendingPathComponent("system.reg").path) else { return false }
+                return steamBottles.contains(prefix.lastPathComponent)
+                    || hasOwnSteamInstall(in: prefix)
+            }
+
+        // Promote the richest existing install: a signed-in one first, then the largest. Ordering
+        // matters because whichever comes first *becomes* the shared install; the rest move aside.
+        // The signed-in test short-circuits, so the expensive size walk only runs on a genuine tie.
+        let ordered = bottles.sorted { a, b in
+            let signedIn = (loggedInAccount(in: a) != nil, loggedInAccount(in: b) != nil)
+            if signedIn.0 != signedIn.1 { return signedIn.0 }
+            let own = (hasOwnSteamInstall(in: a), hasOwnSteamInstall(in: b))
+            if own.0 != own.1 { return own.0 }
+            guard own.0 else { return false }
+            return directorySize(steamDirectory(in: a)) > directorySize(steamDirectory(in: b))
+        }
+
+        var linked = 0
+        for prefix in ordered {
+            guard !isLinkedToSharedInstall(in: prefix) else { continue }
+            progress("Bottle '\(prefix.lastPathComponent)': linking to the shared Steam install…")
+            try linkIntoBottle(prefix: prefix, progress: progress)
+            linked += 1
+        }
+        if let account = sharedLoggedInAccount {
+            progress("Signed in as \(account) — every Steam game now uses this sign-in.")
+        }
+        return linked
+    }
+
+    /// Whether this bottle holds a Steam directory of its own — a real directory, not the shared
+    /// symlink. `attributesOfItem` is deliberate: `fileExists` follows symlinks and would say yes
+    /// for a bottle that is already linked.
+    /// `hasOwnSteamInstall` for callers outside CellarKit (the doctor's "wasted space" line).
+    public static func hasOwnSteamInstallForDiagnostics(in prefix: URL) -> Bool {
+        hasOwnSteamInstall(in: prefix)
+    }
+
+    static func hasOwnSteamInstall(in prefix: URL) -> Bool {
+        let path = steamDirectory(in: prefix).path
+        guard let type = try? FileManager.default.attributesOfItem(atPath: path)[.type] as? FileAttributeType
+        else { return false }
+        return type == .typeDirectory
+    }
+
+    /// The account signed in to the shared install, read directly rather than through a bottle.
+    public static var sharedLoggedInAccount: String? {
+        accountName(inSteamDirectory: sharedInstall)
+    }
+
+    /// Rough on-disk size, used only to pick the richest install to promote. Cheap enough: it walks
+    /// file sizes without reading contents, and only runs during a one-off migration.
+    static func directorySize(_ url: URL) -> Int64 {
+        guard let e = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey],
+                                                     options: [.skipsHiddenFiles]) else { return 0 }
+        var total: Int64 = 0
+        for case let f as URL in e {
+            total += Int64((try? f.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+        return total
+    }
+
     /// The account logged into this bottle's Steam, if any (from loginusers.vdf).
     public static func loggedInAccount(in prefix: URL) -> String? {
-        let vdf = steamDirectory(in: prefix).appendingPathComponent("config/loginusers.vdf")
+        accountName(inSteamDirectory: steamDirectory(in: prefix))
+    }
+
+    /// Parse `loginusers.vdf` in a Steam directory. Split out from `loggedInAccount(in:)` so the
+    /// shared install can be read without pretending to be a bottle.
+    static func accountName(inSteamDirectory dir: URL) -> String? {
+        let vdf = dir.appendingPathComponent("config/loginusers.vdf")
         guard let text = try? String(contentsOf: vdf, encoding: .utf8) else { return nil }
         let pattern = #""AccountName"\s*"([^"]+)""#
         guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -58,8 +209,16 @@ public enum SteamBottle {
 
     /// Download SteamSetup.exe and silently install it into the bottle.
     public static func install(runner: WineRunner, progress: (String) -> Void = { _ in }) throws {
-        if isInstalled(in: runner.prefix) {
-            progress("Windows Steam already installed in this bottle.")
+        // Link before installing: the bottle's Windows Steam path becomes the shared install, so the
+        // installer writes straight into it and every later bottle finds a client already there.
+        try linkIntoBottle(prefix: runner.prefix, progress: progress)
+
+        if isSharedInstallPresent {
+            if let account = sharedLoggedInAccount {
+                progress("Using the Steam you already set up — signed in as \(account). Nothing to download.")
+            } else {
+                progress("Using the Steam you already set up. Nothing to download.")
+            }
             return
         }
         let setup = Paths.cache.appendingPathComponent("SteamSetup.exe")
@@ -79,10 +238,12 @@ public enum SteamBottle {
         progress("Installing Windows Steam into the bottle (silent)…")
         runner.runExecutable(setup.path, args: ["/S"], inheritIO: true)
         runner.waitForServer()
-        guard isInstalled(in: runner.prefix) else {
-            throw CellarError.ioFailure("SteamSetup.exe finished but steam.exe is missing from the bottle.")
+        guard isSharedInstallPresent else {
+            throw CellarError.ioFailure(
+                "SteamSetup.exe finished but steam.exe is missing from \(sharedInstall.path). Run: cellar steam share --repair")
         }
-        progress("Steam installed. It downloads the full client (~1.4 GB) on first launch.")
+        progress("Steam installed — shared by every Steam game, so this is the only time it downloads.")
+        progress("It fetches the full client (~1.4 GB) on first launch.")
     }
 
     /// Write steam.cfg so the bootstrapper stops self-updating. Only valid AFTER the first update:
@@ -273,4 +434,13 @@ public enum SteamPlatformTrick {
             try FileManager.default.removeItem(at: cfgPath)
         }
     }
+}
+
+extension ISO8601DateFormatter {
+    /// `2026-09-08T121314Z` — safe in a filename (no colons, which Finder shows as slashes).
+    static let filenameSafe: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withYear, .withMonth, .withDay, .withTime, .withTimeZone, .withDashSeparatorInDate]
+        return f
+    }()
 }

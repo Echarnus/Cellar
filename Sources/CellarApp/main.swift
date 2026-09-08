@@ -4,6 +4,9 @@ import SwiftUI
 extension Notification.Name {
     /// Posted by the "Settings…" menu item; ContentView opens its settings sheet on receipt.
     static let cellarOpenSettings = Notification.Name("cellar.openSettings")
+    /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
+    /// whose token Cellar holds — because that sign-in is account-level, not per-game.
+    static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -15,6 +18,7 @@ extension Notification.Name {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     var settingsWindow: NSWindow?
+    var accountsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = buildMainMenu()
@@ -25,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // NSHostingView. A top-level window is its own view graph, so it's safe.
         NotificationCenter.default.addObserver(
             self, selector: #selector(showSettings), name: .cellarOpenSettings, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(showAccounts), name: .cellarOpenAccounts, object: nil)
 
         let window = NSWindow(
             // Comfortably above ContentView's minimum: at the minimum the detail pane's two
@@ -59,6 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Accounts…", action: #selector(showAccounts), keyEquivalent: "A")
+            .target = self
         appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
             .target = self
         appMenu.addItem(.separator())
@@ -114,11 +122,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    @objc private func showAccounts() {
+        if accountsWindow == nil {
+            let w = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 560, height: 620),
+                // Not resizable, matching Settings: a resizable window plus a flexible SwiftUI root
+                // frame lets layout feed back into the view graph, and this app aborts in
+                // AttributeGraph when it does (skills/swift.md).
+                styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            w.title = "Accounts"
+            w.isReleasedWhenClosed = false
+            w.center()
+            w.contentView = NSHostingView(rootView: AccountsView(onClose: { [weak self] in
+                self?.accountsWindow?.close()
+            }))
+            accountsWindow = w
+        }
+        accountsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @objc private func showAbout() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
         let credits = NSAttributedString(
             string: "Run Windows games on Apple Silicon — a Proton-like layer over Wine + D3DMetal.\n" +
-                    "Sign in to Steam, then install and play.",
+                    "Sign in once per store, then install and play.",
             attributes: [.font: NSFont.systemFont(ofSize: 11),
                          .foregroundColor: NSColor.secondaryLabelColor])
         NSApp.orderFrontStandardAboutPanel(options: [

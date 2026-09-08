@@ -16,13 +16,24 @@ struct FetchDepot: ParsableCommand {
     @Argument(help: "Profile slug, e.g. 'age-of-empires-2-de'.")
     var slug: String
 
-    @Option(name: .shortAndLong, help: "Steam account name to download with.")
-    var username: String
+    @Option(name: .shortAndLong, help: "Steam account name. Omit to sign in by QR code instead.")
+    var username: String?
 
     func run() throws {
         let plan = try Game.plan(slug: slug)
-        print(Term.bold("Fetching \(plan.name)") + Term.dim("  (Steam auth as \(username); 2FA will prompt below)"))
-        try Game.fetchDepot(plan, username: username) { print("  " + Term.dim($0)) }
+        // No username means the QR device flow — nothing typed, approved in the Steam mobile app.
+        // Preferred, so it is what you get by default.
+        let credentials: DepotTool.Credentials = username.map { .password(username: $0) } ?? .qr
+        switch credentials {
+        case .qr where DepotTool.hasStoredSession:
+            print(Term.bold("Fetching \(plan.name)") + Term.dim("  (using your stored Steam sign-in)"))
+        case .qr:
+            print(Term.bold("Fetching \(plan.name)"))
+            print(Term.dim("  Scan the QR code below with the Steam mobile app to approve the sign-in."))
+        case .password(let name):
+            print(Term.bold("Fetching \(plan.name)") + Term.dim("  (Steam auth as \(name); 2FA will prompt below)"))
+        }
+        try Game.fetchDepot(plan, credentials: credentials) { print("  " + Term.dim($0)) }
         if plan.needsLiveSession {
             print(Term.yellow("Note: \(plan.name) needs a live \(plan.store.displayName) session to play")
                 + " — `cellar launch \(slug)` will use the silent-client path.")

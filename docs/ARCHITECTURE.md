@@ -65,28 +65,74 @@ bottle. Each profile names one with `store = "…"`, and that single field decid
 which installer `cellar setup` runs, what "installed" and "signed in" even mean, how a launch is
 issued, and what the app says to the player.
 
-| | **Steam** (`SteamBottle`) | **Battle.net** (`BattleNetBottle`) | **Standalone** |
-|---|---|---|---|
-| Installer | `SteamSetup.exe /S` — silent | `Battle.net-Setup.exe` — **no silent switch**; a window opens and the player clicks through | none |
-| Client binaries | `steam.exe` | `Battle.net Launcher.exe` bootstraps `Battle.net.exe` | none |
-| Games addressed by | numeric AppID | product code (`Fen` = Diablo IV) | a path |
-| "Signed in?" | readable — `config/loginusers.vdf` | **not observable**; folded into "open the client" | n/a |
-| "Installed?" | `appmanifest_<id>.acf`, `StateFlags 4` | the profile's `install_dir` + `exe` on disk | the exe on disk |
-| Install a game | `steam://install/<id>` | no drivable URL — open the client | DepotDownloader |
-| Launch | `steam://rungameid/<id>` into a `-silent` client | `Battle.net.exe --exec="launch <product>"`, client warmed first | run the exe |
-| Public artwork | yes, per AppID | none a launcher may hotlink | none |
+| | **Steam** (`SteamBottle`) | **Battle.net** (`BattleNetBottle`) | **GOG** (`GOG*`) | **Standalone** |
+|---|---|---|---|---|
+| Client in the bottle | yes | yes | **none** | none |
+| Installer | `SteamSetup.exe /S` — silent | `Battle.net-Setup.exe` — **no silent switch**; a window opens and the player clicks through | the game's own Inno Setup installer, `/VERYSILENT` | none |
+| Client binaries | `steam.exe` | `Battle.net Launcher.exe` bootstraps `Battle.net.exe` | none | none |
+| Games addressed by | numeric AppID | product code (`Fen` = Diablo IV) | `gog_product_id` | a path |
+| Authentication | in the client's own window | in the client's own window | **OAuth 2.0 token Cellar holds** (keychain) | none |
+| "Signed in?" | readable — `config/loginusers.vdf` | **not observable**; folded into "open the client" | readable — Cellar owns the token | n/a |
+| "Installed?" | `appmanifest_<id>.acf`, `StateFlags 4` | the profile's `install_dir` + `exe` on disk | the exe on disk | the exe on disk |
+| Install a game | `steam://install/<id>` | no drivable URL — open the client | Cellar downloads + runs the installer | DepotDownloader |
+| Launch | `steam://rungameid/<id>` into a `-silent` client | `Battle.net.exe --exec="launch <product>"`, client warmed first | run the exe — nothing beside it | run the exe |
+| Public artwork | yes, per AppID | none a launcher may hotlink | yes, from the product API | none |
 
-Two consequences worth stating plainly, because they shape the UI as much as the code:
+Three consequences worth stating plainly, because they shape the UI as much as the code:
 
 - **Cellar never invents a state it cannot check.** Battle.net gets no sign-in step and no ✗ beside
   "account", because Blizzard does not publish one. `GameStore.descriptor.canDetectSignIn` carries
   that fact to every surface.
 - **Cellar announces a pause it cannot remove.** Because Blizzard ships no silent installer, setup
-  warns before the window appears rather than looking hung.
+  warns before the window appears rather than looking hung. GOG's installer *is* silent, which is its
+  own kind of surprising, so that pause is announced too.
+- **Signing in is account-level, not game-level.** `StoreDescriptor.authStyle` says which of the two
+  shapes a store has — `.inClientWindow` (Steam, Battle.net) or `.cellarHeldToken` (GOG) — and the
+  Accounts screen is built from it. See *One Steam, every bottle* below for why this stopped being a
+  per-game question for Steam too.
 
-Both live in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
+All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
 about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a branch in `Game.setUp`
 and `Game.launch`, and a CLI command group.
+
+### One Steam, every bottle
+
+A bottle is per-game on purpose: its own registry, its own runner, its own Wine version. The Steam
+*client* is not per-game — it belongs to the account. Giving each bottle its own copy meant a 1.4 GB
+download and **a fresh sign-in for every game**, and a game owned once could be downloaded twice.
+
+So the client lives once, in `shared/steam`, and every Steam bottle gets a **symlink** at the Windows
+path Steam expects (`C:\Program Files (x86)\Steam`). Because that Windows path is identical in every
+bottle, Steam's own registry keys and `libraryfolders.vdf` stay valid, and every reader
+(`loggedInAccount`, the appmanifest lookups) resolves through the link with no code change.
+
+The alternative — one shared *prefix* for all Steam games — was rejected: a prefix is bound to a Wine
+version, so it would force every Steam game onto one runner and give up per-game runner tuning, which
+is the point of bottles.
+
+`cellar steam share` migrates an existing install and is idempotent. It never deletes a download: the
+richest existing install (a signed-in one first, then the largest) is *promoted* into the shared one
+by a same-volume rename, and any other is moved aside as `Steam.superseded-<timestamp>` with the path
+printed so the player reclaims the space deliberately.
+
+### Steam's two sign-ins
+
+They are different credentials and it is worth not conflating them:
+
+- **The client session** — what a Steamworks or Denuvo game talks to while it runs. Lives in the
+  shared install's `config/loginusers.vdf`. One window, once, for every bottle.
+- **The download session** — a token from Steam's own device-authorization flow
+  (`IAuthenticationService/BeginAuthSessionViaQR`), used by DepotDownloader for the client-free path.
+  `cellar steam login` runs it; nothing is typed and approval happens in the Steam mobile app.
+
+A token cannot be injected into the client's credential store (it is machine-keyed inside
+`config.vdf`), so a game needing a live client still signs in there. Cellar says so rather than
+implying one sign-in covers both.
+
+DepotDownloader only ever *draws* the QR challenge, as terminal ASCII, and prints no URL — so
+`SteamQRCode.swift` reads the drawing back into a module matrix and the app renders it at a scannable
+size. Format, measured not assumed: two characters per module, four-module quiet zone, one text line
+per module row. There is a round-trip case in `cellar selftest`.
 
 ## On-disk layout
 
@@ -94,7 +140,12 @@ and `Game.launch`, and a CLI command group.
 ~/Library/Application Support/Cellar/
 ├── runners/     # installed Wine builds
 ├── prefixes/    # one bottle per game (pfx/ + bottle.toml)
+├── shared/
+│   └── steam/   # THE Windows Steam install — every Steam bottle symlinks to it
+├── tools/
+│   └── depotdownloader/   # native-arm64 DepotDownloader + its stored Steam session
 ├── cache/
+│   ├── gog/     # downloaded GOG installers, resumable
 │   └── d3dmetal/  # user-supplied Apple D3DMetal (never in the repo)
 ├── profiles/    # user/registry-synced profiles (these win over the shipped database)
 └── logs/

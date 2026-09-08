@@ -9,12 +9,15 @@ final class CellarRunner: ObservableObject {
     @Published var busy: Bool = false
     @Published var busyTitle: String = ""
 
-    private let binary: String
+    /// Resolved on first use, never in `init`.
+    ///
+    /// `Shell.which` spawns a subprocess. SwiftUI creates a `@StateObject` lazily, during the first
+    /// evaluation of the view graph — so doing this in `init` meant forking a process from inside
+    /// `NSHostingView.layout()`, and this app aborts in AttributeGraph when layout re-enters
+    /// (skills/swift.md). Deferring it keeps view-graph evaluation free of side effects.
+    private lazy var binary: String = Shell.which("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
 
-    init() {
-        // Prefer a `cellar` on PATH; fall back to the common install location.
-        binary = Shell.which("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
-    }
+    init() {}
 
     var binaryExists: Bool { FileManager.default.isExecutableFile(atPath: binary) }
 
@@ -24,7 +27,10 @@ final class CellarRunner: ObservableObject {
         log += "\n\(message)\n"
     }
 
-    func run(_ args: [String], title: String, then: (@MainActor () -> Void)? = nil) {
+    /// `observe` sees each chunk of output as it arrives, for a caller that has to react to
+    /// something mid-run rather than after exit — the Steam QR challenge is the reason it exists.
+    func run(_ args: [String], title: String, observe: (@MainActor (String) -> Void)? = nil,
+             then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
         busy = true; busyTitle = title
         log += "\n$ cellar \(args.joined(separator: " "))\n"
@@ -39,7 +45,7 @@ final class CellarRunner: ObservableObject {
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
                 guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
-                Task { @MainActor in self.log += s }
+                Task { @MainActor in self.log += s; observe?(s) }
             }
             try? process.run()
             process.waitUntilExit()

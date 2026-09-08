@@ -15,6 +15,9 @@ public enum GameStore: String, CaseIterable, Sendable {
     case steam
     /// Blizzard's Battle.net desktop app, installed inside the bottle.
     case battlenet
+    /// GOG.com. No client in the bottle: Cellar holds an OAuth token, reads the player's owned
+    /// library over HTTP, and installs the DRM-free installer itself.
+    case gog
     /// No store at all — the game's files are on disk and its exe is launched directly.
     case standalone
 
@@ -29,10 +32,25 @@ public enum GameStore: String, CaseIterable, Sendable {
         switch raw {
         case "steam": self = .steam
         case "battlenet", "battle.net", "blizzard", "bnet": self = .battlenet
+        case "gog", "gog.com", "gog-galaxy": self = .gog
         case "standalone", "none", "direct", "drm-free": self = .standalone
         default: return nil
         }
     }
+}
+
+/// How the player proves who they are — the single fact that decides whether signing in is
+/// something Cellar can do *for* them, once, or something they must do inside somebody else's
+/// window, per bottle.
+public enum StoreAuthStyle: String, Sendable {
+    /// Inside the store client's own window, in the bottle (Steam, Battle.net). Cellar can open the
+    /// window and nothing more; it never sees or holds the credential.
+    case inClientWindow
+    /// Cellar runs the sign-in itself and holds a token (GOG's OAuth, Steam's QR device flow for
+    /// downloads). One sign-in, account-wide, no client involved.
+    case cellarHeldToken
+    /// Nothing to sign in to.
+    case none
 }
 
 /// Everything that differs per store, in one table: the words, the marks, and the shape of the
@@ -62,6 +80,15 @@ public struct StoreDescriptor: Sendable {
     public let hasSilentInstaller: Bool
     /// Where the game itself comes from, in the player's words.
     public let installLocation: String
+    /// How signing in works for this store — see `StoreAuthStyle`.
+    public let authStyle: StoreAuthStyle
+    /// Whether Cellar has to stand the store's client up inside the bottle at all. False for GOG,
+    /// which is pure HTTP, and that difference is why GOG needs no per-bottle sign-in.
+    public let installsClientInBottle: Bool
+
+    /// Whether one sign-in covers the whole account rather than one bottle. Drives the Accounts
+    /// screen: a store that is signed in once is listed once, not once per game.
+    public var signsInOnce: Bool { authStyle == .cellarHeldToken }
 
     public var accentColorComponents: (red: Double, green: Double, blue: Double) {
         StoreDescriptor.components(fromHex: accentHex)
@@ -90,7 +117,12 @@ public extension GameStore {
                 accountNoun: "Steam account",
                 canDetectSignIn: true,
                 hasSilentInstaller: true,
-                installLocation: "your Steam library")
+                installLocation: "your Steam library",
+                // Steam's QR device flow signs Cellar in for *downloads*, but a Steamworks game
+                // still talks to a running client, so the bottle's own sign-in is the one that
+                // matters at launch. Honest answer: the client window.
+                authStyle: .inClientWindow,
+                installsClientInBottle: true)
         case .battlenet:
             return StoreDescriptor(
                 store: .battlenet,
@@ -101,7 +133,9 @@ public extension GameStore {
                 accountNoun: "Battle.net account",
                 canDetectSignIn: false,
                 hasSilentInstaller: false,
-                installLocation: "the Battle.net app")
+                installLocation: "the Battle.net app",
+                authStyle: .inClientWindow,
+                installsClientInBottle: true)
         case .standalone:
             return StoreDescriptor(
                 store: .standalone,
@@ -112,7 +146,23 @@ public extension GameStore {
                 accountNoun: "no account",
                 canDetectSignIn: false,
                 hasSilentInstaller: true,
-                installLocation: "a direct download")
+                installLocation: "a direct download",
+                authStyle: .none,
+                installsClientInBottle: false)
+        case .gog:
+            return StoreDescriptor(
+                store: .gog,
+                displayName: "GOG",
+                sectionTitle: "GOG",
+                symbolName: "lock.open.fill",     // DRM-free: the one store with nothing to satisfy
+                accentHex: "#9B4DCA",             // purple — the two other stores are both blue
+                accountNoun: "GOG account",
+                // Cellar holds the token, so it knows exactly who is signed in — and can say so.
+                canDetectSignIn: true,
+                hasSilentInstaller: true,
+                installLocation: "your GOG library",
+                authStyle: .cellarHeldToken,
+                installsClientInBottle: false)
         }
     }
 
@@ -123,7 +173,8 @@ public extension GameStore {
         switch self {
         case .steam: return 0
         case .battlenet: return 1
-        case .standalone: return 2
+        case .gog: return 2
+        case .standalone: return 3
         }
     }
 }

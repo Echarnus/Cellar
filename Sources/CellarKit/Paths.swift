@@ -19,6 +19,20 @@ public enum Paths {
     /// Downloads and extracted artifacts.
     public static var cache: URL { appSupport.appendingPathComponent("cache", isDirectory: true) }
 
+    /// State that belongs to a *store account* rather than to any one game: the single Windows
+    /// Steam install every Steam bottle links to, downloaded installers, cached library metadata.
+    ///
+    /// This is the difference between signing in once and signing in per game. A bottle stays
+    /// per-game (its own registry, runner and Wine version — that isolation is the whole point),
+    /// but the store client and its library are the *account's*, not the game's, so they live here
+    /// and are symlinked into each bottle at the Windows path the client expects.
+    public static var shared: URL { appSupport.appendingPathComponent("shared", isDirectory: true) }
+
+    /// The one Windows Steam install, shared by every Steam bottle. Holds `config/loginusers.vdf`
+    /// (the sign-in) and `steamapps/` (the games), so both are downloaded and authenticated once.
+    public static var sharedSteam: URL { shared.appendingPathComponent("steam", isDirectory: true) }
+
+
     /// Run logs / diagnostics.
     public static var logs: URL { appSupport.appendingPathComponent("logs", isDirectory: true) }
 
@@ -29,7 +43,7 @@ public enum Paths {
     public static var d3dmetalCache: URL { cache.appendingPathComponent("d3dmetal", isDirectory: true) }
 
     public static func ensureBaseDirectories() throws {
-        for dir in [appSupport, runners, prefixes, cache, logs, userProfiles] {
+        for dir in [appSupport, runners, prefixes, cache, logs, userProfiles, shared] {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
     }

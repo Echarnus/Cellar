@@ -25,7 +25,7 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 
 | Path | What lives there |
 |---|---|
-| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store clients (`Store.swift`, `Steam.swift`, `BattleNet.swift`), downloading, app-bundle generation. **All logic lives here.** |
+| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store plugins (`Store.swift`, `Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation. **All logic lives here.** |
 | `Sources/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
@@ -72,18 +72,22 @@ The [verifier agent](agents/verifier.md) codifies these demands per kind of chan
 
 ## Stores are a first-class concept
 
-A game names the storefront it came from (`store = "steam" | "battlenet" | "standalone"`), and that
-one field decides the whole pipeline: which client `cellar setup` installs, what "installed" and
-"signed in" mean, how a launch is issued, and the words the player reads. Read
+A game names the storefront it came from (`store = "steam" | "battlenet" | "gog" | "standalone"`),
+and that one field decides the whole pipeline: which client `cellar setup` installs (if any), what
+"installed" and "signed in" mean, how a launch is issued, and the words the player reads. Read
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → *The store layer* for the comparison table.
 
-The differences are real, not cosmetic — the two that bite hardest:
+The differences are real, not cosmetic — the three that bite hardest:
 
 - **Battle.net has no silent installer.** Steam's takes `/S`; Blizzard's does not exist. Setup must
   *warn the player* that a window will open, or an unexplained pause reads as a hang.
 - **Battle.net does not publish who is signed in.** Steam writes `loginusers.vdf`. So Cellar never
   shows a Battle.net sign-in step and never a ✗ beside "account" — it folds signing in into "open the
   client", the one screen where the player can act on it.
+- **Signing in is account-level, never per game.** One Windows Steam install lives in `shared/steam`
+  and every Steam bottle symlinks to it, and GOG's sign-in is an OAuth token Cellar holds. So a
+  sign-in belongs to the **Accounts** screen (`cellar accounts`, ⌘⇧A), not to a game's page.
+  `StoreDescriptor.authStyle` is the fact that decides which shape a store has.
 
 Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarKit/Store.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
@@ -122,7 +126,7 @@ per language:
 ## Adding a game
 
 A game is a `profiles/<slug>.toml` — copy the closest existing one (`planet-coaster-2` for Steam,
-`diablo-4` for Battle.net). Name its **`store`**, record verified facts (AppID *or* `product_code` +
+`diablo-4` for Battle.net, `witcher-3` for GOG). Name its **`store`**, record verified facts (AppID *or* `product_code` +
 `install_dir` + `exe`, engine, graphics API, arch), state DRM/anti-cheat **honestly**, pick `backend`
 + `fallback_backend`, and give a `status` + `notes` naming the hardware you tested on. The app shows
 those facts verbatim, so "untested" must say so. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
