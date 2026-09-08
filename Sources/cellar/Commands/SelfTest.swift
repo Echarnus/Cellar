@@ -109,6 +109,9 @@ struct SelfTest: ParsableCommand {
         }
         try check(LaunchMarker.stage(in: "  Launching Diablo IV via Battle.net…") == nil,
                   "ordinary output is not mistaken for a marker")
+        // A marker that came back through something that rewrote line endings still parses.
+        try check(LaunchMarker.stage(in: LaunchMarker.line(.client) + "\r") == .client,
+                  "a marker survives a CRLF line ending")
 
         // A game that runs bare must never be shown a step about opening a store client.
         let bare = LaunchContext(game: "The Witcher 3", store: .gog, throughClient: false)

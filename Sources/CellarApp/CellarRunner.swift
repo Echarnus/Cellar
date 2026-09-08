@@ -40,6 +40,8 @@ final class CellarRunner: ObservableObject {
     /// (DepotDownloader's) would look like a stall.
     private var pending: String = ""
     private var committed: String = ""
+    /// Whether the running command reports stage markers (only `launch --machine-progress` does).
+    private var readsStages = false
 
     init() {}
 
@@ -54,11 +56,17 @@ final class CellarRunner: ObservableObject {
 
     /// `observe` sees each chunk of output as it arrives, for a caller that has to react to
     /// something mid-run rather than after exit — the Steam QR challenge is the reason it exists.
-    func run(_ args: [String], title: String, observe: (@MainActor (String) -> Void)? = nil,
+    ///
+    /// `stages` says this command was asked to report its steps. Only then is the output read for
+    /// markers: every other command's output belongs to the player verbatim, and a line that
+    /// happened to start with the marker prefix should not vanish from the activity log.
+    func run(_ args: [String], title: String, stages: Bool = false,
+             observe: (@MainActor (String) -> Void)? = nil,
              then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
         busy = true; busyTitle = title; phase = .working
         stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
+        readsStages = stages
         committed += "\n$ cellar \(args.joined(separator: " "))\n"
         log = committed + pending
 
@@ -98,7 +106,7 @@ final class CellarRunner: ObservableObject {
     func launch(slug: String, showHUD: Bool, then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
         run(["launch", slug, "--machine-progress"] + (showHUD ? ["--hud"] : []),
-            title: "Launching", then: then)
+            title: "Launching", stages: true, then: then)
         launchingSlug = slug
     }
 
@@ -125,7 +133,7 @@ final class CellarRunner: ObservableObject {
         while let newline = pending.firstIndex(of: "\n") {
             let line = String(pending[pending.startIndex..<newline])
             pending = String(pending[pending.index(after: newline)...])
-            if let reached = LaunchMarker.stage(in: line) {
+            if readsStages, let reached = LaunchMarker.stage(in: line) {
                 stage = reached
                 if reached == .starting { attempt += 1 }
                 if reached == .playing { phase = .playing }

@@ -111,13 +111,13 @@ public enum LaunchMarker {
 
     /// The stage a line announces, or nil if it is ordinary output.
     public static func stage(in line: String) -> LaunchStage? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix(prefix) else { return nil }
         return LaunchStage(rawValue: String(trimmed.dropFirst(prefix.count)))
     }
 
     /// Whether this line is a marker rather than something a person should read.
     public static func isMarker(_ line: String) -> Bool {
-        line.trimmingCharacters(in: .whitespaces).hasPrefix(prefix)
+        line.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(prefix)
     }
 }

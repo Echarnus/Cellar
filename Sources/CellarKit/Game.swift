@@ -587,10 +587,14 @@ public enum Game {
             stage(.starting)
             try launchDirect(plan, showHUD: showHUD)
             // Watch for the process rather than declaring victory on a successful spawn: Wine
-            // returns immediately, so "it launched" is otherwise a claim about nothing.
+            // returns immediately, so "it launched" is otherwise a claim about nothing. Not
+            // appearing is a failure and is thrown as one, the way the supervised store routes
+            // throw after their last attempt — a ✓ for a state Cellar could not check is worse
+            // than no launch at all.
             stage(.waiting)
-            if !ProcessWatch.waitToAppear([exe.lastPathComponent], seconds: 40) {
-                progress("Started \(exe.lastPathComponent), but its process hasn't appeared yet — check the activity log if nothing opens.")
+            guard ProcessWatch.waitToAppear([exe.lastPathComponent], seconds: 40) else {
+                throw CellarError.ioFailure(
+                    "Cellar started \(exe.lastPathComponent) but its process never appeared. Check the log, and that the profile's `exe` still matches what is installed: cellar profiles show \(plan.slug)")
             }
             stage(.running)
             return .direct(exeName: exe.lastPathComponent)
