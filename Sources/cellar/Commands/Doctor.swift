@@ -10,6 +10,15 @@ struct Doctor: ParsableCommand {
         print(Term.bold("Cellar doctor") + Term.dim(" — environment diagnostics"))
         print("")
 
+        // The folder-access check works by trying to read the folders, which is what makes macOS
+        // ask — so say so before it happens, the once. After that the answer is recorded and no
+        // dialog can appear again.
+        if !HomeFolderAccess.hasAsked {
+            print(Term.dim("Checking folder access: macOS may ask about your Documents, Desktop and "
+                + "Downloads folders. That is this check — Windows games save into them."))
+            print("")
+        }
+
         let checks = SystemEnvironment.diagnostics()
         for check in checks {
             let name = check.name.padding(toLength: 20, withPad: " ", startingAt: 0)

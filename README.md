@@ -121,6 +121,11 @@ Detailed rules: [docs/LEGAL.md](docs/LEGAL.md).
 - **Rosetta 2** (`softwareupdate --install-rosetta --agree-to-license`)
 - **Swift 6** toolchain (Xcode or Command Line Tools) to build from source
 
+On first launch the app asks for your **Documents, Desktop and Downloads** folders — that is where
+Windows games keep their saves. It asks for all three at once, up front, so macOS doesn't interrupt
+you halfway through installing a game. Turning one down is fine: those games keep their saves inside
+their bottle instead, and **Settings → Review folder access…** shows where you stand.
+
 ## Build & run
 
 ```sh

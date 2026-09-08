@@ -40,6 +40,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>0.1</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <!-- Shown inside macOS's own permission dialog. Cellar asks for all three on first launch
+       (WelcomeView) rather than letting a game trigger them mid-install; without these keys the
+       dialog is the bare "would like to access files in your Documents folder" with no reason. -->
+  <key>NSDocumentsFolderUsageDescription</key><string>Windows games keep their saves and settings in your Documents folder, under My Games.</string>
+  <key>NSDesktopFolderUsageDescription</key><string>Windows installers put game shortcuts on your Desktop, and some games save screenshots there.</string>
+  <key>NSDownloadsFolderUsageDescription</key><string>Game installers and patches you download land in your Downloads folder.</string>
 $ICON_KEY
 </dict></plist>
 PLIST

@@ -25,6 +25,14 @@ struct SettingsView: View {
                     Text("Adds an on-screen FPS/frametime HUD when launching a game.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                Section("Folder access") {
+                    Button("Review folder access…") {
+                        onClose()
+                        NotificationCenter.default.post(name: .cellarOpenFolderAccess, object: nil)
+                    }
+                    Text("Which of your Documents, Desktop and Downloads folders Windows games may use. A folder that is off isn't a failure — those games keep their saves inside their bottle instead.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Section("Runtime") {
                     LabeledContent("Wine runner", value: runnerName)
                     LabeledContent("DepotDownloader", value: depot)

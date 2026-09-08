@@ -152,6 +152,23 @@ public enum SystemEnvironment {
                 hint: RunnerCatalog.gptk.deprecated ?? ""))
         }
 
+        // Folder access. Reported for *this* process — a `cellar` in a terminal is covered by the
+        // terminal's grant, and the app by its own — so the row says whose it is rather than
+        // implying it speaks for both.
+        // requestAll, not a peek: asking *is* the only way to find out (HomeFolderAccess), and it
+        // records that the question has now been put, so nothing asks a second time.
+        let answers = HomeFolderAccess.requestAll()
+        let denied = HomeFolder.allCases.filter { answers[$0] == .denied }
+        let who = Bundle.main.bundleIdentifier == "it.clercq.cellar.app" ? "Cellar" : "this terminal"
+        if denied.isEmpty {
+            checks.append(.init("Folder access", .ok, "Documents, Desktop and Downloads available to \(who)"))
+        } else {
+            checks.append(.init("Folder access", .warn,
+                "\(denied.map(\.displayName).joined(separator: ", ")) not available to \(who)",
+                hint: "Games save into those folders; bottles created now keep those files inside "
+                    + "themselves instead. Change it in System Settings → Privacy & Security → Files and Folders."))
+        }
+
         // Disk
         if let gb = freeDiskGB() {
             let status: CheckStatus = gb < 30 ? .warn : .ok

@@ -39,6 +39,11 @@ interface must say so rather than guess:
   player can actually resolve it. `cellar battlenet status` prints a `·`, never a ✗.
 - Battle.net's installer cannot run silently. Setup therefore *warns first* ("its window will open
   and needs a few clicks") instead of appearing to hang and being killed by an impatient player.
+- macOS's folder prompts are **asked for on first launch, not stumbled into**. Windows games save
+  into Documents/Desktop/Downloads, so the prompts are unavoidable — but *when* they appear is
+  Cellar's to choose, and "mid-install, unexplained" is the one wrong answer. A folder the player
+  turns down is honoured and said so (saves stay in the bottle), never quietly broken. And nothing
+  shows a ✓ for a folder that was never asked about: that row reads "Not asked yet".
 
 The rule: **a control Cellar cannot honour must not exist, and a pause the player will notice must
 be announced before it happens.** Encode the difference in `GameStore.descriptor` so every surface
