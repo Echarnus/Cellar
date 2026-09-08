@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 import CellarKit
 
 @MainActor
@@ -52,6 +53,8 @@ struct ContentView: View {
         }
         .frame(minWidth: 860, minHeight: 560)
         .onAppear { lib.refresh() }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarOpenSettings)) { _ in showSettings = true }
     }
 
     private var sidebar: some View {
