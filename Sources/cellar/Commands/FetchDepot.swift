@@ -23,9 +23,9 @@ struct FetchDepot: ParsableCommand {
         let plan = try Game.plan(slug: slug)
         print(Term.bold("Fetching \(plan.name)") + Term.dim("  (Steam auth as \(username); 2FA will prompt below)"))
         try Game.fetchDepot(plan, username: username) { print("  " + Term.dim($0)) }
-        if plan.needsLiveSteam {
-            print(Term.yellow("Note: \(plan.name) needs a live Steam session to play")
-                + " — `cellar launch \(slug)` will use the silent-Steam path.")
+        if plan.needsLiveSession {
+            print(Term.yellow("Note: \(plan.name) needs a live \(plan.store.displayName) session to play")
+                + " — `cellar launch \(slug)` will use the silent-client path.")
         } else {
             print(Term.green("Ready.") + " Play with: cellar launch \(slug)  (no Steam needed)")
         }

@@ -44,7 +44,23 @@ generalized into a per-game profile system, then given a native GUI.
 - [ ] Optional "Send to Steam" (non-Steam shortcut) and native-Steam bridge (behind a flag)
 - [ ] App signing + notarization
 
-## Phase 4 — Native ARM64EC runner (the Rosetta exit)
+## Phase 4 — More than one store ✅ (Battle.net)
+
+- ✅ `GameStore` + `StoreDescriptor`: a profile names its storefront and that decides setup, install,
+  launch, readiness and copy. Steam / Battle.net / standalone.
+- ✅ `BattleNetBottle`: install Blizzard's client into a bottle (interactive — it has no silent
+  installer), write the `Battle.net.config` that makes its Chromium UI render under Wine, warm the
+  client, launch by product code, and tear the whole layer down on exit.
+- ✅ `cellar battlenet {open,install,status,app,configure}`, mirroring `cellar steam`.
+- ✅ Diablo IV profile (`product_code = "Fen"`), first Battle.net title.
+- ✅ App: library grouped by store, vector store marks, per-store copy and notices, a game
+  information panel, profile-supplied artwork.
+- ✅ The profile database ships inside the app bundle and beside an installed CLI, so a new game
+  reaches players without them copying TOML files — user profiles still win.
+- ⏳ Verify Diablo IV end-to-end on the M5 (install + play). The profile is `untested` until then.
+- ⏳ Further stores when a game needs one: GOG (DRM-free, closest to the standalone path), Epic.
+
+## Phase 5 — Native ARM64EC runner (the Rosetta exit)
 
 The whole stack below the game is x86-64 today and runs on Rosetta 2. macOS 27 is the last release
 with general-purpose Rosetta; macOS 28 (fall 2027) keeps only a subset for "older unmaintained
@@ -94,7 +110,7 @@ the native runner is real.
 
 ## Known risks tracked across phases
 
-- **Rosetta sunset** — see Phase 4. General-purpose Rosetta is removed in macOS 28 (fall 2027);
+- **Rosetta sunset** — see Phase 5. General-purpose Rosetta is removed in macOS 28 (fall 2027);
   the retained gaming subset is a *partial mitigation, not a guarantee* for a Wine layer. macOS
   already shows an "Intel app support ending" notice for the x86_64 runner — harmless on macOS
   26/27. `cellar doctor` reports the measured runner architecture and the horizon.

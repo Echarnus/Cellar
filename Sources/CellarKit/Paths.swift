@@ -34,7 +34,9 @@ public enum Paths {
         }
     }
 
-    /// Search order for the profiles shipped with the repo/binary, plus user/registry profiles.
+    /// Search order for profiles. First match by slug wins, so the list runs from most specific to
+    /// most general: an explicit override, then the player's own edits, then the working directory
+    /// during development, then the database shipped beside the binary.
     public static var profileSearchPaths: [URL] {
         var paths: [URL] = []
         if let env = ProcessInfo.processInfo.environment["CELLAR_PROFILES_DIR"], !env.isEmpty {
@@ -44,6 +46,24 @@ public enum Paths {
         // Repo-relative — supports `swift run cellar ...` from the project root during development.
         paths.append(URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("profiles", isDirectory: true))
+        paths.append(contentsOf: bundledProfiles)
+        return paths
+    }
+
+    /// The profile database that ships with an installed Cellar, so the app and an installed CLI
+    /// know about a game without the player having to copy TOML files around. Searched *last*:
+    /// anything the player has put in `userProfiles` deliberately outranks what Cellar shipped.
+    public static var bundledProfiles: [URL] {
+        var paths: [URL] = []
+        // Cellar.app/Contents/Resources/profiles
+        if let resources = Bundle.main.resourceURL {
+            paths.append(resources.appendingPathComponent("profiles", isDirectory: true))
+        }
+        // A CLI installed to <prefix>/bin/cellar keeps its database at <prefix>/share/cellar/profiles.
+        if let argv0 = ProcessInfo.processInfo.arguments.first {
+            let binDir = URL(fileURLWithPath: argv0).resolvingSymlinksInPath().deletingLastPathComponent()
+            paths.append(binDir.appendingPathComponent("../share/cellar/profiles").standardizedFileURL)
+        }
         return paths
     }
 }

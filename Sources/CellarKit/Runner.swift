@@ -140,7 +140,7 @@ public enum RunnerCatalog {
     // question of packaging, not licensing. Adding it here is a catalog entry, not a rewrite:
     // set `architecture: .arm64ec`, `emulator: "FEX"`, and point the artifacts at the build.
     //
-    // Three upstream gates, all outside Cellar's control — see docs/ROADMAP.md Phase 4:
+    // Three upstream gates, all outside Cellar's control — see docs/ROADMAP.md Phase 5:
     //   1. A free, prebuilt arm64 macOS Wine with the ARM64EC hook (Gcenx/Sikarugir/WineForge).
     //   2. FEX's macOS port available as that hook (CodeWeavers' fork upstreamed, or equivalent).
     //   3. A renderer with ARM64EC PE DLLs: Apple's D3DMetal 4 (GPTK 4 / Metal 4, macOS 27), or

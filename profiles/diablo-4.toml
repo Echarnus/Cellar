@@ -1,0 +1,86 @@
+# Cellar game profile — Diablo IV
+# The first Battle.net title, and the reason Cellar grew a second store. Everything a Steam
+# profile takes for granted is different here: the client installs with a window in front of you,
+# it does not publish who is signed in, and a game is addressed by a product code rather than an
+# AppID. See docs/RESEARCH.md for where each fact below comes from.
+
+[game]
+slug          = "diablo-4"
+name          = "Diablo IV"
+developer     = "Blizzard Entertainment"
+engine        = "in-house (Diablo IV engine)"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2023-06-06"
+
+# Which client has to exist in the bottle. This one field changes the whole pipeline:
+# setup installs Battle.net instead of Steam, and launch drives it instead of steam://.
+store         = "battlenet"
+
+# Battle.net addresses games by product code, not by a numeric id. Diablo IV is "Fen", from its
+# "Fenris" development codename, and it is the argument to `Battle.net.exe --exec="launch Fen"`.
+product_code  = "Fen"
+
+# Battle.net lets the player choose where a game lands and keeps the answer in a binary product
+# database Cellar does not parse. So the profile names the default directory instead, and Cellar
+# searches the usual roots for it — that is how "is it installed?" and "is it running?" are answered.
+install_dir   = "Diablo IV"
+exe           = "Diablo IV.exe"
+
+[compatibility]
+# No kernel-level anti-cheat: Diablo IV runs under Proton on Steam Deck and on CrossOver for Mac,
+# which a ring-0 driver would make impossible. Blizzard's protection is user-space.
+anticheat                   = "none (user-space only)"
+drm                         = "Battle.net account + always-online"
+# Always-online, even solo: the game will not start without an authenticated Battle.net session,
+# so there is no store-free launch path for it. Cellar keeps the client quiet, never absent.
+needs_live_session          = true
+requires_account            = "Battle.net"
+online                      = "always-online (shared world, seasons, co-op)"
+status                      = "untested"
+notes                       = "Configured from CrossOver/Proton evidence, not yet run on Kenneth's M5. CrossOver reports Diablo IV working on macOS 26.x with D3DMetal when MSync is on (Cellar sets WINEMSYNC=1 already). A Season 14 (patch 3.1.0, 2026-06-30) launch crash was reported on CrossOver 26.2 / macOS 26.5.2 — expect turbulence around patch days."
+
+[runner]
+# Same runner as the Steam titles: Wine 11.17 + CrossOver patches, carrying Apple D3DMetal 3.0.
+# Battle.net's UI is an embedded Chromium, which needs a Wine new enough to run modern CEF —
+# another reason the Wine 7.7 GPTK runner is not an option here.
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"     # Diablo IV is DirectX 12
+fallback_backend  = "dxvk"
+metalfx_upscaling = true
+retina            = false
+
+[env]
+# Expose AVX/AVX2 to the translated game, and keep msync on — CrossOver's Diablo IV guidance is
+# explicit that MSync must be enabled with D3DMetal. WineRunner already sets WINEMSYNC=1.
+ROSETTA_ADVERTISE_AVX = "1"
+# Battle.net asks for a geolocation shim Wine has no implementation for; disabling it keeps the
+# client's log readable. Cellar merges this with the backend's own overrides rather than replacing
+# them (see WineRunner.environment).
+WINEDLLOVERRIDES = "locationapi=d"
+
+[dll_overrides]
+# Nothing extra: the override this game needs is applied through [env] above, which is the section
+# Cellar actually reads. A key here would be documentation pretending to be configuration.
+
+[install]
+# Blizzard publishes no depot downloader and no per-game install URL a launcher could drive, so
+# the game is installed from inside the client. Cellar's job is to get you there, not to pretend.
+method       = "battlenet-in-bottle"
+product_code = "Fen"
+
+[art]
+# Battle.net has no artwork CDN addressable by product code the way Steam has one per AppID, so a
+# non-Steam profile supplies its own. Diablo IV is *also* sold on Steam (AppID 2344520), and Valve's
+# CDN serves that key art publicly and unauthenticated — the same images the Steam profiles use.
+# Cellar is still installing and launching this through Battle.net; only the pictures come from here.
+art_portrait = "https://cdn.cloudflare.steamstatic.com/steam/apps/2344520/library_600x900.jpg"
+art_hero     = "https://cdn.cloudflare.steamstatic.com/steam/apps/2344520/library_hero.jpg"
+
+[legal]
+# Cellar runs Blizzard's own client and Blizzard's own DRM, untouched. Only ever with an account
+# and a licence you own.
+drm_circumvention = "never"

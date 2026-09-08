@@ -5,17 +5,17 @@ import Foundation
 struct Launch: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "launch",
-        abstract: "Launch a game. Runs the exe directly (no Steam) when the game allows it, else through the bottle's silent Steam."
+        abstract: "Launch a game. Runs the exe directly when the game allows it, else through its store's client (Steam or Battle.net)."
     )
 
-    @Argument(help: "Profile slug to launch, e.g. 'planet-coaster-2'.")
+    @Argument(help: "Profile slug to launch, e.g. 'diablo-4'.")
     var slug: String
 
     @Flag(help: "Show the Metal performance HUD (FPS / frametime).")
     var hud = false
 
-    @Flag(name: .customLong("steam"), help: "Force the Steam launch path even if a direct launch is possible.")
-    var forceSteam = false
+    @Flag(name: .customLong("store"), help: "Force the store-client launch path even if a direct launch is possible.")
+    var forceStore = false
 
     @Flag(name: .customLong("no-wait"), help: "Return immediately after launch instead of waiting for the game to exit and closing the layer.")
     var noWait = false
@@ -26,57 +26,40 @@ struct Launch: ParsableCommand {
     func run() throws {
         let plan = try Game.plan(slug: slug)
 
-        guard let wine = Game.wineRunner(plan) else {
-            throw CellarError.invalidArgument(
-                "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(slug)")
-        }
         if printEnv {
+            guard let wine = Game.wineRunner(plan) else {
+                throw CellarError.invalidArgument(
+                    "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(slug)")
+            }
             var extra = WineRunner.d3dMetalEnv(showHUD: hud)
-            for (k, v) in plan.env { extra[k] = v }
-            for (k, v) in wine.environment(extra: extra).sorted(by: { $0.key < $1.key }) { print("\(k)=\(v)") }
-            return
-        }
-
-        // Steam-free path: no live-session DRM and the exe is present → run it directly, no Steam.
-        if plan.canLaunchSteamFree && !forceSteam {
-            let exeName = plan.directLaunchExe!.lastPathComponent
-            print(Term.dim("Launching \(plan.name) directly (no Steam) — \(exeName), backend \(plan.backend)…"))
-            try Game.launchDirect(plan, showHUD: hud)
-            print(Term.green("\(plan.name) launched."))
-            if !noWait {
-                print(Term.dim("Playing… (Cellar will close the layer when you quit the game)"))
-                SteamBottle.waitForExit(matching: exeName)
-                wine.killServer()
-                print(Term.green("\(plan.name) closed. Layer shut down."))
+            for (key, value) in plan.env { extra[key] = value }
+            for (key, value) in wine.environment(extra: extra).sorted(by: { $0.key < $1.key }) {
+                print("\(key)=\(value)")
             }
             return
         }
 
-        // Steam path (DRM / Steamworks games): silent Steam + supervised auto-retry.
-        guard SteamBottle.isInstalled(in: plan.prefix) else {
-            let hint = plan.installMethod == "depot"
-                ? "This game needs a live Steam session; set up the bottle: cellar setup --profile \(slug)"
-                : "Windows Steam isn't installed in this bottle. Run: cellar setup --profile \(slug)"
-            throw CellarError.invalidArgument(hint)
-        }
-        guard let appID = plan.appID else {
-            throw CellarError.invalidArgument("Profile '\(slug)' has no steam_appid to launch.")
-        }
-        if SteamBottle.loggedInAccount(in: plan.prefix) == nil {
-            print(Term.yellow("Nobody is logged into this bottle's Steam yet.")
-                + " Run: cellar steam open \(slug)  and sign in first.")
+        // A store that can tell us nobody is signed in should say so before a launch that will
+        // stall on a login screen. Battle.net can't tell, so it doesn't pretend to.
+        if plan.store.descriptor.canDetectSignIn, Game.storeClientInstalled(plan),
+           Game.signedInAccount(plan) == nil {
+            print(Term.yellow("Nobody is signed in to this bottle's \(plan.store.displayName) yet.")
+                + " Run: cellar \(plan.store.rawValue) open \(slug)  and sign in first.")
         }
 
-        print(Term.dim("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…"))
-        try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: hud, gameEnv: plan.env) {
+        let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore) {
             print("  " + Term.dim($0))
         }
         print(Term.green("\(plan.name) is up."))
-        if !noWait {
-            print(Term.dim("Playing… (Cellar will close Steam when you quit the game)"))
-            SteamBottle.waitForGameExit(in: plan.prefix, appID: appID)
-            SteamBottle.shutdown(runner: wine)
-            print(Term.green("\(plan.name) closed. Steam layer shut down."))
+
+        guard !noWait else { return }
+        switch route {
+        case .direct:
+            print(Term.dim("Playing… (Cellar will close the layer when you quit the game)"))
+        case .steam, .battlenet:
+            print(Term.dim("Playing… (Cellar will close \(plan.store.displayName) when you quit the game)"))
         }
+        Game.waitForExitThenShutDown(plan, route: route)
+        print(Term.green("\(plan.name) closed. Layer shut down."))
     }
 }

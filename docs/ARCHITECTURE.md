@@ -52,11 +52,41 @@ Steam-on-Linux does, using Wine + D3DMetal and per-game profiles.
 |---|---|---|
 | Engine core | `CellarKit` | environment detection, bottles (prefixes), runners, profile discovery |
 | CLI | `cellar` | thin ArgumentParser front-end over `CellarKit` |
-| Runner | (Phase 1) | download/pin prebuilt LGPL Wine 11; assemble backend DLL overrides |
-| GPTK import | (Phase 1) | copy user-supplied D3DMetal from Apple's `.dmg` into the local cache |
-| Steam-in-bottle | (Phase 1) | install the Windows Steam client into a bottle |
-| Profile DB | `profiles/` + (Phase 2) loader/registry sync | per-game config, generality |
-| GUI | (Phase 3) | native SwiftUI app over the same `CellarKit` core |
+| Runner | `Runner.swift` | download/pin prebuilt LGPL Wine; graft D3DMetal; assemble backend env |
+| GPTK import | `Gptk.swift` | copy user-supplied D3DMetal from Apple's `.dmg` into the local cache |
+| **Store layer** | `Store.swift` + `Steam.swift` / `BattleNet.swift` | stand the game's own storefront client up inside the bottle |
+| Profile DB | `profiles/` + (Phase 2) registry sync | per-game config, generality |
+| GUI | `CellarApp` | native SwiftUI app over the same `CellarKit` core |
+
+## The store layer
+
+A game does not just need Wine — it needs *the client it was bought from*, running inside the same
+bottle. Each profile names one with `store = "…"`, and that single field decides the whole pipeline:
+which installer `cellar setup` runs, what "installed" and "signed in" even mean, how a launch is
+issued, and what the app says to the player.
+
+| | **Steam** (`SteamBottle`) | **Battle.net** (`BattleNetBottle`) | **Standalone** |
+|---|---|---|---|
+| Installer | `SteamSetup.exe /S` — silent | `Battle.net-Setup.exe` — **no silent switch**; a window opens and the player clicks through | none |
+| Client binaries | `steam.exe` | `Battle.net Launcher.exe` bootstraps `Battle.net.exe` | none |
+| Games addressed by | numeric AppID | product code (`Fen` = Diablo IV) | a path |
+| "Signed in?" | readable — `config/loginusers.vdf` | **not observable**; folded into "open the client" | n/a |
+| "Installed?" | `appmanifest_<id>.acf`, `StateFlags 4` | the profile's `install_dir` + `exe` on disk | the exe on disk |
+| Install a game | `steam://install/<id>` | no drivable URL — open the client | DepotDownloader |
+| Launch | `steam://rungameid/<id>` into a `-silent` client | `Battle.net.exe --exec="launch <product>"`, client warmed first | run the exe |
+| Public artwork | yes, per AppID | none a launcher may hotlink | none |
+
+Two consequences worth stating plainly, because they shape the UI as much as the code:
+
+- **Cellar never invents a state it cannot check.** Battle.net gets no sign-in step and no ✗ beside
+  "account", because Blizzard does not publish one. `GameStore.descriptor.canDetectSignIn` carries
+  that fact to every surface.
+- **Cellar announces a pause it cannot remove.** Because Blizzard ships no silent installer, setup
+  warns before the window appears rather than looking hung.
+
+Both live in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
+about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a branch in `Game.setUp`
+and `Game.launch`, and a CLI command group.
 
 ## On-disk layout
 
@@ -66,9 +96,13 @@ Steam-on-Linux does, using Wine + D3DMetal and per-game profiles.
 ├── prefixes/    # one bottle per game (pfx/ + bottle.toml)
 ├── cache/
 │   └── d3dmetal/  # user-supplied Apple D3DMetal (never in the repo)
-├── profiles/    # user/registry-synced profiles
+├── profiles/    # user/registry-synced profiles (these win over the shipped database)
 └── logs/
 ```
+
+The profile database also ships *inside* the installed app (`Cellar.app/Contents/Resources/profiles`)
+and beside an installed CLI (`<prefix>/share/cellar/profiles`). Those are searched **last**, so a
+shipped update never overwrites a profile the player has edited by hand.
 
 ## The Planet Coaster 2 path (worked example)
 
@@ -85,3 +119,20 @@ Steam-on-Linux does, using Wine + D3DMetal and per-game profiles.
    Wine build — **no `WINEDLLOVERRIDES` needed**.
 5. Optional `cellar steam add planet-coaster-2` — emits `~/Applications/Planet Coaster 2.app` and a
    non-Steam shortcut so it shows in the native Steam library.
+
+## The Diablo IV path (worked example — Battle.net)
+
+1. `cellar setup --profile diablo-4` — installs the **WineForge runner** (Wine 11.17 + D3DMetal 3.0),
+   creates the `diablo-4` bottle, `wineboot --init`, Windows 10, then downloads Blizzard's installer
+   and runs it with `--lang=enUS --installpath="C:\Program Files (x86)\Battle.net"`. **Its window
+   opens and needs a few clicks** — Cellar says so before it happens. Afterwards Cellar stops the
+   client and writes `Battle.net.config` with hardware acceleration and streaming off, which is what
+   makes the login form render under Wine instead of a spinning logo.
+2. `cellar battlenet open diablo-4` — the client opens. Sign in, install Diablo IV from inside it.
+   There is no install URL a launcher can drive, so Cellar takes you there rather than pretending.
+3. `cellar launch diablo-4` — brings `Battle.net.exe` up and waits for it, then issues
+   `--exec="launch Fen"` and supervises the startup, retrying through the D3DMetal race
+   (`ProcessWatch.superviseStart`, shared with the Steam path). Diablo IV is always-online, so the
+   client stays running alongside the game.
+4. Quit the game and Cellar kills the client, its `Agent.exe` and helpers, then `wineserver -k` —
+   the whole layer closes with the game.

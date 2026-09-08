@@ -15,12 +15,19 @@ property of their respective owners:
 
   - Apple Inc.  (macOS, Metal, Game Porting Toolkit, D3DMetal, Rosetta)
   - Valve Corporation  (Steam, Steam Play, Proton)
+  - Blizzard Entertainment, Inc.  (Battle.net, Diablo)
   - CodeWeavers Inc.  (CrossOver)
   - Frontier Developments plc  (Planet Coaster, COBRA engine)
   - The Wine Project, the Khronos Group, and other upstream projects
 
 Product and game names are used only descriptively (nominative use) to state
-what Cellar is compatible with. No logos of the above are used.
+what Cellar is compatible with.
+
+Cellar's interface shows a small mark beside each game to say which storefront
+it came from. Those marks are simplified shapes drawn by Cellar's own code
+(Sources/CellarApp/StoreMark.swift). No third-party logo files are bundled,
+redistributed, or downloaded, and the marks are used nominatively -- to label
+where a game came from -- not to suggest endorsement or affiliation.
 
 ------------------------------------------------------------------------------
 Important

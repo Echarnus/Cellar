@@ -50,7 +50,7 @@ jobs:
           body: |
             Cellar ${{ steps.v.outputs.version }} — run Windows games on Apple Silicon.
 
-            **Easiest:** download **Cellar-${{ steps.v.outputs.version }}.dmg**, open it, and drag
+            **Easiest:** download **Cellar.dmg**, open it, and drag
             Cellar into Applications. First launch: right-click Cellar → Open (it's unsigned). Cellar
             sets up the runtime, you sign in to Steam, then pick a game and play.
 

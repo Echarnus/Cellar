@@ -9,22 +9,29 @@ struct Cellar: ParsableCommand {
         discussion: """
         Cellar assembles a Wine runner plus a graphics backend (Apple's D3DMetal, or the
         open-source DXVK/MoltenVK path) into per-game "bottles", driven by a profile database.
-        Planet Coaster 2 is the first supported profile.
+        Each game names the store it comes from, and Cellar stands that store's client up inside
+        the bottle: Windows Steam, or Blizzard's Battle.net.
 
-        Quick start:
-          cellar doctor                 check your machine
-          cellar setup                  install runner + bottle + Windows Steam (Planet Coaster 2)
-          cellar steam open  planet-coaster-2   log in, install the game
-          cellar launch      planet-coaster-2   play
+        Quick start — Steam:
+          cellar doctor                          check your machine
+          cellar setup --profile planet-coaster-2   runner + bottle + Windows Steam
+          cellar steam open  planet-coaster-2    sign in, install the game
+          cellar launch      planet-coaster-2    play
+
+        Quick start — Battle.net:
+          cellar setup --profile diablo-4        runner + bottle + Battle.net
+          cellar battlenet open diablo-4         sign in, install Diablo IV from the client
+          cellar launch diablo-4                 play
 
         Cellar never bundles Apple's proprietary D3DMetal in its own releases, never circumvents
         DRM, and only ever works with games you own.
         """,
-        version: "0.1.0 (Phase 1)",
+        version: "0.2.0",
         subcommands: [
             Doctor.self,
             Setup.self,
             SteamCommand.self,
+            BattleNetCommand.self,
             FetchDepot.self,
             Launch.self,
             RunnerCommand.self,

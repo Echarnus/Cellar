@@ -21,7 +21,7 @@ Cellar — run Windows games on Apple Silicon.
 Supported games: https://echarnus.github.io/Cellar/
 TXT
 
-DMG="dist/Cellar-$VERSION.dmg"
+DMG="dist/Cellar.dmg"
 rm -f "$DMG"
 hdiutil create -volname "Cellar $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 echo "Built $DMG"

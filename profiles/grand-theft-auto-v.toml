@@ -9,6 +9,10 @@ graphics_api  = "DirectX 11"
 architecture  = "x86-64"
 released      = "2015-04-14"
 
+# Which client Cellar stands up in the bottle for this game. Steam is the default, but every
+# profile says so out loud now that Cellar speaks more than one store (see docs/ARCHITECTURE.md).
+store         = "steam"
+
 [compatibility]
 anticheat                   = "BattlEye (GTA Online only)"
 drm                         = "Steamworks + Rockstar Social Club launcher"

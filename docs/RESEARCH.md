@@ -125,3 +125,71 @@ Has a **native Apple Silicon port by Feral Interactive** on Steam since 2026-05-
 the macOS Steam client directly, no Cellar needed. A Cellar profile exists for the Windows build
 (DX11 via D3DMetal); EasyAntiCheat is enforced only for ranked multiplayer, which is unsupported
 through the layer.
+
+## Update 2026-09-08 — Battle.net as a second store, and Diablo IV
+
+Cellar's first non-Steam storefront. Everything below is sourced; nothing here has yet been run on
+Kenneth's M5, and `profiles/diablo-4.toml` says `status = "untested"` for that reason.
+
+### The client
+
+| Fact | Value | Where it came from |
+|---|---|---|
+| Installer | `https://www.battle.net/download/getInstallerForGame?os=win&version=LIVE&gameProgram=BATTLENET_APP` | Lutris' *Battle.net (Standard)* installer script |
+| Install flags | `--lang=enUS --installpath="C:\Program Files (x86)\Battle.net"` | SilentInstallHQ's Battle.net guide |
+| **Silent install** | **Does not exist.** Those flags only pre-fill the dialog; the UI still appears. A Blizzard forum request for a `/quiet` switch is unanswered. | SilentInstallHQ; Blizzard forums; Lutris' own step is captioned *"an installer will open"* |
+| Two executables | `Battle.net Launcher.exe` bootstraps and updates; `Battle.net.exe` is the client and the only one that takes `--exec` | Lutris docs (`Battle.Net.md`) |
+| Stray processes | `Battle.net.exe`, `Agent.exe`, `Battle.net Helper.exe` outlive the client; a surviving `Agent.exe` is what greys out the Install button next session | Lutris docs; Lutris' `exclude_processes` list |
+| Config | `drive_c/users/<user>/AppData/Roaming/Battle.net/Battle.net.config`, JSON, values are **strings** not booleans | Lutris `write_json` step |
+
+### The config that makes it work under Wine
+
+```json
+{ "Client": { "GameLaunchWindowBehavior": "2" },
+  "GameSearch": { "BackgroundSearch": "true" },
+  "HardwareAcceleration": "false",
+  "Sound": { "Enabled": "false" },
+  "Streaming": { "StreamingEnabled": "false" } }
+```
+
+`HardwareAcceleration: false` is the load-bearing one. The client draws its UI in an embedded
+Chromium; GPU-accelerated under Wine that renders as a spinning logo with no login form, or a white
+window. `StreamingEnabled: false` fixes games black-screening on launch. Cellar writes this during
+setup rather than waiting for the player to hit the bug — `cellar battlenet configure` re-applies it,
+since the client rewrites its own config on exit.
+
+### Launching a game
+
+`Battle.net.exe --exec="launch <product>"`, where the product code is Blizzard's internal name —
+**Diablo IV is `Fen`** (from its "Fenris" codename). The catch, reported consistently: `--exec` is
+dropped when no client is already running. So Cellar starts the launcher, waits for `Battle.net.exe`
+to appear, lets it settle, and only then issues the launch — then supervises the startup with the
+same retry loop the Steam path uses (`ProcessWatch.superviseStart`).
+
+### Diablo IV specifics
+
+- **No kernel anti-cheat.** It runs under Proton on Steam Deck (ProtonDB: Gold) and under CrossOver on
+  macOS, neither of which a ring-0 driver would allow. Blizzard's protection is user-space.
+- **Always-online**, even solo — there is no store-free launch path; the client stays up alongside it.
+- **D3DMetal works, with msync on.** CrossOver's Diablo IV guidance is explicit that MSync must be
+  enabled with D3DMetal; `WineRunner` already sets `WINEMSYNC=1`.
+- **Patch days are turbulent.** A launch crash was reported on CrossOver 26.2 / macOS 26.5.2 after
+  Season 14 (patch 3.1.0, 2026-06-30). Recorded in the profile's `notes` rather than glossed over.
+- **Artwork.** Battle.net publishes none addressable by product code. Diablo IV is also sold on Steam
+  (AppID 2344520) and Valve's CDN serves that key art publicly, so the profile points `art_portrait` /
+  `art_hero` there. Installation and launch still go through Battle.net; only the pictures come from
+  Steam.
+- **Prior art:** [D4Mac](https://github.com/MichaelLod/D4Mac) — an open-source Battle.net launcher for
+  Apple Silicon (Wine 11 from CrossOver 26.1 + GPTK 3.0, DXMT for the client's 32-bit D3D11, MoltenVK
+  fallback). It corroborates the stack and recommends `WINEESYNC=1` + `ROSETTA_ADVERTISE_AVX=1` for
+  the Rosetta-deadlock freezes that macOS 26.5 fixed.
+
+### Sources
+
+- Lutris — Battle.net (Standard) installer script, and `lutris/docs/Battle.Net.md`
+- Lutris — Diablo IV (Battle.net) installer script (`--exec="launch Fen"`, `locationapi=d`)
+- SilentInstallHQ — *Battle.net Silent Install (How-To Guide)*
+- CodeWeavers — Diablo IV compatibility forum (D3DMetal + MSync; the Season 14 crash report)
+- ProtonDB / ValveSoftware/Proton #7199 — Diablo IV anti-cheat and Linux status
+- MichaelLod/D4Mac — Battle.net on Apple Silicon, prior art
+

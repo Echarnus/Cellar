@@ -97,7 +97,7 @@ public enum SystemEnvironment {
         }
         return .init("Runner arch", .info, summary,
             hint: "x86_64 under Rosetta 2 — fine through macOS 27. Tracked migration: a native "
-                + "ARM64EC + FEX runner, see docs/ROADMAP.md Phase 4.")
+                + "ARM64EC + FEX runner, see docs/ROADMAP.md Phase 5.")
     }
 
     /// The full diagnostic battery printed by `cellar doctor`.
