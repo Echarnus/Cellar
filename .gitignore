@@ -22,6 +22,11 @@ DerivedData/
 .vscode/
 .idea/
 
+# Claude Code: commit shared AI config (.claude/CLAUDE.md, skills/, agents/) but never
+# per-session worktrees or local machine settings.
+.claude/worktrees/
+.claude/settings.local.json
+
 # CI/build artifacts
 /dist/
 /site/
