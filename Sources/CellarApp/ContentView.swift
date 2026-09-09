@@ -87,21 +87,26 @@ final class Library: ObservableObject {
     /// Why the library is empty, named per store rather than assumed to be Steam's fault. Cellar
     /// speaks to three stores; only one of them signs in with a QR code.
     var signInReason: String {
-        let stores = Set(withheld.map(\.gatingStore))
+        let allStores = Set(withheld.map(\.gatingStore))
         // Battle.net first, because it is the one store whose sentence is not about ownership at
         // all: Blizzard publishes nothing to check, so what is missing is the player's own word.
-        if stores == [.battlenet] {
+        if allStores == [.battlenet] {
             return "Blizzard publishes nothing Cellar can check, so it asks you instead. Add Battle.net and its games appear."
         }
-        let askable = stores.filter(\.canAnswerOwnership)
-        if askable == [.steam] || (askable.contains(.steam) && askable.count > 1 && !steam.isUsable) {
-            return steam.summary
+        // Only games whose store was never *asked* say anything about signing in. A game the store
+        // answered "no" to is withheld for a reason a sign-in cannot change — counting it here is
+        // how a signed-in player gets told they are not signed in.
+        let unasked = withheld.filter { game in
+            if case .unknown = game.ownership { return game.gatingStore.canAnswerOwnership }
+            return false
         }
-        if askable == [.gog] {
+        let stores = Set(unasked.map(\.gatingStore))
+        if stores.contains(.steam), !steam.isUsable { return steam.summary }
+        if stores == [.gog], !GOGAuth.isSignedIn {
             return "Not signed in to GOG. One sign-in covers your whole GOG library."
         }
-        if askable.isEmpty {
-            return "Cellar hasn't been able to ask your stores what you own yet."
+        if stores.isEmpty {
+            return "Nothing your stores confirmed you own is supported yet."
         }
         return "Cellar lists a game once its store confirms you own it, and it hasn't been able to ask yet."
     }
