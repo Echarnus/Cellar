@@ -146,7 +146,7 @@ struct ContentView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "wineglass.fill").foregroundStyle(.pink)
+            KegMark(size: 18).foregroundStyle(.pink)
             Text("Cellar").font(.system(.title3, design: .rounded).weight(.bold))
             Spacer()
             Button { lib.refresh() } label: { Image(systemName: "arrow.clockwise") }
@@ -432,7 +432,7 @@ struct StatusPill: View {
 struct EmptyState: View {
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "wineglass").font(.system(size: 52, weight: .thin)).foregroundStyle(.pink.gradient)
+            KegMark(size: 64, style: .outline).foregroundStyle(.pink.gradient)
             Text("Choose a game").font(.title2.weight(.semibold))
             Text("Windows games, running on your Mac.").foregroundStyle(.secondary)
         }

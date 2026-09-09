@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import CellarKit
+import CellarUI
 
 /// First run: ask for the folders every Windows game needs, once, having said what they are for.
 ///
@@ -55,7 +56,7 @@ struct WelcomeView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: "wineglass.fill").foregroundStyle(.pink)
+                KegMark(size: 18).foregroundStyle(.pink)
                 Text(isReview ? "Folder access" : "Welcome to Cellar")
                     .font(.title2.weight(.semibold))
             }

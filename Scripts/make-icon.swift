@@ -1,7 +1,7 @@
 // Renders Cellar's app icon to a 1024×1024 PNG with AppKit — reproducible, no external assets.
 // macOS-style: a superellipse "squircle" on the standard icon grid, a layered wine gradient with a
-// top sheen and inner vignette, and a cream wine glass whose bowl holds a green play triangle
-// (Cellar plays games on *Wine*). Run: swift Scripts/make-icon.swift <out.png>
+// top sheen and inner vignette, and a cream keg with burgundy hoops and a tap (games, kept in the
+// cellar, ready to pour). Run: swift Scripts/make-icon.swift <out.png>
 import AppKit
 
 let S = 1024.0
@@ -70,53 +70,83 @@ ctx.addPath(squircle(body.insetBy(dx: S*0.006, dy: S*0.006)))
 ctx.setStrokeColor(rgb(255,255,255,0.18)); ctx.setLineWidth(S*0.010); ctx.strokePath()
 ctx.restoreGState()
 
-// ---- Emblem: a wine glass (cream) with a green play triangle in the bowl ----
-let cx = body.midX
+// ---- Emblem: a keg (cream) seen from slightly above ----
+let cx = body.midX, cy = body.midY
 let cream = rgb(245, 238, 228)
+let hoop = rgb(58, 14, 30)
+
+// Geometry. The keg is a bulged cylinder; `ry` is the half-height of the elliptical rims that the
+// slight top-down view exposes, so the lid and the curved hoops all share one perspective.
+let kegW = S*0.42, kegH = S*0.46, bulge = S*0.045, ry = S*0.040
+let left = cx - kegW/2, right = cx + kegW/2
+let topY = cy + kegH/2 - S*0.02, botY = cy - kegH/2 - S*0.02
+
+// Silhouette: bulged sides, front half of the bottom rim, back half of the top rim.
+let keg = CGMutablePath()
+keg.move(to: CGPoint(x: left, y: topY))
+keg.addQuadCurve(to: CGPoint(x: left, y: botY), control: CGPoint(x: left - bulge, y: cy))
+keg.addQuadCurve(to: CGPoint(x: right, y: botY), control: CGPoint(x: cx, y: botY - 2*ry))
+keg.addQuadCurve(to: CGPoint(x: right, y: topY), control: CGPoint(x: right + bulge, y: cy))
+keg.addQuadCurve(to: CGPoint(x: left, y: topY), control: CGPoint(x: cx, y: topY + 2*ry))
+keg.closeSubpath()
+
+// A curved band across the face at height `y` (follows the rim perspective), wider than the body so
+// the clip trims it to the silhouette.
+func band(at y: Double, height h: Double) -> CGPath {
+    let p = CGMutablePath()
+    let l = left - bulge - S*0.01, r = right + bulge + S*0.01
+    p.move(to: CGPoint(x: l, y: y + h/2))
+    p.addQuadCurve(to: CGPoint(x: r, y: y + h/2), control: CGPoint(x: cx, y: y + h/2 - 2*ry))
+    p.addLine(to: CGPoint(x: r, y: y - h/2))
+    p.addQuadCurve(to: CGPoint(x: l, y: y - h/2), control: CGPoint(x: cx, y: y - h/2 - 2*ry))
+    p.closeSubpath()
+    return p
+}
+
+// Body with a drop shadow.
 ctx.saveGState()
-ctx.setShadow(offset: CGSize(width: 0, height: -S*0.006), blur: S*0.02, color: rgb(0,0,0,0.30))
-
-// Bowl: a rounded cup (half-ellipse top + curved bottom).
-let bowlW = S*0.34, bowlTop = body.midY + S*0.20, bowlDepth = S*0.20
-let bowl = CGMutablePath()
-bowl.move(to: CGPoint(x: cx - bowlW/2, y: bowlTop))
-bowl.addQuadCurve(to: CGPoint(x: cx + bowlW/2, y: bowlTop),
-                  control: CGPoint(x: cx, y: bowlTop + S*0.03)) // gentle rim
-bowl.addCurve(to: CGPoint(x: cx, y: bowlTop - bowlDepth),
-              control1: CGPoint(x: cx + bowlW/2, y: bowlTop - bowlDepth*0.55),
-              control2: CGPoint(x: cx + bowlW*0.28, y: bowlTop - bowlDepth))
-bowl.addCurve(to: CGPoint(x: cx - bowlW/2, y: bowlTop),
-              control1: CGPoint(x: cx - bowlW*0.28, y: bowlTop - bowlDepth),
-              control2: CGPoint(x: cx - bowlW/2, y: bowlTop - bowlDepth*0.55))
-bowl.closeSubpath()
-ctx.addPath(bowl); ctx.setFillColor(cream); ctx.fillPath()
-
-// Stem + base.
-let stemTop = bowlTop - bowlDepth
-let baseY = body.midY - S*0.20
-let stemW = S*0.028
-ctx.setShadow(offset: .zero, blur: 0, color: rgb(0,0,0,0))
-let stem = CGRect(x: cx - stemW/2, y: baseY, width: stemW, height: stemTop - baseY)
-ctx.addRect(stem); ctx.setFillColor(cream); ctx.fillPath()
-let baseW = S*0.22, baseH = S*0.03
-let base = CGPath(roundedRect: CGRect(x: cx - baseW/2, y: baseY - baseH/2, width: baseW, height: baseH),
-                  cornerWidth: baseH/2, cornerHeight: baseH/2, transform: nil)
-ctx.addPath(base); ctx.setFillColor(cream); ctx.fillPath()
+ctx.setShadow(offset: CGSize(width: 0, height: -S*0.008), blur: S*0.024, color: rgb(0,0,0,0.32))
+ctx.addPath(keg); ctx.setFillColor(cream); ctx.fillPath()
 ctx.restoreGState()
 
-// Green play triangle inside the bowl (gradient + subtle depth).
-let t = S*0.085
-let tx = cx - t*0.34, ty = bowlTop - bowlDepth*0.5
-let tri = CGMutablePath()
-tri.move(to: CGPoint(x: tx, y: ty + t))
-tri.addLine(to: CGPoint(x: tx, y: ty - t))
-tri.addLine(to: CGPoint(x: tx + t*1.5, y: ty))
-tri.closeSubpath()
 ctx.saveGState()
-ctx.addPath(tri); ctx.clip()
-let green = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-    colors: [rgb(60, 214, 108), rgb(40, 170, 84)] as CFArray, locations: [0, 1])!
-ctx.drawLinearGradient(green, start: CGPoint(x: tx, y: ty + t), end: CGPoint(x: tx, y: ty - t), options: [])
+ctx.addPath(keg); ctx.clip()
+// Cylindrical shading: lit from the left, darker toward the right edge.
+let barrel = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+    colors: [rgb(252, 248, 240), rgb(245, 238, 228), rgb(212, 198, 182)] as CFArray, locations: [0, 0.45, 1])!
+ctx.drawLinearGradient(barrel, start: CGPoint(x: left, y: cy), end: CGPoint(x: right, y: cy), options: [])
+
+// Hoops: two burgundy bands near the rims, each with a highlight and a shadow edge so they read as metal.
+let bandH = S*0.050
+for y in [topY - S*0.075, botY + S*0.095] {
+    ctx.addPath(band(at: y, height: bandH)); ctx.setFillColor(hoop); ctx.fillPath()
+    ctx.addPath(band(at: y + bandH/2 - S*0.005, height: S*0.010)); ctx.setFillColor(rgb(255,255,255,0.16)); ctx.fillPath()
+    ctx.addPath(band(at: y - bandH/2 + S*0.004, height: S*0.008)); ctx.setFillColor(rgb(0,0,0,0.22)); ctx.fillPath()
+}
+ctx.restoreGState()
+
+// Lid: the full top ellipse, slightly darker than the face, with a rim line and a centre bung.
+let lid = CGRect(x: left, y: topY - ry, width: kegW, height: 2*ry)
+ctx.saveGState()
+ctx.addEllipse(in: lid); ctx.setFillColor(rgb(232, 222, 208)); ctx.fillPath()
+ctx.addEllipse(in: lid.insetBy(dx: S*0.004, dy: S*0.003))
+ctx.setStrokeColor(rgb(0,0,0,0.12)); ctx.setLineWidth(S*0.006); ctx.strokePath()
+let bung = S*0.028
+ctx.addEllipse(in: CGRect(x: cx - bung/2, y: topY - bung*0.32, width: bung, height: bung*0.64))
+ctx.setFillColor(hoop); ctx.fillPath()
+ctx.restoreGState()
+
+// Tap on the front face, low down: a dark spout reaching below the rim, with a small handle.
+ctx.saveGState()
+ctx.setShadow(offset: CGSize(width: 0, height: -S*0.006), blur: S*0.02, color: rgb(0,0,0,0.30))
+let spoutW = S*0.052, spoutTop = botY + S*0.060, spoutBot = botY - S*0.065
+ctx.addPath(CGPath(roundedRect: CGRect(x: cx - spoutW/2, y: spoutBot, width: spoutW, height: spoutTop - spoutBot),
+                   cornerWidth: S*0.012, cornerHeight: S*0.012, transform: nil))
+ctx.setFillColor(hoop); ctx.fillPath()
+let handleW = S*0.12, handleH = S*0.028
+ctx.addPath(CGPath(roundedRect: CGRect(x: cx - handleW/2, y: botY + S*0.005, width: handleW, height: handleH),
+                   cornerWidth: handleH/2, cornerHeight: handleH/2, transform: nil))
+ctx.setFillColor(rgb(84, 24, 46)); ctx.fillPath()
 ctx.restoreGState()
 
 NSGraphicsContext.restoreGraphicsState()

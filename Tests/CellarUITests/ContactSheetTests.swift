@@ -30,7 +30,7 @@ struct ContactSheetTests {
         for scheme in [ColorScheme.light, .dark] {
             let sheet = ContactSheet().environment(\.colorScheme, scheme)
             let bitmap = Snapshot.render(sheet,
-                                         size: CGSize(width: 620, height: 380),
+                                         size: CGSize(width: 620, height: 470),
                                          scale: 2,
                                          background: scheme == .dark ? Color(white: 0.13) : Color(white: 0.97))
             let data = try #require(bitmap.pngData(), "the contact sheet rendered no PNG data")
@@ -70,8 +70,29 @@ private struct ContactSheet: View {
                     StoreBadge(store: store, diameter: 20)
                 }
             }
+
+            // Cellar's own mark, in the two styles the app uses: filled beside a title, outlined large.
+            HStack(alignment: .center, spacing: 18) {
+                Text("Cellar")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 78, alignment: .leading)
+                ForEach([CGFloat(14), 18, 24], id: \.self) { size in
+                    VStack(spacing: 4) {
+                        KegMark(size: size).foregroundStyle(.pink)
+                            .frame(width: 48, height: 48)
+                        Text("\(Int(size))")
+                            .font(.system(size: 8))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                KegMark(size: 64, style: .outline).foregroundStyle(.pink.gradient)
+                HStack(spacing: 8) {
+                    KegMark(size: 18).foregroundStyle(.pink)
+                    Text("Cellar").font(.system(.title3, design: .rounded).weight(.bold))
+                }
+            }
         }
         .padding(20)
-        .frame(width: 620, height: 380, alignment: .topLeading)
+        .frame(width: 620, height: 470, alignment: .topLeading)
     }
 }
