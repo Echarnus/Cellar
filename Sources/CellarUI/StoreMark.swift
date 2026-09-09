@@ -1,18 +1,29 @@
 import SwiftUI
+import AppKit
 import CellarKit
 
-/// The storefronts' own marks, drawn as vectors.
+/// The storefronts' own marks.
 ///
 /// A generic game-controller glyph tells a player nothing; the Steam valve and the Battle.net orb
 /// are recognised instantly, and that recognition is the whole point of separating the stores.
 ///
-/// They are **drawn in code, not shipped as artwork**. Cellar's hard rule is that it redistributes
-/// nobody's proprietary assets (`AGENTS.md`, `docs/LEGAL.md`), and a bundled PNG of Valve's or
-/// Blizzard's logo would break it. Vector marks composed from primitives keep the repo asset-free,
-/// stay crisp at every size, work offline, and adapt to light and dark on their own.
+/// There are two ways to get one on screen, and Cellar uses both, in this order:
 ///
-/// Use is nominative: the mark labels which store a game came from. It is not a badge of
-/// endorsement, and Cellar says so in `NOTICE`.
+/// 1. **The store's real artwork, from the copy already on this machine** — the `.icns` inside the
+///    store's Mac app, the icon Wine extracted from the Windows client's `.exe` while setting the
+///    bottle up, or a loose `.ico` the client ships. That is the storefront's own mark, not an
+///    impression of it, and it costs nothing to be exact.
+/// 2. **A vector mark drawn here**, when the store isn't installed and there is nothing to point at.
+///
+/// What Cellar never does is **ship** anyone's logo. Cellar's hard rule is that it redistributes
+/// nobody's proprietary assets (`AGENTS.md`, `docs/LEGAL.md`), and a bundled PNG of Valve's or
+/// Blizzard's logo would break it — as well as being artwork this GPL-3.0 repository has no right
+/// to relicense. Grafting from the player's own install is the same move Cellar makes for Apple's
+/// D3DMetal, for the same reason.
+///
+/// So the drawn marks below are not placeholders — for a store the player hasn't installed they are
+/// what ships, and they have to be good. Use is nominative either way: the mark labels which store a
+/// game came from. It is not a badge of endorsement, and Cellar says so in `NOTICE`.
 public struct StoreMark: View {
     let store: GameStore
     var size: CGFloat
@@ -23,6 +34,22 @@ public struct StoreMark: View {
     }
 
     public var body: some View {
+        if let image = StoreIcons.image(for: store) {
+            // Clipped to the mark's own silhouette rather than always a circle: GOG's outline is a
+            // rounded tile, and `StoreBadge` rings whatever shape this returns. Real artwork has to
+            // occupy the same footprint as the drawn mark, or the ring stops fitting.
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .clipShape(StoreMark.outline(of: store, size: size))
+        } else {
+            drawn
+        }
+    }
+
+    @ViewBuilder private var drawn: some View {
         switch store {
         case .steam:      SteamMark(size: size)
         case .battlenet:  BattleNetMark(size: size)
@@ -41,6 +68,28 @@ public struct StoreMark: View {
         default:    AnyInsettableShape(Circle())
         }
     }
+}
+
+/// Resolved store artwork, looked up once per store and kept for the life of the process.
+///
+/// `StoreMark` renders in every library row, so this has to be a dictionary lookup by the second
+/// call. The first call touches the filesystem — a handful of `fileExists` checks, and at most one
+/// `sips` conversion the very first time a bottle's `.ico` is seen. That happens once ever, not
+/// once per launch, because the converted PNG is cached on disk by `StoreIcon`.
+@MainActor
+public enum StoreIcons {
+    private static var cache: [GameStore: NSImage?] = [:]
+
+    public static func image(for store: GameStore) -> NSImage? {
+        if let known = cache[store] { return known }
+        let image = StoreIcon.mark(store).flatMap { NSImage(contentsOf: $0) }
+        cache[store] = image
+        return image
+    }
+
+    /// Forget what was resolved, so a store that has just been installed starts showing its own
+    /// mark without a relaunch. Called when the library reloads after `cellar setup`.
+    public static func refresh() { cache.removeAll() }
 }
 
 /// A type-erased `InsettableShape`, so `outline(of:size:)` can hand back either a circle or a tile

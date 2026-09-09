@@ -24,10 +24,12 @@ Product and game names are used only descriptively (nominative use) to state
 what Cellar is compatible with.
 
 Cellar's interface shows a small mark beside each game to say which storefront
-it came from. Those marks are simplified shapes drawn by Cellar's own code
-(Sources/CellarApp/StoreMark.swift). No third-party logo files are bundled,
-redistributed, or downloaded, and the marks are used nominatively -- to label
-where a game came from -- not to suggest endorsement or affiliation.
+it came from. Cellar bundles, redistributes and downloads no third-party logo
+file. Where the storefront is already installed on the machine, Cellar displays
+that installation's own icon, read from the user's own copy; where it is not,
+Cellar draws a simplified shape in its own code
+(Sources/CellarApp/StoreMark.swift). Either way the mark is used nominatively --
+to label where a game came from -- not to suggest endorsement or affiliation.
 
 ------------------------------------------------------------------------------
 Important

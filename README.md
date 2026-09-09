@@ -106,8 +106,9 @@ Cellar is **GPL-3.0** and is built to **stay** free and legal:
 - **Owned games only.** Any game files come from *your* authenticated account, through that
   storefront's own client running unmodified in the bottle.
 - **Trademark-safe.** Cellar is not affiliated with or endorsed by Apple, Valve, Blizzard,
-  CodeWeavers, or Frontier Developments. The store marks in the app are drawn by Cellar's own code —
-  no logo files are bundled or fetched. See [NOTICE](NOTICE).
+  CodeWeavers, or Frontier Developments. **No logo files are bundled or downloaded**: where a
+  storefront is already installed on your Mac, Cellar shows that installation's own icon; where it
+  isn't, Cellar draws its own mark. See [NOTICE](NOTICE).
 
 Full component-by-component license matrix: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 Detailed rules: [docs/LEGAL.md](docs/LEGAL.md).

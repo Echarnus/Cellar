@@ -43,12 +43,27 @@ verified research into each component's license and the relevant law.
    disclaimer ships in [NOTICE](../NOTICE).
 
    **Store marks.** Cellar labels each game with the storefront it came from, and that label carries a
-   small mark. Those marks are *drawn by Cellar's own code* as simplified vector shapes
-   (`Sources/CellarApp/StoreMark.swift`) — **no logo file is committed, bundled, or fetched**, which
-   keeps rule 1's "we redistribute nobody's proprietary assets" intact. Their use is nominative:
-   identifying which storefront a game belongs to is the information the player needs, and it does not
-   imply endorsement. If a rights-holder ever objected, the fallback is one line — swap `StoreMark`
-   for the neutral SF Symbol already named in `StoreDescriptor.symbolName`.
+   small mark. **No logo file is committed, bundled, or downloaded**, which keeps rule 1's "we
+   redistribute nobody's proprietary assets" intact. The mark comes from one of two places
+   (`Sources/CellarKit/StoreIcon.swift`):
+
+   - **The store's own installation on this machine** — the `.icns` inside the store's Mac app, the
+     icon Wine extracted from the Windows client's `.exe` during setup, or a loose `.ico` the client
+     ships. This is the player's own copy of the store's artwork, displayed in place; nothing is
+     redistributed, exactly as with Apple's D3DMetal.
+   - **A vector shape Cellar draws itself** (`Sources/CellarApp/StoreMark.swift`) when the store is
+     not installed and there is nothing to point at.
+
+   This matters because every storefront's own brand terms rule out shipping the artwork: Valve's
+   guidelines forbid the Steam logo as a prominent feature on non-Valve materials and reserve prior
+   approval of anything carrying it; Blizzard's permit their marks only for the fan-site, tournament
+   and custom-map activities they enumerate, and only non-commercially; GOG publishes a press kit but
+   grants no licence in it. A GPL-3.0 release could not relicense any of it in any case.
+
+   Use is nominative either way: identifying which storefront a game belongs to is the information the
+   player needs, and it does not imply endorsement. If a rights-holder ever objected, the fallback is
+   one line — swap `StoreMark` for the neutral SF Symbol already named in
+   `StoreDescriptor.symbolName`.
 
 5. **No proprietary CrossOver code.** Only CodeWeavers' publicly published **LGPL `winecx` Wine
    modifications** may be reused — never CrossOver's GUI, installer, or product code.

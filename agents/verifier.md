@@ -57,7 +57,9 @@ one obvious next action with a plain sentence under it; empty / loading / first-
 states all designed; light *and* dark; readable at the window's minimum width. **Honesty:** no ✓ for
 a state Cellar cannot actually check (Battle.net sign-in), and any step the player must perform by
 hand is announced before it happens (Battle.net's installer). Store identity carried by position +
-mark + word, never colour alone; store marks drawn in code, never bundled logo files. Icon-only
+mark + word, never colour alone; store marks are never bundled logo files — the store's real icon
+comes from its install on this machine (`StoreIcon.swift`), with Cellar's own vector as the fallback
+(`StoreMark.swift`). Icon-only
 controls have both `.accessibilityLabel` and `.help`. **Evidence: a screenshot of the changed screen
 from a launched build** — a diff is not evidence about an interface.
 

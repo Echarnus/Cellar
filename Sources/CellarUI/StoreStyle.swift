@@ -8,8 +8,9 @@ import CellarKit
 /// answer changes what the next button does. Three signals carry that, always together:
 ///
 /// 1. **Position** — the library is grouped by store, so a game's neighbours already tell you.
-/// 2. **A mark** — the store's own logo, drawn as vectors (see `StoreMark`), on the cover and in
-///    the header. A real mark is recognised where a generic glyph has to be read.
+/// 2. **A mark** — the store's own logo (see `StoreMark`): its real icon where the store is
+///    installed on this machine, a vector Cellar draws where it isn't. On the cover and in the
+///    header. A real mark is recognised where a generic glyph has to be read.
 /// 3. **A word** — the store's name, spelled out, next to the mark.
 ///
 /// No signal ever stands alone. Steam's and Battle.net's brands are both blue, so colour could

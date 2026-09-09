@@ -224,8 +224,11 @@ These are correctness *and* legality constraints. They override any convenience.
 - **Never add DRM or anti-cheat circumvention.** Cellar runs DRM *through* the layer, untouched.
 - **Owned games only** — game data comes from the user's own authenticated Steam account.
 - **Trademark-safe** — not affiliated with Apple, Valve, Blizzard, CodeWeavers, or Frontier. Store
-  marks in the UI are **drawn in code** (`StoreMark.swift`), never bundled logo files. See
-  [`NOTICE`](NOTICE) and [`docs/LEGAL.md`](docs/LEGAL.md).
+  marks in the UI are **never bundled logo files**: Cellar shows the store's real icon by pointing at
+  the copy already installed on the player's machine (`StoreIcon.swift` — the Mac app's `.icns`, the
+  icon Wine extracted from the Windows client's `.exe`, or a loose `.ico`), the same graft-don't-bundle
+  move it makes for D3DMetal, and draws its own vector mark when there is nothing to point at
+  (`StoreMark.swift`). See [`NOTICE`](NOTICE) and [`docs/LEGAL.md`](docs/LEGAL.md).
 
 ## AI configuration in this repo
 

@@ -116,27 +116,13 @@ public enum AppBundle {
 
     // MARK: - Icons
 
-    /// A store's icon from its natively installed macOS app, if the player has one. Cellar never
-    /// ships these — it points at what is already on the machine (see docs/LEGAL.md). Returns nil
-    /// when the store isn't installed natively, and the app falls back to Cellar's own icon.
-    /// (Steam's file is `Steam.icns` — the capital matters on a case-sensitive volume.)
+    /// A store's icon for a generated `.app` bundle, from the store's own native Mac app.
+    /// Cellar never ships these — it points at what is already on the machine (`StoreIcon`,
+    /// docs/LEGAL.md). Returns nil when the store isn't installed natively, and the bundle falls
+    /// back to Cellar's own icon. `CFBundleIconFile` only accepts an `.icns`, which is why this
+    /// asks for the native artwork specifically rather than the mark the app draws in its library.
     static func nativeStoreIcon(_ store: GameStore) -> URL? {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let relative: [String]
-        switch store {
-        case .steam:
-            relative = ["Steam.app/Contents/Resources/Steam.icns"]
-        case .battlenet:
-            relative = ["Battle.net.app/Contents/Resources/battle.net.icns",
-                        "Battle.net.app/Contents/Resources/Battle.net.icns"]
-        // GOG Galaxy may be installed natively, but Cellar never opens it — there is no GOG client
-        // in a bottle to give an icon to. Standalone has no client either.
-        case .gog, .standalone:
-            return nil
-        }
-        let roots = ["/Applications", "\(home)/Applications"]
-        return roots.flatMap { root in relative.map { URL(fileURLWithPath: "\(root)/\($0)") } }
-            .first { FileManager.default.fileExists(atPath: $0.path) }
+        StoreIcon.nativeICNS(store)
     }
 
     /// Resolve an `.icns` for a game launcher, in order: a user-supplied icon next to the profile,

@@ -18,11 +18,14 @@ landed. Key rules:
 - **Stores are told apart by three signals together:** position (grouped sections), mark (the store's
   real logo, drawn as vectors in `StoreMark.swift`), and word (its name, including in a11y labels).
   Colour never carries it alone — Steam and Battle.net are both blue.
-- **Marks are drawn, never bundled — but traced, never remembered, and never invented.** Shipping
-  Valve's or Blizzard's artwork breaks a hard rule in `AGENTS.md`; drawing one from memory ships a
-  logo the player can see is wrong. Put the real mark on screen, zoom in, copy the geometry. Not
-  every mark is a disc — ask `StoreMark.outline(of:size:)` before ringing one. Never leave a blank
-  cover either: `GeneratedCover` draws a deterministic one.
+- **Marks are never bundled — grafted first, drawn second, and the drawing is traced, never
+  remembered or invented.** Shipping Valve's or Blizzard's artwork breaks a hard rule in `AGENTS.md`
+  and those companies' own brand terms. Cellar shows the real icon from the store's install on this
+  machine (`StoreIcon.swift`) and draws its own vector when there is none (`StoreMark.swift`) — that
+  drawn fallback is what ships for an uninstalled store, so it has to be right. Drawing one from
+  memory ships a logo the player can see is wrong: put the real mark on screen, zoom in, copy the
+  geometry. Not every mark is a disc — ask `StoreMark.outline(of:size:)` before ringing one. Never
+  leave a blank cover either: `GeneratedCover` draws a deterministic one.
 - **Then judge it at the size *and scale* it ships at.** A 12pt chip is 24 device pixels; detail finer
   than a pixel is static, however authentic. Zoom to inspect, never to approve — `Scripts/test.sh`'s
   `markSurvivesAtDeviceScale` renders at 2× because an 8× render once passed a mark the app showed as

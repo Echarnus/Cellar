@@ -25,7 +25,9 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
   light *and* dark; readable at the window's minimum width. **Honesty:** no ✓ for a state Cellar
   cannot actually check (Battle.net sign-in), and any step the player must do by hand is announced
   before it happens (Battle.net's installer). Store identity carried by position + mark + word, never
-  colour alone; store marks drawn in code, never bundled logo files. Icon-only controls have both
+  colour alone; store marks are never bundled logo files — the store's real icon comes from its
+  install on this machine (`StoreIcon.swift`), Cellar's own vector is the fallback. Icon-only
+  controls have both
   `.accessibilityLabel` and `.help`. Per-store behaviour lives in `GameStore.descriptor`, not in a
   `switch` inside a view. **Demand a screenshot of the changed screen from a launched build.**
 - **Swift/GUI** ([`skills/swift.md`](../../skills/swift.md)): logic stayed in CellarKit (not copied
