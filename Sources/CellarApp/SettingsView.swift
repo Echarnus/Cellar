@@ -20,6 +20,15 @@ struct SettingsView: View {
             }.padding(20)
             Divider()
             Form {
+                // Signing in is account-level, so it belongs here as well as behind ⌘⇧A — the
+                // welcome tour promises "you can do this later in Settings", and this is that.
+                Section("Accounts") {
+                    Button("Manage accounts…") {
+                        NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
+                    }
+                    Text("Sign in to Steam, GOG or Battle.net — once per store, for your whole library. Also at ⌘⇧A.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Section("Gameplay") {
                     Toggle("Show Metal performance overlay (FPS)", isOn: $showHUD)
                     Text("Adds an on-screen FPS/frametime HUD when launching a game.")
@@ -35,6 +44,12 @@ struct SettingsView: View {
                         NSWorkspace.shared.open(Paths.logs)
                     }
                 }
+                Section("Help") {
+                    Button("Show the welcome tour again") {
+                        NotificationCenter.default.post(name: .cellarOpenWelcomeTour, object: nil)
+                    }
+                    Link("Questions & answers", destination: URL(string: "https://echarnus.github.io/Cellar/faq.html")!)
+                }
                 Section("About") {
                     LabeledContent("Version", value: appVersion)
                     Link("Cellar on GitHub", destination: URL(string: "https://github.com/Echarnus/Cellar")!)
@@ -45,7 +60,7 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
         }
-        .frame(width: 460, height: 500)
+        .frame(width: 460, height: 700)
     }
 
     private var appVersion: String {

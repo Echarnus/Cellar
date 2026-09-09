@@ -7,6 +7,10 @@ extension Notification.Name {
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.
     static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
+    /// Posted by the "Welcome to Cellar…" menu item and by Settings, to replay the first-run tour.
+    /// Named for the *tour* specifically: a separate first-run screen asking for folder access is in
+    /// flight on another branch, and the two must be able to coexist rather than fight for the name.
+    static let cellarOpenWelcomeTour = Notification.Name("cellar.openWelcomeTour")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -19,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     var settingsWindow: NSWindow?
     var accountsWindow: NSWindow?
+    var welcomeTourWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = buildMainMenu()
@@ -31,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self, selector: #selector(showSettings), name: .cellarOpenSettings, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(showAccounts), name: .cellarOpenAccounts, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(showWelcomeTour), name: .cellarOpenWelcomeTour, object: nil)
 
         let window = NSWindow(
             // Comfortably above ContentView's minimum: at the minimum the detail pane's two
@@ -47,6 +54,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
+
+        // First launch: introduce the app and offer to sign in, before the player is left staring
+        // at a library of games that all say "Sign in". Skipping it counts as seen — Settings
+        // replays it. Deferred to the next runloop turn so it opens over a window that has already
+        // finished its first layout, rather than during it (skills/swift.md).
+        if WelcomeTour.isOwed && !useDiagnostic {
+            DispatchQueue.main.async { [weak self] in self?.showWelcomeTour() }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -63,6 +78,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
         appItem.submenu = appMenu
         appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
+            .target = self
+        appMenu.addItem(withTitle: "Welcome to \(appName)…", action: #selector(showWelcomeTour), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Accounts…", action: #selector(showAccounts), keyEquivalent: "A")
@@ -108,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showSettings() {
         if settingsWindow == nil {
             let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 460, height: 520),
+                contentRect: NSRect(x: 0, y: 0, width: 460, height: 700),
                 styleMask: [.titled, .closable], backing: .buffered, defer: false)
             w.title = "Settings"
             w.isReleasedWhenClosed = false
@@ -139,6 +156,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             accountsWindow = w
         }
         accountsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// The first-run tour. Its own window for the usual reason — a sheet under `NSHostingView` is a
+    /// fatal AttributeGraph cycle — and not resizable, because the tour is laid out at a fixed size.
+    /// Closing it by any route (Continue to the end, "Skip for now", or the red button) counts as
+    /// seen, so it never reappears uninvited.
+    @objc private func showWelcomeTour() {
+        if welcomeTourWindow == nil {
+            let w = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 620, height: 580),
+                styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            w.title = "Welcome to Cellar"
+            w.isReleasedWhenClosed = false
+            w.center()
+            w.contentView = NSHostingView(rootView: WelcomeTourView(onFinish: { [weak self] in
+                WelcomeTour.markSeen()
+                self?.welcomeTourWindow?.close()
+            }))
+            welcomeTourWindow = w
+        }
+        WelcomeTour.markSeen()
+        welcomeTourWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
