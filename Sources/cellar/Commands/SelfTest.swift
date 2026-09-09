@@ -159,6 +159,27 @@ struct SelfTest: ParsableCommand {
         try check(decoded?.first?.count == size, "ASCII QR round-trip: \(size) module columns recovered")
         try check(decoded == matrix, "ASCII QR round-trip is module-exact")
 
+        // 5. The launch markers the app follows a launch by. If these stop round-tripping, the
+        // launch window silently goes back to being a spinner — so they are worth a check.
+        for stage in LaunchStage.allCases {
+            let line = LaunchMarker.line(stage)
+            try check(LaunchMarker.stage(in: line) == stage && LaunchMarker.isMarker(line),
+                      "launch marker round-trips: \(stage.rawValue)")
+        }
+        try check(LaunchMarker.stage(in: "  Launching Diablo IV via Battle.net…") == nil,
+                  "ordinary output is not mistaken for a marker")
+        // A marker that came back through something that rewrote line endings still parses.
+        try check(LaunchMarker.stage(in: LaunchMarker.line(.client) + "\r") == .client,
+                  "a marker survives a CRLF line ending")
+
+        // A game that runs bare must never be shown a step about opening a store client.
+        let bare = LaunchContext(game: "The Witcher 3", store: .gog, throughClient: false)
+        let viaClient = LaunchContext(game: "Diablo IV", store: .battlenet, throughClient: true)
+        try check(!LaunchStage.sequence(bare).contains(.client),
+                  "a store-free launch shows no client step")
+        try check(LaunchStage.sequence(viaClient).contains(.client),
+                  "a launch through a client shows the client step")
+
         print(Term.green("All selftests passed."))
     }
 }

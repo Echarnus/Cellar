@@ -338,11 +338,13 @@ public enum SteamBottle {
     /// once, silently), so retries are cheap.
     public static func runGameSupervised(runner: WineRunner, appID: Int, showHUD: Bool = false,
                                          gameEnv: [String: String] = [:], attempts: Int = 8,
-                                         progress: (String) -> Void = { _ in }) throws {
+                                         progress: (String) -> Void = { _ in },
+                                         stage: (LaunchStage) -> Void = { _ in }) throws {
         // Warm the client first: launching the game into a not-yet-ready Steam makes the D3DMetal
         // race fire almost every time. Start Steam silently (tray only) with the game's env, wait
         // for it to come up, then drive the game into the warm client.
         if !isRunning {
+            stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
             try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv,
                              dock: .hidden)
@@ -359,8 +361,10 @@ public enum SteamBottle {
             killGameProcesses(in: runner.prefix, appID: appID)
             if attempt > 1 { Thread.sleep(forTimeInterval: 8) }
 
+            stage(.starting)
             try launchClient(runner: runner, extraArgs: ["steam://rungameid/\(appID)"],
                              showHUD: showHUD, gameEnv: gameEnv, dock: .hidden)
+            stage(.waiting)
 
             // Wait up to ~24 s for the game process to appear.
             var appeared = false
