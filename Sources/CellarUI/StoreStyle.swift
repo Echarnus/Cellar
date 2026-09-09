@@ -17,21 +17,26 @@ import CellarKit
 /// met it before. Position, mark and word travel together everywhere.
 extension GameStore {
     /// The store's accent, from CellarKit's descriptor so the CLI and the app agree.
-    var tint: Color {
+    public var tint: Color {
         let rgb = descriptor.accentColorComponents
         return Color(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue, opacity: 1)
     }
 
-    var symbol: String { descriptor.symbolName }
+    public var symbol: String { descriptor.symbolName }
 }
 
 /// The store's mark and name, side by side — the canonical lockup. Used in section headers and
 /// under a game's title so the same pairing is learned once and recognised everywhere.
-struct StoreLockup: View {
+public struct StoreLockup: View {
     let store: GameStore
-    var compact = false
+    var compact: Bool
 
-    var body: some View {
+    public init(store: GameStore, compact: Bool = false) {
+        self.store = store
+        self.compact = compact
+    }
+
+    public var body: some View {
         HStack(spacing: compact ? 4 : 6) {
             StoreMark(store: store, size: compact ? 11 : 14)
             Text(store.displayName)
@@ -48,11 +53,16 @@ struct StoreLockup: View {
 
 /// The store's mark alone, as a badge pinned to a cover. Sized to stay legible at 34pt art without
 /// swallowing it, and ringed so it survives whatever the artwork is doing underneath.
-struct StoreBadge: View {
+public struct StoreBadge: View {
     let store: GameStore
-    var diameter: CGFloat = 16
+    var diameter: CGFloat
 
-    var body: some View {
+    public init(store: GameStore, diameter: CGFloat = 16) {
+        self.store = store
+        self.diameter = diameter
+    }
+
+    public var body: some View {
         StoreMark(store: store, size: diameter)
             .overlay(Circle().strokeBorder(.background.opacity(0.92), lineWidth: diameter * 0.10))
             .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
@@ -66,13 +76,19 @@ struct StoreBadge: View {
 /// hotlink. Rather than let half the library render as empty grey boxes, Cellar composes its own:
 /// a deterministic two-tone gradient keyed on the game's name, the title's monogram, and the store's
 /// mark. Deterministic matters — a cover that changed hue between launches would read as a bug.
-struct GeneratedCover: View {
+public struct GeneratedCover: View {
     let title: String
     let store: GameStore
     /// The art's short edge, used to scale everything else so one view serves 34pt and 92pt.
     let width: CGFloat
 
-    var body: some View {
+    public init(title: String, store: GameStore, width: CGFloat) {
+        self.title = title
+        self.store = store
+        self.width = width
+    }
+
+    public var body: some View {
         ZStack {
             LinearGradient(colors: [base.opacity(0.95), deep], startPoint: .topLeading, endPoint: .bottomTrailing)
             // A soft highlight off the top-left keeps the flat gradient from looking like a swatch.

@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import CellarKit
+import CellarUI
 
 struct SettingsView: View {
     @AppStorage("showHUD") private var showHUD = false

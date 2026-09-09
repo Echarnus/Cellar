@@ -1,5 +1,6 @@
 import SwiftUI
 import CellarKit
+import CellarUI
 
 /// One window for "who am I signed in as" — the change that makes signing in a thing you do once.
 ///

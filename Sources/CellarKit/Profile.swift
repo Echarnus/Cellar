@@ -5,6 +5,11 @@ import Foundation
 public struct ProfileRef {
     public let slug: String
     public let url: URL
+
+    public init(slug: String, url: URL) {
+        self.slug = slug
+        self.url = url
+    }
 }
 
 public enum ProfileStore {

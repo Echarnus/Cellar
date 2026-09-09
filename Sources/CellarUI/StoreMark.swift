@@ -13,11 +13,16 @@ import CellarKit
 ///
 /// Use is nominative: the mark labels which store a game came from. It is not a badge of
 /// endorsement, and Cellar says so in `NOTICE`.
-struct StoreMark: View {
+public struct StoreMark: View {
     let store: GameStore
-    var size: CGFloat = 14
+    var size: CGFloat
 
-    var body: some View {
+    public init(store: GameStore, size: CGFloat = 14) {
+        self.store = store
+        self.size = size
+    }
+
+    public var body: some View {
         switch store {
         case .steam:      SteamMark(size: size)
         case .battlenet:  BattleNetMark(size: size)

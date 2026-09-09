@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import CellarKit
+import CellarUI
 
 struct GameDetailView: View {
     let game: GameSummary

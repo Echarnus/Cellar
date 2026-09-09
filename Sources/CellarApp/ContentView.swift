@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import CellarKit
+import CellarUI
 
 @MainActor
 final class Library: ObservableObject {

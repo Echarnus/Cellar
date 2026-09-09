@@ -27,6 +27,8 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 |---|---|
 | `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store plugins (`Store.swift`, `Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation. **All logic lives here.** |
 | `Sources/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
+| `Sources/CellarUI/` | The app's presentation primitives — store marks, lockups, the generated cover, and `Snapshot`, which renders a SwiftUI view to pixels. A library rather than part of the app, because **a test cannot import an executable**. |
+| `Tests/` | `CellarKitTests` (engine logic, the profile database) and `CellarUITests` (marks rendered offscreen and measured). Run with `sh Scripts/test.sh`. |
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
 | `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator). |
@@ -40,6 +42,7 @@ Swift 6 toolchain, Apple Silicon, macOS 13+.
 
 ```sh
 swift build                       # debug build
+sh Scripts/test.sh                # the test suite (headless, ~0.5s)
 swift run cellar doctor           # sanity-check the machine
 swift build -c release            # release build (what CI and the app installer use)
 swift run cellar selftest         # in-repo smoke test
@@ -63,12 +66,47 @@ Climb to the **highest rung available** before claiming a change is done. Never 
 verifying, and if you cannot verify, say so and name what needs manual checking.
 
 1. **Builds** — `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` is clean.
-2. **Self-test** — `swift run cellar selftest` passes.
-3. **Behaviour** — the actual path you changed runs: the CLI command, or the installed app launched
+2. **Tests** — `sh Scripts/test.sh` passes. This is the rung to reach for first: it runs headless in
+   under a second, so it costs nothing and it does not take the machine away from whoever is using
+   it. See *Testing* below.
+3. **Self-test** — `swift run cellar selftest` passes.
+4. **Behaviour** — the actual path you changed runs: the CLI command, or the installed app launched
    and exercised. GUI changes are verified by reinstalling (`install-app.sh`) and launching, not by
    reading the diff. Site changes are verified by generating and opening `site/index.html`.
 
 The [verifier agent](agents/verifier.md) codifies these demands per kind of change.
+
+### Testing
+
+```sh
+sh Scripts/test.sh                    # the whole suite, ~0.5s
+sh Scripts/test.sh --filter Profile   # one part of it
+```
+
+Use the script rather than a bare `swift test`: swift-testing ships as a framework inside the
+developer directory, and this machine's `xcode-select` points at a Nix SDK that has none — so
+`swift test` fails with *"no such module 'Testing'"* until the framework search path is supplied.
+`Scripts/test.sh` finds a developer directory that really has it and passes the paths through.
+
+Three targets, and the split matters:
+
+| Target | Covers | Why it exists |
+|---|---|---|
+| `CellarKit` | the engine | logic |
+| `CellarUI` | store marks, lockups, the generated cover, `Snapshot` | **a test cannot import an executable**, so anything to be verified without launching the app lives here, not in `CellarApp` |
+| `CellarApp` | windows, menus, state, the CLI subprocess | the part that genuinely needs launching |
+
+**`Tests/CellarUITests` renders SwiftUI offscreen and measures the pixels.** That is what lets a
+user-visible change be checked in the background instead of taking over the machine — and it is a
+real check, not a proxy: the marks are drawn, then measured. It asserts the *identifying* properties
+of each mark (Steam's big wheel upper-right and open, Blizzard's orb not filled in) rather than exact
+pixels, because a test that broke on every gradient nudge would be deleted within a week, and one
+that passes a mirrored logo is worthless. When you add a view worth verifying, put it in `CellarUI`.
+
+Every run also writes `.build/ui-snapshots/store-marks-{light,dark}.png` — every mark, both themes,
+every size it is used at, in one image. **Open that instead of launching the app** for a first look;
+CI uploads it as an artifact on every PR. It does not replace rung 4 — a snapshot cannot show you
+that a window resizes or a click lands — but it catches the wrong-looking before it reaches anyone.
 
 ## Stores are a first-class concept
 

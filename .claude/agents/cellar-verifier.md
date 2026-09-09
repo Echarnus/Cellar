@@ -13,6 +13,10 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
 
 ## 1. Build & self-test
 - Run `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` — must be clean, no new warnings.
+- Run `sh Scripts/test.sh` — must pass. It is headless and takes under a second, so it is never
+  skipped. A user-visible change that moved no test is a finding: say so.
+- For a change to `Sources/CellarUI/**`, open `.build/ui-snapshots/store-marks-dark.png` and look at
+  it. That is the "verify by looking" demand, met without launching the app.
 - If `Sources/**` changed, run `swift run cellar selftest` — must pass.
 
 ## 2. Per-kind demands (climb the verification ladder in AGENTS.md)

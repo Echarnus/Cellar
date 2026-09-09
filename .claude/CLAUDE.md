@@ -26,6 +26,15 @@ one matching your work; each points back at the portable guide for the full deta
 Run it (read-only) before reporting any change to `Sources/**`, `Scripts/**`, `profiles/**`, or the
 site as done.
 
+### Tests
+
+`sh Scripts/test.sh` runs the whole suite headlessly in about half a second — use it before
+reaching for `install-app.sh`. A bare `swift test` fails on this machine with *"no such module
+'Testing'"* because `xcode-select` points at a Nix SDK with no swift-testing framework; the script
+finds a developer directory that has one. Every run also writes
+`.build/ui-snapshots/store-marks-{light,dark}.png` — open that to check the marks instead of
+launching the app. Details in `AGENTS.md` → *Testing*.
+
 ### Build reminder
 
 Build with `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` — a Nix/devenv shell exports an
