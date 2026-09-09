@@ -119,6 +119,20 @@ public enum SteamShortcuts {
         return existing.count - survivors.count
     }
 
+    /// The names of every shortcut whose target is a launcher Cellar generated.
+    ///
+    /// Matched on the **exe path**, never the name, so a player who added the same game to Steam by
+    /// hand keeps their own entry. `directory` is normally `AppBundle.applicationsDirectory`; only
+    /// entries pointing at a `.app/Contents/MacOS/launcher` inside it are ours.
+    public static func cellarEntryNames(pointingInto directory: URL, in configDir: URL) -> [String] {
+        let prefix = directory.standardizedFileURL.path
+        return entriesWithExe(in: configDir).compactMap { entry in
+            let exe = entry.exe.replacingOccurrences(of: "\"", with: "")
+            guard exe.hasPrefix(prefix), exe.hasSuffix("/Contents/MacOS/launcher") else { return nil }
+            return entry.name
+        }
+    }
+
     /// `(appname, exe)` for every shortcut in the file, or nothing when there is no file yet.
     static func entriesWithExe(in configDir: URL) -> [(name: String, exe: String)] {
         let file = configDir.appendingPathComponent("shortcuts.vdf")

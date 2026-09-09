@@ -20,6 +20,10 @@ public enum Reset {
         public enum Target: Sendable, Equatable {
             case path(URL)
             case storeCredentials(GameStore)
+            /// A line Cellar wrote into the *native* Steam client's shortcut database. Not a file of
+            /// ours, which is exactly why it needs naming: deleting Cellar's folder leaves the entry
+            /// behind, pointing at a launcher that no longer exists.
+            case steamShortcuts([String])
         }
         public let target: Target
         /// "Games and the Windows Steam client" — what the player is losing, in their words.
@@ -37,6 +41,7 @@ public enum Reset {
         public var exists: Bool {
             switch target {
             case .path(let url):             return FileManager.default.fileExists(atPath: url.path)
+            case .steamShortcuts(let names):  return !names.isEmpty
             case .storeCredentials(.gog):    return GOGAuth.isSignedIn
             case .storeCredentials:          return false
             }
@@ -44,7 +49,17 @@ public enum Reset {
     }
 
     /// Everything Cellar owns on this Mac, in the order a person would think about it.
-    public static func plan() -> [Item] {
+    ///
+    /// "Everything" is the whole promise of this command, so it deliberately reaches **outside**
+    /// `~/Library/Application Support/Cellar`. Cellar also writes launcher `.app`s into
+    /// `~/Applications` and lines into the native Steam client's shortcut database, and a reset that
+    /// left those behind handed the player a Launchpad full of icons that open nothing — which is
+    /// precisely what happened before this was fixed. `Uninstall` has always cleaned both for a
+    /// single game; this is the same discipline for all of them.
+    ///
+    /// `includingCellarItself` adds the app and the CLI — a true uninstall rather than a clean
+    /// slate. It is off by default because `cellar reset` is normally run to *keep* using Cellar.
+    public static func plan(includingCellarItself: Bool = false) -> [Item] {
         var items: [Item] = []
         func add(_ url: URL, _ title: String, _ cost: String) {
             guard FileManager.default.fileExists(atPath: url.path) else { return }
@@ -73,7 +88,55 @@ public enum Reset {
                               title: "Your GOG sign-in (an OAuth token in your login keychain)",
                               cost: "one sign-in", bytes: 0))
         }
+
+        // Outside Application Support. Found by identity, never by name, so nothing the player made
+        // themselves is ever in this list.
+        for app in AppBundle.generatedApps() {
+            items.append(Item(target: .path(app),
+                              title: "Launcher app \"\(app.deletingPathExtension().lastPathComponent)\"",
+                              cost: "re-created by setting the game up again", bytes: size(of: app)))
+        }
+        if let config = SteamShortcuts.userdataConfigDir() {
+            let names = SteamShortcuts.cellarEntryNames(pointingInto: AppBundle.applicationsDirectory,
+                                                        in: config)
+            if !names.isEmpty {
+                items.append(Item(target: .steamShortcuts(names),
+                                  title: "Entries Cellar added to your Steam library (\(names.count))",
+                                  cost: "re-added by cellar steam add", bytes: 0))
+            }
+        }
+
+        if includingCellarItself {
+            add(cellarApp, "Cellar.app", "download it again")
+            if let cli = cellarBinary { add(cli, "The cellar command-line tool", "download it again") }
+        }
         return items
+    }
+
+    /// Where the app and the CLI live, for `--everything`. The CLI is found from the running
+    /// process rather than assumed: it is installed by hand, so it can be anywhere on `PATH`.
+    static var cellarApp: URL {
+        AppBundle.applicationsDirectory.appendingPathComponent("Cellar.app", isDirectory: true)
+    }
+
+    static var cellarBinary: URL? {
+        let path = URL(fileURLWithPath: CommandLine.arguments.first ?? "")
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard path.isFileURL, FileManager.default.isExecutableFile(atPath: path.path),
+              path.lastPathComponent == "cellar" else { return nil }
+        return path
+    }
+
+    /// What `reset` deliberately leaves behind, so the plan can say so rather than implying a
+    /// completeness it does not have. Empty once `--everything` has taken them.
+    public static func leftBehind(after items: [Item]) -> [URL] {
+        let removing = Set(items.compactMap(\.url))
+        var rest: [URL] = []
+        if FileManager.default.fileExists(atPath: cellarApp.path), !removing.contains(cellarApp) {
+            rest.append(cellarApp)
+        }
+        if let cli = cellarBinary, !removing.contains(cli) { rest.append(cli) }
+        return rest
     }
 
     /// Saves live inside a bottle's `drive_c/users`, so wiping bottles wipes saves that the game
@@ -97,6 +160,11 @@ public enum Reset {
                 switch item.target {
                 case .path(let url):
                     try FileManager.default.removeItem(at: url)
+                case .steamShortcuts(let names):
+                    guard let config = SteamShortcuts.userdataConfigDir() else { break }
+                    for name in names {
+                        try SteamShortcuts.remove(appName: name, from: config)
+                    }
                 case .storeCredentials(.gog):
                     try GOGAuth.signOut()
                     StoreLibrary.forgetGOG()

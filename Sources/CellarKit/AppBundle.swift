@@ -19,6 +19,44 @@ public enum AppBundle {
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true)
     }
 
+    /// Every launcher Cellar has generated on this Mac.
+    ///
+    /// Found by **identity, not by name**: a bundle counts only if its identifier is one of ours
+    /// *and* its executable is the `launcher` script this file writes. Matching names would be
+    /// unsafe in both directions — a player's own `Planet Coaster 2.app` is not Cellar's to delete,
+    /// and a launcher the player renamed is still Cellar's to clean up.
+    ///
+    /// The executable check is what excludes `Cellar.app` itself, whose identifier shares the same
+    /// prefix but whose executable is `CellarApp`. That matters: this list feeds `Reset`, and the
+    /// app deleting itself out from under a running command is not a tidy-up.
+    static let identifierPrefix = "it.clercq.cellar."
+
+    public static func generatedApps() -> [URL] {
+        let fm = FileManager.default
+        // Built by appending to `applicationsDirectory`, never taken from the enumerator: on macOS
+        // /var is a symlink to /private/var, and a URL the enumerator resolved compares unequal to
+        // the one `generate` handed back for the very same bundle. `Reset` matches these against
+        // paths built the other way, so the two have to agree.
+        let names = (try? fm.contentsOfDirectory(atPath: applicationsDirectory.path)) ?? []
+        return names
+            .filter { ($0 as NSString).pathExtension == "app" }
+            .map { applicationsDirectory.appendingPathComponent($0, isDirectory: true) }
+            .filter { isGenerated($0) }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    /// Whether this `.app` is one Cellar wrote. Used by `generatedApps()` and safe to ask of any
+    /// bundle — a missing or unreadable `Info.plist` is simply "not ours".
+    public static func isGenerated(_ app: URL) -> Bool {
+        let plist = app.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: plist),
+              let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let identifier = info["CFBundleIdentifier"] as? String,
+              identifier.hasPrefix(identifierPrefix),
+              info["CFBundleExecutable"] as? String == "launcher" else { return false }
+        return true
+    }
+
     /// A game launcher: `<name>.app` → `cellar launch <slug>`. Uses the game's own icon when the
     /// bottle is known (so the app shows the game's artwork in Launchpad/Finder, not a blank tile).
     @discardableResult

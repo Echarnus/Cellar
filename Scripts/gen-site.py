@@ -490,9 +490,13 @@ FAQ_SECTIONS = [
          "<p>What it keeps: your store sign-in, the Wine runner, and the shared Steam install with "
          "every other game in it, so re-installing is just the download. Add <code>--bottle</code> "
          "to take the bottle too — its Wine prefix, registry and the store client inside it.</p>"
-         "<p>To remove Cellar entirely: drag the app to the Trash and delete "
-         "<code>~/Library/Application&nbsp;Support/Cellar</code>. Nothing is installed outside "
-         "those two places.</p>"),
+         "<p>To remove Cellar entirely, <code>cellar reset --everything</code>. Cellar does not "
+         "live in one folder — besides <code>~/Library/Application&nbsp;Support/Cellar</code> it "
+         "writes launcher apps into <code>~/Applications</code>, adds entries to your Steam "
+         "library, and keeps a GOG sign-in in your login keychain. That command takes all of it, "
+         "plus the app and the <code>cellar</code> command themselves, and shows you the list "
+         "first. Without <code>--everything</code> it stops short of the app and the command, so "
+         "you can carry on using Cellar.</p>"),
     ]),
 
     ("Legal and licensing", "legal", "What Cellar ships, and what it deliberately does not.", [
