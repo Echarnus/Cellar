@@ -209,6 +209,31 @@ The profile database also ships *inside* the installed app (`Cellar.app/Contents
 and beside an installed CLI (`<prefix>/share/cellar/profiles`). Those are searched **last**, so a
 shipped update never overwrites a profile the player has edited by hand.
 
+## Folder permissions: asked once, up front
+
+`wineboot --init` builds the Windows user profile with *Documents*, *Desktop* and *Downloads*
+symlinked to the real `~/Documents`, `~/Desktop`, `~/Downloads` — which is what you want, since a
+save then lands where Finder and Time Machine can see it. Those three are exactly the folders macOS
+gates behind a privacy prompt, so left alone the player meets *"Cellar.app would like to access files
+in your Documents folder"* halfway through an install, with nothing on screen explaining it.
+
+So Cellar owns the timing instead (`Sources/CellarKit/HomeFolders.swift`):
+
+- **The app asks on first launch** (`WelcomeView`) — the same three dialogs macOS would have shown,
+  together, before anything is at stake, under a sentence saying what each folder is for. The
+  `NS*FolderUsageDescription` keys in `Info.plist` put that reason inside the system dialog too.
+  Re-openable afterwards from **Settings → Review folder access…**.
+- **The CLI announces it** instead: `cellar setup` warns before `wineboot` runs, since a terminal
+  has no first-run screen. `cellar doctor` reports the state — naming *which* process it speaks for,
+  because a `cellar` in Terminal is covered by Terminal's grant, not Cellar.app's.
+- **"Don't Allow" is honoured, not fought.** `redirectDeniedUserShellFolders` replaces the symlink
+  for a refused folder with a real directory inside the bottle, so the game writes its saves there
+  rather than failing silently. Only Wine's own symlink is ever replaced — never a directory that
+  already holds saves.
+
+There is no API for reading the privacy database, so *asking is the only way to find out*: reading
+the directory **is** the request. That is the whole reason the timing is Cellar's to choose.
+
 ## The Planet Coaster 2 path (worked example)
 
 1. `cellar setup` — installs the **GPTK runner** (Wine 7.7 + D3DMetal, fetched from Gcenx),

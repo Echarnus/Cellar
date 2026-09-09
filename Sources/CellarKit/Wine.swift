@@ -172,13 +172,20 @@ public struct WineRunner {
     /// Create the prefix. Suppresses the Mono/Gecko first-run dialogs so init is headless.
     /// A wow64 Wine build (Sikarugir) produces both `Program Files` trees, which the 32-bit Steam
     /// client + 64-bit games need.
-    public func initializePrefix() throws {
+    ///
+    /// Returns the home folders that had to be redirected into the bottle because macOS refuses
+    /// Cellar access to them — empty on the normal path. `wineboot` points the Windows user's
+    /// Documents/Desktop/Downloads at the real ones, so a folder the player declined would leave a
+    /// game writing saves into a symlink it cannot follow (see `HomeFolderAccess`).
+    @discardableResult
+    public func initializePrefix() throws -> [HomeFolder] {
         try FileManager.default.createDirectory(at: prefix, withIntermediateDirectories: true)
         let result = run(["wineboot", "--init"], extraEnv: ["WINEDLLOVERRIDES": "mscoree=d;mshtml=d"])
         guard result.succeeded else {
             throw CellarError.ioFailure("wineboot --init failed: \(result.stderr)")
         }
         waitForServer()
+        return HomeFolderAccess.redirectDeniedUserShellFolders(in: prefix)
     }
 
     /// Set the Windows version (run after initializePrefix so the registry hive exists).

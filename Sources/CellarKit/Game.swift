@@ -447,8 +447,17 @@ public enum Game {
         let registry = plan.prefix.appendingPathComponent("system.reg")
         if !FileManager.default.fileExists(atPath: registry.path) {
             progress("Initialising the Wine prefix (64-bit + WoW64)…")
-            try wine.initializePrefix()
+            if !HomeFolderAccess.hasAsked {
+                // A pause the player will notice gets announced before it happens. The app asks on
+                // first launch instead, so this is the terminal's version of that screen.
+                progress("macOS may ask to let Cellar use your Documents, Desktop and Downloads folders — that is where Windows games keep their saves.")
+            }
+            let redirected = try wine.initializePrefix()
             try wine.setWindowsVersion("win10")
+            if !redirected.isEmpty {
+                let names = redirected.map(\.displayName).joined(separator: ", ")
+                progress("No access to \(names), so this game's \(redirected.count == 1 ? "folder stays" : "folders stay") inside the bottle. Change it in System Settings → Privacy & Security → Files and Folders.")
+            }
             let x86 = plan.prefix.appendingPathComponent("drive_c/Program Files (x86)")
             guard FileManager.default.fileExists(atPath: x86.path) else {
                 throw CellarError.ioFailure(

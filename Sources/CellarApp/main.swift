@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import CellarKit
 
 extension Notification.Name {
     /// Posted by the "Settings…" menu item; ContentView opens its settings sheet on receipt.
@@ -7,6 +8,9 @@ extension Notification.Name {
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.
     static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
+    /// Posted by Settings' "Review folder access…" button — the same window first run shows, in its
+    /// status-board form.
+    static let cellarOpenFolderAccess = Notification.Name("cellar.openFolderAccess")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -19,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     var settingsWindow: NSWindow?
     var accountsWindow: NSWindow?
+    var folderAccessWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = buildMainMenu()
@@ -31,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self, selector: #selector(showSettings), name: .cellarOpenSettings, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(showAccounts), name: .cellarOpenAccounts, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(showFolderAccess), name: .cellarOpenFolderAccess, object: nil)
 
         let window = NSWindow(
             // Comfortably above ContentView's minimum: at the minimum the detail pane's two
@@ -47,6 +54,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
+
+        // First run: get the folder permissions out of the way here, with a sentence explaining
+        // them, rather than letting macOS raise them mid-install on behalf of a game (see
+        // HomeFolderAccess). Deliberately after the main window is up, so the ask arrives in front
+        // of Cellar rather than out of nowhere.
+        if !HomeFolderAccess.hasAsked { showWelcome() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -139,6 +152,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             accountsWindow = w
         }
         accountsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// The first-run ask. Same window as `showFolderAccess`, but in the form that actually requests
+    /// the permissions instead of reporting on them.
+    private func showWelcome() { presentFolderAccess(isReview: false) }
+
+    @objc private func showFolderAccess() { presentFolderAccess(isReview: true) }
+
+    private func presentFolderAccess(isReview: Bool) {
+        // Rebuilt each time rather than cached: the window has two forms (ask / status board) and a
+        // reused NSHostingView would keep the first one's state.
+        folderAccessWindow?.close()
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 430),
+            // Not resizable, matching Settings and Accounts: a resizable window plus a flexible
+            // SwiftUI root frame lets layout feed back into the view graph, and this app aborts in
+            // AttributeGraph when it does (skills/swift.md).
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        w.title = isReview ? "Folder access" : "Welcome to Cellar"
+        w.isReleasedWhenClosed = false
+        w.center()
+        w.contentView = NSHostingView(rootView: WelcomeView(isReview: isReview) { [weak self] in
+            self?.folderAccessWindow?.close()
+        })
+        folderAccessWindow = w
+        w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
