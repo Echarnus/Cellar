@@ -25,7 +25,8 @@ struct StoreMarkTests {
     static let sizes: [CGFloat] = [11, 14, 22, 32]
 
     static func render(_ store: GameStore, size: CGFloat) -> Snapshot.Bitmap {
-        Snapshot.render(StoreMark(store: store, size: size), size: CGSize(width: size, height: size), scale: 8)
+        Snapshot.render(StoreMark(store: store, size: size, artwork: false),
+                        size: CGSize(width: size, height: size), scale: 8)
     }
 
     static func geometry(_ store: GameStore, size: CGFloat) -> MarkGeometry {
@@ -61,7 +62,7 @@ struct StoreMarkTests {
     @Test("every mark survives the screen it is drawn on",
           arguments: GameStore.allCases, [CGFloat(11), 12, 13, 14, 16, 22, 30])
     func markSurvivesAtDeviceScale(store: GameStore, size: CGFloat) {
-        let bitmap = Snapshot.render(StoreMark(store: store, size: size),
+        let bitmap = Snapshot.render(StoreMark(store: store, size: size, artwork: false),
                                      size: CGSize(width: size, height: size), scale: 2)
         let mush = MarkGeometry(bitmap: bitmap, ink: store == .gog ? .dark : .light).mushFraction
         #expect(mush < 0.18,
@@ -260,7 +261,8 @@ struct StoreMarkTests {
         let box = CGSize(width: 160, height: 30)
         let background = Color(white: 0.13)
         let withWord = Snapshot.render(StoreLockup(store: store), size: box, scale: 4, background: background)
-        let markOnly = Snapshot.render(StoreMark(store: store, size: 14), size: box, scale: 4, background: background)
+        let markOnly = Snapshot.render(StoreMark(store: store, size: 14, artwork: false),
+                                       size: box, scale: 4, background: background)
 
         // The label and the capsule behind it are tinted, not white, so they are invisible to the
         // ink threshold — this has to measure everything that is not the background.

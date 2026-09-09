@@ -16,11 +16,13 @@ struct GameSummaryTests {
                          clientInstalled: Bool = true,
                          account: String? = "kenneth",
                          gameInstalled: Bool = true,
+                         bottleExists: Bool = true,
                          running: Bool = false,
                          needsClientAtRuntime: Bool = true) -> GameSummary {
         GameSummary(slug: "fixture", name: "Fixture", store: store, appID: 1, iconPath: nil,
                     runnerInstalled: runnerInstalled, clientInstalled: clientInstalled,
-                    account: account, gameInstalled: gameInstalled, running: running,
+                    account: account, gameInstalled: gameInstalled, bottleExists: bottleExists,
+                    running: running,
                     productCode: nil, artworkAppID: nil, artPortraitURL: nil, artHeroURL: nil,
                     needsClientAtRuntime: needsClientAtRuntime,
                     facts: GameFacts(developer: nil, released: nil, engine: nil, graphicsAPI: nil,
@@ -64,9 +66,18 @@ struct GameSummaryTests {
         #expect(ready.nextStep == .play)
     }
 
-    @Test("A store that can read its sign-in does show the step", arguments: [GameStore.steam, .gog])
-    func detectableStoresShowSignIn(_ store: GameStore) {
-        #expect(summary(store: store, account: nil).nextStep == .signIn)
+    @Test("The in-bottle client is the only thing a game's page asks a sign-in for")
+    func onlyTheInBottleClientAsksForSignIn() {
+        // Steam's client lives in the bottle and keeps its own session, which Cellar cannot supply
+        // from a token — so a Steamworks game has to name that step or it fails its licence check
+        // with nothing on screen having warned anyone.
+        #expect(summary(store: .steam, account: nil).nextStep == .signIn)
+
+        // GOG is the other way round: Cellar holds the token, no client is stood up in the bottle,
+        // and the game is DRM-free once downloaded. Signing in is account-level, so it belongs to
+        // the Accounts screen and never to a game's page (AGENTS.md). Asking here would be an
+        // invented step in front of a game that is genuinely ready.
+        #expect(summary(store: .gog, account: nil).nextStep == .play)
     }
 
     @Test("Standalone games skip sign-in entirely — there is no account")
@@ -106,8 +117,9 @@ struct GameSummaryTests {
 
     @Test("The sign-in button names the store, so it is never an anonymous verb")
     func signInNamesTheStore() {
+        // Steam is the only store that reaches `.signIn` from a game's page, so it is the only
+        // one whose button can be checked for naming its store rather than saying a bare "Sign in".
         #expect(summary(store: .steam, account: nil).actionTitle == "Sign in to Steam")
-        #expect(summary(store: .gog, account: nil).actionTitle == "Sign in to GOG")
     }
 
     @Test("Setup copy warns about Battle.net's non-silent installer, and only Battle.net's")
@@ -122,11 +134,12 @@ struct GameSummaryTests {
         }
     }
 
-    @Test("A once-per-account sign-in says so; a per-window one does not")
+    @Test("A per-window sign-in says so; an account-level one never reaches a game's page")
     func signInCopyMatchesAuthStyle() {
+        // A GOG game with no account is ready to play, so its hint must not imply a sign-in the
+        // page is not going to offer — the honesty rule in skills/ux.md cuts both ways.
         let gog = summary(store: .gog, account: nil).actionHint
-        #expect(gog.contains("once"))
-        #expect(gog.contains("every GOG game"))
+        #expect(!gog.lowercased().contains("sign in"))
 
         let steam = summary(store: .steam, account: nil).actionHint
         #expect(steam.contains("window opens"), "Steam's sign-in happens in Steam's own window")

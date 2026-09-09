@@ -27,14 +27,22 @@ import CellarKit
 public struct StoreMark: View {
     let store: GameStore
     var size: CGFloat
+    /// Whether to prefer the store's real artwork when this machine has it.
+    ///
+    /// Almost always yes. It is `false` only where the *drawn* mark is the subject: the snapshot
+    /// tests measure the vectors, and what they must measure cannot depend on which storefronts
+    /// happen to be installed on the machine running them — otherwise the suite passes or fails by
+    /// accident of the developer's Mac, and stops saying anything about what ships.
+    var artwork: Bool
 
-    public init(store: GameStore, size: CGFloat = 14) {
+    public init(store: GameStore, size: CGFloat = 14, artwork: Bool = true) {
         self.store = store
         self.size = size
+        self.artwork = artwork
     }
 
     public var body: some View {
-        if let image = StoreIcons.image(for: store) {
+        if artwork, let image = StoreIcons.image(for: store) {
             // Clipped to the mark's own silhouette rather than always a circle: GOG's outline is a
             // rounded tile, and `StoreBadge` rings whatever shape this returns. Real artwork has to
             // occupy the same footprint as the drawn mark, or the ring stops fitting.

@@ -58,7 +58,7 @@ private struct ContactSheet: View {
 
                     ForEach(sizes, id: \.self) { size in
                         VStack(spacing: 4) {
-                            StoreMark(store: store, size: size)
+                            StoreMark(store: store, size: size, artwork: false)
                                 .frame(width: 48, height: 48)
                             Text("\(Int(size))")
                                 .font(.system(size: 8))
