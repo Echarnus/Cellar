@@ -35,10 +35,6 @@ struct Launch: ParsableCommand {
     }
 
     func run() throws {
-        // Line-buffer stdout: piped into the app (or a `tee`), the default 4 KB buffering would hold
-        // a launch's progress back until it had all happened, which is exactly the wait it describes.
-        setvbuf(stdout, nil, _IOLBF, 0)
-
         let plan = try Game.plan(slug: slug)
 
         if printEnv {

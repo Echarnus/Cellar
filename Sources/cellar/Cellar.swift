@@ -66,12 +66,14 @@ struct Cellar: ParsableCommand {
     /// point, every failure — lands in the rolling log. The app drives this CLI for its actions, so
     /// this one place covers both front-ends.
     static func main() {
-        // Line-buffer stdout. C's default for a non-TTY is a 4 KB *block* buffer, and the app reads
-        // this CLI through a pipe — so output reached it in 4096-byte lumps rather than as lines.
-        // For the Steam QR that was the whole bug: DepotDownloader draws the challenge in under a
-        // second, but the first lump cut it mid-row and the rest of it sat in the buffer until Steam
-        // rotated the code ~20s later and pushed the count past the next 4096. Flushing per line
-        // costs nothing here and makes what the player sees match what Cellar is doing.
+        // Line-buffer stdout, for every command. C's default for a non-TTY is a 4 KB *block* buffer,
+        // and the app reads this CLI through a pipe — so output reached it in 4096-byte lumps rather
+        // than as lines. `launch` set this for itself, because a launch's progress arriving only once
+        // the launch was over is obviously wrong; but the same buffer held back anything the player
+        // waits on. The Steam QR was the costly case: DepotDownloader draws the challenge in under a
+        // second, yet the first lump cut it mid-row and the rest sat unflushed until Steam rotated
+        // the code ~20s later. One command that streams is an exception someone has to remember; the
+        // whole CLI streaming is just how it behaves, and flushing per line costs nothing here.
         setvbuf(stdout, nil, _IOLBF, 0)
 
         let arguments = Array(CommandLine.arguments.dropFirst())
