@@ -64,13 +64,16 @@ MTL_DEBUG_LAYER_ERROR_MODE = "nslog"
 # None required as a baseline; add here if a specific build needs them.
 
 [install]
-# Robust, fully-legitimate path: install Windows Steam into the bottle and let it
-# download / validate / update the owned game.
+# Cellar downloads the game itself with the one Steam sign-in (DepotDownloader, -os windows), so
+# installing needs no Steam window. The client is still installed in the bottle because Denuvo
+# wants a *running* Steam session at launch — install and DRM are two different needs.
 method      = "windows-steam-in-bottle"
 steam_appid = 2688950
-# Experimental alternative (owned game only): depot download via DepotDownloader (-os windows).
-# Note: a bare depot dump may not boot because of the live-session DRM requirement.
-experimental_depot_download = false
+# Verified on this machine (2026-09-09) by reading the installed copy: Steam's appmanifest gives
+# installdir "Planet Coaster 2", and the game's exe sits at its root. Both are needed so Cellar can
+# find the game whichever way it was installed — its own download, or the client's.
+install_dir = "Planet Coaster 2"
+exe         = "PlanetCoaster2.exe"
 
 [legal]
 # Cellar never circumvents DRM; Denuvo runs untouched inside the layer.

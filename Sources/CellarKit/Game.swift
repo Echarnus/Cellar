@@ -49,6 +49,10 @@ public struct GamePlan {
                 prefix.appendingPathComponent("drive_c/Program Files (x86)/\(installDir)"),
                 prefix.appendingPathComponent("drive_c/Program Files/\(installDir)"),
                 prefix.appendingPathComponent("drive_c/Games/\(installDir)"),
+                // Where the Windows Steam client puts a game it installed itself. Without this a
+                // client-installed copy is invisible to every direct route, because Steam nests it
+                // one directory deeper than the search below reaches.
+                prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam/steamapps/common/\(installDir)"),
             ]
         }
         roots.append(prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam/steamapps/common"))
@@ -102,6 +106,22 @@ public struct GameFacts: Sendable {
     /// Free text: the caveats, the hardware something was tested on, the known patch-day breakage.
     public let notes: String?
 
+    public init(developer: String? = nil, released: String? = nil, engine: String? = nil,
+                graphicsAPI: String? = nil, anticheat: String? = nil, drm: String? = nil,
+                online: String? = nil, requiresAccount: String? = nil, status: String? = nil,
+                notes: String? = nil) {
+        self.developer = developer
+        self.released = released
+        self.engine = engine
+        self.graphicsAPI = graphicsAPI
+        self.anticheat = anticheat
+        self.drm = drm
+        self.online = online
+        self.requiresAccount = requiresAccount
+        self.status = status
+        self.notes = notes
+    }
+
     /// The facts worth printing as a spec list, in reading order, skipping what a profile omits.
     public var about: [(label: String, value: String)] {
         [("Developer", developer), ("Released", released),
@@ -152,12 +172,32 @@ public struct GameSummary: Identifiable, Sendable {
     public let running: Bool           // the store's client is up
     /// Battle.net's equivalent of an AppID — how its client names this game (`Fen` = Diablo IV).
     public let productCode: String?
+    /// What the store says about this account owning the game. The library is filtered on it, so a
+    /// game only appears once the store has confirmed it — see `StoreLibrary`.
+    public let ownership: Ownership
+    /// Who answers for this game's ownership. Usually `store`, but a DRM-free game bought on Steam
+    /// is filed under "no store" and still gated by Steam — see `StoreLibrary.gatingStore`.
+    public let gatingStore: GameStore
+    /// Whether the store's client has to be *running* for this game to start (Steamworks, Denuvo,
+    /// always-online). Read from the profile, so it is known before the game is installed —
+    /// `needsClientAtRuntime` cannot answer that, because it also depends on files being on disk.
+    public let needsLiveSession: Bool
     /// Steam AppID to pull public artwork with — nil for stores that publish none.
     public let artworkAppID: Int?
     public let artPortraitURL: String?
     public let artHeroURL: String?
 
     public var id: String { slug }
+
+    /// Whether this game belongs in the player's library at all.
+    public var isVisible: Bool { verdict.isVisible }
+
+    /// Why this game is or isn't in the library — the whole answer, so a caller that needs the
+    /// sentence and the fix doesn't re-derive them from the parts.
+    public var verdict: StoreLibrary.Verdict {
+        StoreLibrary.verdict(store: gatingStore, ownership: ownership,
+                             isConnected: StoreLibrary.isConnected(gatingStore))
+    }
 
     /// The single most useful next action given the current state.
     public enum NextStep: Sendable {
@@ -167,13 +207,28 @@ public struct GameSummary: Identifiable, Sendable {
         case play       // ready
     }
 
+    /// Cellar's *own* sign-in is an account-level fact, done once in Settings, and a game whose
+    /// store hasn't been signed in is not in the library to be looked at — so a game screen never
+    /// asks for that one.
+    ///
+    /// `.signIn` survives for a different thing entirely: the store **client inside the bottle**.
+    /// A Steamworks or Denuvo game talks to a running Steam while it plays, and that client keeps
+    /// its own session, which Cellar cannot supply from a token. Downloading the game no longer
+    /// walks the player past a client sign-in on the way, so this is now the only place that step
+    /// is named — and leaving it out meant a game showing "Ready to play" and then failing its
+    /// licence check with nothing on screen having warned anyone.
     public var nextStep: NextStep {
-        if !runnerInstalled || !clientInstalled { return .setup }
-        // Only Steam publishes a readable sign-in state. For Battle.net, signing in and installing
-        // both happen inside the client's own window, so they are one step — claiming to know
-        // otherwise would put a button in front of the player that can't be trusted.
-        if store.descriptor.canDetectSignIn, account == nil { return .signIn }
+        if !runnerInstalled { return .setup }
+        // The store client only has to exist for a game that talks to it while it runs. A game
+        // Cellar downloads and launches itself needs no client, so demanding one would be an
+        // invented step — and a 1.4 GB one.
+        if needsLiveSession, store.descriptor.installsClientInBottle, !clientInstalled { return .setup }
         if !gameInstalled { return .install }
+        // Only asked where Cellar can actually *read* that nobody is signed in. Battle.net publishes
+        // nothing comparable, so it never gets a ✗ beside an account and never a sign-in step —
+        // signing in stays folded into opening the client.
+        if needsLiveSession, store.descriptor.installsClientInBottle,
+           store.descriptor.canDetectSignIn, account == nil { return .signIn }
         return .play
     }
 
@@ -214,16 +269,18 @@ public struct GameSummary: Identifiable, Sendable {
                 : "Cellar installs the Windows runtime, then opens Blizzard's installer — that one needs a few clicks from you, because Battle.net ships no silent install."
         case .signIn:
             // A token store is signed in once for the whole account; a client store is signed in
-            // inside its own window. Promising the wrong one is exactly the dishonesty ux.md forbids.
+            // inside its own window. Promising the wrong one is exactly the dishonesty ux.md forbids
+            // — and for Steam the player has *already* signed in to Cellar, so this has to say
+            // plainly that it is a different session and why the game insists on it.
             switch store.descriptor.authStyle {
             case .cellarHeldToken:
                 return "Sign in to \(store.displayName) once — it covers every \(store.displayName) game, not just this one."
             case .inClientWindow, .none:
-                return "Sign in to your \(store.descriptor.accountNoun). A \(store.displayName) window opens; the QR code with the mobile app is quickest."
+                return "\(name) checks its DRM against a running \(store.displayName) client, and that client keeps its own sign-in — the one you gave Cellar can't be handed to it. A \(store.displayName) window opens; the QR code with the mobile app is quickest. Once, for every \(store.displayName) game."
             }
         case .install:
             switch store {
-            case .steam:      return "Install the game — Cellar asks Steam to download it. You already own it."
+            case .steam:      return "Cellar downloads it from your Steam library with the sign-in you already gave it. No Steam window, nothing to click."
             case .battlenet:  return "Battle.net opens. Sign in if you haven't, then install the game from there. Cellar takes over once the files are down."
             case .gog:        return "Cellar downloads it from your GOG library and installs it. No client, and nothing runs alongside the game."
             case .standalone: return "Cellar downloads the game's files straight from your library — no store client involved."
@@ -251,7 +308,10 @@ public struct GameSummary: Identifiable, Sendable {
 
     public init(slug: String, name: String, store: GameStore, appID: Int?, iconPath: String?,
                 runnerInstalled: Bool, clientInstalled: Bool, account: String?, gameInstalled: Bool,
-                bottleExists: Bool, running: Bool, productCode: String?, artworkAppID: Int?,
+                bottleExists: Bool, running: Bool, productCode: String?,
+                ownership: Ownership = .unknown("not checked"),
+                gatingStore: GameStore? = nil, needsLiveSession: Bool = true,
+                artworkAppID: Int?,
                 artPortraitURL: String?, artHeroURL: String?,
                 needsClientAtRuntime: Bool, facts: GameFacts, runnerID: String, backend: String,
                 bottleName: String) {
@@ -267,6 +327,9 @@ public struct GameSummary: Identifiable, Sendable {
         self.bottleExists = bottleExists
         self.running = running
         self.productCode = productCode
+        self.ownership = ownership
+        self.gatingStore = gatingStore ?? store
+        self.needsLiveSession = needsLiveSession
         self.artworkAppID = artworkAppID
         self.artPortraitURL = artPortraitURL
         self.artHeroURL = artHeroURL
@@ -299,6 +362,11 @@ public enum Game {
                 bottleExists: FileManager.default.fileExists(atPath: plan.prefix.path),
                 running: storeClientRunning(plan),
                 productCode: plan.productCode,
+                // Cache only — `summaries()` runs on every library refresh, so it must never ask a
+                // store anything. `StoreLibrary.refreshAll` is what does the asking.
+                ownership: StoreLibrary.ownership(of: plan),
+                gatingStore: StoreLibrary.gatingStore(for: plan),
+                needsLiveSession: plan.needsLiveSession,
                 // Only Steam publishes free cover art keyed on an app id; everything else has to
                 // bring its own URLs or fall back to Cellar's generated cover.
                 artworkAppID: plan.store == .steam ? plan.appID : nil,
@@ -311,6 +379,11 @@ public enum Game {
                 bottleName: plan.bottleName)
         }
     }
+
+    /// **The player's library**: the games their stores confirmed they own, plus the ones no store
+    /// can be asked about. Everything the app and `cellar library` show goes through here, so the
+    /// two cannot disagree about whose games these are.
+    public static func library() -> [GameSummary] { summaries().filter(\.isVisible) }
 
     /// Bottle names belonging to profiles from one store. Cheap: it reads the profile TOMLs and
     /// nothing else — no runner lookups, no icon extraction, no filesystem walk of the bottles.
@@ -494,7 +567,15 @@ public enum Game {
 
         switch plan.store {
         case .steam:
-            try SteamBottle.install(runner: wine, progress: step)
+            // The client is a *runtime* dependency, not an install one: Cellar downloads the game
+            // itself now, so a title whose DRM never talks to a running Steam has no reason to pull
+            // a 1.4 GB client it will never start. Setting one up anyway would be an invented step,
+            // and the game screen already promises not to demand it (`GameSummary.nextStep`).
+            if plan.needsLiveSession {
+                try SteamBottle.install(runner: wine, progress: step)
+            } else {
+                step("No Steam client needed — this game runs without a live Steam session.")
+            }
         case .battlenet:
             try BattleNetBottle.install(runner: wine, progress: step)
         case .gog:
@@ -559,8 +640,25 @@ public enum Game {
             guard let appID = plan.appID else {
                 throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid.")
             }
-            step("Asking the bottle's Steam to install \(plan.name) (AppID \(appID))…")
-            try SteamBottle.installGame(runner: wine, appID: appID)
+            // Steam already installed it — leave that copy alone. Downloading a second one into
+            // Cellar's own directory would cost the player the whole game twice.
+            if SteamBottle.isGameInstalled(in: plan.prefix, appID: appID) {
+                step("\(plan.name) is already installed in your Steam library.")
+                return
+            }
+            guard let credentials = SteamAccount.credentials else {
+                throw CellarError.invalidArgument(
+                    "Not signed in to Steam. One scan covers every Steam game: cellar steam login")
+            }
+            step("Downloading \(plan.name) from your Steam library (AppID \(appID))…")
+            // `progress` is non-escaping and the download does not outlive this call — the tool's
+            // output is handed over line by line while it runs.
+            try withoutActuallyEscaping(progress) { report in
+                try DepotTool.fetch(appID: appID, into: plan.depotGameDir,
+                                    credentials: credentials, output: report)
+            }
+            SteamDRM.markAppDirectory(plan.depotGameDir, appID: appID)
+            step("Downloaded to \(plan.depotGameDir.path)")
         case .battlenet:
             // Battle.net exposes no per-product install URL Cellar could drive, so the honest
             // move is to open the client where the player can do it in two clicks.
@@ -582,8 +680,22 @@ public enum Game {
             }
             step("\(plan.name) is installed. Play it with: cellar launch \(plan.slug)")
         case .standalone:
-            throw CellarError.invalidArgument(
-                "\(plan.name) has no store client. Download it with: cellar fetch-depot \(plan.slug) --username <steam-account>")
+            // "Standalone" means no client in the bottle — not that the files come from nowhere. A
+            // DRM-free game bought on Steam is still fetched from the Steam account that owns it.
+            guard let appID = plan.appID else {
+                throw CellarError.invalidArgument(
+                    "\(plan.name) has no store and no steam_appid, so Cellar doesn't know where its files come from.")
+            }
+            guard let credentials = SteamAccount.credentials else {
+                throw CellarError.invalidArgument(
+                    "Not signed in to Steam. One scan covers every Steam game: cellar steam login")
+            }
+            progress("Downloading \(plan.name) from your Steam library (AppID \(appID))…")
+            try withoutActuallyEscaping(progress) { report in
+                try DepotTool.fetch(appID: appID, into: plan.depotGameDir,
+                                    credentials: credentials, output: report)
+            }
+            progress("Downloaded to \(plan.depotGameDir.path)")
         }
     }
 
@@ -678,12 +790,32 @@ public enum Game {
 
         switch plan.store {
         case .steam:
+            guard let appID = plan.appID else {
+                throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid to launch.")
+            }
+            // Cellar downloaded this copy, so Steam has no appmanifest for it and `rungameid` would
+            // find nothing. The game's own DRM still wants a live session, so the client is brought
+            // up quietly first and the exe is launched beside it — Steamworks finds the running,
+            // signed-in client the same way it does for any game started outside the library.
+            if !SteamBottle.isGameInstalled(in: plan.prefix, appID: appID), let exe = plan.directLaunchExe {
+                guard SteamBottle.isInstalled(in: plan.prefix) else {
+                    throw CellarError.invalidArgument(
+                        "\(plan.name) needs a running Steam client for its DRM, and this bottle has none. Run: cellar setup --profile \(plan.slug)")
+                }
+                // Starting a client nobody is signed in to just moves the failure to the game's own
+                // licence check, where it looks like the game is broken. Say it here instead.
+                guard SteamBottle.loggedInAccount(in: plan.prefix) != nil else {
+                    throw CellarError.invalidArgument(
+                        "\(plan.name) checks its DRM against a running Steam client, and nobody is signed in to the one in this bottle — that client keeps its own session, separate from the sign-in you gave Cellar. Sign in once: cellar steam open \(plan.slug)")
+                }
+                progress("Starting Steam quietly for \(plan.name)'s DRM, then launching the game…")
+                try SteamBottle.launchAlongside(runner: wine, exe: exe, appID: appID,
+                                                showHUD: showHUD, gameEnv: plan.env, progress: progress)
+                return .direct(exeName: exe.lastPathComponent)
+            }
             guard SteamBottle.isInstalled(in: plan.prefix) else {
                 throw CellarError.invalidArgument(
                     "Windows Steam isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
-            }
-            guard let appID = plan.appID else {
-                throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid to launch.")
             }
             progress("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…")
             try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: showHUD,
@@ -718,7 +850,7 @@ public enum Game {
                 "\(plan.name) isn't installed yet. Run: cellar gog install \(plan.slug)")
         case .standalone:
             throw CellarError.invalidArgument(
-                "No launchable exe found for '\(plan.slug)'. Run: cellar fetch-depot \(plan.slug) --username <steam-account>")
+                "\(plan.name) isn't installed yet. Run: cellar install \(plan.slug)")
         }
     }
 
@@ -729,7 +861,7 @@ public enum Game {
         }
         guard let exe = plan.directLaunchExe else {
             throw CellarError.invalidArgument(
-                "No launchable exe found for '\(plan.slug)'. Run: cellar fetch-depot \(plan.slug) --username <steam-account>")
+                "No launchable exe found for '\(plan.slug)'. Run: cellar install \(plan.slug)")
         }
         var env = WineRunner.d3dMetalEnv(showHUD: showHUD)
         for (key, value) in plan.env { env[key] = value }

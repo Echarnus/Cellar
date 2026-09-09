@@ -15,9 +15,10 @@ struct Cellar: ParsableCommand {
 
         Quick start — Steam:
           cellar doctor                          check your machine
-          cellar setup --profile planet-coaster-2   runner + bottle + Windows Steam
-          cellar steam open  planet-coaster-2    sign in once (shared by every Steam game)
-          cellar launch      planet-coaster-2    play
+          cellar steam login                     one QR scan, and that is the last of it
+          cellar library                         the games you own that Cellar can run
+          cellar install planet-coaster-2        downloaded with that sign-in, no Steam window
+          cellar launch  planet-coaster-2        play
 
         Quick start — GOG (DRM-free, no client in the bottle):
           cellar gog login                       sign in once, for your whole library
@@ -41,11 +42,12 @@ struct Cellar: ParsableCommand {
         subcommands: [
             Doctor.self,
             Setup.self,
+            LibraryCommand.self,
+            Install.self,
             SteamCommand.self,
             BattleNetCommand.self,
             GogCommand.self,
             Accounts.self,
-            FetchDepot.self,
             Launch.self,
             UninstallCommand.self,
             RunnerCommand.self,
@@ -54,6 +56,7 @@ struct Cellar: ParsableCommand {
             Gptk.self,
             SelfTest.self,
             LogsCommand.self,
+            ResetCommand.self,
         ],
         defaultSubcommand: Doctor.self
     )

@@ -13,8 +13,9 @@ landed. Key rules:
   designed (empty, loading, first-run, busy, error); light *and* dark; minimum window size.
 - **Honesty is a UX rule.** Never show a ✓ for something Cellar cannot check, never imply a step is
   automatic when the player must click. Steam publishes who is signed in; Battle.net does not — so
-  Battle.net has no sign-in step and its installer is announced as needing clicks. Encode the
-  difference in `GameStore.descriptor`, never as a special case in a view.
+  Battle.net has no sign-in step (Accounts only asks you to *add* it, and says who is claiming what)
+  and its installer is announced as needing clicks. Encode the difference in `GameStore.descriptor`,
+  never as a special case in a view.
 - **Stores are told apart by three signals together:** position (grouped sections), mark (the store's
   real logo, drawn as vectors in `StoreMark.swift`), and word (its name, including in a11y labels).
   Colour never carries it alone — Steam and Battle.net are both blue.

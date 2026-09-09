@@ -25,11 +25,21 @@ final class Library: ObservableObject {
         var id: String { rawValue }
     }
 
+    /// Every profile Cellar ships that the player's stores did not confirm — kept only so the
+    /// sidebar can say *how many* games are being withheld and why. Never rendered as a list: a
+    /// list of games you don't own, presented in your library, is a claim no caption undoes.
+    @Published var withheld: [GameSummary] = []
+    /// The one Steam sign-in, so the empty state can name the fix rather than shrug.
+    @Published var steam: SteamAccount.State = .signedOut
+
     func refresh() {
         // A store that has just been set up now has its own artwork on disk; re-resolve so its
         // mark upgrades from the drawn one to the store's own without needing a relaunch.
         StoreIcons.refresh()
-        games = Game.summaries()
+        let all = Game.summaries()
+        withheld = all.filter { !$0.isVisible }
+        steam = SteamAccount.state
+        games = all.filter(\.isVisible)
         guard selected == nil || !games.contains(where: { $0.slug == selected }) else { return }
         let remembered = UserDefaults.standard.string(forKey: Library.lastSelectedKey)
         if let remembered, games.contains(where: { $0.slug == remembered }) {
@@ -73,6 +83,28 @@ final class Library: ObservableObject {
     }
 
     var current: GameSummary? { games.first { $0.slug == selected } }
+
+    /// Why the library is empty, named per store rather than assumed to be Steam's fault. Cellar
+    /// speaks to three stores; only one of them signs in with a QR code.
+    var signInReason: String {
+        let stores = Set(withheld.map(\.gatingStore))
+        // Battle.net first, because it is the one store whose sentence is not about ownership at
+        // all: Blizzard publishes nothing to check, so what is missing is the player's own word.
+        if stores == [.battlenet] {
+            return "Blizzard publishes nothing Cellar can check, so it asks you instead. Add Battle.net and its games appear."
+        }
+        let askable = stores.filter(\.canAnswerOwnership)
+        if askable == [.steam] || (askable.contains(.steam) && askable.count > 1 && !steam.isUsable) {
+            return steam.summary
+        }
+        if askable == [.gog] {
+            return "Not signed in to GOG. One sign-in covers your whole GOG library."
+        }
+        if askable.isEmpty {
+            return "Cellar hasn't been able to ask your stores what you own yet."
+        }
+        return "Cellar lists a game once its store confirms you own it, and it hasn't been able to ask yet."
+    }
 }
 
 struct ContentView: View {
@@ -190,14 +222,71 @@ struct ContentView: View {
                         StoreSectionHeader(store: section.store, count: section.games.count)
                     }
                 }
-                if lib.filtered.isEmpty {
-                    Text(lib.games.isEmpty ? "No profiles found." : "No games match.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity).padding(.top, 24)
-                }
+                if lib.filtered.isEmpty { emptyLibrary }
+                withheldNotice
             }
             .padding(8)
         }
+    }
+
+    /// Games are being withheld because a store hasn't been asked yet — say so, in the library,
+    /// where they would have been.
+    ///
+    /// This has to sit *below* the sections rather than only in the empty state: one Battle.net game
+    /// is enough to make the library non-empty, and then five Steam games and a GOG game go missing
+    /// with nothing on screen to explain it. A count and the action is the whole fix.
+    @ViewBuilder private var withheldNotice: some View {
+        if !lib.withheld.isEmpty, !lib.games.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Divider().padding(.vertical, 4)
+                Text("\(lib.withheld.count) more \(lib.withheld.count == 1 ? "game" : "games") once you sign in")
+                    .font(.caption.weight(.semibold))
+                // The same sentence the empty state uses, so a player who sees both is told the
+                // same thing twice rather than two different things once.
+                Text(lib.signInReason)
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Sign in") {
+                    NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
+                }
+                .buttonStyle(.bordered).controlSize(.small)
+            }
+            .padding(.horizontal, 10).padding(.bottom, 10)
+        }
+    }
+
+    /// The empty library is where a player finds out *why* their games aren't here — so it carries
+    /// the reason and the single action that fixes it, not an apology.
+    @ViewBuilder private var emptyLibrary: some View {
+        VStack(spacing: 8) {
+            if !lib.games.isEmpty {
+                Text("No games match.").font(.caption).foregroundStyle(.secondary)
+            } else if lib.steam.isUsable {
+                Text("Nothing here yet.").font(.callout.weight(.semibold))
+                Text("Signed in, but none of the games Cellar supports are in your library.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Button("Check again") {
+                    runner.run(["library", "--refresh"], title: "Checking your library",
+                               then: { lib.refresh() })
+                }
+                .buttonStyle(.bordered).controlSize(.small)
+            } else {
+                // Which store is actually missing decides the sentence. Telling a GOG-only player
+                // to scan a Steam QR code names the wrong problem *and* the wrong fix.
+                Text("Sign in to see your games").font(.callout.weight(.semibold))
+                Text(lib.signInReason)
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Button("Sign in") {
+                    NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.small)
+                if !lib.withheld.isEmpty {
+                    Text("\(lib.withheld.count) supported \(lib.withheld.count == 1 ? "game is" : "games are") waiting behind it.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity).padding(.top, 24).padding(.horizontal, 8)
     }
 
     private var footer: some View {

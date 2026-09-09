@@ -71,7 +71,7 @@ struct Setup: ParsableCommand {
                 next("cellar gog install \(profile)", "downloads and installs it. No client, no DRM.")
             }
         case .standalone:
-            next("cellar fetch-depot \(profile)", "downloads the game's files by QR sign-in. No client needed.")
+            next("cellar install \(profile)", "downloads the game with the Steam sign-in you already gave.")
         }
         next("cellar launch \(profile)", "play.")
         if store == .steam {

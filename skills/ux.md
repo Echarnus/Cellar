@@ -35,9 +35,12 @@ Cellar drives other people's software. Some of what it would like to know is not
 interface must say so rather than guess:
 
 - Steam writes `loginusers.vdf`, so "Signed in as kenneth" is a fact and gets a ✓.
-- Battle.net exposes nothing equivalent. So Cellar does **not** show a sign-in step for it, does not
-  show a ✗ next to "account", and folds signing in into "Open Battle.net" — the one screen where the
-  player can actually resolve it. `cellar battlenet status` prints a `·`, never a ✗.
+- Battle.net exposes nothing equivalent — no signed-in state, no entitlements. So Cellar never shows
+  a ✓ or a ✗ for it (`cellar battlenet status` prints a `·`), and the sign-in itself still happens
+  inside Blizzard's client, where it always did. What Cellar *does* ask, once, in Accounts, is
+  whether the player has an account there at all — because the library will not list a store nobody
+  has connected, and asking is the only way this one can ever be known. The row says "Added by you",
+  never "Signed in": the words carry who did the claiming.
 - Battle.net's installer cannot run silently. Setup therefore *warns first* ("its window will open
   and needs a few clicks") instead of appearing to hang and being killed by an impatient player.
 - macOS's folder prompts are **asked for on first launch, not stumbled into**. Windows games save

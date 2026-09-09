@@ -25,7 +25,7 @@ needs_live_steam            = false
 requires_account            = "none"
 online                      = "single-player + co-op"
 status                      = "untested"
-notes                       = "Reference case for the fully Steam-free path (fetch-depot + direct launch)."
+notes                       = "Reference case for the fully Steam-free path (cellar install + direct launch)."
 
 [runner]
 id              = "wineforge"

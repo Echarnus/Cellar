@@ -125,7 +125,8 @@ struct GameDetailView: View {
             switch game.store {
             case .steam:
                 Button("Open Steam") { act(["steam", "open", game.slug], "Opening Steam") }
-                Button("Install game") { act(["steam", "install", game.slug], "Installing") }
+                Button("Download game") { act(["install", game.slug], "Downloading \(game.name)") }
+                Button("Install through the Steam client") { act(["steam", "install", game.slug], "Installing") }
                 Button("Add to Steam library") { act(["steam", "add", game.slug], "Adding") }
                 Button("Create Steam app in ~/Applications") { act(["steam", "app", game.slug], "Creating app") }
             case .battlenet:
@@ -136,7 +137,7 @@ struct GameDetailView: View {
                 Button("Download and install from GOG") { act(["gog", "install", game.slug], "Installing") }
                 Button("GOG accounts…") { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
             case .standalone:
-                Button("Copy download command") { copyDownloadCommand() }
+                Button("Download game") { act(["install", game.slug], "Downloading \(game.name)") }
             }
             Divider()
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
@@ -298,20 +299,12 @@ struct GameDetailView: View {
                 act([game.store.rawValue, "open", game.slug], "Opening \(game.store.displayName)")
             }
         case .install:
-            switch game.store {
-            case .steam:      act(["steam", "install", game.slug], "Installing")
-            case .battlenet:  act(["battlenet", "open", game.slug], "Opening Battle.net")
-            case .gog:        act(["gog", "install", game.slug], "Downloading from GOG")
-            case .standalone: copyDownloadCommand()
-            }
+            // One verb for every store. The route still differs — Cellar downloads a Steam or GOG
+            // game itself and opens Blizzard's client for a Battle.net one — but that is a fact
+            // about the store, not something the player should have to know to press a button.
+            act(["install", game.slug],
+                game.store == .battlenet ? "Opening Battle.net" : "Downloading \(game.name)")
         }
-    }
-
-    private func copyDownloadCommand() {
-        let command = "cellar fetch-depot \(game.slug) --username <your-steam-account>"
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(command, forType: .string)
-        runner.note("Copied to the clipboard:\n$ \(command)\nRun it in Terminal — Steam Guard needs one.")
     }
 
     private func act(_ args: [String], _ title: String) {

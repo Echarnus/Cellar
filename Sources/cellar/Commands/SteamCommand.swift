@@ -35,39 +35,49 @@ struct SteamCommand: ParsableCommand {
 
     struct Login: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Sign in to Steam by QR code, for downloads that skip the Windows client.",
+            abstract: "Sign in to Steam. Once — it covers every Steam game.",
             discussion: """
-            Uses Steam's own device-authorization flow — the same QR the real client shows. Cellar
-            never sees a password: you approve the sign-in in the Steam mobile app, and Steam hands
-            back a token that every later `cellar fetch-depot` reuses silently.
+            Steam's own device-authorization flow: the same QR code the real client shows. Cellar
+            never sees a password — you approve it in the Steam mobile app, and Steam hands back a
+            token that every later run reuses silently.
 
-            This signs in the *download* path. A game with Steamworks or Denuvo DRM also talks to a
-            running Steam client when it launches, and that client has its own sign-in — one window,
-            once, shared by every bottle: cellar steam open <slug>
+            This one sign-in is what tells Cellar which games you own and lets it download them.
+            Sessions last a few months and Steam can end one early; when that happens Cellar says so
+            and asks for one more scan, rather than failing a download for no visible reason.
             """)
 
-        @Flag(help: "Sign out instead: forget the stored download session.")
+        @Flag(help: "Sign out instead: forget the session and the list of what you own.")
         var forget = false
 
         func run() throws {
             if forget {
-                try DepotTool.forgetSession()
-                print(Term.green("Signed out.") + " Downloads will ask again: cellar steam login")
+                try SteamAccount.signOut()
+                StoreLibrary.forgetSteam()
+                print(Term.green("Signed out.") + " Sign in again with: cellar steam login")
                 return
             }
-            if DepotTool.hasStoredSession {
-                print(Term.green("Already signed in for downloads.")
-                    + Term.dim(" Replace it by signing out first: cellar steam login --forget"))
+            switch SteamAccount.state {
+            case .signedIn(let account, _, _):
+                print(Term.green("Already signed in as \(account)."))
+                print(Term.dim("  " + SteamAccount.state.summary))
+                print(Term.dim("  Replace it by signing out first: cellar steam login --forget"))
                 return
+            case .expired(_, let reason):
+                print(Term.yellow("Your last session ended (\(reason)).") + " Signing in again.")
+            case .signedOut:
+                break
             }
             print(Term.bold("Sign in to Steam"))
             print(Term.dim("  Scan the QR code below with the Steam mobile app. Nothing to type."))
-            try DepotTool.signIn(credentials: .qr) { print("  " + $0) }
-            if DepotTool.hasStoredSession {
-                print(Term.green("Signed in.") + " Downloads won't ask again: cellar fetch-depot <slug>")
-            } else {
+            let state = try SteamAccount.signIn { print("  " + $0) }
+            guard case .signedIn(let account, _, _) = state else {
                 print(Term.yellow("Sign-in didn't complete.") + " Run it again: cellar steam login")
+                return
             }
+            print(Term.green("Signed in as \(account)."))
+            print(Term.dim("  Checking which games you own…"))
+            try StoreLibrary.refreshSteam { print("  " + Term.dim($0)) }
+            print(Term.green("Done.") + " See them with: cellar library")
         }
     }
 
@@ -149,9 +159,16 @@ struct SteamCommand: ParsableCommand {
 
     // MARK: install (open the game's install dialog)
 
+    /// Kept for the case Cellar's own download can't cover: letting the Windows client install the
+    /// game into its own library, appmanifest and all. `cellar install` is the everyday verb.
     struct Install: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Open the install dialog for the profile's game in the bottle's Steam.")
+            abstract: "Open the install dialog for the profile's game in the bottle's Steam.",
+            discussion: """
+            The long way round. `cellar install <slug>` downloads the game with the sign-in you
+            already gave Cellar and never opens a Steam window; this hands the job to the client
+            instead, which is worth doing when you want Steam itself to manage and update the files.
+            """)
         @Argument(help: "Profile slug.") var slug: String
 
         func run() throws {

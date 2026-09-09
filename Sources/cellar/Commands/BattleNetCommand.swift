@@ -9,8 +9,46 @@ struct BattleNetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "battlenet",
         abstract: "The Battle.net plugin: open Blizzard's client in a bottle, install games, surface them natively.",
-        subcommands: [Open.self, Install.self, Status.self, App.self, Configure.self]
+        subcommands: [Add.self, Forget.self, Open.self, Install.self, Status.self, App.self, Configure.self]
     )
+
+    // MARK: add / forget
+
+    /// The one thing a player can tell Cellar about Battle.net, since Blizzard tells it nothing.
+    ///
+    /// Not called `login`: Cellar never sees a Battle.net password and never holds a session, so a
+    /// command named after signing in would promise something it cannot do. This only says "I have
+    /// an account there" — which is exactly what the library needs to know before listing Blizzard's
+    /// games as yours.
+    struct Add: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "add",
+            abstract: "Tell Cellar you have a Battle.net account, so its games are listed.",
+            discussion: """
+            Blizzard publishes neither who is signed in nor what they own, so Cellar cannot check
+            this and never claims to. Adding the account only puts Blizzard's games in your library;
+            you still sign in inside Battle.net itself, the first time it opens.
+            """)
+
+        func run() throws {
+            try StoreLibrary.BattleNetAccount.add()
+            print(Term.green("✓") + " Battle.net added. Its games are in your library now.")
+            print(Term.dim("  Cellar can't check this one — you sign in inside Battle.net when it opens."))
+            print(Term.dim("  cellar library"))
+        }
+    }
+
+    struct Forget: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "forget",
+            abstract: "Forget that you have a Battle.net account, and hide its games again.")
+
+        func run() throws {
+            try StoreLibrary.BattleNetAccount.forget()
+            print("Battle.net forgotten. Its games are no longer listed.")
+            print(Term.dim("  Nothing was uninstalled — cellar battlenet add puts them back."))
+        }
+    }
 
     // MARK: status
 
