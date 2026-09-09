@@ -10,8 +10,13 @@ public enum AppBundle {
         public let launcher: URL   // Contents/MacOS/launcher — the Steam shortcut target
     }
 
+    /// Where generated launchers are written. `CELLAR_APPLICATIONS_DIR` redirects it, so a test can
+    /// generate a bundle without dropping an app into the player's ~/Applications.
     public static var applicationsDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true)
+        if let override = ProcessInfo.processInfo.environment["CELLAR_APPLICATIONS_DIR"], !override.isEmpty {
+            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath, isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true)
     }
 
     /// A game launcher: `<name>.app` → `cellar launch <slug>`. Uses the game's own icon when the

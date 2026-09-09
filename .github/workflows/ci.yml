@@ -22,5 +22,11 @@ jobs:
         run: swift build -c release
       - name: Self-test (VDF/CRC/shortcut codecs)
         run: swift run -c release cellar selftest
+
+      # Unit tests + the hermetic integration tier. The Wine tiers (CELLAR_IT=1) are deliberately
+      # not run here: a hosted runner has no reason to download a 400 MB Wine build and nothing
+      # worth translating to. See docs/TESTING.md.
+      - name: Tests
+        run: sh Scripts/test.sh
       - name: Generate supported-games site (sanity)
         run: python3 Scripts/gen-site.py
