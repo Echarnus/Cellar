@@ -483,12 +483,13 @@ FAQ_SECTIONS = [
          "Mac and macOS version, the game and its profile, which backend you used, and the log from "
          "the run that failed.</p>"),
         ("How do I remove a game, or Cellar itself?",
-         "<p>There is <b>no Remove button in the app yet</b>. A bottle is deleted from the command "
-         "line — <code>cellar prefix remove &lt;name&gt;</code> — and that is a plain delete: no "
-         "confirmation, and no summary of what else lives in there.</p>"
-         "<p>Which matters most for Steam, because every Steam bottle shares one Steam install and "
-         "one library folder. Deleting the wrong bottle can take another game's files with it, and "
-         "nothing will stop you. Check what a bottle holds before you remove it.</p>"
+         "<p><code>cellar uninstall &lt;game&gt;</code>, or the <b>•••</b> menu on the game's page "
+         "in the app. Cellar shows the plan first — every path it will delete, with its size, and "
+         "what it will keep — and asks before anything goes. Add <code>--dry-run</code> to see that "
+         "plan without deleting anything.</p>"
+         "<p>What it keeps: your store sign-in, the Wine runner, and the shared Steam install with "
+         "every other game in it, so re-installing is just the download. Add <code>--bottle</code> "
+         "to take the bottle too — its Wine prefix, registry and the store client inside it.</p>"
          "<p>To remove Cellar entirely: drag the app to the Trash and delete "
          "<code>~/Library/Application&nbsp;Support/Cellar</code>. Nothing is installed outside "
          "those two places.</p>"),
