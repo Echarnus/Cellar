@@ -63,9 +63,11 @@ struct AccountsView: View {
             refresh()
             takeFocus()             // the window may have been built *by* the request
         }
-        .onReceive(NotificationCenter.default.publisher(for: .cellarOpenAccounts)) { note in
-            if let asked = note.object as? String { AccountsFocus.pending = asked }
-            takeFocus()             // …or it may have been open already
+        // …or it may have been open already, in which case `onAppear` never runs again and the
+        // app delegate re-announces the request on this second name. Exactly one writer (the
+        // delegate) and one reader (this view), so a request can never be left latched.
+        .onReceive(NotificationCenter.default.publisher(for: .cellarFocusAccounts)) { note in
+            focus(on: note.object as? String)
         }
     }
 
@@ -333,8 +335,13 @@ struct AccountsView: View {
     /// Steam library" has to land on the field that does it — hiding the form behind a disclosure
     /// is only an improvement if the screen that sends you here still opens it for you.
     private func takeFocus() {
-        guard AccountsFocus.pending == AccountsFocus.steamLibrary else { return }
+        let asked = AccountsFocus.pending
         AccountsFocus.pending = nil
+        focus(on: asked)
+    }
+
+    private func focus(on asked: String?) {
+        guard asked == AccountsFocus.steamLibrary else { return }
         showingSteamKeyField = true
     }
 
@@ -354,6 +361,9 @@ struct AccountsView: View {
 /// for the first time is posted before there is a view to receive it.
 enum AccountsFocus {
     static let steamLibrary = "steam-library"
+    /// Written only by `AppDelegate.openAccounts(_:)`, read only by `AccountsView.takeFocus()`, and
+    /// cleared in both — so a request that nobody consumed can never re-open the key field the next
+    /// time someone presses ⌘⇧A.
     static var pending: String?
 }
 
@@ -394,12 +404,15 @@ struct StoreAccountState {
             isLoaded: true)
     }
 
-    /// The Steam **account** badge — who is signed in, and nothing else. What Cellar can do with
-    /// that account is reported separately, under it, because those are not sign-ins.
+    /// The Steam **account** badge — the client's own sign-in, and nothing else.
+    ///
+    /// A stored download session must *not* raise it to a ✓. That token is a capability, reported on
+    /// its own line below; counting it as the account produced a screen that contradicted itself —
+    /// a green "Signed in" beside a library line reading "Sign in above first", because the library
+    /// genuinely needs the client's account and the QR session cannot supply it. `cellar accounts`
+    /// reads the same single fact, so the two surfaces cannot drift.
     var steamAccountState: AccountState {
-        if let steamAccount { return .signedIn(steamAccount) }
-        if steamDownloadSession { return .signedInUnnamed }
-        return .signedOut
+        steamAccount.map { AccountState.signedIn($0) } ?? .signedOut
     }
 
     var steamAccountDetail: String {
@@ -407,7 +420,7 @@ struct StoreAccountState {
             return "One Windows Steam client, shared by every Steam game — so this sign-in covers all of them."
         }
         if steamDownloadSession {
-            return "Signed in for downloads. Games with Steam's DRM also need the Windows client signed in."
+            return "Cellar can already fetch your game files (below), but playing one means signing in to the Windows Steam client too."
         }
         return "Opens the Windows Steam client. Signing in there with the Steam mobile app's QR code is quickest."
     }

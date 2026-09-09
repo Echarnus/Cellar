@@ -7,6 +7,10 @@ extension Notification.Name {
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.
     static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
+    /// Sent *after* the Accounts window is up, naming the part of it the player asked for. Separate
+    /// from `cellarOpenAccounts` so the window has exactly one way to hear a request, whether it was
+    /// built by that request or was already on screen.
+    static let cellarFocusAccounts = Notification.Name("cellar.focusAccounts")
     /// Posted whenever a store is signed in to, signed out of, or connected. The library is gated on
     /// exactly that, and Accounts is a separate window with its own view graph — so without this,
     /// a player signs in and returns to the same empty library.
@@ -126,11 +130,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// The notification form: the poster may name the part of the window it wants opened, and a
-    /// window built in response to this very post has no view yet to hear it — so it is latched.
+    /// The notification form: the poster may name the part of the window it wants opened.
+    ///
+    /// A window built in response to *this* post has no view yet to hear it, so the request is
+    /// latched and read in `onAppear`. A window that was already up will never run `onAppear` again,
+    /// so it is told directly instead. One or the other, never both, and the latch is cleared either
+    /// way — a request left lying around would open the key field on the next plain ⌘⇧A.
     @objc private func openAccounts(_ notification: Notification) {
-        AccountsFocus.pending = notification.object as? String
+        let focus = notification.object as? String
+        let wasOpen = accountsWindow != nil
+        AccountsFocus.pending = wasOpen ? nil : focus
         showAccounts()
+        if wasOpen, let focus {
+            NotificationCenter.default.post(name: .cellarFocusAccounts, object: focus)
+        }
     }
 
     @objc private func showAccounts() {
