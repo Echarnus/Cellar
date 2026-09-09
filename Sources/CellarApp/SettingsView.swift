@@ -39,7 +39,10 @@ struct SettingsView: View {
             }.padding(20)
             Divider()
             Form {
-                Section("Account") {
+                // Signing in is account-level, so it belongs here as well as behind ⌘⇧A — the
+                // welcome tour promises "you can do this later in Settings", and this is that. The
+                // rows are shown inline rather than behind a button: this *is* the accounts screen.
+                Section("Accounts") {
                     AccountsSection(runner: runner, state: accounts, refresh: refresh)
                         .padding(.vertical, 4)
                 }
@@ -61,6 +64,12 @@ struct SettingsView: View {
                     LabeledContent("DepotDownloader", value: depot)
                     Button("Open Cellar folder") { NSWorkspace.shared.open(Paths.appSupport) }
                     Button("Open logs") { NSWorkspace.shared.open(Paths.logs) }
+                }
+                Section("Help") {
+                    Button("Show the welcome tour again") {
+                        NotificationCenter.default.post(name: .cellarOpenWelcomeTour, object: nil)
+                    }
+                    Link("Questions & answers", destination: URL(string: "https://echarnus.github.io/Cellar/faq.html")!)
                 }
                 diagnostics
                 Section("About") {

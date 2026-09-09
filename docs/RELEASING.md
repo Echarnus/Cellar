@@ -54,3 +54,8 @@ step once there's a Developer ID.
 from `profiles/*.toml` (via `Scripts/gen-site.py`) and deploys it to GitHub Pages on every push to
 `main` that touches profiles or the generator. Enable it once under **Settings → Pages → Source:
 GitHub Actions**.
+
+The generator writes two pages: `index.html` (the games grid) and `faq.html` (the
+[questions &amp; answers](https://echarnus.github.io/Cellar/faq.html) page, which the app links to
+from **Settings → Help**). The FAQ's prose lives in `FAQ_SECTIONS` in `Scripts/gen-site.py` — it
+makes factual claims about how Cellar behaves, so it changes when the behaviour does.

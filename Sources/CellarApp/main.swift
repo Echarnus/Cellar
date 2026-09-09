@@ -12,6 +12,10 @@ extension Notification.Name {
     /// Posted by Settings' "Review folder access…" button — the same window first run shows, in its
     /// status-board form.
     static let cellarOpenFolderAccess = Notification.Name("cellar.openFolderAccess")
+    /// Posted by the "Welcome to Cellar…" menu item and by Settings, to replay the first-run tour.
+    /// Named for the *tour* specifically, because the folder-access screen above is the other
+    /// first-run window and the two coexist rather than fight for the name.
+    static let cellarOpenWelcomeTour = Notification.Name("cellar.openWelcomeTour")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -25,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: NSWindow?
     var accountsWindow: NSWindow?
     var folderAccessWindow: NSWindow?
+    var welcomeTourWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // First thing, before anything can crash: this is also where a previous session that
@@ -42,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self, selector: #selector(showAccounts), name: .cellarOpenAccounts, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(showFolderAccess), name: .cellarOpenFolderAccess, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(showWelcomeTour), name: .cellarOpenWelcomeTour, object: nil)
 
         let window = NSWindow(
             // Comfortably above ContentView's minimum: at the minimum the detail pane's two
@@ -59,11 +66,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
 
-        // First run: get the folder permissions out of the way here, with a sentence explaining
-        // them, rather than letting macOS raise them mid-install on behalf of a game (see
-        // HomeFolderAccess). Deliberately after the main window is up, so the ask arrives in front
-        // of Cellar rather than out of nowhere.
-        if !HomeFolderAccess.hasAsked { showWelcome() }
+        // Two things want the first launch, so they take it in turn — stacking two windows on a
+        // player who has not seen the app yet is worse than either on its own.
+        //
+        // The tour goes first: it introduces Cellar and offers to sign in, before the player is
+        // left staring at a library of games that all say "Sign in". Skipping it counts as seen —
+        // Settings replays it. Deferred to the next runloop turn so it opens over a window that has
+        // already finished its first layout, rather than during it (skills/swift.md).
+        //
+        // The folder ask then arrives on the next launch, with a sentence explaining it, rather
+        // than letting macOS raise it mid-install on behalf of a game (see `HomeFolderAccess`).
+        // Settings can raise either one at any time.
+        if WelcomeTour.isOwed && !useDiagnostic {
+            DispatchQueue.main.async { [weak self] in self?.showWelcomeTour() }
+        } else if !HomeFolderAccess.hasAsked {
+            showWelcome()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -86,6 +104,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
         appItem.submenu = appMenu
         appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
+            .target = self
+        appMenu.addItem(withTitle: "Welcome to \(appName)…", action: #selector(showWelcomeTour), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Account…", action: #selector(showAccounts), keyEquivalent: "A")
@@ -176,6 +196,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         })
         folderAccessWindow = w
         w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// The first-run tour. Its own window for the usual reason — a sheet under `NSHostingView` is a
+    /// fatal AttributeGraph cycle — and not resizable, because the tour is laid out at a fixed size.
+    /// Closing it by any route (Continue to the end, "Skip for now", or the red button) counts as
+    /// seen, so it never reappears uninvited.
+    @objc private func showWelcomeTour() {
+        if welcomeTourWindow == nil {
+            let w = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 620, height: 580),
+                styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            w.title = "Welcome to Cellar"
+            w.isReleasedWhenClosed = false
+            w.center()
+            w.contentView = NSHostingView(rootView: WelcomeTourView(onFinish: { [weak self] in
+                WelcomeTour.markSeen()
+                self?.welcomeTourWindow?.close()
+            }))
+            welcomeTourWindow = w
+        }
+        WelcomeTour.markSeen()
+        welcomeTourWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
