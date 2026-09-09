@@ -228,6 +228,38 @@ New games are added as **profiles** — see [CONTRIBUTING.md](CONTRIBUTING.md). 
 **upstream fixes** to Wine/DXVK where possible (one of the lessons from Whisky's end), keep the core
 small, and let the community own the profile database.
 
+## Built on Wine
+
+Everything Cellar does happens inside **[Wine](https://www.winehq.org/)** — the Windows
+compatibility layer that reimplements Win32 on macOS. Cellar is a launcher over it: a runner
+catalogue, bottles, profiles and a native front-end. The hard part is Wine's, and has been for over
+thirty years. Wine is LGPL-2.1+; its source is at
+[gitlab.winehq.org/wine/wine](https://gitlab.winehq.org/wine/wine).
+
+With thanks to the people whose work Cellar installs and drives:
+
+- **[CodeWeavers / CrossOver](https://www.codeweavers.com/crossover)** — the macOS patches (the Mac
+  driver, msync) that make Wine fast on a Mac. Cellar uses only their public
+  [LGPL sources](https://github.com/CodeWeavers/wine), never CrossOver itself.
+- **[WineForge](https://github.com/Alien4042x/WineForge)** — the default runner: Wine 11 with the
+  CrossOver patches, prebuilt for macOS.
+- **[Sikarugir](https://github.com/Sikarugir-App)** — the Wine 10 runner and the wrapper template
+  Cellar takes D3DMetal from.
+- **[Gcenx](https://github.com/Gcenx)** — the Game Porting Toolkit runner build, and years of
+  Wine-on-macOS packaging.
+- **Apple D3DMetal** — DirectX 11/12 → Metal, grafted from a runner at run time under Apple's
+  non-commercial grant; never bundled.
+- **[DepotDownloader](https://github.com/SteamRE/DepotDownloader)** — downloads the games you own
+  from Steam without the Windows client.
+
+The same list is in the app: **Cellar › About Cellar**, and **Settings › About**.
+
+Cellar does **not** fork Wine. The macOS-specific speedups that exist — CodeWeavers' Mac driver
+work, msync, the coming ARM64EC + FEX runner — are already upstream or in the runners Cellar
+installs, and the measured bottleneck ([docs/RESEARCH.md](docs/RESEARCH.md)) is Rosetta translating
+draw-call submission, which no Wine patch touches. Fixes go upstream; see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#why-cellar-does-not-fork-wine).
+
 ## License
 
 [GPL-3.0](LICENSE) © Cellar contributors. Bundled third-party components retain their own licenses

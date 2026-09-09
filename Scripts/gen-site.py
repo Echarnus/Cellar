@@ -213,7 +213,9 @@ def site_footer(games):
     return (f'<footer>{len(games)} games · {playable} playable · '
             f'<a href="index.html">Games</a> · <a href="faq.html">FAQ</a> · '
             f'<a href="{REPO}">Source</a> · Cellar is GPL-3.0 · '
-            f'not affiliated with Valve, Blizzard, GOG, Apple, or the game publishers.</footer>')
+            f'not affiliated with Valve, Blizzard, GOG, Apple, or the game publishers.<br>'
+            f'Built on <a href="https://www.winehq.org/">Wine</a>, the Windows compatibility '
+            f'layer — Cellar is a launcher over it, and the hard part is theirs.</footer>')
 
 
 def load_games():

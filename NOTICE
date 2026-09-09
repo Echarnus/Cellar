@@ -6,6 +6,30 @@ the terms of the GNU General Public License version 3, as published by the Free
 Software Foundation. See the LICENSE file for the full text.
 
 ------------------------------------------------------------------------------
+Built on Wine
+------------------------------------------------------------------------------
+
+Everything Cellar does happens inside Wine, the Windows compatibility layer
+that reimplements the Win32 API on macOS. Cellar is a launcher over it — a
+runner catalogue, bottles, profiles and a front-end. The Win32 implementation
+is Wine's.
+
+  Wine      Copyright (C) 1993-2026 the Wine project authors
+            LGPL-2.1-or-later — https://www.winehq.org/
+            Source: https://gitlab.winehq.org/wine/wine
+
+Cellar does not bundle Wine in its source or release artifacts; it downloads
+prebuilt LGPL Wine runners at run time (see THIRD_PARTY_LICENSES.md), and it
+carries no modifications to Wine. With thanks also to:
+
+  CodeWeavers  — the public LGPL macOS patches (Mac driver, msync) in the runners
+                 https://github.com/CodeWeavers/wine
+  WineForge    — the default runner build      https://github.com/Alien4042x/WineForge
+  Sikarugir    — the Wine 10 runner + template https://github.com/Sikarugir-App
+  Gcenx        — the Game Porting Toolkit build https://github.com/Gcenx
+  SteamRE      — DepotDownloader (GPL-2.0)      https://github.com/SteamRE/DepotDownloader
+
+------------------------------------------------------------------------------
 Trademarks & non-affiliation
 ------------------------------------------------------------------------------
 

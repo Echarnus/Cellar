@@ -46,6 +46,31 @@ plugs into the **Linux** Steam client's compatibility-tool hook (**absent on the
 So Cellar reproduces the *experience*, not the binary: it **owns the launch path** the way
 Steam-on-Linux does, using Wine + D3DMetal and per-game profiles.
 
+## Why Cellar does not fork Wine
+
+The question comes up: Wine is LGPL, macOS is a second-class Wine target, so why not fork
+[gitlab.winehq.org/wine/wine](https://gitlab.winehq.org/wine/wine) and tune it for Apple Silicon?
+Because every macOS-specific gain that is known already reaches Cellar without a fork, and the one
+that does not is not Wine's to give:
+
+| macOS-specific speedup | Where it lives | How Cellar gets it |
+|---|---|---|
+| **msync** — Mach-semaphore synchronisation, the macOS answer to esync/fsync | CodeWeavers' patches, carried by WineForge and Sikarugir | `WINEMSYNC=1` in every launch environment (`Wine.swift`) |
+| **Mac driver work** — window/event path, Metal surfaces | CodeWeavers' public `winecx` sources, carried by WineForge | the default runner |
+| **D3DMetal** — DirectX → Metal without a Vulkan hop | Apple, grafted into the runner | `D3DMETAL_RUNTIME_DIR` |
+| **ARM64EC + FEX** — no Rosetta: a native arm64 Wine translating only the game | Upstream Wine (ARM64EC since 10.0) + CodeWeavers' FEX integration, being upstreamed | the *Rosetta Sunset* migration, tracked in `docs/ROADMAP.md` |
+
+The measured wall (`docs/RESEARCH.md`) is **Rosetta translating draw-call submission** — CPU time
+spent between the game and D3DMetal, not inside Wine's own code. No Wine patch moves that number;
+the ARM64EC runner does, and that work is happening upstream, where a fork could only lag it.
+
+A fork would also mean building and signing Wine ourselves — CrossOver patches, msync, the
+`__wine_unix_call` compatibility path D3DMetal needs — which is exactly the maintenance load that
+ended Whisky. Cellar's rule is the opposite: **fixes go upstream** (to Wine, DXVK, or the runner
+projects) and Cellar installs prebuilt, LGPL Wine. If a genuine macOS-only improvement ever
+cannot be upstreamed, the place for it is a patch series against a runner project, not a Cellar
+fork of Wine.
+
 ## Components
 
 | Layer | Module | Responsibility |

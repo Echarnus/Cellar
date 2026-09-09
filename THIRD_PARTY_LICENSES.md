@@ -6,7 +6,7 @@ component's license and how Cellar treats it. Verified against upstream `LICENSE
 
 | Component | Purpose | License | Cellar bundles it? | Obligations |
 |---|---|---|---|---|
-| **Wine** (Gcenx `wine-crossover` builds) | Win32 → macOS API layer | **LGPL-2.1+** | ✅ Yes (planned, Phase 1) | Ship full LGPL text; publish any Wine source **modifications**; preserve ability to relink; no added reverse-engineering restrictions |
+| **Wine** (prebuilt WineForge / Sikarugir / Gcenx runners) | Win32 → macOS API layer | **LGPL-2.1+** | ❌ Not in the repo or release artifacts — `cellar setup` downloads a prebuilt runner at run time (`Runner.swift`); Cellar carries no Wine modifications | Credit it (NOTICE, About); if a runner is ever bundled: ship full LGPL text, publish any Wine source **modifications**, preserve ability to relink, no added reverse-engineering restrictions |
 | **DXVK** | DirectX 9/10/11 → Vulkan | **zlib/libpng** | ✅ Yes | Don't misrepresent origin; keep notice; mark altered sources |
 | **VKD3D-Proton** | DirectX 12 → Vulkan | **LGPL-2.1+** | ✅ Yes | Same LGPL obligations as Wine |
 | **MoltenVK** | Vulkan → Metal | **Apache-2.0** | ✅ Yes | Include license; retain notices; **preserve the NOTICE file**; state modifications |

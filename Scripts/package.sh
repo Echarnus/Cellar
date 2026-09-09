@@ -50,7 +50,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>it.clercq.cellar.app</string>
   <key>CFBundleName</key><string>Cellar</string>
   <key>CFBundleGetInfoString</key><string>Cellar — run Windows games on Apple Silicon via Wine + D3DMetal.</string>
-  <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0. Not affiliated with Valve or Apple.</string>
+  <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0; not affiliated with the Wine project, Valve, Blizzard, GOG, Apple or any game publisher.</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>

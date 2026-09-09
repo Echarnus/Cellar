@@ -76,8 +76,25 @@ struct SettingsView: View {
                     LabeledContent("Version", value: appVersion)
                     Link("Cellar on GitHub", destination: URL(string: "https://github.com/Echarnus/Cellar")!)
                     Link("Supported games", destination: URL(string: "https://echarnus.github.io/Cellar/")!)
-                    Text("Windows games on Apple Silicon via Wine + Apple D3DMetal. GPL-3.0. Not affiliated with Valve or Apple.")
+                    Text(Credits.nonAffiliation)
                         .font(.caption).foregroundStyle(.secondary)
+                }
+                // Wine gets its own group rather than a line among the links: Cellar is a launcher
+                // over it, and a player reading "About" should leave knowing that.
+                Section("Built on Wine") {
+                    Text(Credits.wine.role)
+                        .font(.caption).foregroundStyle(.secondary)
+                    Link("Wine — winehq.org", destination: Credits.wine.url)
+                    Link("Wine source — gitlab.winehq.org", destination: Credits.wine.sourceURL!)
+                    LabeledContent("License", value: Credits.wine.license)
+                }
+                Section("With thanks to") {
+                    ForEach(Credits.all.dropFirst(), id: \.name) { credit in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Link(credit.name, destination: credit.url)
+                            Text(credit.role).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
             .formStyle(.grouped)

@@ -224,17 +224,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showAbout() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
-        let credits = NSAttributedString(
-            string: "Run Windows games on Apple Silicon — a Proton-like layer over Wine + D3DMetal.\n" +
-                    "Sign in once, then install and play the games you own.",
-            attributes: [.font: NSFont.systemFont(ofSize: 11),
-                         .foregroundColor: NSColor.secondaryLabelColor])
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Cellar",
             .applicationVersion: version,
-            .credits: credits,
+            .credits: Self.aboutCredits(),
         ])
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// The About panel's credits: the tagline, then the thank-you to Wine — the project Cellar is a
+    /// thin layer over. Short on purpose: the standard panel shows credits in a ~100 pt box that
+    /// auto-scrolls when the text overflows, and a long list scrolls Wine straight out of view.
+    /// The full list, one link per project, is Settings › About. The GPL / non-affiliation line is
+    /// the panel's copyright field (Info.plist), so it is not repeated here.
+    private static func aboutCredits() -> NSAttributedString {
+        let body: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11),
+                                                    .foregroundColor: NSColor.secondaryLabelColor]
+        let heading: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: 11),
+                                                       .foregroundColor: NSColor.labelColor]
+        func link(_ text: String, _ url: URL) -> NSAttributedString {
+            NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 11), .link: url])
+        }
+
+        let out = NSMutableAttributedString(string: Credits.tagline + "\n\n", attributes: body)
+        out.append(NSAttributedString(string: "Built on Wine. ", attributes: heading))
+        out.append(NSAttributedString(string: Credits.wine.role + " ", attributes: body))
+        out.append(link("winehq.org", Credits.wine.url))
+        out.append(NSAttributedString(string: " · ", attributes: body))
+        out.append(link("source", Credits.wine.sourceURL!))
+        out.append(NSAttributedString(string: "\n\nEveryone else Cellar stands on: Settings › About.", attributes: body))
+        return out
     }
 }
 
