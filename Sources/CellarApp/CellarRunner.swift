@@ -67,13 +67,21 @@ final class CellarRunner: ObservableObject {
         busy = true; busyTitle = title; phase = .working
         stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
         readsStages = stages
-        committed += "\n$ cellar \(args.joined(separator: " "))\n"
+
+        // Redact once, use everywhere. `args` can carry a credential the player just pasted — the
+        // GOG sign-in hands this method their one-time OAuth code — and it reaches two places from
+        // here: the on-screen activity pane (which a player screenshots into a bug report) and the
+        // rolling log (which `cellar logs export` ships). The subprocess redacts its own
+        // invocation; this is the app's separate copy of the same command line.
+        let shown = "cellar " + Diagnostics.redactCommandLine(args).text
+        committed += "\n$ \(shown)\n"
         log = committed + pending
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
         process.arguments = args
         self.process = process
+        let binaryPath = binary
 
         Task.detached {
             let pipe = Pipe()
@@ -84,9 +92,30 @@ final class CellarRunner: ObservableObject {
                 guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
                 Task { @MainActor in self.absorb(s); observe?(s) }
             }
-            try? process.run()
+            do {
+                try process.run()
+            } catch {
+                // The CLI is how the app does everything — if it can't be started, the player sees
+                // a button that does nothing, so make sure the reason is on record.
+                // The same string on screen as in the log: this path runs through the player's home
+                // folder, and the activity pane ends up in screenshots.
+                let helperPath = Diagnostics.redact(binaryPath)
+                CellarLog.error(.app, "Could not run the cellar CLI at "
+                    + "\(helperPath): \(CellarLog.describe(error))")
+                await MainActor.run {
+                    self.absorb("\nCellar's command-line helper isn't at \(helperPath).\n"
+                        + "Reinstall Cellar, or run: sh Scripts/install-app.sh\n")
+                    self.busy = false
+                    then?()
+                }
+                return
+            }
             process.waitUntilExit()
             pipe.fileHandleForReading.readabilityHandler = nil
+            let status = process.terminationStatus
+            if status != 0 {
+                CellarLog.debug(.app, "\(shown) exited with \(status).")
+            }
             await MainActor.run {
                 self.absorb("\n(exit \(process.terminationStatus))\n")
                 self.process = nil

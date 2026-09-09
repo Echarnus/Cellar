@@ -83,6 +83,8 @@ public enum ProcessWatch {
             }
             if !appeared {
                 progress("Attempt \(attempt): the game didn't start; retrying…")
+                CellarLog.warn(.launch, "Start attempt \(attempt) of \(attempts): the game's process "
+                    + "never appeared within \(appearSeconds)s. Retrying.")
                 continue
             }
 
@@ -93,11 +95,17 @@ public enum ProcessWatch {
                 if !isUp() { survived = false; break }
             }
             if survived {
-                if attempt > 1 { progress("Up after \(attempt) attempts.") }
+                if attempt > 1 {
+                    progress("Up after \(attempt) attempts.")
+                    CellarLog.info(.launch, "The game stayed up on attempt \(attempt).")
+                }
                 return
             }
             progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
+            CellarLog.warn(.launch, "Start attempt \(attempt) of \(attempts): the game appeared and then "
+                + "died inside \(settleSeconds)s — the D3DMetal startup race. Cleaning up and retrying.")
         }
+        CellarLog.error(.launch, "Gave up: the game would not stay up after \(attempts) attempts.")
         throw CellarError.ioFailure(
             "The game kept failing to stay up after \(attempts) attempts. Try launching again.")
     }

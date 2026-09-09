@@ -179,6 +179,73 @@ struct SelfTest: ParsableCommand {
                   "a store-free launch shows no client step")
         try check(LaunchStage.sequence(viaClient).contains(.client),
                   "a launch through a client shows the client step")
+        // 6. The rolling log's line format. Every entry is written and read back through these
+        // two, so a message carrying newlines or a double space must survive the round-trip —
+        // otherwise a crash report loses the very line that explains the crash.
+        let written = LogEntry(date: Date(timeIntervalSince1970: 1_757_000_000), level: .warn,
+                               source: "cli", category: .session, subject: "planet-coaster-2",
+                               message: "exited after 12s\nerr:module:import_dll  missing")
+        guard let read = LogEntry.parse(written.line) else {
+            throw Failure(message: "FAILED: a written log line did not parse back")
+        }
+        try check(read.level == .warn && read.category == .session, "log line keeps its level and category")
+        try check(read.subject == "planet-coaster-2", "log line keeps its subject")
+        try check(read.date == written.date, "log line keeps its timestamp to the second")
+        try check(!read.message.contains("\n") && read.message.contains("err:module:import_dll"),
+                  "log message survives newlines and double spaces")
+        try check(LogEntry.parse("not a log line at all") == nil, "a junk line is skipped, not shown")
+
+        // 7. Redaction. The diagnostics report is meant to be posted in public, so these are the
+        // three shapes that must never come out the other side.
+        let secrets = Diagnostics.redact(
+            "refresh_token=abc123 --password hunter2 " + FileManager.default.homeDirectoryForCurrentUser.path + "/Games")
+        try check(!secrets.contains("abc123"), "redaction removes a token value")
+        try check(!secrets.contains("hunter2"), "redaction removes a --password value")
+        try check(secrets.contains("~/Games"), "redaction replaces the home path with ~")
+
+        // 8. The command line as the log records it. `Cellar.main` logs every invocation, and the
+        // export folds the log into a file players are told to attach to a public bug report — so
+        // this exercises the formatter that actually runs, in every spelling ArgumentParser accepts.
+        // The first version of this only tested `redact()` against strings built from its own
+        // pattern list, and duly missed `-u <steam account>` and `gog login --code <oauth code>`.
+        let commandLines: [([String], String)] = [
+            (["fetch-depot", "witcher-3", "-u", "SteamAccountName"], "short flag"),
+            (["fetch-depot", "witcher-3", "-uSteamAccountName"], "glued short flag"),
+            (["fetch-depot", "witcher-3", "--username", "SteamAccountName"], "long flag"),
+            (["fetch-depot", "witcher-3", "--username=SteamAccountName"], "long flag with ="),
+            (["gog", "login", "--code", "SteamAccountName"], "one-time OAuth code"),
+            (["gog", "login", "--future-option", "SteamAccountName"], "an option nobody listed"),
+        ]
+        for (arguments, shape) in commandLines {
+            let line = Diagnostics.redactCommandLine(arguments).text
+            try check(!line.contains("SteamAccountName") && line.contains("<redacted>"),
+                      "command line redacts a value passed by \(shape)")
+        }
+
+        // …without redacting the words that make a log line worth reading.
+        let readable = Diagnostics.redactCommandLine(["launch", "witcher-3", "--level", "warn"]).text
+        try check(readable.contains("launch") && readable.contains("witcher-3"),
+                  "command line keeps the subcommand and the profile slug")
+        try check(readable.contains("warn"), "command line keeps a known-safe option value")
+
+        // 9. The whole logged line, built from a *real* parse failure. ArgumentParser's own error
+        // text quotes the offending token back verbatim ("Unknown option '-uGluedSecret…'"), so a
+        // redacted invocation is worthless if the reason beside it is not scrubbed with the same
+        // secrets. Testing the formatter alone missed this; parsing for real is what catches it.
+        let failing: [([String], String)] = [
+            (["fetch-depot", "witcher-3", "-uGluedSecretAccount"], "a glued short flag"),
+            (["fetch-depot", "witcher-3", "--username"], "a flag with its value missing"),
+            (["gog", "login", "--code"], "an OAuth code flag with no value"),
+            (["fetch-depot", "witcher-3", "--nonsense=SecretAccountName"], "an unknown option"),
+        ]
+        for (arguments, shape) in failing {
+            var reason = ""
+            do { _ = try Cellar.parseAsRoot(arguments) } catch { reason = Cellar.message(for: error) }
+            try check(!reason.isEmpty, "\(shape) really does fail to parse")
+            let line = Cellar.failureLine(Diagnostics.redactCommandLine(arguments), reason)
+            try check(!line.contains("GluedSecretAccount") && !line.contains("SecretAccountName"),
+                      "the logged failure keeps no secret out of \(shape)")
+        }
 
         print(Term.green("All selftests passed."))
     }

@@ -10,6 +10,11 @@ swift build -c release --product CellarApp
 BIN=".build/release/CellarApp"
 [ -x "$BIN" ] || { echo "Build produced no CellarApp binary at $BIN"; exit 1; }
 
+# One version, from CellarKit. A diagnostics report that names a version nobody shipped is worse
+# than no version at all, and a dev install used to claim 0.1 forever.
+VERSION="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sources/CellarKit/Version.swift)"
+VERSION="${VERSION:-0.0.0}-dev"
+
 APP="$HOME/Applications/Cellar.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -37,7 +42,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleGetInfoString</key><string>Cellar — run Windows games on Apple Silicon via Wine + D3DMetal.</string>
   <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0. Not affiliated with Valve or Apple.</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- Shown inside macOS's own permission dialog. Cellar asks for all three on first launch

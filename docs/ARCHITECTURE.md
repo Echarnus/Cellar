@@ -203,6 +203,9 @@ prefix and the client inside it). The rules that keep it safe:
 │   └── d3dmetal/  # user-supplied Apple D3DMetal (never in the repo)
 ├── profiles/    # user/registry-synced profiles (these win over the shipped database)
 └── logs/
+    ├── cellar.log      # the rolling event log (+ .1, .2 — the two files it rolls into)
+    ├── game-<slug>.log # Wine's own output for a direct launch
+    └── steam-*.log / battlenet-*.log   # Wine's output for a store client
 ```
 
 The profile database also ships *inside* the installed app (`Cellar.app/Contents/Resources/profiles`)
@@ -233,6 +236,53 @@ So Cellar owns the timing instead (`Sources/CellarKit/HomeFolders.swift`):
 
 There is no API for reading the privacy database, so *asking is the only way to find out*: reading
 the directory **is** the request. That is the whole reason the timing is Cellar's to choose.
+## The rolling log
+
+Cellar drives Wine, a store client and a Windows game, and none of them report back. When a player
+says "it crashed", the only thing that can answer is what Cellar wrote down at the time — so it
+writes down every set-up step, launch, retry, play session and failure, from **both** the CLI and
+the app, into one file.
+
+| Piece | Where | What it does |
+|---|---|---|
+| `CellarLog` | `Sources/CellarKit/Log.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
+| `Diagnostics` | `Sources/CellarKit/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
+| `cellar logs` | `Sources/cellar/Commands/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
+| Settings → Diagnostics | `Sources/CellarApp/SettingsView.swift` | The same export, one button, saved to the Desktop. |
+
+What it records, and why each one is there:
+
+- **App started / quit.** The app writes a marker file while it runs and removes it on a clean quit,
+  so the *next* start can say the previous session ended abnormally — and look for a macOS crash
+  report filed in that window. This is the only honest way Cellar can know it crashed.
+- **A play session.** `Game.launch` records the route it took; `waitForExitThenShutDown` records how
+  long the game ran. An exit inside 90 seconds is logged as a **warning** with the tail of the Wine
+  log and any crash report from that window — Cellar cannot see a Windows exit code through Wine, so
+  it never *claims* a crash, it reports what it observed.
+- **Every progress line.** The `progress:` closures the CLI prints are wrapped, so what the player
+  read is what the log holds — set-up steps, the D3DMetal start-race retries, install progress.
+- **Every failure.** `Cellar.main` wraps the CLI's entry point, so any command that exits non-zero
+  is logged with the invocation and the error the player was shown.
+
+`cellar logs export` folds all of that plus the machine, the runners, the bottles and the tails of
+the Wine logs into one text file for a bug report. It is **redacted**: the home path becomes `~`, the
+user name becomes `<user>`, and sign-in *state* is reported, never account names.
+
+Command lines are redacted **fail-closed**, in `Diagnostics.redactCommandLine`: an option's value is
+kept only if the option is on a short allowlist of diagnostic ones (`--profile`, `--level`,
+`--output`…), and every other value — including options that do not exist yet — becomes
+`<redacted>`. Positional words (the subcommand, the profile slug) are kept, because no command takes
+a credential positionally and they are what makes a line readable.
+
+The first version listed *sensitive* names instead and matched only `--long` options, so
+`fetch-depot -u <steam account>` and `gog login --code <oauth code>` reached the export in
+plaintext — under an on-screen promise that they had been removed. A list you must remember to
+extend leaks every option nobody thought of; the allowlist cannot. `cellar selftest` now drives the
+real formatter in every spelling ArgumentParser accepts (`-u v`, `-uv`, `--username v`,
+`--username=v`, and an option deliberately not on any list).
+
+`CELLAR_LOG_LEVEL` sets the floor (`off` disables the file entirely); `CELLAR_LOG_STDERR=1` mirrors
+entries to stderr while developing.
 
 ## The Planet Coaster 2 path (worked example)
 

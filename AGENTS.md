@@ -25,7 +25,7 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 
 | Path | What lives there |
 |---|---|
-| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store plugins (`Store.swift`, `Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation. **All logic lives here.** |
+| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store plugins (`Store.swift`, `Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
 | `Sources/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
 | `Sources/CellarUI/` | The app's presentation primitives — store marks, lockups, the generated cover, and `Snapshot`, which renders a SwiftUI view to pixels. A library rather than part of the app, because **a test cannot import an executable**. |
 | `Tests/CellarKitTests/` | Unit tests over the engine — parsing, the store table, launch routes, the readiness ladder and its copy, the profile database. Fast, hermetic, no Wine. |
