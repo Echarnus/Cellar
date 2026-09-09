@@ -41,6 +41,11 @@ let package = Package(
         // Renders the marks offscreen and measures them. Needs the profile database and the golden
         // images on disk, so it is handed the repo root rather than guessing from #filePath.
         .testTarget(name: "CellarUITests", dependencies: ["CellarUI", "CellarKit"]),
+
+        // Tiered integration tests. Tier A is hermetic; tiers B and C install a real runner, build
+        // a real Wine prefix and run a real Windows executable, and are opt-in behind environment
+        // variables so the default run stays fast and CI stays green. See docs/TESTING.md.
+        .testTarget(name: "CellarIntegrationTests", dependencies: ["CellarKit"]),
     ],
     // Pragmatic: a synchronous CLI doesn't need Swift 6 strict-concurrency overhead yet.
     swiftLanguageModes: [.v5]

@@ -31,7 +31,9 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 | `Tests/` | `CellarKitTests` (engine logic, the profile database) and `CellarUITests` (marks rendered offscreen and measured). Run with `sh Scripts/test.sh`. |
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
-| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator). |
+| `Tests/CellarKitTests/` | Unit tests — parsing, the store table, launch routes, the readiness ladder and its copy. Fast, hermetic, no Wine. |
+| `Tests/CellarIntegrationTests/` | Integration tests, tiered: bottles and app bundles always; a real runner, prefix and Windows game behind `CELLAR_IT=1`. See [`docs/TESTING.md`](docs/TESTING.md). |
+| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `test.sh` (the test runner). |
 | `docs/` | `ARCHITECTURE.md`, `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
 | `.github/workflows/` | `ci.yml`, `release.yml`, `pages.yml`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
@@ -46,6 +48,8 @@ sh Scripts/test.sh                # the test suite (headless, ~0.5s)
 swift run cellar doctor           # sanity-check the machine
 swift build -c release            # release build (what CI and the app installer use)
 swift run cellar selftest         # in-repo smoke test
+sh Scripts/test.sh                # unit tests + hermetic integration tier (what CI runs)
+sh Scripts/test.sh --integration  # + the Wine tiers: real prefix, real Windows game
 sh Scripts/install-app.sh         # build + install ~/Applications/Cellar.app
 python3 Scripts/gen-site.py       # regenerate the Pages site into site/
 ```
@@ -68,12 +72,17 @@ verifying, and if you cannot verify, say so and name what needs manual checking.
 1. **Builds** — `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` is clean.
 2. **Tests** — `sh Scripts/test.sh` passes. This is the rung to reach for first: it runs headless in
    under a second, so it costs nothing and it does not take the machine away from whoever is using
-   it. See *Testing* below.
+   it. A change to a profile, a store, a launch route, a mark or any player-visible wording is
+   expected to be *covered* here, not merely to leave it green. See *Testing* below.
 3. **Self-test** — `swift run cellar selftest` passes.
-4. **Behaviour** — the actual path you changed runs: the CLI command, or the installed app launched
+4. **Wine tiers** — `sh Scripts/test.sh --integration` for anything touching runners, prefixes or
+   launching. Installs a real runner and starts a real Windows executable, so it is a local rung,
+   not a CI one — and it is the rung to climb before a release.
+5. **Behaviour** — the actual path you changed runs: the CLI command, or the installed app launched
    and exercised. GUI changes are verified by reinstalling (`install-app.sh`) and launching, not by
    reading the diff. Site changes are verified by generating and opening `site/index.html`.
 
+Full map, including how to point tier C at a specific game: [`docs/TESTING.md`](docs/TESTING.md).
 The [verifier agent](agents/verifier.md) codifies these demands per kind of change.
 
 ### Testing

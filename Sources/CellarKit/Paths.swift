@@ -3,7 +3,16 @@ import Foundation
 /// Canonical on-disk locations for Cellar's state.
 /// Everything lives under ~/Library/Application Support/Cellar.
 public enum Paths {
+    /// The root of everything Cellar owns on disk.
+    ///
+    /// `CELLAR_HOME` relocates it wholesale. That exists so a test run — or a second, throwaway
+    /// installation — can create bottles, install runners and write logs without touching the
+    /// player's real library. Nothing else in Cellar reads the environment for a path; if it needs
+    /// a location, it derives it from here.
     public static var appSupport: URL {
+        if let override = ProcessInfo.processInfo.environment["CELLAR_HOME"], !override.isEmpty {
+            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath, isDirectory: true)
+        }
         let base = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first!

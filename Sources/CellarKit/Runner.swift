@@ -309,7 +309,12 @@ public enum RunnerManager {
         }
         for case let url as URL in enumerator {
             if url.lastPathComponent == name, url.deletingLastPathComponent().lastPathComponent == "bin",
-               url.path.contains("/wine/bin/") {
+               url.path.contains("/wine/bin/"),
+               // Same demand as the direct path above. Without it a half-extracted download, or one
+               // whose permissions were stripped, reports as an installed runner and then fails at
+               // exec time with something nobody can read — rather than honestly saying it is not
+               // installed yet.
+               FileManager.default.isExecutableFile(atPath: url.path) {
                 return url
             }
         }

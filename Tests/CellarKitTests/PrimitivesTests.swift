@@ -98,9 +98,13 @@ struct PrimitivesTests {
             let paths = Paths.profileSearchPaths.map(\.standardizedFileURL.path)
             let userIndex = try #require(paths.firstIndex(of: Paths.userProfiles.standardizedFileURL.path),
                                          "the user profile directory is not searched at all")
+            // An explicit CELLAR_PROFILES_DIR override is allowed to outrank the player's own
+            // directory — that is what the override is for, and the test run itself sets one.
+            // Nothing else may.
+            let override = ProcessInfo.processInfo.environment["CELLAR_PROFILES_DIR"]
+                .map { URL(fileURLWithPath: $0).standardizedFileURL.path }
             for (i, path) in paths.enumerated() where i < userIndex {
-                #expect(path == Paths.userProfiles.standardizedFileURL.path,
-                        "\(path) is searched before the player's own profiles")
+                #expect(path == override, "\(path) is searched before the player's own profiles")
             }
         }
     }

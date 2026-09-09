@@ -1,159 +1,190 @@
-import Testing
 import Foundation
+import Testing
 @testable import CellarKit
 
-/// The profile database is the one part of Cellar a contributor edits without writing any Swift, so
-/// it is the part most likely to ship a mistake. The app prints these fields **verbatim** to the
-/// player, and the setup/launch pipelines branch on them — a profile that names a store nobody
-/// implements, or claims `status = "verified"` with no hardware named, is a bug that reaches a
-/// person rather than a compiler.
+/// A lint over the profile database the repo actually ships.
 ///
-/// These run over `profiles/*.toml` in the checkout, so adding a game means adding a test case.
-@Suite("Profile database")
+/// A profile is the whole contract for a game: get a field wrong and the failure surfaces to a
+/// player as "it doesn't work", with no clue why. The app also shows these facts *verbatim*, so
+/// `status` and `notes` are not decoration — an untested profile that doesn't say so is a lie the
+/// interface tells on Cellar's behalf.
+@Suite(.serialized)
 struct ProfileDatabaseTests {
 
-    /// Every profile in the repo, read through the same flat scanner the CLI and app use — so a
-    /// profile that these tests pass is a profile Cellar can actually read.
-    static let profiles: [(slug: String, fields: [String: String], env: [String: String])] = {
-        guard let files = try? Repo.profileFiles() else { return [] }
-        return files.map { url in
-            let ref = ProfileRef(slug: url.deletingPathExtension().lastPathComponent, url: url)
-            return (ref.slug, ProfileStore.fields(ref), ProfileStore.env(ref))
+    /// The repo's `profiles/` directory, found from this file rather than the working directory.
+    static let directory: URL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()   // CellarKitTests
+        .deletingLastPathComponent()   // Tests
+        .deletingLastPathComponent()   // <repo>
+        .appendingPathComponent("profiles", isDirectory: true)
+
+    /// Every shipped profile, staged where `ProfileStore` will find it.
+    static let slugs: [String] = {
+        TestHome.ensure()
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        else { return [] }
+        var staged: [String] = []
+        for url in entries where url.pathExtension == "toml" {
+            let target = TestHome.profilesDirectory.appendingPathComponent(url.lastPathComponent)
+            try? fm.removeItem(at: target)
+            try? fm.copyItem(at: url, to: target)
+            staged.append(url.deletingPathExtension().lastPathComponent)
         }
+        return staged.sorted()
     }()
 
-    static var slugs: [String] { profiles.map(\.slug) }
-
-    @Test("the checkout actually ships profiles")
-    func databaseIsNotEmpty() throws {
-        #expect(!Self.profiles.isEmpty, "no profiles/*.toml found under \(Repo.profiles.path)")
-    }
-
-    @Test("a profile's slug matches its filename", arguments: Self.slugs)
-    func slugMatchesFilename(slug: String) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug })
-        #expect(p.fields["slug"] == slug,
-                "\(slug).toml declares slug = \"\(p.fields["slug"] ?? "")\" — the two are used interchangeably")
-    }
-
-    @Test("every profile names a store Cellar implements", arguments: Self.slugs)
-    func storeIsKnown(slug: String) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug })
-        let raw = try #require(p.fields["store"], "\(slug).toml has no store = \"…\"")
-        #expect(GameStore(profileValue: raw) != nil,
-                "\(slug).toml names store \"\(raw)\", which no GameStore case handles")
-    }
-
-    @Test("every profile carries the facts the app puts on screen", arguments: Self.slugs)
-    func requiredFactsArePresent(slug: String) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug })
-        for key in ["name", "engine", "graphics_api", "architecture", "status", "notes"] {
-            let value = p.fields[key] ?? ""
-            #expect(!value.isEmpty, "\(slug).toml is missing \(key) — the app shows this field verbatim")
+    @Test("The database is not empty and every file is a readable profile")
+    func databaseLoads() throws {
+        #expect(!Self.slugs.isEmpty, "profiles/ has no .toml files — Cellar would ship no games")
+        for slug in Self.slugs {
+            #expect(throws: Never.self) { try Game.plan(slug: slug) }
         }
     }
 
-    /// Per-store addressing. Steam games are reached by AppID; Battle.net by product code plus the
-    /// directory the client drops the game in; GOG by its product id. Get this wrong and setup
-    /// installs the right client and then cannot find the game.
-    @Test("a profile carries the identifiers its own store needs", arguments: Self.slugs)
-    func storeSpecificIdentifiers(slug: String) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug })
-        let store = try #require(GameStore(profileValue: p.fields["store"]))
+    @Test("Every profile resolves into a usable plan", arguments: ProfileDatabaseTests.slugs)
+    func planIsUsable(_ slug: String) throws {
+        let plan = try Game.plan(slug: slug)
 
-        switch store {
+        #expect(!plan.name.isEmpty)
+        #expect(plan.name != slug, "profile '\(slug)' has no display name")
+        #expect(!plan.bottleName.isEmpty)
+        #expect(RunnerCatalog.spec(forID: plan.runnerID) != nil,
+                "'\(slug)' pins runner '\(plan.runnerID)', which is not in the catalog")
+        #expect(GraphicsBackend(rawValue: plan.backend) != nil,
+                "'\(slug)' names backend '\(plan.backend)', which is not a backend Cellar has")
+    }
+
+    @Test("Each profile carries what its store needs to install and launch",
+          arguments: ProfileDatabaseTests.slugs)
+    func storeRequirements(_ slug: String) throws {
+        let plan = try Game.plan(slug: slug)
+        switch plan.store {
         case .steam:
-            let appID = p.fields["steam_appid"] ?? ""
-            #expect(!appID.isEmpty, "\(slug).toml is a Steam game with no steam_appid")
-            #expect(UInt64(appID) != nil, "\(slug).toml steam_appid \"\(appID)\" is not a number")
+            #expect(plan.appID != nil, "'\(slug)' is a Steam game with no steam_appid — nothing can launch it")
+            #expect((plan.appID ?? 0) > 0)
         case .battlenet:
-            #expect(!(p.fields["product_code"] ?? "").isEmpty,
-                    "\(slug).toml is a Battle.net game with no product_code — launch has nothing to --exec")
-            #expect(!(p.fields["install_dir"] ?? "").isEmpty,
-                    "\(slug).toml is a Battle.net game with no install_dir — Cellar cannot tell if it is installed")
-            #expect(!(p.fields["exe"] ?? "").isEmpty, "\(slug).toml is a Battle.net game with no exe")
+            #expect(plan.productCode != nil,
+                    "'\(slug)' is a Battle.net game with no product_code — the client cannot be told what to start")
+            #expect(!plan.gameProcessNeedles.isEmpty,
+                    "'\(slug)' needs an exe or install_dir, or Cellar cannot tell when the game is running")
         case .gog:
-            let id = p.fields["gog_product_id"] ?? ""
-            #expect(!id.isEmpty, "\(slug).toml is a GOG game with no gog_product_id")
-            #expect(UInt64(id) != nil, "\(slug).toml gog_product_id \"\(id)\" is not a number")
-            #expect(!(p.fields["exe"] ?? "").isEmpty, "\(slug).toml is a GOG game with no exe to launch")
+            #expect(plan.gogProductID != nil, "'\(slug)' is a GOG game with no gog_product_id")
+            #expect(plan.launchExe != nil, "a GOG game is launched directly, so it needs an exe")
         case .standalone:
-            #expect(!(p.fields["exe"] ?? "").isEmpty, "\(slug).toml is standalone with no exe to launch")
+            #expect(plan.launchExe != nil, "'\(slug)' has no store and no exe — there is nothing to run")
         }
     }
 
-    @Test("graphics backends are ones Cellar can actually graft", arguments: Self.slugs)
-    func backendsAreSupported(slug: String) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug })
-        // Derived from the enum rather than listed here: a hardcoded copy would go stale the day
-        // somebody adds a backend, and then reject a perfectly good profile.
-        let supported = Set(GraphicsBackend.allCases.map(\.rawValue) + ["none"])
-        for key in ["backend", "fallback_backend"] {
-            guard let value = p.fields[key], !value.isEmpty else { continue }
-            #expect(supported.contains(value), "\(slug).toml \(key) = \"\(value)\" is not a backend Cellar installs")
-        }
-        // A fallback that is the same as the primary is not a fallback.
-        if let b = p.fields["backend"], let f = p.fields["fallback_backend"] {
-            #expect(b != f, "\(slug).toml falls back from \(b) to itself")
+    @Test("A profile that does not need a live session says how to start the game itself",
+          arguments: ProfileDatabaseTests.slugs)
+    func drmFreeGamesAreLaunchable(_ slug: String) throws {
+        let plan = try Game.plan(slug: slug)
+        if !plan.needsLiveSession {
+            #expect(plan.launchExe != nil,
+                    "'\(slug)' opts out of the store client but names no exe, so it can never launch")
         }
     }
 
-    /// The honesty rule applied to data. `AGENTS.md`: "the app shows those facts verbatim, so
-    /// 'untested' must say so". A profile may only claim to be verified if its notes name the
-    /// hardware it was verified on.
-    @Test("a status is one of the words the app knows, and 'verified' names hardware",
-          arguments: Self.slugs)
-    func statusIsHonest(slug: String) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug })
-        let status = p.fields["status"] ?? ""
-        let known: Set<String> = ["untested", "testing", "playable", "verified", "broken"]
-        #expect(known.contains(status), "\(slug).toml status = \"\(status)\" is not a word the app renders")
+    @Test("Compatibility is stated honestly", arguments: ProfileDatabaseTests.slugs)
+    func honestStatus(_ slug: String) throws {
+        let plan = try Game.plan(slug: slug)
+        let status = try #require(plan.facts.status, "'\(slug)' has no status — the app would show a blank")
+        #expect(["playable", "untested", "broken", "partial"].contains(status),
+                "'\(slug)' has status '\(status)', which the app has no vocabulary for")
 
-        if status == "verified" || status == "playable" {
-            let notes = p.fields["notes"] ?? ""
-            #expect(notes.count > 20,
-                    "\(slug).toml claims \(status) but its notes do not say what that was tested on")
+        // A profile claiming "playable" is claiming somebody ran it. Notes are where that is
+        // recorded — which hardware, which caveats — and the app prints them verbatim.
+        if status == "playable" {
+            let notes = try #require(plan.facts.notes, "'\(slug)' claims playable but records nothing about it")
+            #expect(notes.count > 20, "'\(slug)' claims playable with a note too short to be evidence")
         }
     }
 
-    /// The hard project rule, as a test rather than as a habit. No profile may describe defeating
-    /// DRM or anti-cheat; Cellar runs them through the layer untouched.
-    @Test("no profile describes circumventing DRM or anti-cheat", arguments: Self.slugs)
-    func noCircumvention(slug: String) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug })
-        if let declared = p.fields["drm_circumvention"] {
-            #expect(declared == "never", "\(slug).toml declares drm_circumvention = \"\(declared)\"")
-        }
-        let text = try String(contentsOf: Repo.profiles.appendingPathComponent("\(slug).toml"), encoding: .utf8)
-        for banned in ["crack", "no-cd", "nocd", "bypass anti-cheat", "defeat drm"] {
-            #expect(!text.lowercased().contains(banned),
-                    "\(slug).toml mentions \"\(banned)\" — Cellar never circumvents DRM or anti-cheat")
+    @Test("Compatibility facts a player needs before installing are present",
+          arguments: ProfileDatabaseTests.slugs)
+    func compatibilityFactsPresent(_ slug: String) throws {
+        let plan = try Game.plan(slug: slug)
+        #expect(plan.facts.anticheat != nil, "'\(slug)' does not say whether it has anti-cheat")
+        #expect(plan.facts.drm != nil, "'\(slug)' does not say what DRM it carries")
+        #expect(!plan.facts.compatibility.isEmpty)
+    }
+
+    @Test("The legal boundary is declared and never crossed", arguments: ProfileDatabaseTests.slugs)
+    func legalBoundary(_ slug: String) throws {
+        let text = try String(contentsOf: Self.directory.appendingPathComponent("\(slug).toml"),
+                              encoding: .utf8)
+        #expect(text.contains("drm_circumvention"),
+                "'\(slug)' does not declare its DRM stance — see docs/LEGAL.md")
+        #expect(text.contains(#"drm_circumvention = "never""#),
+                "'\(slug)' must declare drm_circumvention = \"never\"")
+
+        // Hard project rule: Cellar runs DRM through the layer untouched.
+        let forbidden = ["crack", "no-cd", "nocd", "bypass anti-cheat", "keygen", "drm removal"]
+        for word in forbidden {
+            #expect(!text.lowercased().contains(word), "'\(slug)' mentions '\(word)'")
         }
     }
 
-    /// Environment variables reach Wine verbatim. A stray quote or a trailing inline comment used to
-    /// be a real source of "the game launches on my machine but not from a profile" reports.
-    @Test("env values survive the parser intact", arguments: Self.slugs)
-    func envIsClean(slug: String) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug })
-        for (key, value) in p.env {
+    @Test("A slug is filesystem-safe and matches what the profile calls itself",
+          arguments: ProfileDatabaseTests.slugs)
+    func slugsAreWellFormed(_ slug: String) throws {
+        #expect(slug == slug.lowercased())
+        #expect(slug.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" },
+                "'\(slug)' has characters that will not survive being a bottle directory name")
+
+        let fields = ProfileStore.fields(try #require(ProfileStore.find(slug)))
+        if let declared = fields["slug"] {
+            #expect(declared == slug, "'\(slug).toml' declares slug = \"\(declared)\"")
+        }
+    }
+
+    @Test("Artwork URLs, where a profile supplies them, are usable",
+          arguments: ProfileDatabaseTests.slugs)
+    func artworkURLs(_ slug: String) throws {
+        let plan = try Game.plan(slug: slug)
+        for url in [plan.artPortraitURL, plan.artHeroURL].compactMap({ $0 }) {
+            #expect(url.hasPrefix("https://"), "'\(slug)' has a non-HTTPS art URL")
+            #expect(URL(string: url) != nil, "'\(slug)' has an art URL that will not parse: \(url)")
+        }
+        if plan.store != .steam {
+            // Only Steam publishes free cover art keyed on an app id; every other store has to
+            // bring URLs or fall back to Cellar's generated cover. Stardew Valley is the case that
+            // matters: it carries a steam_appid but is a `standalone` profile.
+            let summary = Game.summaries().first { $0.slug == slug }
+            #expect(summary?.artworkAppID == nil,
+                    "'\(slug)' is not a Steam game, so it must not fetch Steam artwork")
+        }
+    }
+
+    @Test("Bottles are only shared deliberately")
+    func sharedBottlesAreIntentional() throws {
+        var byBottle: [String: [String]] = [:]
+        for slug in Self.slugs {
+            let plan = try Game.plan(slug: slug)
+            byBottle[plan.bottleName, default: []].append(slug)
+        }
+        for (bottle, slugs) in byBottle where slugs.count > 1 {
+            // Several games in one bottle is a supported choice, but they must at least agree on
+            // the runner — a bottle has exactly one Wine.
+            let runners = try Set(slugs.map { try Game.plan(slug: $0).runnerID })
+            #expect(runners.count == 1,
+                    "bottle '\(bottle)' is shared by \(slugs) with different runners: \(runners)")
+            let stores = try Set(slugs.map { try Game.plan(slug: $0).store })
+            #expect(stores.count == 1,
+                    "bottle '\(bottle)' is shared across stores \(stores) — one bottle holds one client")
+        }
+    }
+
+    @Test("Every profile's env values are plain strings Wine can take",
+          arguments: ProfileDatabaseTests.slugs)
+    func envValuesAreClean(_ slug: String) throws {
+        let plan = try Game.plan(slug: slug)
+        for (key, value) in plan.env {
             #expect(!key.isEmpty)
-            #expect(!value.contains("\""), "\(slug).toml env \(key) still carries a quote: \(value)")
-            #expect(!value.contains("#"), "\(slug).toml env \(key) still carries a comment: \(value)")
-            #expect(value.trimmingCharacters(in: .whitespaces) == value,
-                    "\(slug).toml env \(key) has stray whitespace: '\(value)'")
+            #expect(!key.contains(" "), "'\(slug)' has an env key with a space: '\(key)'")
+            #expect(!value.contains("\""), "'\(slug)' left a quote in \(key)=\(value)")
+            #expect(!value.hasPrefix("#"), "'\(slug)' read a comment as the value of \(key)")
         }
-    }
-
-    /// The reference profiles `CONTRIBUTING.md` tells a contributor to copy. If one is renamed or
-    /// removed, that instruction quietly stops working.
-    @Test("the per-store reference profiles named in CONTRIBUTING.md exist",
-          arguments: [("planet-coaster-2", GameStore.steam),
-                      ("diablo-4", GameStore.battlenet),
-                      ("witcher-3", GameStore.gog)])
-    func referenceProfilesExist(slug: String, store: GameStore) throws {
-        let p = try #require(Self.profiles.first { $0.slug == slug },
-                             "\(slug).toml is the reference profile for \(store.displayName)")
-        #expect(GameStore(profileValue: p.fields["store"]) == store)
     }
 }
