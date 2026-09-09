@@ -20,6 +20,30 @@ struct Doctor: ParsableCommand {
         }
         print("")
 
+        // Where the player stands with the stores, since that is what "am I ready to play?" actually
+        // depends on once the machine itself is fine. Full detail: cellar accounts.
+        print(Term.bold("Store accounts") + Term.dim("  (detail: cellar accounts)"))
+        if let account = SteamBottle.sharedLoggedInAccount {
+            print("  \(Term.green("✓")) Steam        signed in as \(account), shared by every Steam game")
+        } else if SteamBottle.isSharedInstallPresent {
+            print("  \(Term.yellow("•")) Steam        installed but not signed in — cellar steam open <slug>")
+        } else {
+            print("  \(Term.dim("·")) Steam        no shared install yet — created by: cellar setup --profile <slug>")
+        }
+        if GOGAuth.isSignedIn {
+            print("  \(Term.green("✓")) GOG          signed in\(GOGAuth.cachedUsername.map { " as \($0)" } ?? "")")
+        } else {
+            print("  \(Term.dim("·")) GOG          not signed in — cellar gog login")
+        }
+        // A bottle still carrying its own Steam copy is wasted space the player should know about.
+        let unshared = ((try? PrefixManager.list()) ?? []).filter {
+            SteamBottle.hasOwnSteamInstallForDiagnostics(in: $0.url)
+        }
+        if !unshared.isEmpty {
+            print("  \(Term.yellow("•")) \(unshared.count) bottle(s) still keep their own Steam copy — cellar steam share")
+        }
+        print("")
+
         let fails = checks.filter { $0.status == .fail }.count
         let warns = checks.filter { $0.status == .warn }.count
         if fails == 0 && warns == 0 {

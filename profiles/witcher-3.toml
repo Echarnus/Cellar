@@ -1,0 +1,52 @@
+# Cellar game profile — The Witcher 3: Wild Hunt (GOG)
+# Schema version 0. The DRM-free reference case for the GOG store: no client in the bottle, no live
+# session, one account-level sign-in. Untested on the M5 — validate before trusting.
+
+[game]
+slug          = "witcher-3"
+name          = "The Witcher 3: Wild Hunt"
+developer     = "CD PROJEKT RED"
+engine        = "REDengine 3"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2015-05-19"
+
+# GOG: Cellar holds an OAuth token and talks to GOG's API directly. Nothing is installed in the
+# bottle but the game itself — see docs/ARCHITECTURE.md, "The store layer".
+store         = "gog"
+
+[compatibility]
+anticheat                   = "none"
+# The whole point of GOG: there is nothing to satisfy at runtime.
+drm                         = "none (DRM-free)"
+needs_live_session          = false
+requires_account            = "GOG (to download only — the installed game needs no account)"
+online                      = "single-player"
+status                      = "untested"
+notes                       = "DRM-free, so it runs with no store client at all. DX11 through D3DMetal should be well-behaved; the DX12 'next-gen' build is a separate exe and untested here."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+MTL_HUD_ENABLED = "1"
+
+[install]
+# Cellar downloads the Windows installer the player owns and runs it silently into C:\Games\witcher-3.
+method          = "gog-installer"
+# Verified against api.gog.com on 2026-09-08: 1207664643 is
+# "The Witcher 3: Wild Hunt - Complete Edition" (slug the_witcher_3_wild_hunt_game).
+# `cellar gog library` prints the id for anything else you own.
+gog_product_id  = 1207664643
+
+[launch]
+# Relative to the install directory. The DX11 build; the next-gen DX12 one is bin/x64_dx12/witcher3.exe.
+exe = "bin/x64/witcher3.exe"
+
+[legal]
+drm_circumvention = "never"

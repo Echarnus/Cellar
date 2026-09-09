@@ -10,7 +10,8 @@ struct SteamCommand: ParsableCommand {
         the same way — the two differ only where the stores genuinely do (Steam installs silently
         and publishes who is signed in; Battle.net does neither).
         """,
-        subcommands: [Open.self, Install.self, Status.self, App.self, Add.self, EnableWindowsPlatform.self, DisableWindowsPlatform.self]
+        subcommands: [Open.self, Login.self, Share.self, Install.self, Status.self, App.self, Add.self,
+                      EnableWindowsPlatform.self, DisableWindowsPlatform.self]
     )
 
     // MARK: app (Steam client as a macOS .app)
@@ -27,6 +28,75 @@ struct SteamCommand: ParsableCommand {
                 store: .steam, bottle: plan.bottleName, slug: slug,
                 cellarBinary: AppBundle.resolveCellarBinary())
             print(Term.green("Created ") + bundle.app.path)
+        }
+    }
+
+    // MARK: login (QR device flow, for the download path)
+
+    struct Login: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Sign in to Steam by QR code, for downloads that skip the Windows client.",
+            discussion: """
+            Uses Steam's own device-authorization flow — the same QR the real client shows. Cellar
+            never sees a password: you approve the sign-in in the Steam mobile app, and Steam hands
+            back a token that every later `cellar fetch-depot` reuses silently.
+
+            This signs in the *download* path. A game with Steamworks or Denuvo DRM also talks to a
+            running Steam client when it launches, and that client has its own sign-in — one window,
+            once, shared by every bottle: cellar steam open <slug>
+            """)
+
+        @Flag(help: "Sign out instead: forget the stored download session.")
+        var forget = false
+
+        func run() throws {
+            if forget {
+                try DepotTool.forgetSession()
+                print(Term.green("Signed out.") + " Downloads will ask again: cellar steam login")
+                return
+            }
+            if DepotTool.hasStoredSession {
+                print(Term.green("Already signed in for downloads.")
+                    + Term.dim(" Replace it by signing out first: cellar steam login --forget"))
+                return
+            }
+            print(Term.bold("Sign in to Steam"))
+            print(Term.dim("  Scan the QR code below with the Steam mobile app. Nothing to type."))
+            try DepotTool.signIn(credentials: .qr) { print("  " + $0) }
+            if DepotTool.hasStoredSession {
+                print(Term.green("Signed in.") + " Downloads won't ask again: cellar fetch-depot <slug>")
+            } else {
+                print(Term.yellow("Sign-in didn't complete.") + " Run it again: cellar steam login")
+            }
+        }
+    }
+
+    // MARK: share (one Steam install for every bottle)
+
+    struct Share: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Point every bottle at one shared Steam install — one sign-in, one download.",
+            discussion: """
+            A bottle is per-game so each game keeps its own registry, runner and Wine version. The
+            Steam *client* is not per-game — it belongs to your account — so Cellar keeps one copy in
+            ~/Library/Application Support/Cellar/shared/steam and links every bottle to it. One
+            sign-in, one 1.4 GB client, and a game you own downloaded once instead of per bottle.
+
+            Safe to re-run, and it never deletes a download: the richest existing install is promoted
+            into the shared one, and any other is moved aside with the path printed so you can
+            reclaim the space yourself.
+            """)
+
+        func run() throws {
+            print(Term.bold("Sharing one Steam install across every bottle"))
+            let linked = try SteamBottle.adoptSharedInstall { print("  " + Term.dim($0)) }
+            if linked == 0 {
+                print(Term.green("Nothing to do.") + " Every bottle already uses the shared install.")
+            } else {
+                print(Term.green("Linked \(linked) bottle\(linked == 1 ? "" : "s").")
+                    + " Sign in once with: cellar steam open <slug>")
+            }
+            print(Term.dim("  shared install: \(SteamBottle.sharedInstall.path)"))
         }
     }
 

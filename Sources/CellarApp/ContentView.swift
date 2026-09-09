@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import CellarKit
+import CellarUI
 
 @MainActor
 final class Library: ObservableObject {
@@ -111,6 +112,12 @@ struct ContentView: View {
             Button { lib.refresh() } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.borderless).help("Refresh the library")
                 .accessibilityLabel("Refresh the library")
+            // Accounts sits beside Settings because signing in is a thing you do once, for the
+            // whole library — not something to rediscover on each game's screen.
+            Button { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
+                label: { Image(systemName: "person.crop.circle") }
+                .buttonStyle(.borderless).help("Accounts — sign in to Steam, GOG and Battle.net")
+                .accessibilityLabel("Accounts")
             Button { NotificationCenter.default.post(name: .cellarOpenSettings, object: nil) }
                 label: { Image(systemName: "gearshape") }
                 .buttonStyle(.borderless).help("Settings")

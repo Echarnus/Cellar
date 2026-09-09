@@ -17,6 +17,9 @@ The diff (or list of changed files) and a one-line statement of intent.
 
 **1. It builds and self-tests.**
 - `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` is clean (no warnings introduced).
+- `sh Scripts/test.sh` passes. Headless and under a second, so there is never an excuse to skip it —
+  and a change to a store mark, a profile or the store descriptors is *expected* to be covered by it.
+  If the change is user-visible and no test moved, ask why not before accepting it.
 - `swift run cellar selftest` passes when `Sources/**` changed.
 
 **2. It matches the verification ladder for the kind of change** (see [`../AGENTS.md`](../AGENTS.md)):

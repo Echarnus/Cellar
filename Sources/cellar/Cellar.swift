@@ -9,14 +9,21 @@ struct Cellar: ParsableCommand {
         discussion: """
         Cellar assembles a Wine runner plus a graphics backend (Apple's D3DMetal, or the
         open-source DXVK/MoltenVK path) into per-game "bottles", driven by a profile database.
-        Each game names the store it comes from, and Cellar stands that store's client up inside
-        the bottle: Windows Steam, or Blizzard's Battle.net.
+        Each game names the store it comes from, and that decides how it is set up: Windows Steam or
+        Blizzard's Battle.net stood up inside the bottle, or — for GOG — no client at all, just an
+        OAuth token and a DRM-free installer. `cellar accounts` shows where you're signed in.
 
         Quick start — Steam:
           cellar doctor                          check your machine
           cellar setup --profile planet-coaster-2   runner + bottle + Windows Steam
-          cellar steam open  planet-coaster-2    sign in, install the game
+          cellar steam open  planet-coaster-2    sign in once (shared by every Steam game)
           cellar launch      planet-coaster-2    play
+
+        Quick start — GOG (DRM-free, no client in the bottle):
+          cellar gog login                       sign in once, for your whole library
+          cellar gog library                     see what you own
+          cellar gog install witcher-3           download + install
+          cellar launch witcher-3                play
 
         Quick start — Battle.net:
           cellar setup --profile diablo-4        runner + bottle + Battle.net
@@ -32,6 +39,8 @@ struct Cellar: ParsableCommand {
             Setup.self,
             SteamCommand.self,
             BattleNetCommand.self,
+            GogCommand.self,
+            Accounts.self,
             FetchDepot.self,
             Launch.self,
             RunnerCommand.self,

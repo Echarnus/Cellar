@@ -25,11 +25,15 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 
 | Path | What lives there |
 |---|---|
-| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store clients (`Store.swift`, `Steam.swift`, `BattleNet.swift`), downloading, app-bundle generation. **All logic lives here.** |
+| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store plugins (`Store.swift`, `Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation. **All logic lives here.** |
 | `Sources/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
+| `Sources/CellarUI/` | The app's presentation primitives — store marks, lockups, the generated cover, and `Snapshot`, which renders a SwiftUI view to pixels. A library rather than part of the app, because **a test cannot import an executable**. |
+| `Tests/` | `CellarKitTests` (engine logic, the profile database) and `CellarUITests` (marks rendered offscreen and measured). Run with `sh Scripts/test.sh`. |
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
-| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator). |
+| `Tests/CellarKitTests/` | Unit tests — parsing, the store table, launch routes, the readiness ladder and its copy. Fast, hermetic, no Wine. |
+| `Tests/CellarIntegrationTests/` | Integration tests, tiered: bottles and app bundles always; a real runner, prefix and Windows game behind `CELLAR_IT=1`. See [`docs/TESTING.md`](docs/TESTING.md). |
+| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `test.sh` (the test runner). |
 | `docs/` | `ARCHITECTURE.md`, `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
 | `.github/workflows/` | `ci.yml`, `release.yml`, `pages.yml`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
@@ -40,9 +44,12 @@ Swift 6 toolchain, Apple Silicon, macOS 13+.
 
 ```sh
 swift build                       # debug build
+sh Scripts/test.sh                # the test suite (headless, ~0.5s)
 swift run cellar doctor           # sanity-check the machine
 swift build -c release            # release build (what CI and the app installer use)
 swift run cellar selftest         # in-repo smoke test
+sh Scripts/test.sh                # unit tests + hermetic integration tier (what CI runs)
+sh Scripts/test.sh --integration  # + the Wine tiers: real prefix, real Windows game
 sh Scripts/install-app.sh         # build + install ~/Applications/Cellar.app
 python3 Scripts/gen-site.py       # regenerate the Pages site into site/
 ```
@@ -63,27 +70,71 @@ Climb to the **highest rung available** before claiming a change is done. Never 
 verifying, and if you cannot verify, say so and name what needs manual checking.
 
 1. **Builds** — `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` is clean.
-2. **Self-test** — `swift run cellar selftest` passes.
-3. **Behaviour** — the actual path you changed runs: the CLI command, or the installed app launched
+2. **Tests** — `sh Scripts/test.sh` passes. This is the rung to reach for first: it runs headless in
+   under a second, so it costs nothing and it does not take the machine away from whoever is using
+   it. A change to a profile, a store, a launch route, a mark or any player-visible wording is
+   expected to be *covered* here, not merely to leave it green. See *Testing* below.
+3. **Self-test** — `swift run cellar selftest` passes.
+4. **Wine tiers** — `sh Scripts/test.sh --integration` for anything touching runners, prefixes or
+   launching. Installs a real runner and starts a real Windows executable, so it is a local rung,
+   not a CI one — and it is the rung to climb before a release.
+5. **Behaviour** — the actual path you changed runs: the CLI command, or the installed app launched
    and exercised. GUI changes are verified by reinstalling (`install-app.sh`) and launching, not by
    reading the diff. Site changes are verified by generating and opening `site/index.html`.
 
+Full map, including how to point tier C at a specific game: [`docs/TESTING.md`](docs/TESTING.md).
 The [verifier agent](agents/verifier.md) codifies these demands per kind of change.
+
+### Testing
+
+```sh
+sh Scripts/test.sh                    # the whole suite, ~0.5s
+sh Scripts/test.sh --filter Profile   # one part of it
+```
+
+Use the script rather than a bare `swift test`: swift-testing ships as a framework inside the
+developer directory, and this machine's `xcode-select` points at a Nix SDK that has none — so
+`swift test` fails with *"no such module 'Testing'"* until the framework search path is supplied.
+`Scripts/test.sh` finds a developer directory that really has it and passes the paths through.
+
+Three targets, and the split matters:
+
+| Target | Covers | Why it exists |
+|---|---|---|
+| `CellarKit` | the engine | logic |
+| `CellarUI` | store marks, lockups, the generated cover, `Snapshot` | **a test cannot import an executable**, so anything to be verified without launching the app lives here, not in `CellarApp` |
+| `CellarApp` | windows, menus, state, the CLI subprocess | the part that genuinely needs launching |
+
+**`Tests/CellarUITests` renders SwiftUI offscreen and measures the pixels.** That is what lets a
+user-visible change be checked in the background instead of taking over the machine — and it is a
+real check, not a proxy: the marks are drawn, then measured. It asserts the *identifying* properties
+of each mark (Steam's big wheel upper-right and open, Blizzard's orb not filled in) rather than exact
+pixels, because a test that broke on every gradient nudge would be deleted within a week, and one
+that passes a mirrored logo is worthless. When you add a view worth verifying, put it in `CellarUI`.
+
+Every run also writes `.build/ui-snapshots/store-marks-{light,dark}.png` — every mark, both themes,
+every size it is used at, in one image. **Open that instead of launching the app** for a first look;
+CI uploads it as an artifact on every PR. It does not replace rung 4 — a snapshot cannot show you
+that a window resizes or a click lands — but it catches the wrong-looking before it reaches anyone.
 
 ## Stores are a first-class concept
 
-A game names the storefront it came from (`store = "steam" | "battlenet" | "standalone"`), and that
-one field decides the whole pipeline: which client `cellar setup` installs, what "installed" and
-"signed in" mean, how a launch is issued, and the words the player reads. Read
+A game names the storefront it came from (`store = "steam" | "battlenet" | "gog" | "standalone"`),
+and that one field decides the whole pipeline: which client `cellar setup` installs (if any), what
+"installed" and "signed in" mean, how a launch is issued, and the words the player reads. Read
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → *The store layer* for the comparison table.
 
-The differences are real, not cosmetic — the two that bite hardest:
+The differences are real, not cosmetic — the three that bite hardest:
 
 - **Battle.net has no silent installer.** Steam's takes `/S`; Blizzard's does not exist. Setup must
   *warn the player* that a window will open, or an unexplained pause reads as a hang.
 - **Battle.net does not publish who is signed in.** Steam writes `loginusers.vdf`. So Cellar never
   shows a Battle.net sign-in step and never a ✗ beside "account" — it folds signing in into "open the
   client", the one screen where the player can act on it.
+- **Signing in is account-level, never per game.** One Windows Steam install lives in `shared/steam`
+  and every Steam bottle symlinks to it, and GOG's sign-in is an OAuth token Cellar holds. So a
+  sign-in belongs to the **Accounts** screen (`cellar accounts`, ⌘⇧A), not to a game's page.
+  `StoreDescriptor.authStyle` is the fact that decides which shape a store has.
 
 Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarKit/Store.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
@@ -122,7 +173,7 @@ per language:
 ## Adding a game
 
 A game is a `profiles/<slug>.toml` — copy the closest existing one (`planet-coaster-2` for Steam,
-`diablo-4` for Battle.net). Name its **`store`**, record verified facts (AppID *or* `product_code` +
+`diablo-4` for Battle.net, `witcher-3` for GOG). Name its **`store`**, record verified facts (AppID *or* `product_code` +
 `install_dir` + `exe`, engine, graphics API, arch), state DRM/anti-cheat **honestly**, pick `backend`
 + `fallback_backend`, and give a `status` + `notes` naming the hardware you tested on. The app shows
 those facts verbatim, so "untested" must say so. See [`CONTRIBUTING.md`](CONTRIBUTING.md).

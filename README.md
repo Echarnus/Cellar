@@ -5,8 +5,10 @@
 Cellar assembles a [Wine](https://www.winehq.org/) runner plus a graphics-translation backend
 (Apple's **D3DMetal**, or the open-source **DXVK → MoltenVK** path) into per-game **bottles**,
 driven by a community **profile database**. Each game names the **storefront** it came from, and
-Cellar stands that client up inside the bottle — Windows **Steam**, or Blizzard's **Battle.net**.
-The engine is general: adding a game means adding a profile, not rebuilding the layer.
+Cellar handles that store's shape: Windows **Steam** or Blizzard's **Battle.net** stood up inside the
+bottle, or — for **GOG** — no client at all, just an OAuth token and a DRM-free installer. You sign in
+once per store, not once per game. The engine is general: adding a game means adding a profile, not
+rebuilding the layer.
 
 > **Status:** Phase 1 (working). **Planet Coaster 2 is playable on an Apple M5 / macOS 26.5** —
 > `cellar setup` installs the runner (WineForge: Wine 11.17 + D3DMetal 3.0), creates the bottle,
@@ -44,26 +46,46 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full stack.
 
 ---
 
-## Two storefronts, told apart properly
+## Three storefronts, told apart properly
 
-A profile says `store = "steam"`, `"battlenet"` or `"standalone"`, and that decides everything
-downstream — which client `cellar setup` installs, what "installed" means, how a launch is issued,
-and what the app tells you. The differences are real, and Cellar refuses to paper over them:
+A profile says `store = "steam"`, `"battlenet"`, `"gog"` or `"standalone"`, and that decides
+everything downstream — which client `cellar setup` installs (if any), what "installed" and "signed
+in" mean, how a launch is issued, and what the app tells you. The differences are real, and Cellar
+refuses to paper over them:
 
-| | Steam | Battle.net |
-|---|---|---|
-| Installing the client | silent (`/S`) | **not silent** — Blizzard's window opens and wants a few clicks, so Cellar warns you before it does |
-| Who's signed in | readable (`loginusers.vdf`) — the app shows your account | **not published** — so Cellar shows no sign-in step and no false ✗; you sign in inside the client |
-| Games are named by | AppID (`2688950`) | product code (`Fen` = Diablo IV) |
-| Installing a game | `cellar steam install <slug>` | opens Battle.net — Blizzard exposes no install URL a launcher can drive |
-| Launching | `steam://rungameid/…` into a silent client | `Battle.net.exe --exec="launch Fen"`, client warmed first |
+| | Steam | Battle.net | GOG |
+|---|---|---|---|
+| Client in the bottle | yes | yes | **none** — Cellar talks to GOG over HTTP |
+| Installing the client | silent (`/S`) | **not silent** — Blizzard's window opens and wants a few clicks, so Cellar warns you before it does | n/a |
+| Signing in | once, in the client's window — **shared by every Steam game** | in the client's window | **once, OAuth** — covers your whole library |
+| Who's signed in | readable (`loginusers.vdf`) — the app shows your account | **not published** — so Cellar shows no sign-in step and no false ✗ | Cellar holds the token, so it knows |
+| Games are named by | AppID (`2688950`) | product code (`Fen` = Diablo IV) | `gog_product_id` |
+| Installing a game | `cellar steam install <slug>` | opens Battle.net — Blizzard exposes no install URL a launcher can drive | `cellar gog install <slug>` — Cellar downloads and installs it |
+| Launching | `steam://rungameid/…` into a silent client | `Battle.net.exe --exec="launch Fen"`, client warmed first | run the exe — nothing beside it |
 
 ```sh
 # Diablo IV, via Battle.net
 cellar setup --profile diablo-4     # runner + bottle + Battle.net (its installer needs a few clicks)
 cellar battlenet open diablo-4      # sign in, install the game from the client
 cellar launch diablo-4              # play — quitting the game closes the whole layer
+
+# The Witcher 3, via GOG — DRM-free, so no store client is involved at all
+cellar gog login                    # sign in once, for your whole GOG library
+cellar gog install witcher-3        # Cellar downloads it and installs it silently
+cellar launch witcher-3             # play
 ```
+
+### You sign in once, not once per game
+
+A bottle is per-game so each game keeps its own registry, runner and Wine version. The Steam *client*
+is not per-game — it's your account's — so Cellar keeps **one** Windows Steam install in
+`shared/steam` and symlinks every bottle to it. One sign-in, one 1.4 GB client, and a game you own
+downloaded once instead of per bottle. `cellar steam share` migrates an existing setup and never
+deletes a download.
+
+`cellar accounts` (⌘⇧A in the app) shows where you're signed in — and only what Cellar can actually
+check: your Steam account name, your GOG account name, and for Battle.net an honest "not published"
+rather than a guess.
 
 In the app the library is grouped by store, each game carries its storefront's mark and name, and
 the detail page states what the profile actually knows: developer, engine, graphics API, anti-cheat,
@@ -123,9 +145,19 @@ The minimal-setup path to Planet Coaster 2:
 ```sh
 cellar doctor                       # check your machine (Apple Silicon, Rosetta, disk…)
 cellar setup                        # install runner + bottle + Windows Steam (Planet Coaster 2)
-cellar steam open  planet-coaster-2 # opens Steam in the bottle — log in (Steam Guard/2FA works)
+cellar steam open  planet-coaster-2 # opens Steam in the bottle — log in once, for every Steam game
 cellar steam install planet-coaster-2  # opens the install dialog for PC2 (or install from the UI)
 cellar launch      planet-coaster-2 # play (routes through Steam so DRM/auth work)
+```
+
+Signing in, wherever you are:
+
+```sh
+cellar accounts                     # where you're signed in, across every store
+cellar steam login                  # QR sign-in for client-free downloads (nothing typed)
+cellar steam share                  # one Steam install for every bottle (safe to re-run)
+cellar gog login                    # OAuth, once, for your whole GOG library
+cellar gog library                  # everything you own that runs on Windows
 ```
 
 Surface it like a native game:
@@ -136,7 +168,7 @@ cellar steam add planet-coaster-2   # generates ~/Applications/Planet Coaster 2.
 ```
 
 Other commands: `cellar runner list/install`, `cellar prefix list`, `cellar profiles list/show`,
-`cellar steam enable-windows-platform` (advanced).
+`cellar fetch-depot <slug>` (client-free download), `cellar steam enable-windows-platform` (advanced).
 
 ---
 

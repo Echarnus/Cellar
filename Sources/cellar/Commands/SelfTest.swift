@@ -65,6 +65,41 @@ struct SelfTest: ParsableCommand {
         // 4. appid high bit is set (Steam non-Steam-shortcut convention)
         try check((id1 & 0x8000_0000) != 0, "shortcut appid has the high bit set")
 
+        // 5. Steam's QR sign-in: DepotDownloader only *draws* the challenge, so Cellar reads the
+        // drawing back into modules (see SteamQRCode.swift). Round-trip a synthetic code through
+        // exactly the layout DepotDownloader emits — two characters per module, a four-module quiet
+        // zone, whitespace-only rows above and below. Verified against DepotDownloader 3.4.0 output,
+        // which is a 29x29 matrix; this uses 21x21 (QR version 1) so the fixture stays readable.
+        let size = 21
+        var matrix = (0..<size).map { row in
+            (0..<size).map { column in (row * 7 + column * 3) % 5 == 0 }
+        }
+        // Finder patterns in three corners: the outermost modules must be dark, or the trim step
+        // has nothing to anchor the bounding box to.
+        for corner in [(0, 0), (0, size - 7), (size - 7, 0)] {
+            for dr in 0..<7 {
+                for dc in 0..<7 {
+                    let ring = dr == 0 || dr == 6 || dc == 0 || dc == 6
+                    let core = (2...4).contains(dr) && (2...4).contains(dc)
+                    matrix[corner.0 + dr][corner.1 + dc] = ring || core
+                }
+            }
+        }
+
+        let quiet = String(repeating: "  ", count: 4)
+        var drawn = [String(repeating: " ", count: size * 2 + 16)]   // top quiet zone
+        drawn += matrix.map { row in quiet + row.map { $0 ? "██" : "  " }.joined() + quiet }
+        drawn.append(String(repeating: " ", count: size * 2 + 16))   // bottom quiet zone
+
+        var reader = SteamQRCodeReader()
+        var decoded: [[Bool]]?
+        for line in drawn {
+            if let emitted = reader.consume(line) { decoded = emitted }
+        }
+        try check(decoded?.count == size, "ASCII QR round-trip: \(size) module rows recovered")
+        try check(decoded?.first?.count == size, "ASCII QR round-trip: \(size) module columns recovered")
+        try check(decoded == matrix, "ASCII QR round-trip is module-exact")
+
         print(Term.green("All selftests passed."))
     }
 }

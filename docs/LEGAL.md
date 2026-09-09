@@ -25,9 +25,10 @@ verified research into each component's license and the relevant law.
    technical protection measures is unlawful under the US DMCA §1201 and EU equivalents.) Titles that
    require defeating kernel anti-cheat are out of scope, not worked around.
 
-3. **Owned games only.** Any game files come exclusively from the user's own authenticated account,
-   through that storefront's own client — Valve's Steam or Blizzard's Battle.net, installed in the
-   bottle and running unmodified. Cellar issues the same commands a player would click.
+3. **Owned games only.** Any game files come exclusively from the user's own authenticated account.
+   For Steam and Battle.net that means the storefront's own client, installed in the bottle and
+   running unmodified — Cellar issues the same commands a player would click. For GOG it means GOG's
+   own API, called with a token the player granted (see *Store authentication* below).
    - Downloading the Windows files of a game you own (in-bottle Windows Steam, or `DepotDownloader` /
      `steamcmd` with the platform forced to Windows) is ownership-gated by Steam itself.
    - Honest framing: under the Steam Subscriber Agreement, content is **"licensed, not sold"** — you
@@ -51,6 +52,36 @@ verified research into each component's license and the relevant law.
 
 5. **No proprietary CrossOver code.** Only CodeWeavers' publicly published **LGPL `winecx` Wine
    modifications** may be reused — never CrossOver's GUI, installer, or product code.
+
+## Store authentication
+
+Cellar signs in to stores *as the player*, and never stores a password. What each flow actually is,
+stated plainly, because the three sit in different places:
+
+| Flow | What it is | Standing |
+|---|---|---|
+| **Steam client** (in the bottle) | the real Windows Steam client, signing in to itself | Valve's own software, unmodified |
+| **Steam downloads** (`cellar steam login`) | Steam's own device-authorization flow (`IAuthenticationService/BeginAuthSessionViaQR`) via DepotDownloader | reverse-engineered protocol client — the same **tolerated gray area** as rule 3, which is why the in-bottle client stays the default |
+| **GOG** (`cellar gog login`) | OAuth 2.0 authorization-code flow against `auth.gog.com`, then GOG's product/download API | GOG Galaxy's own published endpoints; DRM-free catalogue by GOG's own policy |
+
+Points worth being explicit about:
+
+- **No credential ever reaches Cellar.** Steam's QR flow is approved in the Steam mobile app; GOG's
+  sign-in happens on GOG's own page in a `WKWebView` with a non-persistent data store, and Cellar
+  reads nothing from that page except the authorization code GOG hands back. No script is injected.
+- **Tokens live in the login keychain**, not in a file under Application Support, scoped per store and
+  marked `WhenUnlockedThisDeviceOnly` so a refresh token is never carried to another Mac by keychain
+  sync or a Time Machine restore (`Sources/CellarKit/Keychain.swift`).
+- **GOG Galaxy's OAuth client id is used**, because GOG operates no registration portal for
+  third-party applications — there is no per-app id to obtain instead. It is public knowledge, ships
+  in GOG's own client, and is what every third-party GOG integration authenticates with. Cellar uses
+  it only to authenticate the player to GOG and fetch games that player owns.
+- **Nothing here circumvents anything.** GOG's catalogue carries no DRM to circumvent; Steam's DRM
+  runs untouched inside the bottle exactly as rule 2 requires. Cellar downloads only what the
+  authenticated account is entitled to, and the store is the thing enforcing that.
+- **None of the three is a vendor-sanctioned public API for launchers.** Valve, Blizzard and GOG each
+  publish no such thing. If a rights-holder objected to a flow, the fallback is to remove that store's
+  plugin — the store layer is built so that costs one `GameStore` case.
 
 ## License hygiene
 

@@ -20,7 +20,18 @@ jobs:
         run: swift --version
       - name: Build (release)
         run: swift build -c release
+      - name: Test suite
+        run: sh Scripts/test.sh
       - name: Self-test (VDF/CRC/shortcut codecs)
         run: swift run -c release cellar selftest
+      # The rendered store marks, light and dark. A reviewer can look at the actual pixels a PR
+      # produces without checking it out and launching the app.
+      - name: Upload rendered UI snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-snapshots
+          path: .build/ui-snapshots/*.png
+          if-no-files-found: warn
       - name: Generate supported-games site (sanity)
         run: python3 Scripts/gen-site.py
