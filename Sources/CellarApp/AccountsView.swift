@@ -31,6 +31,10 @@ struct AccountsView: View {
     /// The Steam Web API key being typed. Held here and cleared on save — it goes to the keychain,
     /// never to a view's persisted state.
     @State private var steamKeyDraft = ""
+    /// Whether the key field is showing. Closed by default: a form standing open on the Accounts
+    /// screen reads as a fourth thing to fill in, when it is an optional way to widen a library
+    /// that already works.
+    @State private var showingSteamKeyField = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,10 +42,7 @@ struct AccountsView: View {
             Divider()
             ScrollView {
                 VStack(spacing: 10) {
-                    steamRow
-                    steamBottleWarning
-                    steamDownloadsRow
-                    steamLibraryRow
+                    steamCard
                     gogRow
                     battleNetRow
                 }
@@ -56,9 +57,16 @@ struct AccountsView: View {
         // auxiliary window in this app that has never crashed. A flexible root frame inside
         // NSHostingView lets layout feed back into the view graph, and this app aborts in
         // AttributeGraph when that happens (skills/swift.md). Not worth being clever about.
-        .frame(width: 560, height: 740)
+        .frame(width: 560, height: 680)
         .background(.background)
-        .onAppear(perform: refresh)
+        .onAppear {
+            refresh()
+            takeFocus()             // the window may have been built *by* the request
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarOpenAccounts)) { note in
+            if let asked = note.object as? String { AccountsFocus.pending = asked }
+            takeFocus()             // …or it may have been open already
+        }
     }
 
     // MARK: - Chrome
@@ -103,131 +111,142 @@ struct AccountsView: View {
 
     // MARK: - Rows
 
-    /// Steam's client: one install behind every bottle, so one sign-in covers the library.
-    private var steamRow: some View {
-        let account = state.steamAccount
-        return AccountRow(
-            store: .steam,
-            title: "Steam",
-            state: account != nil ? .signedIn(account!) : .signedOut,
-            detail: account != nil
-                ? "Shared by every Steam game — one client, one sign-in."
-                : "Opens the Windows Steam client. The QR code with the Steam mobile app is quickest.",
-            actionTitle: account != nil ? "Open Steam" : "Sign in",
-            busy: runner.busy) {
-                guard let slug = state.steamBottleSlug else { return }
-                runner.run(["steam", "open", slug], title: "Opening Steam", then: { changed() })
-            }
-    }
-
-    /// Honesty: "Open Steam" needs a bottle to open Steam *in*, so when there is none, say so rather
-    /// than leaving a control that quietly does nothing.
-    @ViewBuilder private var steamBottleWarning: some View {
-        if state.isLoaded && state.steamBottleSlug == nil {
-            Text("Set up a Steam game first — the client lives in a bottle.")
-                .font(.caption).foregroundStyle(.orange)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 46)
-        }
-    }
-
-    /// Steam's *download* session is a separate credential from the client's — a token, not a
-    /// window — so it is its own row rather than a detail hidden inside the one above.
-    private var steamDownloadsRow: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AccountRow(
-                store: .steam,
-                title: "Steam downloads",
-                state: state.steamDownloadSession ? .signedInUnnamed : .signedOut,
-                detail: state.steamDownloadSession
-                    ? "Stored — downloads that skip the Windows client won't ask again."
-                    : "Scan a QR code with the Steam mobile app. Cellar never sees your password.",
-                actionTitle: state.steamDownloadSession ? "Sign out" : "Sign in with QR",
-                busy: runner.busy) {
-                    if state.steamDownloadSession {
-                        runner.run(["steam", "login", "--forget"], title: "Signing out", then: {
-                            steamQRCode = nil
-                            changed()
-                        })
-                    } else {
-                        steamQRCode = nil
-                        steamQRReader = SteamQRCodeReader()
-                        runner.run(["steam", "login"], title: "Waiting for the QR scan",
-                                   observe: { chunk in
-                            // DepotDownloader only *draws* the challenge, as terminal ASCII sized for
-                            // a monospace font — unscannable in a GUI. Read it back into modules and
-                            // draw it properly. Steam rotates the code, so later blocks replace it.
-                            for line in chunk.split(separator: "\n", omittingEmptySubsequences: false) {
-                                if let matrix = steamQRReader.consume(String(line)) {
-                                    steamQRCode = matrix
-                                }
-                            }
-                        }, then: {
-                            steamQRCode = nil       // the code is spent either way
-                            changed()
-                        })
-                    }
-                }
-
-            if let steamQRCode {
-                QRCodePanel(modules: steamQRCode)
-            } else if runner.busy, runner.busyTitle == "Waiting for the QR scan" {
-                // The gap between launching the tool and its first output is real; name it.
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Asking Steam for a sign-in code…").font(.callout).foregroundStyle(.secondary)
-                }
-                .padding(.leading, 46)
-            }
-        }
-    }
-
-    /// **Your Steam library** — the row that decides which Steam games the app may show you.
+    /// **One Steam account, one row.**
     ///
-    /// Steam has no OAuth for entitlements, and an anonymous request for a library is refused unless
-    /// the player's game details are public. A key issued to their own account answers either way.
-    /// It is optional: without it Cellar still lists the Steam games it can see installed, and says
-    /// so — it just will not pad the list with games it cannot confirm you own.
-    private var steamLibraryRow: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AccountRow(
+    /// Steam hands Cellar three separate credentials — the client's own sign-in inside the bottle,
+    /// the QR device session downloads use, and a Web API key that reads the owned-games list — and
+    /// this window used to show all three as sign-in rows, each with the Steam mark and its own ✓.
+    /// A player has *one* Steam account, so three rows read as being asked to sign in three times.
+    ///
+    /// So the account is the row. The other two are not accounts, they are things Cellar can or
+    /// cannot do with the account, and they sit under it in secondary type — each with the single
+    /// action that closes the gap, and nothing to do when there is no gap.
+    private var steamCard: some View {
+        AccountCard {
+            AccountHeader(
                 store: .steam,
-                title: "Steam library",
-                state: state.steamLibraryState,
-                detail: state.steamLibraryDetail,
-                actionTitle: state.steamHasKey ? "Forget key" : nil,
+                title: "Steam",
+                state: state.steamAccountState,
+                detail: state.steamAccountDetail,
+                actionTitle: state.steamAccount != nil ? "Open Steam" : "Sign in",
                 busy: runner.busy) {
-                    runner.run(["steam", "key", "--forget"], title: "Forgetting the key", then: { changed() })
+                    guard let slug = state.steamBottleSlug else { return }
+                    runner.run(["steam", "open", slug], title: "Opening Steam", then: { changed() })
                 }
 
-            if !state.steamHasKey {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Paste a Steam Web API key to list every Steam game you own.")
-                        .font(.callout).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 8) {
-                        TextField("32-character key", text: $steamKeyDraft)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(.callout, design: .monospaced))
-                        Button("Save") {
-                            runner.run(["steam", "key", "--set", steamKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)],
-                                       title: "Reading your Steam library", then: {
-                                steamKeyDraft = ""
-                                changed()
-                            })
-                        }
-                        .disabled(runner.busy || steamKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).count != 32)
-                    }
-                    Button("Get a key from Steam…") {
-                        if let url = URL(string: SteamWebAPI.keyPage) { NSWorkspace.shared.open(url) }
-                    }
-                    .buttonStyle(.link).font(.callout)
-                    Text("It's free and takes a minute. Cellar keeps it in your keychain and uses it only to read your own library.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.leading, 46)
+            // Honesty: "Open Steam" needs a bottle to open Steam *in*, so when there is none, say so
+            // rather than leaving a control that quietly does nothing.
+            if state.isLoaded && state.steamBottleSlug == nil {
+                Text("Set up a Steam game first — the client lives in a bottle.")
+                    .font(.caption).foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 42)
             }
+
+            Divider().padding(.leading, 42)
+            steamDownloadsCapability
+            steamLibraryCapability
+        }
+    }
+
+    /// What the QR device session buys: Cellar fetching game files itself, with no Windows client in
+    /// the way. Steam will not merge it with the client's sign-in — it is genuinely a second token —
+    /// but it is the same account, so it is listed as a capability rather than as another sign-in.
+    @ViewBuilder private var steamDownloadsCapability: some View {
+        CapabilityLine(
+            done: state.steamDownloadSession,
+            title: "Downloads without the client",
+            status: state.steamDownloadSession
+                ? "Connected — Cellar can fetch game files itself, and won't ask again."
+                : "Scan a QR code with the Steam mobile app and Cellar can fetch game files itself. It never sees your password.",
+            actionTitle: state.steamDownloadSession ? "Sign out" : "Sign in with QR",
+            busy: runner.busy) {
+                if state.steamDownloadSession {
+                    runner.run(["steam", "login", "--forget"], title: "Signing out", then: {
+                        steamQRCode = nil
+                        changed()
+                    })
+                } else {
+                    steamQRCode = nil
+                    steamQRReader = SteamQRCodeReader()
+                    runner.run(["steam", "login"], title: "Waiting for the QR scan",
+                               observe: { chunk in
+                        // DepotDownloader only *draws* the challenge, as terminal ASCII sized for a
+                        // monospace font — unscannable in a GUI. Read it back into modules and draw
+                        // it properly. Steam rotates the code, so later blocks replace it.
+                        for line in chunk.split(separator: "\n", omittingEmptySubsequences: false) {
+                            if let matrix = steamQRReader.consume(String(line)) {
+                                steamQRCode = matrix
+                            }
+                        }
+                    }, then: {
+                        steamQRCode = nil       // the code is spent either way
+                        changed()
+                    })
+                }
+            }
+
+        if let steamQRCode {
+            QRCodePanel(modules: steamQRCode)
+        } else if runner.busy, runner.busyTitle == "Waiting for the QR scan" {
+            // The gap between launching the tool and its first output is real; name it.
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Asking Steam for a sign-in code…").font(.callout).foregroundStyle(.secondary)
+            }
+            .padding(.leading, 42)
+        }
+    }
+
+    /// Whether Steam will tell Cellar the *whole* library, which is what decides how many Steam
+    /// games the app may show.
+    ///
+    /// Steam has no OAuth for entitlements, and an anonymous request is redirected to the login page
+    /// unless the player's game details are public. A key issued to their own account answers either
+    /// way — so it stays available, but behind a disclosure, because Cellar works without it and
+    /// says exactly what it is missing until then.
+    @ViewBuilder private var steamLibraryCapability: some View {
+        CapabilityLine(
+            done: state.steamLibraryIsComplete,
+            title: "Every game you own",
+            status: state.steamLibraryStatus,
+            actionTitle: state.steamLibraryActionTitle,
+            busy: runner.busy) {
+                if state.steamHasKey {
+                    runner.run(["steam", "key", "--forget"], title: "Forgetting the key", then: {
+                        showingSteamKeyField = false
+                        changed()
+                    })
+                } else {
+                    showingSteamKeyField.toggle()
+                }
+            }
+
+        if showingSteamKeyField && !state.steamHasKey {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    TextField("32-character key", text: $steamKeyDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.callout, design: .monospaced))
+                    Button("Save") {
+                        runner.run(["steam", "key", "--set", steamKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)],
+                                   title: "Reading your Steam library", then: {
+                            steamKeyDraft = ""
+                            showingSteamKeyField = false
+                            changed()
+                        })
+                    }
+                    .disabled(runner.busy || steamKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).count != 32)
+                }
+                Button("Get a key from Steam…") {
+                    if let url = URL(string: SteamWebAPI.keyPage) { NSWorkspace.shared.open(url) }
+                }
+                .buttonStyle(.link).font(.callout)
+                Text("It's free and takes a minute. Cellar keeps it in your keychain and uses it only to read your own library.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.leading, 42)
         }
     }
 
@@ -310,6 +329,15 @@ struct AccountsView: View {
         NotificationCenter.default.post(name: .cellarStoresChanged, object: nil)
     }
 
+    /// Open the part of this window the player actually asked for. A link that says "connect your
+    /// Steam library" has to land on the field that does it — hiding the form behind a disclosure
+    /// is only an improvement if the screen that sends you here still opens it for you.
+    private func takeFocus() {
+        guard AccountsFocus.pending == AccountsFocus.steamLibrary else { return }
+        AccountsFocus.pending = nil
+        showingSteamKeyField = true
+    }
+
     private func refresh() {
         Task.detached {
             if GOGAuth.isSignedIn, GOGAuth.cachedUsername == nil {
@@ -319,6 +347,14 @@ struct AccountsView: View {
             await MainActor.run { state = snapshot }
         }
     }
+}
+
+/// Which part of the Accounts window the player asked for, when they arrived from a link that names
+/// one. Latched rather than passed, because the window is built lazily: the request that opens it
+/// for the first time is posted before there is a view to receive it.
+enum AccountsFocus {
+    static let steamLibrary = "steam-library"
+    static var pending: String?
 }
 
 /// A snapshot of every store's sign-in state, read once per refresh — never from a view body.
@@ -358,21 +394,48 @@ struct StoreAccountState {
             isLoaded: true)
     }
 
-    /// The Steam library row's badge. A ✓ only for a library Steam actually handed over — a partial
-    /// list read off the disk is not the same claim and must not look like one.
-    var steamLibraryState: AccountState {
-        guard let steamLibrary else { return .partial("Not read yet") }
-        guard steamLibrary.isComplete else { return .partial("Installed games only") }
-        return .signedIn("\(steamLibrary.totalCount) games")
+    /// The Steam **account** badge — who is signed in, and nothing else. What Cellar can do with
+    /// that account is reported separately, under it, because those are not sign-ins.
+    var steamAccountState: AccountState {
+        if let steamAccount { return .signedIn(steamAccount) }
+        if steamDownloadSession { return .signedInUnnamed }
+        return .signedOut
     }
 
-    var steamLibraryDetail: String {
-        guard let steamLibrary else {
-            return "Cellar hasn't read your Steam library yet."
+    var steamAccountDetail: String {
+        if steamAccount != nil {
+            return "One Windows Steam client, shared by every Steam game — so this sign-in covers all of them."
         }
-        return steamLibrary.isComplete
-            ? "Read from \(steamLibrary.source). Cellar shows the ones it supports."
-            : "Cellar can only confirm the \(steamLibrary.keys.count) game\(steamLibrary.keys.count == 1 ? "" : "s") already installed, so those are all it lists."
+        if steamDownloadSession {
+            return "Signed in for downloads. Games with Steam's DRM also need the Windows client signed in."
+        }
+        return "Opens the Windows Steam client. Signing in there with the Steam mobile app's QR code is quickest."
+    }
+
+    /// A ✓ only for a library Steam actually handed over. A partial list read off the disk is a
+    /// different claim and must not look like the same one.
+    var steamLibraryIsComplete: Bool { steamLibrary?.isComplete == true }
+
+    var steamLibraryStatus: String {
+        guard steamAccount != nil else {
+            return "Sign in above first — Cellar has to know whose library to ask about."
+        }
+        guard let steamLibrary else {
+            return "Cellar hasn't asked Steam yet."
+        }
+        if steamLibrary.isComplete {
+            return "\(steamLibrary.totalCount) games, read from \(steamLibrary.source). Cellar shows the ones it supports."
+        }
+        let n = steamLibrary.keys.count
+        return "Only the \(n) game\(n == 1 ? "" : "s") already installed can be confirmed, so those are all Cellar lists."
+    }
+
+    /// No button when there is nothing useful to press: before the account is known a key cannot be
+    /// used, and once Steam is answering in full there is nothing to add.
+    var steamLibraryActionTitle: String? {
+        guard steamAccount != nil else { return nil }
+        if steamHasKey { return "Forget key" }
+        return steamLibraryIsComplete ? nil : "Show all my games"
     }
 }
 
@@ -383,16 +446,26 @@ enum AccountState {
     /// Signed in, but the store doesn't hand back a name worth showing.
     case signedInUnnamed
     case signedOut
-    /// Cellar has *part* of the answer and knows it is partial — the Steam library read off the
-    /// disk rather than from Steam. Not a ✓, because it is not the whole truth; not "not signed
-    /// in" either, because that is a different question and this row isn't asking it.
-    case partial(String)
     /// The store publishes nothing Cellar can read. Never a ✗ — see skills/ux.md.
     case unknowable
 }
 
+/// The card an account lives in. Shared, so an account with capabilities listed under it is
+/// visibly *one* account rather than a stack of separate ones.
+struct AccountCard<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) { content() }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.04),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
 /// One store's sign-in state, as position + mark + word (never colour alone).
-struct AccountRow: View {
+struct AccountHeader: View {
     let store: GameStore
     let title: String
     let state: AccountState
@@ -421,9 +494,6 @@ struct AccountRow: View {
                     .buttonStyle(.bordered)
             }
         }
-        .padding(12)
-        .background(Color.primary.opacity(0.04),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title), \(accessibilityState). \(detail)")
     }
@@ -439,9 +509,6 @@ struct AccountRow: View {
         case .signedOut:
             Label("Not signed in", systemImage: "circle.dashed")
                 .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-        case .partial(let summary):
-            Label(summary, systemImage: "circle.lefthalf.filled")
-                .font(.caption.weight(.medium)).foregroundStyle(.orange)
         case .unknowable:
             Label("Not published", systemImage: "questionmark.circle")
                 .font(.caption.weight(.medium)).foregroundStyle(.secondary)
@@ -453,9 +520,66 @@ struct AccountRow: View {
         case .signedIn(let name):  return "signed in as \(name)"
         case .signedInUnnamed:     return "signed in"
         case .signedOut:           return "not signed in"
-        case .partial(let summary): return summary
         case .unknowable:          return "sign-in state not published by this store"
         }
+    }
+}
+
+/// A whole account in one card — the common case, where nothing is listed under the header.
+struct AccountRow: View {
+    let store: GameStore
+    let title: String
+    let state: AccountState
+    let detail: String
+    let actionTitle: String?
+    let busy: Bool
+    let action: () -> Void
+
+    var body: some View {
+        AccountCard {
+            AccountHeader(store: store, title: title, state: state, detail: detail,
+                          actionTitle: actionTitle, busy: busy, action: action)
+        }
+    }
+}
+
+/// One thing Cellar can or cannot do with an account it already has — never a second account.
+///
+/// Deliberately quieter than `AccountHeader`: no store mark, no headline, a small dot instead of a
+/// badge, and a small button. Steam's three credentials each drawn as a sign-in row is exactly the
+/// confusion this shape exists to remove — one account, and under it what it currently reaches.
+struct CapabilityLine: View {
+    let done: Bool
+    let title: String
+    let status: String
+    /// nil when there is nothing to press — see `steamLibraryActionTitle`.
+    let actionTitle: String?
+    let busy: Bool
+    let action: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: done ? "checkmark.circle.fill" : "circle.dashed")
+                .font(.caption)
+                .foregroundStyle(done ? Color.green : Color.secondary)
+                .padding(.top, 3)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.callout.weight(.medium))
+                Text(status).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if let actionTitle {
+                Button(actionTitle, action: action)
+                    .disabled(busy)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        }
+        .padding(.leading, 42)      // the header's 30pt mark + its 12pt gap: the text lines up
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(done ? "connected" : "not connected"). \(status)")
     }
 }
 

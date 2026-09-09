@@ -14,15 +14,20 @@ struct Accounts: ParsableCommand {
         actually check — never a ✓ for a guess:
 
           Steam       one shared client for every bottle, so one sign-in. Read from loginusers.vdf.
-          Steam DL    the QR device session used for client-free downloads.
           GOG         Cellar holds the OAuth token, so it knows the account name.
           Battle.net  publishes nothing readable. Cellar never claims to know.
+
+        Steam's account is one row. Indented under it is what that one account currently reaches —
+        client-free downloads, and the full owned-games list — which are separate credentials Steam
+        will not merge, but not separate accounts, and never shown as separate sign-ins.
         """)
 
     func run() throws {
         print(Term.bold("Store accounts"))
 
-        // Steam — the shared client. One row, because there is now one install.
+        // Steam — one account, one row. Its two extra credentials (the QR download session and the
+        // Web API key) are capabilities of that account, so they are indented under it rather than
+        // printed as two more sign-ins. See `AccountsView.steamCard` for the same shape in the app.
         let steamAccount = SteamBottle.sharedLoggedInAccount
         row(state: steamAccount != nil ? .yes : .no,
             store: "Steam",
@@ -32,25 +37,26 @@ struct Accounts: ParsableCommand {
             print("    " + Term.dim("no shared Steam install yet — cellar steam share"))
         }
 
-        // Steam's download path is a separate session (a token, not the client), so it is its own row.
-        row(state: DepotTool.hasStoredSession ? .yes : .no,
-            store: "Steam downloads",
-            detail: DepotTool.hasStoredSession
-                ? "QR session stored — fetch-depot won't ask again"
-                : "no stored session — cellar steam login")
+        capability(done: DepotTool.hasStoredSession,
+                   name: "downloads",
+                   detail: DepotTool.hasStoredSession
+                    ? "no client needed — fetch-depot won't ask again"
+                    : "sign in once to fetch game files without the client — cellar steam login")
 
-        // Steam's *library* is a third fact again: which games you own, which decides what the
-        // library may show you. Exact only once Cellar has a way to ask.
         let steamLibrary = StoreLibrary.cached(.steam)
-        if let steamLibrary, steamLibrary.isComplete {
-            row(state: .yes, store: "Steam library",
-                detail: "\(steamLibrary.totalCount) games, read from \(steamLibrary.source)")
+        if steamAccount == nil {
+            capability(done: false, name: "your library",
+                       detail: "sign in first — Cellar has to know whose library to ask about")
+        } else if let steamLibrary, steamLibrary.isComplete {
+            capability(done: true, name: "your library",
+                       detail: "\(steamLibrary.totalCount) games, read from \(steamLibrary.source)")
         } else if let steamLibrary {
-            row(state: .no, store: "Steam library",
-                detail: "only the \(steamLibrary.keys.count) installed game\(steamLibrary.keys.count == 1 ? "" : "s") can be confirmed — cellar steam key --set <key>")
+            let n = steamLibrary.keys.count
+            capability(done: false, name: "your library",
+                       detail: "only the \(n) installed game\(n == 1 ? "" : "s") can be confirmed — cellar steam key --set <key>")
         } else {
-            row(state: .no, store: "Steam library",
-                detail: "not read yet — cellar library --refresh")
+            capability(done: false, name: "your library",
+                       detail: "not read yet — cellar library --refresh")
         }
 
         // GOG — a token Cellar owns, so the account name is a fact.
@@ -81,6 +87,13 @@ struct Accounts: ParsableCommand {
     }
 
     private enum State { case yes, no, unknown }
+
+    /// A capability of the account printed just above — indented, and marked with the same ✓/•
+    /// vocabulary, so it reads as "this account can/cannot" rather than as another sign-in.
+    private func capability(done: Bool, name: String, detail: String) {
+        let mark = done ? Term.green("✓") : Term.yellow("•")
+        print("      \(mark) \(name.padding(toLength: 13, withPad: " ", startingAt: 0)) " + Term.dim(detail))
+    }
 
     private func row(state: State, store: String, detail: String) {
         let mark: String

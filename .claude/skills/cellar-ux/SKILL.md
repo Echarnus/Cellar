@@ -20,6 +20,10 @@ landed. Key rules:
   been asked (Steam without a Web API key) hides its games and the screen says how to fix it; a store
   that can *never* answer (Battle.net) shows them and the screen says Cellar cannot check. The rule
   is `LibraryAccess.isVisible` in CellarKit — never a second copy in a view or command.
+- **One account per store, however many credentials that takes.** Steam hands Cellar three (the
+  client's sign-in, the QR download session, the Web API key) and will not merge them — but the
+  player has one Steam account, so the account is the row and the rest are capabilities listed under
+  it, each with the one action that closes the gap. See `AccountsView.steamCard` and `cellar accounts`.
 - **Stores are told apart by three signals together:** position (grouped sections), mark (the store's
   real logo, drawn as vectors in `StoreMark.swift`), and word (its name, including in a11y labels).
   Colour never carries it alone — Steam and Battle.net are both blue.

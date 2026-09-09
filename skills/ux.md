@@ -47,6 +47,15 @@ interface must say so rather than guess:
   "these are your games" is a sentence that has to stay true. The rule is `LibraryAccess.isVisible`,
   and it belongs there and nowhere else.
 
+- **One account per store, however many credentials that takes.** Steam hands Cellar three: the
+  client's sign-in inside the bottle, the QR device session downloads use, and a Web API key that
+  reads the owned-games list. Steam will not merge them — but the player has *one* Steam account, so
+  three sign-in rows is a lie about how many accounts they need. The account is the row; the rest are
+  **capabilities listed under it**, in secondary type, each with the one action that closes the gap
+  and no action when there is no gap. Both surfaces do this — `AccountsView.steamCard` and
+  `cellar accounts` — and an optional form (the API key) stays behind a disclosure, with the links
+  that ask for it opening it on arrival.
+
 The rule: **a control Cellar cannot honour must not exist, and a pause the player will notice must
 be announced before it happens.** Encode the difference in `GameStore.descriptor` so every surface
 inherits it, rather than special-casing a store in a view.

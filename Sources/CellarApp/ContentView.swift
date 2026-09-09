@@ -467,7 +467,9 @@ struct StoreLibraryNote: View {
             }
             if offersFix {
                 Button("Connect your \(store.displayName) library…") {
-                    NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
+                    NotificationCenter.default.post(
+                        name: .cellarOpenAccounts,
+                        object: store == .steam ? AccountsFocus.steamLibrary : nil)
                 }
                 .buttonStyle(.link).font(.caption)
             }
@@ -625,7 +627,8 @@ struct EmptyState: View {
                 .frame(maxWidth: 460)
             if !hasGames, steamLibraryUnread {
                 Button("Connect your Steam library…") {
-                    NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
+                    NotificationCenter.default.post(name: .cellarOpenAccounts,
+                                                    object: AccountsFocus.steamLibrary)
                 }
                 .buttonStyle(.borderedProminent).tint(GameStore.steam.tint)
                 .padding(.top, 4)

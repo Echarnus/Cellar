@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(showSettings), name: .cellarOpenSettings, object: nil)
         NotificationCenter.default.addObserver(
-            self, selector: #selector(showAccounts), name: .cellarOpenAccounts, object: nil)
+            self, selector: #selector(openAccounts(_:)), name: .cellarOpenAccounts, object: nil)
 
         let window = NSWindow(
             // Comfortably above ContentView's minimum: at the minimum the detail pane's two
@@ -126,10 +126,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// The notification form: the poster may name the part of the window it wants opened, and a
+    /// window built in response to this very post has no view yet to hear it — so it is latched.
+    @objc private func openAccounts(_ notification: Notification) {
+        AccountsFocus.pending = notification.object as? String
+        showAccounts()
+    }
+
     @objc private func showAccounts() {
         if accountsWindow == nil {
             let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 560, height: 620),
+                contentRect: NSRect(x: 0, y: 0, width: 560, height: 680),
                 // Not resizable, matching Settings: a resizable window plus a flexible SwiftUI root
                 // frame lets layout feed back into the view graph, and this app aborts in
                 // AttributeGraph when it does (skills/swift.md).
