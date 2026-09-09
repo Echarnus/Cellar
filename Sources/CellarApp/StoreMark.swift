@@ -26,12 +26,27 @@ struct StoreMark: View {
     }
 }
 
-/// Valve's mark: the large valve wheel, the connecting rod, and the smaller wheel above it, on the
-/// dark navy Steam has used since 2013.
+/// Valve's mark: the valve wheel, the smaller wheel, and the handle that runs out to the rim, on
+/// the dark navy Steam has used since 2013.
+///
+/// The layout is not a matter of taste, and getting it wrong is the tell that a logo was drawn from
+/// memory: the **big wheel sits upper-right**, the **small wheel lower-left**, and the handle carries
+/// on up past the small wheel to the left rim. Both wheels are open **rings** — draw them as discs
+/// with a pinhole and the mark reads as a dumbbell instead of a valve.
+///
+/// The proportions below were measured off Steam's own `Steam.icns`, in fractions of the mark's box,
+/// so they hold at every size. What has to survive the smallest use (11pt in a filter chip) is the
+/// big wheel's hole, which is what sets the rest.
 private struct SteamMark: View {
     let size: CGFloat
 
     private var navy: Color { Color(.sRGB, red: 0.10, green: 0.16, blue: 0.22, opacity: 1) }
+
+    private let bigWheel = CGPoint(x: 0.655, y: 0.355)
+    private let smallWheel = CGPoint(x: 0.330, y: 0.672)
+    /// Where the handle runs out to — the left rim, level with the centre. The disc clips it there,
+    /// which is what gives the end the flat cut Valve's has.
+    private let handleEnd = CGPoint(x: 0.02, y: 0.500)
 
     var body: some View {
         ZStack {
@@ -39,29 +54,48 @@ private struct SteamMark: View {
                 LinearGradient(colors: [Color(.sRGB, red: 0.16, green: 0.24, blue: 0.33, opacity: 1), navy],
                                startPoint: .topLeading, endPoint: .bottomTrailing))
 
-            // The rod, drawn first so both wheels sit on top of its ends.
-            Capsule()
-                .fill(.white)
-                .frame(width: size * 0.46, height: size * 0.10)
-                .rotationEffect(.degrees(-45))
-
-            // Lower-left valve wheel — the big one. Its hole has to stay open at 12pt, which is
-            // what sets every other proportion here.
+            // One white silhouette, built by overlapping opaque pieces — the two wheels' holes are
+            // then punched back out in navy on top.
             ZStack {
-                Circle().fill(.white).frame(width: size * 0.52)
-                Circle().fill(navy).frame(width: size * 0.20)
-            }
-            .offset(x: -size * 0.15, y: size * 0.15)
+                MarkLine(from: bigWheel, to: smallWheel)
+                    .stroke(.white, style: StrokeStyle(lineWidth: size * 0.155, lineCap: .round))
+                MarkLine(from: smallWheel, to: handleEnd)
+                    .stroke(.white, style: StrokeStyle(lineWidth: size * 0.108, lineCap: .round))
 
-            // Upper-right wheel, roughly half the size — the proportion that makes it read as Steam
-            // rather than as a dumbbell.
-            ZStack {
-                Circle().fill(.white).frame(width: size * 0.28)
-                Circle().fill(navy).frame(width: size * 0.10)
+                MarkDisc(center: bigWheel, radius: 0.208).fill(.white)
+                MarkDisc(center: smallWheel, radius: 0.115).fill(.white)
+                MarkDisc(center: bigWheel, radius: 0.120).fill(navy)
+                MarkDisc(center: smallWheel, radius: 0.060).fill(navy)
             }
-            .offset(x: size * 0.19, y: -size * 0.19)
+            .clipShape(Circle())
         }
         .frame(width: size, height: size)
+    }
+}
+
+/// A straight segment between two points given in fractions of the mark's box.
+private struct MarkLine: Shape {
+    let from: CGPoint, to: CGPoint
+
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height)
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + from.x * s, y: rect.minY + from.y * s))
+        path.addLine(to: CGPoint(x: rect.minX + to.x * s, y: rect.minY + to.y * s))
+        return path
+    }
+}
+
+/// A disc whose centre and radius are fractions of the mark's box.
+private struct MarkDisc: Shape {
+    let center: CGPoint, radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height)
+        let r = radius * s
+        return Path(ellipseIn: CGRect(x: rect.minX + center.x * s - r,
+                                      y: rect.minY + center.y * s - r,
+                                      width: r * 2, height: r * 2))
     }
 }
 
@@ -80,15 +114,17 @@ private struct BattleNetMark: View {
             // rather than a plain circle.
             Circle()
                 .trim(from: 0.06, to: 0.78)
-                .stroke(.white, style: StrokeStyle(lineWidth: size * 0.13, lineCap: .round))
-                .frame(width: size * 0.60)
+                .stroke(.white, style: StrokeStyle(lineWidth: size * 0.115, lineCap: .round))
+                .frame(width: size * 0.62)
                 .rotationEffect(.degrees(-90))
 
-            // Inner sweep, wound the other way — the hook that closes the orb.
+            // Inner sweep, wound the other way — the hook that closes the orb. Its stroke has to
+            // stay well under its own radius: at the old 0.13 on a 0.28 circle the line was nearly
+            // half the diameter, so the arc closed up and the centre of the orb read as a blob.
             Circle()
                 .trim(from: 0.06, to: 0.72)
-                .stroke(.white, style: StrokeStyle(lineWidth: size * 0.13, lineCap: .round))
-                .frame(width: size * 0.28)
+                .stroke(.white, style: StrokeStyle(lineWidth: size * 0.095, lineCap: .round))
+                .frame(width: size * 0.34)
                 .rotationEffect(.degrees(90))
         }
         .frame(width: size, height: size)
