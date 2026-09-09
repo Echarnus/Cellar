@@ -141,6 +141,16 @@ public enum SystemEnvironment {
         // Measured from the installed wine binary, not taken from the catalog's word for it.
         checks.append(runnerArchitectureCheck(macOSMajor: version.majorVersion))
 
+        // The Dock shim. Cosmetic, so never a failure — but say so plainly rather than let a
+        // storefront client quietly turn up in the Dock with no explanation.
+        if let shim = DockShim.libraryURL {
+            checks.append(.init("Dock shim", .ok, shim.path))
+        } else {
+            checks.append(.init("Dock shim", .info, "not built",
+                hint: "A bottle's Steam/Battle.net will show its own Dock icon while you play. "
+                    + "Build it with: sh Scripts/build-dock-shim.sh"))
+        }
+
         // Homebrew (arm)
         if let brew = armHomebrew {
             checks.append(.init("Homebrew (arm64)", .ok, brew))

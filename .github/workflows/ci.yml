@@ -22,6 +22,10 @@ jobs:
         run: swift build -c release
       - name: Test suite
         run: sh Scripts/test.sh
+      # SwiftPM does not build the Dock shim (it has to be universal), so nothing else here would
+      # notice if it stopped compiling.
+      - name: Build the Dock shim (universal)
+        run: sh Scripts/build-dock-shim.sh
       - name: Self-test (VDF/CRC/shortcut codecs)
         run: swift run -c release cellar selftest
       # The rendered store marks, light and dark. A reviewer can look at the actual pixels a PR

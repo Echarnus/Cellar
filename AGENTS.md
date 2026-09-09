@@ -33,7 +33,8 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 | `Tests/CellarIntegrationTests/` | Integration tests, tiered: bottles and app bundles always; a real runner, prefix and Windows game behind `CELLAR_IT=1`. See [`docs/TESTING.md`](docs/TESTING.md). |
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
-| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `test.sh` (the test runner). |
+| `Shim/` | `cellar-dock-shim.c` — the one piece of C in the repo. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts. Built by `Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
+| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `test.sh` (the test runner). |
 | `docs/` | `ARCHITECTURE.md`, `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
 | `.github/workflows/` | `ci.yml`, `release.yml`, `pages.yml`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
@@ -50,8 +51,14 @@ swift run cellar doctor           # sanity-check the machine
 swift build -c release            # release build (what CI and the app installer use)
 swift run cellar selftest         # in-repo smoke test
 sh Scripts/install-app.sh         # build + install ~/Applications/Cellar.app
+sh Scripts/build-dock-shim.sh     # build the Dock shim into .build/ (needed by `swift run cellar`)
 python3 Scripts/gen-site.py       # regenerate the Pages site into site/
 ```
+
+`swift build` does **not** build the Dock shim — it is a universal C dylib, and SwiftPM builds for one
+architecture. `install-app.sh` and `package.sh` build it for you; run `Scripts/build-dock-shim.sh`
+once by hand if you are testing launches straight from a checkout. Without it a bottle's Steam or
+Battle.net simply keeps its Dock icon, which is what Cellar did before the shim existed.
 
 > **Critical build gotcha.** A Nix/devenv shell on this machine exports `DEVELOPER_DIR`/`SDKROOT`
 > pointing at a non-macOS SDK, which makes `swift build` fail or link the wrong SDK. Always build the

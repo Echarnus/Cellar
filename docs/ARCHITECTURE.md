@@ -133,6 +133,35 @@ DepotDownloader only ever *draws* the QR challenge, as terminal ASCII, and print
 `SteamQRCode.swift` reads the drawing back into a module matrix and the app renders it at a scannable
 size. Format, measured not assumed: two characters per module, four-module quiet zone, one text line
 per module row. There is a round-trip case in `cellar selftest`.
+### Keeping the client out of the Dock
+
+Wine's Mac driver gives a Dock icon to every Windows process that shows a window — it calls
+`-[NSApplication setActivationPolicy:Regular]` the first time one is ordered front. For a game that
+is correct. For Steam it is not: Cellar starts Steam so a game can run, and a second icon beside
+Cellar's advertises plumbing the player never asked for.
+
+Wine has no setting for this. The Mac driver's entire option list under `Software\Wine\Mac Driver`
+(`RetinaMode`, `EnableAppNap`, `CaptureDisplaysForFullscreen`, …) has no dock key, and macOS refuses
+to let one process change another's activation policy — `TransformProcessType` on a foreign
+`ProcessSerialNumber` returns `procNotFound`. The decision can only be changed inside the process
+making it, so Cellar inserts one (`Shim/cellar-dock-shim.c`, via `DYLD_INSERT_LIBRARIES`) that turns
+that process's request for *Regular* into *Accessory*: windows, focus and keyboard all keep working,
+and only the Dock tile and the ⌘-Tab entry go away.
+
+Two rules keep it honest:
+
+- **Only the client, never the game.** `CELLAR_DOCK_HIDE` names the client's own executables
+  (`StoreDescriptor.clientProcessNames` — `steamwebhelper.exe` is the one that actually takes the
+  icon; `steam.exe` claims one too once it has shown a window). Every other process in the launch is
+  left alone, so a game — or anything Cellar has not been told about — keeps its icon by default.
+- **Only when the client is scaffolding.** `DockPresence` splits the two intents. Starting a game is
+  `.hidden`. Choosing *Open Steam* is `.visible`, because a window the player has to come back to
+  needs a Dock icon to come back *to*.
+
+The shim is a universal dylib (a runner may be x86_64 under Rosetta or arm64), built by
+`Scripts/build-dock-shim.sh` and installed beside the CLI. If it is missing, `DockShim.environment`
+returns nothing and launches behave exactly as they did before — a cosmetic feature must never be
+able to stop a game from starting.
 
 ## On-disk layout
 

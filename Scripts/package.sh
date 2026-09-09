@@ -21,6 +21,8 @@ cp "$BINDIR/cellar" "$DIST/cellar"
 mkdir -p "$DIST/cli/bin" "$DIST/cli/share/cellar/profiles"
 cp "$BINDIR/cellar" "$DIST/cli/bin/cellar"
 cp profiles/*.toml "$DIST/cli/share/cellar/profiles/"
+# The Dock shim travels with the CLI: the CLI is what spawns Wine, so it is what needs to find it.
+sh Scripts/build-dock-shim.sh "$DIST/cli/share/cellar/cellar-dock-shim.dylib"
 ( cd "$DIST/cli" && zip -qr "../Cellar-CLI-$VERSION.zip" bin share )
 
 # GUI app
@@ -30,6 +32,7 @@ cp "$BINDIR/CellarApp" "$APP/Contents/MacOS/CellarApp"
 # The shipped profile database. Searched after the player's own profiles, never instead of them.
 mkdir -p "$APP/Contents/Resources/profiles"
 cp profiles/*.toml "$APP/Contents/Resources/profiles/"
+cp "$DIST/cli/share/cellar/cellar-dock-shim.dylib" "$APP/Contents/Resources/"
 
 [ -f Resources/AppIcon.png ] || swift Scripts/make-icon.swift Resources/AppIcon.png
 ISET="$(mktemp -d)/Cellar.iconset"; mkdir -p "$ISET"

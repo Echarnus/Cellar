@@ -85,6 +85,10 @@ public struct StoreDescriptor: Sendable {
     /// Whether Cellar has to stand the store's client up inside the bottle at all. False for GOG,
     /// which is pure HTTP, and that difference is why GOG needs no per-bottle sign-in.
     public let installsClientInBottle: Bool
+    /// The Windows executables that *are* the client, so Cellar can keep them out of the Dock while
+    /// a game is starting (see `DockShim`). Deliberately a list of the client's own processes and
+    /// nothing else: anything not named here — the game, a mod tool, an installer — keeps its icon.
+    public let clientProcessNames: [String]
 
     /// Whether one sign-in covers the whole account rather than one bottle. Drives the Accounts
     /// screen: a store that is signed in once is listed once, not once per game.
@@ -122,7 +126,8 @@ public extension GameStore {
                 // still talks to a running client, so the bottle's own sign-in is the one that
                 // matters at launch. Honest answer: the client window.
                 authStyle: .inClientWindow,
-                installsClientInBottle: true)
+                installsClientInBottle: true,
+                clientProcessNames: SteamBottle.clientProcesses)
         case .battlenet:
             return StoreDescriptor(
                 store: .battlenet,
@@ -135,7 +140,8 @@ public extension GameStore {
                 hasSilentInstaller: false,
                 installLocation: "the Battle.net app",
                 authStyle: .inClientWindow,
-                installsClientInBottle: true)
+                installsClientInBottle: true,
+                clientProcessNames: BattleNetBottle.clientProcesses)
         case .standalone:
             return StoreDescriptor(
                 store: .standalone,
@@ -148,7 +154,8 @@ public extension GameStore {
                 hasSilentInstaller: true,
                 installLocation: "a direct download",
                 authStyle: .none,
-                installsClientInBottle: false)
+                installsClientInBottle: false,
+                clientProcessNames: [])   // no client, so nothing of Cellar's to hide
         case .gog:
             return StoreDescriptor(
                 store: .gog,
@@ -162,7 +169,9 @@ public extension GameStore {
                 hasSilentInstaller: true,
                 installLocation: "your GOG library",
                 authStyle: .cellarHeldToken,
-                installsClientInBottle: false)
+                installsClientInBottle: false,
+                clientProcessNames: [])   // pure HTTP, no client to hide
+
         }
     }
 
