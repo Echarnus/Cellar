@@ -83,15 +83,20 @@ final class Library: ObservableObject {
     /// Why the library is empty, named per store rather than assumed to be Steam's fault. Cellar
     /// speaks to three stores; only one of them signs in with a QR code.
     var signInReason: String {
-        let stores = Set(withheld.map(\.gatingStore)).filter(\.canAnswerOwnership)
-        if stores == [.steam] || (stores.contains(.steam) && stores.count > 1 && !steam.isUsable) {
-            return steam.summary
+        // Only games whose store was never *asked* say anything about signing in. A game the store
+        // answered "no" to is withheld for a reason a sign-in cannot change — counting it here is
+        // how a signed-in player gets told they are not signed in.
+        let unasked = withheld.filter { game in
+            if case .unknown = game.ownership { return game.gatingStore.canAnswerOwnership }
+            return false
         }
-        if stores == [.gog] {
+        let stores = Set(unasked.map(\.gatingStore))
+        if stores.contains(.steam), !steam.isUsable { return steam.summary }
+        if stores == [.gog], !GOGAuth.isSignedIn {
             return "Not signed in to GOG. One sign-in covers your whole GOG library."
         }
         if stores.isEmpty {
-            return "Cellar hasn't been able to ask your stores what you own yet."
+            return "Nothing your stores confirmed you own is supported yet."
         }
         return "Cellar lists a game once its store confirms you own it, and it hasn't been able to ask yet."
     }
