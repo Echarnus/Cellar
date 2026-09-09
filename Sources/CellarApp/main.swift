@@ -18,7 +18,6 @@ extension Notification.Name {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     var settingsWindow: NSWindow?
-    var accountsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = buildMainMenu()
@@ -65,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Accounts…", action: #selector(showAccounts), keyEquivalent: "A")
+        appMenu.addItem(withTitle: "Account…", action: #selector(showAccounts), keyEquivalent: "A")
             .target = self
         appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
             .target = self
@@ -108,7 +107,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showSettings() {
         if settingsWindow == nil {
             let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 460, height: 520),
+                contentRect: NSRect(x: 0, y: 0, width: 560, height: 680),
+                // Not resizable: a resizable window plus a flexible SwiftUI root frame lets layout
+                // feed back into the view graph, and this app aborts in AttributeGraph when it does
+                // (skills/swift.md).
                 styleMask: [.titled, .closable], backing: .buffered, defer: false)
             w.title = "Settings"
             w.isReleasedWhenClosed = false
@@ -122,31 +124,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc private func showAccounts() {
-        if accountsWindow == nil {
-            let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 560, height: 620),
-                // Not resizable, matching Settings: a resizable window plus a flexible SwiftUI root
-                // frame lets layout feed back into the view graph, and this app aborts in
-                // AttributeGraph when it does (skills/swift.md).
-                styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = "Accounts"
-            w.isReleasedWhenClosed = false
-            w.center()
-            w.contentView = NSHostingView(rootView: AccountsView(onClose: { [weak self] in
-                self?.accountsWindow?.close()
-            }))
-            accountsWindow = w
-        }
-        accountsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
+    /// There is one place to sign in, and it is Settings. "Accounts…" and every "Sign in" button
+    /// in the app land on the same window rather than on a second one that could disagree with it.
+    @objc private func showAccounts() { showSettings() }
 
     @objc private func showAbout() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
         let credits = NSAttributedString(
             string: "Run Windows games on Apple Silicon — a Proton-like layer over Wine + D3DMetal.\n" +
-                    "Sign in once per store, then install and play.",
+                    "Sign in once, then install and play the games you own.",
             attributes: [.font: NSFont.systemFont(ofSize: 11),
                          .foregroundColor: NSColor.secondaryLabelColor])
         NSApp.orderFrontStandardAboutPanel(options: [

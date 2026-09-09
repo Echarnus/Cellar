@@ -410,6 +410,51 @@ public enum SteamBottle {
     }
 }
 
+/// Telling a Steamworks game which app it is when Cellar, not Steam, started it.
+///
+/// This is not a DRM workaround and does not weaken one. `steam_appid.txt` is Valve's own developer
+/// file: `steam_api` reads it to learn the app id, then talks to the **running, signed-in** Steam
+/// client, which must hold a licence for that app or the game refuses to start. Cellar downloads
+/// games with the player's own credentials and runs their DRM untouched (docs/LEGAL.md).
+public enum SteamDRM {
+    /// Drop `steam_appid.txt` beside a downloaded game so it can find the live session.
+    public static func markAppDirectory(_ directory: URL, appID: Int) {
+        try? "\(appID)\n".write(to: directory.appendingPathComponent("steam_appid.txt"),
+                                atomically: true, encoding: .utf8)
+    }
+}
+
+public extension SteamBottle {
+    /// Launch a game Cellar downloaded itself, with the Steam client up beside it for its DRM.
+    ///
+    /// Steam has no appmanifest for this copy, so `steam://rungameid` would find nothing. Bringing
+    /// the client up silently first and then starting the exe gives a Steamworks or Denuvo title
+    /// exactly what it asks for — a live session belonging to an account that owns the game — while
+    /// keeping the download path free of the client's install dialog.
+    static func launchAlongside(runner: WineRunner, exe: URL, appID: Int, showHUD: Bool = false,
+                                gameEnv: [String: String] = [:],
+                                progress: (String) -> Void = { _ in }) throws {
+        SteamDRM.markAppDirectory(exe.deletingLastPathComponent(), appID: appID)
+        if !isRunning {
+            progress("Starting Steam (silent) and waiting for it to be ready…")
+            try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv)
+            for _ in 0..<20 {
+                Thread.sleep(forTimeInterval: 2)
+                if isRunning && isClientUpdated(in: runner.prefix) { break }
+            }
+            Thread.sleep(forTimeInterval: 6)   // let the sign-in settle before the game asks
+        }
+        var env = WineRunner.d3dMetalEnv(showHUD: showHUD)
+        for (key, value) in gameEnv { env[key] = value }
+        // What steam_api looks at when a game was not started by the client.
+        env["SteamAppId"] = "\(appID)"
+        env["SteamGameId"] = "\(appID)"
+        progress("Launching \(exe.lastPathComponent)…")
+        try runner.spawn([exe.path], extraEnv: env,
+                         log: Paths.logs.appendingPathComponent("game-\(exe.deletingPathExtension().lastPathComponent).log"))
+    }
+}
+
 /// The kaon `steam_dev.cfg` trick: force the *native* macOS Steam client to show Install/Play for
 /// Windows-only games. Advanced/opt-in only — it blocks Steam's self-update and can empty games
 /// that have a macOS depot. The non-Steam-shortcut path (SteamShortcuts) is preferred.

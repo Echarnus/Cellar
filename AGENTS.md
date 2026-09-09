@@ -84,10 +84,16 @@ The differences are real, not cosmetic — the three that bite hardest:
 - **Battle.net does not publish who is signed in.** Steam writes `loginusers.vdf`. So Cellar never
   shows a Battle.net sign-in step and never a ✗ beside "account" — it folds signing in into "open the
   client", the one screen where the player can act on it.
-- **Signing in is account-level, never per game.** One Windows Steam install lives in `shared/steam`
-  and every Steam bottle symlinks to it, and GOG's sign-in is an OAuth token Cellar holds. So a
-  sign-in belongs to the **Accounts** screen (`cellar accounts`, ⌘⇧A), not to a game's page.
+- **Signing in is account-level, never per game — and Steam is asked exactly once.** The single
+  Steam sign-in is Steam's QR device flow (`SteamAccount`), and it covers both *what you own* and
+  *downloading it*. There is no Web API key and no separate download session; the in-bottle Windows
+  client is not a second account but a runtime dependency of games whose DRM talks to a running
+  Steam. Sign-in belongs in **Settings** (`cellar steam login`, ⌘⇧A), never on a game's page.
   `StoreDescriptor.authStyle` is the fact that decides which shape a store has.
+- **The library is the games you own, not the catalogue.** `StoreLibrary` gates every profile on
+  what the store confirmed, with three answers and not two — owned, not owned, *unverifiable* — and
+  a store that can never answer (Battle.net) shows its games saying so. Adding a claim about the
+  player's library without a store behind it is the one bug class `cellar selftest` covers directly.
 
 Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarKit/Store.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a

@@ -83,9 +83,21 @@ is not per-game — it's your account's — so Cellar keeps **one** Windows Stea
 downloaded once instead of per bottle. `cellar steam share` migrates an existing setup and never
 deletes a download.
 
-`cellar accounts` (⌘⇧A in the app) shows where you're signed in — and only what Cellar can actually
-check: your Steam account name, your GOG account name, and for Battle.net an honest "not published"
-rather than a guess.
+### One Steam sign-in, and only the games you own
+
+Steam is signed in to **once**, by QR, from **Settings** in the app (⌘⇧A) or `cellar steam login`.
+That single session is what tells Cellar which games you own *and* downloads them — there is no
+second credential, no Web API key, and no per-game sign-in. Sessions expire after a few months and
+Steam can end one early; Cellar notices the moment Steam refuses it and says so, instead of failing
+a download for no visible reason.
+
+Nothing is listed until a store is signed in, and then only what that store confirms you own —
+`cellar library`. Steam is asked with the same session that would do the downloading, so "owned"
+means "Cellar can install this", not "an id turned up in a list". Battle.net publishes neither a
+sign-in state nor what you own, so its games are shown with that said out loud rather than hidden.
+
+`cellar accounts` shows where you're signed in — and only what Cellar can actually check: your Steam
+account name, your GOG account name, and for Battle.net an honest "not published" rather than a guess.
 
 In the app the library is grouped by store, each game carries its storefront's mark and name, and
 the detail page states what the profile actually knows: developer, engine, graphics API, anti-cheat,
@@ -154,7 +166,7 @@ Signing in, wherever you are:
 
 ```sh
 cellar accounts                     # where you're signed in, across every store
-cellar steam login                  # QR sign-in for client-free downloads (nothing typed)
+cellar steam login                  # the one Steam sign-in: a QR code, nothing typed
 cellar steam share                  # one Steam install for every bottle (safe to re-run)
 cellar gog login                    # OAuth, once, for your whole GOG library
 cellar gog library                  # everything you own that runs on Windows
@@ -167,8 +179,17 @@ cellar steam add planet-coaster-2   # generates ~/Applications/Planet Coaster 2.
                                     # and a non-Steam shortcut (quit Steam first)
 ```
 
+Your games, and starting over:
+
+```sh
+cellar library                      # the games you own that Cellar can run
+cellar library --refresh            # ask your stores again
+cellar install planet-coaster-2     # download it with the sign-in you already gave
+cellar reset                        # show everything Cellar put on this Mac (--yes to remove it)
+```
+
 Other commands: `cellar runner list/install`, `cellar prefix list`, `cellar profiles list/show`,
-`cellar fetch-depot <slug>` (client-free download), `cellar steam enable-windows-platform` (advanced).
+`cellar steam enable-windows-platform` (advanced).
 
 ---
 

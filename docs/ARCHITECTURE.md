@@ -88,8 +88,8 @@ Three consequences worth stating plainly, because they shape the UI as much as t
   own kind of surprising, so that pause is announced too.
 - **Signing in is account-level, not game-level.** `StoreDescriptor.authStyle` says which of the two
   shapes a store has — `.inClientWindow` (Steam, Battle.net) or `.cellarHeldToken` (GOG) — and the
-  Accounts screen is built from it. See *One Steam, every bottle* below for why this stopped being a
-  per-game question for Steam too.
+  Settings screen is built from it. See *One Steam, every bottle* and *The one Steam sign-in* below
+  for why this stopped being a per-game question for Steam too.
 
 All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
 about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a branch in `Game.setUp`
@@ -115,19 +115,54 @@ richest existing install (a signed-in one first, then the largest) is *promoted*
 by a same-volume rename, and any other is moved aside as `Steam.superseded-<timestamp>` with the path
 printed so the player reclaims the space deliberately.
 
-### Steam's two sign-ins
+### The one Steam sign-in
 
-They are different credentials and it is worth not conflating them:
+`SteamAccount` is the whole of it: Steam's own device-authorization flow
+(`IAuthenticationService/BeginAuthSessionViaQR`), run once from Settings, approved in the Steam
+mobile app, nothing typed. That single session answers **both** questions Cellar has of Steam —
+which games this account may have, and hand them over — so there is no Web API key, no separate
+download credential, and no per-game sign-in.
 
-- **The client session** — what a Steamworks or Denuvo game talks to while it runs. Lives in the
-  shared install's `config/loginusers.vdf`. One window, once, for every bottle.
-- **The download session** — a token from Steam's own device-authorization flow
-  (`IAuthenticationService/BeginAuthSessionViaQR`), used by DepotDownloader for the client-free path.
-  `cellar steam login` runs it; nothing is typed and approval happens in the Steam mobile app.
+Three things had to be true for one to be enough:
 
-A token cannot be injected into the client's credential store (it is machine-keyed inside
-`config.vdf`), so a game needing a live client still signs in there. Cellar says so rather than
-implying one sign-in covers both.
+- **The token is DepotDownloader's, not Cellar's.** It obtains it and keeps it in .NET *isolated
+  storage*, whose location is derived from the process's `HOME` and hashed. Cellar pins `HOME` to a
+  directory it owns (`tools/depotdownloader/home`) so the session can be seen, reused and genuinely
+  revoked. Before that, Cellar looked for an `account.config` beside the binary that .NET never
+  writes there — so "signed in" was permanently false, sign-out did nothing, and every download
+  asked for a fresh QR scan. That single wrong path is what made the sign-in feel like three.
+- **The account name is captured, not guessed.** A stored token can only be looked up by the
+  username it was stored under, so the name is parsed out of DepotDownloader's own success line and
+  recorded. That is what makes every later run silent.
+- **Expiry is learned by being refused.** Cellar never holds the token, so it cannot read an expiry
+  date and does not pretend to: it watches for `Access token was rejected (…)`, keeps Steam's own
+  word for the reason, and turns the next screen into "sign in again" rather than a failed download.
+  Age is reported instead of a countdown — these sessions last about 200 days, and Cellar starts
+  mentioning it at 180.
+
+**The in-bottle Windows client is not a second account.** It is a runtime dependency of the games
+whose DRM talks to a running Steam (`config/loginusers.vdf`, one window, once, shared by every
+bottle). A token cannot be injected into its credential store — that is machine-keyed inside
+`config.vdf` — so those games still sign in there, and Cellar reports it as a fact about the machine
+rather than as another sign-in to perform.
+
+### Your games, not the catalogue
+
+`StoreLibrary` decides what is in the library, once, so `cellar library` and the app cannot drift.
+Ownership has **three** answers, not two — `.owned`, `.notOwned`, `.unknown` — and the gate splits
+the last one on whether the store *could* ever answer: a store that can (Steam, GOG) hides its games
+until asked, with the fix attached; a store that never can (Battle.net) shows them, saying so.
+
+Steam is asked per game, by running the download's own licence check and stopping the moment it
+answers (`DepotTool.access`). That is deliberately the *same* question as "can I install this",
+asked of the same credential that would do the installing — so it covers a lapsed family-share or a
+region lock, which a list of owned app ids would not. Answers are cached under `shared/libraries/`,
+keyed to the account, because `Game.summaries()` runs on every library refresh and must never make a
+network call.
+
+`StoreLibrary.gatingStore` handles the one crossover: a `standalone` profile carrying a
+`steam_appid` (Stardew Valley) needs no client but is still fetched from the player's Steam account,
+so **Steam** gates it.
 
 DepotDownloader only ever *draws* the QR challenge, as terminal ASCII, and prints no URL — so
 `SteamQRCode.swift` reads the drawing back into a module matrix and the app renders it at a scannable
