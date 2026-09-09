@@ -23,6 +23,13 @@ enum IT {
 
     static var wineTierEnabled: Bool { flag("CELLAR_IT") }
 
+    /// Tier D — a real game, downloaded from a real Steam depot with the player's own sign-in.
+    ///
+    /// Kept behind a switch of its own rather than folded into `CELLAR_IT`, because it is the only
+    /// tier that needs an *account* and moves gigabytes. `CELLAR_IT=1` alone still runs the Wine
+    /// tiers against `winemine.exe` and stays offline.
+    static var steamTierEnabled: Bool { flag("CELLAR_IT_STEAM") }
+
     /// Tier B and C need Apple Silicon plus a working Rosetta, because every runner Cellar ships is
     /// an x86_64 Wine. Reported rather than assumed, so a skip is never mistaken for a pass.
     static var machineCanRunWine: Bool {
@@ -241,6 +248,84 @@ enum IT {
             return url
         }
         return nil
+    }
+
+    // MARK: - Tier D: a real game from a real Steam depot
+
+    /// The Steam title tier D installs and runs.
+    ///
+    /// **Fallout Shelter by default**, and the choice is the interesting part. Tier C proves the
+    /// pipeline with `winemine.exe`, which is honest about being a fixture: it is 100 KB, it ships
+    /// inside Wine, and nothing about running it resembles installing a game. Tier D exists to
+    /// close the remaining gap — a real Steam depot, a real Unity-sized install, a real game
+    /// process — and Fallout Shelter is the cheapest title that closes it:
+    ///
+    /// - **Free-to-play**, so anyone with a Steam account can add it and run this tier.
+    /// - **~2 GB**, small enough to download in a test rather than a maintenance window.
+    /// - **Windows-only** — Steam publishes no macOS build, so a pass cannot be a native binary
+    ///   quietly running instead. Translation is the only way it can start on this Mac.
+    /// - **Single-player, no third-party DRM**, so it takes Cellar's store-free route and the test
+    ///   observes the game directly instead of a client that spawned it.
+    struct SteamGame {
+        var appID: Int
+        var slug: String
+        var installDir: String
+        var exe: String
+
+        static let falloutShelter = SteamGame(appID: 588430, slug: "fallout-shelter",
+                                              installDir: "Fallout Shelter",
+                                              exe: "FalloutShelter.exe")
+
+        /// Point the tier at a different title without touching the code.
+        static var configured: SteamGame {
+            var game = falloutShelter
+            if let id = IT.value("CELLAR_IT_STEAM_APPID").flatMap(Int.init) { game.appID = id }
+            if let slug = IT.value("CELLAR_IT_STEAM_SLUG") { game.slug = slug }
+            if let dir = IT.value("CELLAR_IT_STEAM_INSTALLDIR") { game.installDir = dir }
+            if let exe = IT.value("CELLAR_IT_STEAM_EXE") { game.exe = exe }
+            return game
+        }
+    }
+
+    /// Why tier D cannot run, or `nil` when it can.
+    ///
+    /// Asked of Steam itself rather than inferred, and reported as a **sentence naming the fix**,
+    /// because this tier skips far more often than it runs: on any machine without a sign-in the
+    /// only thing it can produce is an explanation, and "skipped" must never be mistakable for
+    /// "passed". Ownership is checked with the same credential that would do the downloading, so a
+    /// lapsed family-share or a region lock is caught here rather than half a download later.
+    static func steamBlocker(for game: SteamGame) -> String? {
+        guard steamTierEnabled else {
+            return "set CELLAR_IT_STEAM=1 to download and run a real Steam game"
+        }
+        guard machineCanRunWine else {
+            return "this Mac cannot run x86-64 Windows (Apple Silicon + Rosetta required)"
+        }
+        guard let credentials = SteamAccount.credentials else {
+            return "no Steam sign-in — run `cellar steam login` (one QR scan) and try again"
+        }
+        switch DepotTool.access(appID: game.appID, credentials: credentials) {
+        case .available:
+            return nil
+        case .unavailable:
+            // Free-to-play is not the same as already-owned: it still has to be in the library.
+            return "this Steam account has no licence for app \(game.appID) — "
+                 + "add it once from the store page (it is free) and re-run"
+        case .unknown(let reason):
+            return "Steam did not confirm access to app \(game.appID): \(reason)"
+        }
+    }
+
+    /// Download the game's Windows files into the bottle, through Cellar's own call.
+    ///
+    /// Deliberately `Game.fetchDepot` and not a hand-rolled DepotDownloader command line: the point
+    /// of the tier is that *Cellar's* install path works, and a test that drove the tool itself
+    /// would pass while `fetchDepot` was broken.
+    static func downloadFromSteam(_ plan: GamePlan, progress: (String) -> Void = { _ in }) throws {
+        guard let credentials = SteamAccount.credentials else {
+            throw CellarError.invalidArgument("no Steam sign-in — steamBlocker should have skipped this test")
+        }
+        try Game.fetchDepot(plan, credentials: credentials, progress: progress)
     }
 
     // MARK: - Reporting

@@ -1,0 +1,57 @@
+# Cellar game profile — Fallout Shelter
+#
+# The smallest honest end-to-end case in the database, and the one the Steam integration tier runs
+# by default: free-to-play, ~2 GB, Windows-only, single-player, no third-party DRM. Everything a
+# test wants — a real Steam depot, a real Windows PE, and no reason for a store client to be alive.
+
+[game]
+slug          = "fallout-shelter"
+name          = "Fallout Shelter"
+developer     = "Bethesda Game Studios"
+publisher     = "Bethesda Softworks"
+steam_appid   = 588430
+architecture  = "x86-64"
+released      = "2017-03-29"
+
+# No store client at all: the files come from the Steam depot and the exe is run directly, the same
+# path Stardew Valley demonstrates. Steam's own app record lists no DRM and no third-party account,
+# and the game is single-player, so nothing has to be running alongside it.
+store         = "standalone"
+
+[compatibility]
+# Single-player only — Steam lists no multiplayer category, so there is no anti-cheat to translate.
+anticheat                   = "none"
+# Steam publishes `drm_notice` and `ext_user_account_notice` when a game carries third-party DRM or
+# needs a publisher account (Denuvo, Bethesda.net, …). For 588430 both are absent.
+drm                         = "none (no third-party DRM listed by Steam)"
+# `needs_live_session` is the canonical spelling; `needs_live_steam` is only read for older files.
+needs_live_session          = false
+requires_account            = "none"
+online                      = "single-player (Steam Cloud + achievements only, both optional)"
+status                      = "untested"
+notes                       = "Facts verified 2026-09-09 from Steam's own app record: appid 588430, installdir 'Fallout Shelter', launch executable 'FalloutShelter.exe', Windows-only (no macOS build), ~2 GB, free-to-play. Not yet launched on this Mac — the account it would download with is not signed in, so the Steam integration tier reports skipped rather than passing. Run `cellar steam login`, then `sh Scripts/test.sh --steam` to promote this."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[install]
+# `depot` = DepotDownloader fetches the Windows files with the one Steam sign-in; no Steam window
+# is ever opened, on this Mac or inside the bottle.
+method      = "depot"
+steam_appid = 588430
+# Both taken from Steam's app record, not guessed, so Cellar finds the game whichever way it was
+# installed — its own depot download, or a copy the Windows client put down.
+install_dir = "Fallout Shelter"
+exe         = "FalloutShelter.exe"
+
+[launch]
+exe = "FalloutShelter.exe"
+
+[legal]
+# Free-to-play still means owned: the account doing the downloading must have it in its library.
+drm_circumvention = "never"

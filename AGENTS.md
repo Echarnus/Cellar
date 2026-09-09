@@ -47,6 +47,7 @@ Swift 6 toolchain, Apple Silicon, macOS 13+.
 swift build                       # debug build
 sh Scripts/test.sh                # the test suite, headless (~0.5s) — what CI runs
 sh Scripts/test.sh --integration  # + the Wine tiers: real runner, real prefix, real Windows game
+sh Scripts/test.sh --steam        # + tier D: a real Steam game (Fallout Shelter) downloaded and run
 swift run cellar doctor           # sanity-check the machine
 swift build -c release            # release build (what CI and the app installer use)
 swift run cellar selftest         # in-repo smoke test
@@ -84,11 +85,14 @@ verifying, and if you cannot verify, say so and name what needs manual checking.
 4. **Wine tiers** — `sh Scripts/test.sh --integration` for anything touching runners, prefixes or
    launching. Installs a real runner and starts a real Windows executable, so it is a local rung,
    not a CI one — and it is the rung to climb before a release.
-5. **Behaviour** — the actual path you changed runs: the CLI command, or the installed app launched
+5. **A real game** — `sh Scripts/test.sh --steam` for anything touching depots, ownership or store
+   credentials. Downloads Fallout Shelter (free, ~2 GB, Windows-only) from a real Steam depot and
+   starts it. Needs `cellar steam login`; without it the tier skips and says so, which is not a pass.
+6. **Behaviour** — the actual path you changed runs: the CLI command, or the installed app launched
    and exercised. GUI changes are verified by reinstalling (`install-app.sh`) and launching, not by
    reading the diff. Site changes are verified by generating and opening `site/index.html`.
 
-Full map, including how to point tier C at a specific game: [`docs/TESTING.md`](docs/TESTING.md).
+Full map, including how to point tiers C and D at a specific game: [`docs/TESTING.md`](docs/TESTING.md).
 The [verifier agent](agents/verifier.md) codifies these demands per kind of change.
 
 ### Testing

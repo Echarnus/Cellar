@@ -7,6 +7,7 @@ every push, and an opt-in layer that actually translates Windows.
 ```sh
 sh Scripts/test.sh                  # unit tests — fast, hermetic, no network. What CI runs.
 sh Scripts/test.sh --integration    # + the Wine tiers: real runner, real prefix, real Windows game.
+sh Scripts/test.sh --steam          # + tier D: download a real Steam game and run it.
 sh Scripts/test.sh --filter Store   # anything else is passed straight to `swift test`.
 ```
 
@@ -28,9 +29,11 @@ sh Scripts/test.sh --filter Store   # anything else is passed straight to `swift
 | **A — integration, hermetic** | always | ~1 s | Bottles, generated `.app` launchers, `shortcuts.vdf` — real files on disk, no Wine. |
 | **B — the layer** | `CELLAR_IT=1` | ~1 min | A runner installs, a Wine prefix initialises as WoW64, a Windows PE runs and its output comes back. |
 | **C — a game** | `CELLAR_IT=1` | ~2 min | A Windows-only game goes profile → bottle → launch → watched → shut down, through Cellar's own calls. |
+| **D — a *real* game** | `CELLAR_IT_STEAM=1` | ~10 min + download | A game the player owns comes down from a real Steam depot, through `Game.fetchDepot`, and starts. |
 
-Tiers B and C **skip** rather than fail when `CELLAR_IT` is unset, and are reported as skipped —
-a skip must never read like a pass.
+Tiers B, C and D **skip** rather than fail when their switch is unset, and are reported as skipped —
+a skip must never read like a pass. Tier D goes further and prints *why* on every run, because it is
+the tier most likely to sit unrun: it needs an account, and no amount of correct code can supply one.
 
 ---
 
@@ -119,6 +122,61 @@ read-only, so a test run never costs 400 MB and never writes into it.
 
 ---
 
+## Tier D: a real Steam game — Fallout Shelter
+
+Tier C is honest about being a fixture. `winemine.exe` is 100 KB, it ships inside Wine, and nothing
+about running it resembles installing a game: no account, no depot, no engine, no shader
+compilation. Tier D closes that gap by doing the thing a player does — authenticate to Steam, pull
+the game down through **`Game.fetchDepot`**, and start it.
+
+**The game is Fallout Shelter (app `588430`)**, and every part of that choice is load-bearing:
+
+- **Free-to-play** — anyone with a Steam account can add it, so the tier is not gated on owning
+  something expensive.
+- **~2 GB** — small enough to download inside a test run.
+- **Windows-only.** Steam publishes no macOS build, so a pass *cannot* be a native binary quietly
+  running instead. Translation is the only way it can start on this Mac. This is the property that
+  makes it evidence rather than a smoke test.
+- **Single-player, no third-party DRM** — Steam publishes no `drm_notice` and no
+  `ext_user_account_notice` for it — so it takes Cellar's store-free route and the test watches the
+  game's own process instead of a client that spawned it.
+
+It runs the profile the repo actually ships (`profiles/fallout-shelter.toml`), not a fixture. That is
+the point: when this tier passes, that file is correct. Step 5 is the one worth knowing about — it
+asserts the downloaded files match what the profile promised, so if Bethesda renames the executable,
+Cellar finds out here rather than in a bug report.
+
+```sh
+cellar steam login              # once — a QR scan in the Steam mobile app, no password
+sh Scripts/test.sh --steam
+```
+
+### It skips loudly
+
+Ownership is asked of **Steam**, with the same credential that would do the downloading — so a
+lapsed family-share or a region lock is caught before the download rather than halfway through it.
+Free-to-play is exactly where this goes wrong: "free" reads like "everybody has it", and Steam still
+refuses the depot until the account has actually added the game. When the tier cannot run it says so
+as a sentence naming the fix:
+
+```
+[integration] Steam tier SKIPPED for fallout-shelter (app 588430): no Steam sign-in —
+              run `cellar steam login` (one QR scan) and try again
+```
+
+| Variable | Meaning |
+|---|---|
+| `CELLAR_IT_STEAM` | `1` to enable tier D. Implies `CELLAR_IT` — it needs a runner and a prefix. |
+| `CELLAR_IT_STEAM_APPID` | Steam app id to install. Default `588430`. |
+| `CELLAR_IT_STEAM_SLUG` | Profile slug to run it through. Default `fallout-shelter`. |
+| `CELLAR_IT_STEAM_INSTALLDIR` | The game's install directory name. Default `Fallout Shelter`. |
+| `CELLAR_IT_STEAM_EXE` | The executable to launch and watch. Default `FalloutShelter.exe`. |
+
+The download lands inside the throwaway `CELLAR_HOME` and goes with it, so the tier never touches a
+real bottle — and never leaves 2 GB behind on a passing run.
+
+---
+
 ## Where this sits in the verification ladder
 
 `AGENTS.md` asks for the highest rung available before calling a change done. The suite maps onto it:
@@ -129,6 +187,7 @@ read-only, so a test run never costs 400 MB and never writes into it.
 | 2. Self-test | `swift run cellar selftest` |
 | 2b. **Unit + tier A** | `sh Scripts/test.sh` |
 | 2c. **Wine tiers** | `sh Scripts/test.sh --integration` |
+| 2d. **A real game** | `sh Scripts/test.sh --steam` |
 | 3. Behaviour | the CLI command, or `sh Scripts/install-app.sh` and launch the app |
 
 `cellar selftest` stays: it is a check an *installed* binary can run on a player's machine, which a
@@ -146,5 +205,8 @@ to climb before a release**.
   the unit suite, and needs no Wine.
 - A change to what Cellar *writes* — bottles, app bundles, shortcuts, configs — belongs in tier A.
 - A change to how a game is *run* belongs in tier B or C, behind `CELLAR_IT`.
+- A change to how a game is *obtained* — depots, ownership, store credentials — belongs in tier D,
+  behind `CELLAR_IT_STEAM`, and must skip with a sentence naming the fix rather than failing on a
+  machine that is simply not signed in.
 - Adding a game profile needs no new test: `ProfileDatabaseTests` picks it up automatically, and will
   tell you what it is missing.

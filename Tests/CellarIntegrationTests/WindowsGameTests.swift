@@ -206,8 +206,15 @@ struct WindowsGameTests {
             _ = try Game.launch(plan)
             Issue.record("launching a game with no files on disk must not succeed")
         } catch let error as CellarError {
-            #expect(error.description.contains("No launchable exe found"))
+            // The message a player actually gets. `Game.launch` never reaches `launchDirect`'s
+            // "No launchable exe found" for this case — that one is only possible once the files
+            // are on disk, because `canLaunchStoreFree` gates the direct route. With nothing
+            // installed, launch falls through to the store switch, and for a game with no store
+            // the honest answer is that it isn't installed yet.
+            #expect(error.description.contains("isn't installed yet"))
             #expect(error.description.contains(plan.slug), "the message must name the game")
+            #expect(error.description.contains("cellar install"),
+                    "refusing to launch is only half of it — the message has to say what to do next")
         }
     }
 

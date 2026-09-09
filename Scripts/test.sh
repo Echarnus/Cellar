@@ -3,6 +3,7 @@
 #
 #   sh Scripts/test.sh                 # unit + hermetic tiers — fast, what CI runs
 #   sh Scripts/test.sh --integration   # + the Wine tiers: real runner, real prefix, real Windows exe
+#   sh Scripts/test.sh --steam         # + tier D: download a real Steam game and run it
 #   sh Scripts/test.sh --filter Store  # anything else is passed straight through to `swift test`
 #
 # Three environment problems this exists to solve:
@@ -73,10 +74,13 @@ fi
 INTEROP="$DEVELOPER_DIR/Library/Developer/usr/lib"
 
 INTEGRATION=0
+STEAM=0
 ARGS=""
 for arg in "$@"; do
     case "$arg" in
         --integration) INTEGRATION=1 ;;
+        # Tier D implies the Wine tiers: it cannot run a game without a runner and a prefix.
+        --steam) INTEGRATION=1; STEAM=1 ;;
         *) ARGS="$ARGS $arg" ;;
     esac
 done
@@ -89,6 +93,15 @@ if [ "$INTEGRATION" = "1" ]; then
     echo "    Game:    ${CELLAR_IT_GAME_URL:-winemine.exe from the runner itself}"
 else
     echo "==> Unit + hermetic tiers. Add --integration to run the Wine tiers."
+fi
+
+if [ "$STEAM" = "1" ]; then
+    CELLAR_IT_STEAM=1
+    export CELLAR_IT_STEAM
+    echo "==> ALSO the Steam tier (CELLAR_IT_STEAM=1) — downloads a real game"
+    echo "    Steam app: ${CELLAR_IT_STEAM_APPID:-588430 (Fallout Shelter — free, ~2 GB, Windows-only)}"
+    echo "    Needs a Steam sign-in that has the game: cellar steam login"
+    echo "    The tier skips with a reason if it hasn't; it never fails for being unable to download."
 fi
 
 # Hand the test process a throwaway Cellar installation.
