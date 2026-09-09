@@ -248,14 +248,27 @@ private struct GOGMark: View {
     /// badge's ring can never disagree with the tile it is drawn around.
     static let corner: CGFloat = 0.13
 
+    /// Below this, the tile carries a single `g` instead of the whole wordmark.
+    ///
+    /// Not a preference — arithmetic. The full wordmark is 26 grid cells across; in a 12pt chip on a
+    /// 2× screen that is 24 device pixels, so every stroke lands on well under one pixel and the mark
+    /// greys into static. The player's own screen is the constraint, and rendering the mark at 8× to
+    /// admire it is how that got missed the first time. One glyph is 8 cells wide, which leaves the
+    /// strokes ~4px and legible.
+    ///
+    /// It is still GOG's mark, not a new one: their tile, their letterform, their ink — the wordmark
+    /// cropped to its first glyph, the way a favicon crops a logotype. The word "GOG" is beside it in
+    /// every lockup and section heading regardless, so nothing rests on the glyph alone.
+    static let wordmarkFloor: CGFloat = 20
+
     var body: some View {
         let corner = size * Self.corner
         ZStack {
             RoundedRectangle(cornerRadius: corner, style: .continuous)
                 .fill(.white)
-            BlockWord(lines: ["gog", "com"])
+            BlockWord(lines: size >= Self.wordmarkFloor ? ["gog", "com"] : ["g"])
                 .fill(ink)
-                .padding(size * 0.12)
+                .padding(size * (size >= Self.wordmarkFloor ? 0.12 : 0.20))
         }
         .frame(width: size, height: size)
         .overlay(

@@ -184,12 +184,64 @@ struct MarkGeometry {
 
     /// The ink in each row of the mark, as a fraction of the row's width — the profile that shows a
     /// two-line wordmark has actually got two lines, with a clear band between them.
-    var inkByRow: [Double] {
-        (0..<bitmap.height).map { y in
+    ///
+    /// `inset` trims that fraction off each edge first. GOG's mark is a rounded tile on a dark
+    /// background, so its own corners are "dark ink" to this measure; anything counting *bands* has
+    /// to look inside the tile rather than at the box.
+    func inkByRow(inset: Double = 0) -> [Double] {
+        let trimX = Int(Double(bitmap.width) * inset), trimY = Int(Double(bitmap.height) * inset)
+        let xs = trimX..<(bitmap.width - trimX)
+        guard !xs.isEmpty else { return [] }
+        return (trimY..<(bitmap.height - trimY)).map { y in
             var n = 0
-            for x in 0..<bitmap.width where isInk(bitmap[x, y]) { n += 1 }
-            return Double(n) / Double(bitmap.width)
+            for x in xs where isInk(bitmap[x, y]) { n += 1 }
+            return Double(n) / Double(xs.count)
         }
+    }
+
+    var inkByRow: [Double] { inkByRow() }
+
+    /// How many separate horizontal bands of ink there are — one per line of a wordmark.
+    var inkBandCount: Int {
+        var bands = 0, inBand = false
+        for row in inkByRow(inset: 0.12) {
+            if row > 0.05, !inBand { bands += 1; inBand = true }
+            else if row < 0.02 { inBand = false }
+        }
+        return bands
+    }
+
+    /// The fraction of the mark that renders as **neither its ink nor its field** — mush.
+    ///
+    /// This is the measure that catches detail too fine for the screen it is drawn on, and it only
+    /// means anything on a bitmap rendered at the *real* device scale. A stroke narrower than a pixel
+    /// cannot be drawn as a stroke: it is averaged into the background as mid-grey, and enough of that
+    /// is what a player calls "a smudge". Judged against the mark's **own** two tones rather than
+    /// absolute luminance, so a mid-blue disc is a field, not mush.
+    ///
+    /// Measured inside the mark, away from its own antialiased rim.
+    var mushFraction: Double {
+        let cx = Double(bitmap.width) / 2, cy = Double(bitmap.height) / 2
+        let radius = min(cx, cy) * 0.86
+        var inside: [Double] = []
+        for y in 0..<bitmap.height {
+            for x in 0..<bitmap.width {
+                let dx = Double(x) - cx, dy = Double(y) - cy
+                if dx * dx + dy * dy <= radius * radius { inside.append(bitmap[x, y].luminance) }
+            }
+        }
+        guard inside.count > 20 else { return 0 }
+
+        // The mark's two tones, taken as percentiles so one stray pixel cannot define either.
+        let sorted = inside.sorted()
+        func percentile(_ p: Double) -> Double { sorted[min(sorted.count - 1, Int(Double(sorted.count) * p))] }
+        let inkTone = ink == .light ? percentile(0.98) : percentile(0.02)
+        let fieldTone = ink == .light ? percentile(0.10) : percentile(0.90)
+
+        let gap = abs(inkTone - fieldTone)
+        guard gap > 0.05 else { return 0 }      // a mark with only one tone has nothing to blur
+        let ambiguous = inside.filter { min(abs($0 - inkTone), abs($0 - fieldTone)) > 0.30 * gap }
+        return Double(ambiguous.count) / Double(inside.count)
     }
 
     /// Average colour of the disc behind the mark, sampled just inside the rim at the four

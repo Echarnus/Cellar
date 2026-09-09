@@ -46,6 +46,31 @@ struct StoreMarkTests {
                 "\(store.rawValue) at \(Int(size))pt is \(pct(g.inkCoverage)) ink — it has filled in and lost its shape")
     }
 
+    /// **The mark has to survive the screen it is drawn on.**
+    ///
+    /// Every other test here renders at 8×, which is generous on purpose — it measures the *design*.
+    /// This one renders at **2×, the scale a real Retina Mac uses**, and asks whether the drawing is
+    /// still made of ink and field rather than grey. Detail finer than a device pixel cannot be drawn
+    /// as detail; it averages into mush, and the player sees a smudge.
+    ///
+    /// This is the test that was missing when a GOG mark whose wordmark needed 26 grid cells shipped
+    /// into a 12pt filter chip — 24 device pixels — and every assertion in this file passed while the
+    /// app on screen showed static. A coverage ratio cannot see that; only rendering at the real scale
+    /// can. The sizes below are the ones the app actually asks for, `ContentView`'s 12 and 13
+    /// included — not a tidy series.
+    @Test("every mark survives the screen it is drawn on",
+          arguments: GameStore.allCases, [CGFloat(11), 12, 13, 14, 16, 22, 30])
+    func markSurvivesAtDeviceScale(store: GameStore, size: CGFloat) {
+        let bitmap = Snapshot.render(StoreMark(store: store, size: size),
+                                     size: CGSize(width: size, height: size), scale: 2)
+        let mush = MarkGeometry(bitmap: bitmap, ink: store == .gog ? .dark : .light).mushFraction
+        #expect(mush < 0.18,
+                """
+                \(store.rawValue) at \(Int(size))pt: \(pct(mush)) of the mark renders as neither ink \
+                nor field on a 2× screen — its detail is finer than a pixel, so a player sees a smudge
+                """)
+    }
+
     /// A mark is a disc with ink on it, so the ink has to be near the middle. A centroid that has
     /// drifted to an edge means something is clipped or offset out of the circle.
     @Test("the mark sits in its disc", arguments: GameStore.allCases, sizes)
@@ -178,9 +203,23 @@ struct StoreMarkTests {
                 """)
     }
 
-    /// Two lines, not one. The tile says `gog` over `com`, and a band of clear tile separates them;
-    /// lose that and the mark is a smudge rather than a wordmark.
-    @Test("GOG's wordmark is set on two lines", arguments: [CGFloat(22), 32])
+    /// Below 20pt the tile carries a single `g`, because the whole wordmark is 26 grid cells across
+    /// and a 12pt chip is 24 device pixels — every stroke would land on less than one pixel. The app
+    /// draws marks at 12pt (filter chips) and 13pt (section headings), so this *is* the common case.
+    @Test("GOG's tile drops to one glyph at the sizes the app actually uses",
+          arguments: [CGFloat(11), 12, 13, 14, 16])
+    func gogIsOneGlyphWhenSmall(size: CGFloat) {
+        let bands = Self.geometry(.gog, size: size).inkBandCount
+        #expect(bands == 1,
+                """
+                GOG at \(Int(size))pt drew \(bands) lines of wordmark. Below 20pt it has to be the \
+                single `g`: six glyphs in this many pixels render as static, not as a word
+                """)
+    }
+
+    /// Two lines, not one, where there is room for two. The tile says `gog` over `com`, and a band of
+    /// clear tile separates them.
+    @Test("GOG's wordmark is set on two lines once there is room", arguments: [CGFloat(22), 32])
     func gogHasTwoLines(size: CGFloat) {
         let rows = Self.geometry(.gog, size: size).inkByRow
         let inked = rows.enumerated().filter { $0.element > 0.05 }.map(\.offset)
