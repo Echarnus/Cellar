@@ -80,9 +80,10 @@ issued, and what the app says to the player.
 
 Three consequences worth stating plainly, because they shape the UI as much as the code:
 
-- **Cellar never invents a state it cannot check.** Battle.net gets no sign-in step and no ✗ beside
-  "account", because Blizzard does not publish one. `GameStore.descriptor.canDetectSignIn` carries
-  that fact to every surface.
+- **Cellar never invents a state it cannot check.** Battle.net gets no sign-in step and no ✓ or ✗
+  beside "account", because Blizzard does not publish one. `GameStore.descriptor.canDetectSignIn`
+  carries that fact to every surface. Accounts asks only whether the player *has* an account there —
+  labelled "Added by you", so the badge names who is making the claim.
 - **Cellar announces a pause it cannot remove.** Because Blizzard ships no silent installer, setup
   warns before the window appears rather than looking hung. GOG's installer *is* silent, which is its
   own kind of surprising, so that pause is announced too.
@@ -149,9 +150,16 @@ rather than as another sign-in to perform.
 ### Your games, not the catalogue
 
 `StoreLibrary` decides what is in the library, once, so `cellar library` and the app cannot drift.
-Ownership has **three** answers, not two — `.owned`, `.notOwned`, `.unknown` — and the gate splits
-the last one on whether the store *could* ever answer: a store that can (Steam, GOG) hides its games
-until asked, with the fix attached; a store that never can (Battle.net) shows them, saying so.
+The gate asks two questions in order. **Is the store connected?** — nothing is listed for a store
+Cellar has no account for, whatever it can or cannot say about ownership. For Steam and GOG that is
+a credential Cellar holds; for Battle.net it is the player's own word, added once in Accounts
+(`StoreLibrary.BattleNetAccount`), because Blizzard publishes nothing to read. Without that first
+question, Diablo IV was listed on a Mac that had never opened Battle.net.
+
+**Then: do they own it?** Ownership has **three** answers, not two — `.owned`, `.notOwned`,
+`.unknown` — and the gate splits the last one on whether the store *could* ever answer: a store that
+can (Steam, GOG) hides its games until asked, with the fix attached; a store that never can
+(Battle.net) shows them once connected, saying plainly that nobody checked.
 
 Steam is asked per game, by running the download's own licence check and stopping the moment it
 answers (`DepotTool.access`). That is deliberately the *same* question as "can I install this",

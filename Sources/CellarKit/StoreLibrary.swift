@@ -45,6 +45,17 @@ public enum Ownership: Sendable, Equatable, Codable {
 /// Whether a store can answer the ownership question at all — the fact that decides what an
 /// unanswered store does to its games.
 public extension GameStore {
+    /// What a player does to make this store's games appear, in the words the button uses. Steam
+    /// and GOG are signed in to; Battle.net is only ever *claimed*, because there is nothing there
+    /// to sign in to from Cellar's side.
+    var libraryFix: String {
+        switch self {
+        case .steam, .gog: return "Sign in to \(displayName)"
+        case .battlenet:   return "Add Battle.net in Accounts"
+        case .standalone:  return "Sign in to the store the files come from"
+        }
+    }
+
     /// Steam and GOG both publish, to a signed-in Cellar, exactly what the account owns. Blizzard
     /// publishes neither entitlements nor a sign-in state, and a standalone game has no store to
     /// ask. Those two can never be checked, so hiding their games would mean pretending they don't
@@ -72,7 +83,18 @@ public enum StoreLibrary {
     }
 
     /// Decide one game's place in the library.
-    public static func verdict(store: GameStore, ownership: Ownership) -> Verdict {
+    ///
+    /// **Connected first, owned second.** A store nobody has signed in to has confirmed nothing, so
+    /// its games are not this player's library — and for Battle.net, which can never answer the
+    /// ownership question at all, the connection is the *only* question there is. Leaving it out is
+    /// how Diablo IV came to be listed on a Mac that had never opened Battle.net: the catalogue this
+    /// gate exists to abolish, wearing the gate's own clothes.
+    public static func verdict(store: GameStore, ownership: Ownership, isConnected: Bool) -> Verdict {
+        guard isConnected else {
+            return Verdict(ownership: ownership, isVisible: false,
+                           note: "Cellar isn't connected to \(store.displayName) yet.",
+                           fix: store.libraryFix)
+        }
         switch ownership {
         case .owned:
             return Verdict(ownership: .owned, isVisible: true, note: nil, fix: nil)
@@ -88,8 +110,21 @@ public enum StoreLibrary {
                                note: "Cellar can't check whether you own this — \(store.displayName) doesn't publish it.",
                                fix: nil)
             }
-            return Verdict(ownership: ownership, isVisible: false, note: why,
-                           fix: store == .steam ? "Sign in to Steam" : "Sign in to \(store.displayName)")
+            return Verdict(ownership: ownership, isVisible: false, note: why, fix: store.libraryFix)
+        }
+    }
+
+    /// **Is this store's account Cellar's to speak for?** — the first half of the gate.
+    ///
+    /// Two of the three are facts Cellar reads: a Steam session it holds, a GOG token it holds.
+    /// Battle.net is the player's word (`BattleNetAccount`), because Blizzard publishes nothing to
+    /// read. `standalone` has no store to connect to, so it is never in the way of its own games.
+    public static func isConnected(_ store: GameStore) -> Bool {
+        switch store {
+        case .steam:      return SteamAccount.isSignedIn
+        case .gog:        return GOGAuth.isSignedIn
+        case .battlenet:  return BattleNetAccount.isAdded
+        case .standalone: return true
         }
     }
 
@@ -229,6 +264,38 @@ public enum StoreLibrary {
 
     public static func forgetGOG() {
         try? FileManager.default.removeItem(at: gogCacheFile)
+    }
+
+    // MARK: - Battle.net
+
+    /// Battle.net's half of the gate, which is the player's word rather than anything Cellar read.
+    ///
+    /// Blizzard publishes no signed-in state and no entitlements, so Cellar has exactly two honest
+    /// options: never list a Battle.net game, or ask. It asks — once, in Accounts — and never draws
+    /// a ✓ beside the answer, because a ✓ claims a check that did not happen. What the answer buys
+    /// is only a place in the library; signing in still happens inside Blizzard's own client, where
+    /// it always did.
+    ///
+    /// A marker file under `shared/` rather than `UserDefaults`, because the CLI and the app are two
+    /// binaries with two defaults domains and they must agree about this.
+    public enum BattleNetAccount {
+        static var marker: URL { Paths.shared.appendingPathComponent("libraries/battlenet-account") }
+
+        /// True once the player has said they have a Battle.net account. Never "signed in" — Cellar
+        /// cannot know that, and the name is the difference.
+        public static var isAdded: Bool { FileManager.default.fileExists(atPath: marker.path) }
+
+        public static func add() throws {
+            try FileManager.default.createDirectory(
+                at: marker.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data().write(to: marker)
+        }
+
+        /// Part of signing out, so the next person at this Mac doesn't inherit the last one's stores.
+        public static func forget() throws {
+            guard isAdded else { return }
+            try FileManager.default.removeItem(at: marker)
+        }
     }
 
     // MARK: - One answer for any game

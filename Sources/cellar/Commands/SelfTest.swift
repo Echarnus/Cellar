@@ -120,18 +120,31 @@ struct SelfTest: ParsableCommand {
         // 8. The library gate, against fabricated store states rather than whatever this Mac
         // happens to hold. This is the one place a bug is a *claim about the player* — that these
         // are their games — so it is not left to chance.
-        let steamUnchecked = StoreLibrary.verdict(store: .steam, ownership: .unknown("not checked"))
+        let steamUnchecked = StoreLibrary.verdict(store: .steam, ownership: .unknown("not checked"),
+                                                  isConnected: true)
         try check(!steamUnchecked.isVisible && steamUnchecked.fix != nil,
                   "Library gate: a store that could answer but hasn't hides its games, and offers the fix")
-        try check(StoreLibrary.verdict(store: .steam, ownership: .owned).isVisible,
+        try check(StoreLibrary.verdict(store: .steam, ownership: .owned, isConnected: true).isVisible,
                   "Library gate: a game Steam confirmed is shown")
-        try check(!StoreLibrary.verdict(store: .steam, ownership: .notOwned).isVisible,
+        try check(!StoreLibrary.verdict(store: .steam, ownership: .notOwned, isConnected: true).isVisible,
                   "Library gate: a game Steam refused is not shown")
-        let blizzard = StoreLibrary.verdict(store: .battlenet, ownership: .unknown("no API"))
+        // Connection comes first, and Battle.net is where that matters: it can never answer the
+        // ownership question, so without this its games were listed for a player who had never
+        // opened Battle.net. Both directions are pinned — hidden until added, shown after.
+        let blizzardUnadded = StoreLibrary.verdict(store: .battlenet, ownership: .unknown("no API"),
+                                                   isConnected: false)
+        try check(!blizzardUnadded.isVisible && blizzardUnadded.fix != nil,
+                  "Library gate: a store nobody has connected hides its games, and offers the fix")
+        try check(!StoreLibrary.verdict(store: .steam, ownership: .owned, isConnected: false).isVisible,
+                  "Library gate: not even an owned game is shown for a store nobody signed in to")
+        let blizzard = StoreLibrary.verdict(store: .battlenet, ownership: .unknown("no API"),
+                                            isConnected: true)
         try check(blizzard.isVisible && blizzard.note != nil,
-                  "Library gate: a store that can never answer shows its games, saying so")
+                  "Library gate: once added, a store that can never answer shows its games, saying so")
         try check(!GameStore.battlenet.canAnswerOwnership && GameStore.steam.canAnswerOwnership,
                   "Library gate: only the stores that publish entitlements are asked")
+        try check(StoreLibrary.isConnected(.standalone),
+                  "Library gate: a game with no storefront is never withheld for want of one")
 
         // 9. The readiness ladder, against fabricated states. Cellar downloads a Steam game itself
         // now, which no longer walks the player past the in-bottle client's sign-in — so a game

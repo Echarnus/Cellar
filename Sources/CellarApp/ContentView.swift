@@ -83,14 +83,20 @@ final class Library: ObservableObject {
     /// Why the library is empty, named per store rather than assumed to be Steam's fault. Cellar
     /// speaks to three stores; only one of them signs in with a QR code.
     var signInReason: String {
-        let stores = Set(withheld.map(\.gatingStore)).filter(\.canAnswerOwnership)
-        if stores == [.steam] || (stores.contains(.steam) && stores.count > 1 && !steam.isUsable) {
+        let stores = Set(withheld.map(\.gatingStore))
+        // Battle.net first, because it is the one store whose sentence is not about ownership at
+        // all: Blizzard publishes nothing to check, so what is missing is the player's own word.
+        if stores == [.battlenet] {
+            return "Blizzard publishes nothing Cellar can check, so it asks you instead. Add Battle.net and its games appear."
+        }
+        let askable = stores.filter(\.canAnswerOwnership)
+        if askable == [.steam] || (askable.contains(.steam) && askable.count > 1 && !steam.isUsable) {
             return steam.summary
         }
-        if stores == [.gog] {
+        if askable == [.gog] {
             return "Not signed in to GOG. One sign-in covers your whole GOG library."
         }
-        if stores.isEmpty {
+        if askable.isEmpty {
             return "Cellar hasn't been able to ask your stores what you own yet."
         }
         return "Cellar lists a game once its store confirms you own it, and it hasn't been able to ask yet."
@@ -231,7 +237,9 @@ struct ContentView: View {
                 Divider().padding(.vertical, 4)
                 Text("\(lib.withheld.count) more \(lib.withheld.count == 1 ? "game" : "games") once you sign in")
                     .font(.caption.weight(.semibold))
-                Text("Cellar lists a game once the store confirms you own it. It hasn't been able to ask yet.")
+                // The same sentence the empty state uses, so a player who sees both is told the
+                // same thing twice rather than two different things once.
+                Text(lib.signInReason)
                     .font(.caption2).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Sign in") {

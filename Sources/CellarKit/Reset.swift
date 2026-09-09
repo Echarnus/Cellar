@@ -57,8 +57,9 @@ public enum Reset {
         add(Paths.runners, "Wine runners", "re-downloaded on the next setup (~1–2 GB)")
         add(DepotTool.root, "DepotDownloader and your Steam sign-in",
             "re-downloaded, and one QR scan to sign in again")
-        add(Paths.shared.appendingPathComponent("libraries"), "The cached list of what you own",
-            "re-read from the stores when you next refresh")
+        add(Paths.shared.appendingPathComponent("libraries"),
+            "The cached list of what you own, and the Battle.net account you added",
+            "re-read from the stores when you next refresh; Battle.net added again in Accounts")
         add(SteamAccount.recordFile, "Cellar's record of your Steam account", "one QR scan")
         add(Paths.cache, "Downloaded installers and other scratch files", "re-downloaded when needed")
         add(Paths.logs, "Logs", "nothing to restore")

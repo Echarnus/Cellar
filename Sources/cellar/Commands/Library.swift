@@ -11,8 +11,9 @@ struct LibraryCommand: ParsableCommand {
         own. Steam is asked with the same session that would do the downloading, so "owned" means
         "Cellar can install this" rather than "an id turned up in a list".
 
-        Battle.net publishes neither a sign-in state nor what you own, so its games are shown with
-        that said out loud — hiding them would just mean pretending Battle.net doesn't exist.
+        Battle.net publishes neither a sign-in state nor what you own, so Cellar asks you instead:
+        `cellar battlenet add` puts Blizzard's games in the library, and they are marked as
+        unchecked, because that is what they are.
         """)
 
     @Flag(name: .long, help: "Ask the stores again instead of using the cached answers.")
@@ -31,10 +32,14 @@ struct LibraryCommand: ParsableCommand {
         let visible = all ? games : games.filter(\.isVisible)
 
         if visible.isEmpty {
+            // Three stores, three different ways in. Naming only Steam's here is how a GOG player
+            // gets told to scan a QR code that has nothing to do with their missing games.
             print(Term.bold("Nothing to show yet."))
             print("  " + SteamAccount.state.summary)
-            print(Term.dim("  Sign in:  cellar steam login") )
-            print(Term.dim("  Then:     cellar library --refresh"))
+            print(Term.dim("  cellar steam login      Steam, by QR code from your phone"))
+            print(Term.dim("  cellar gog login        GOG, in a browser window"))
+            print(Term.dim("  cellar battlenet add    Battle.net, which publishes nothing to check"))
+            print(Term.dim("  cellar library --refresh"))
             return
         }
 
@@ -48,17 +53,20 @@ struct LibraryCommand: ParsableCommand {
             }
         }
 
-        // The gap is the point: a store that could answer and hasn't is where a player finds out
-        // *why* their games are missing, so it gets a line rather than silence.
-        for store in GameStore.allCases where store.canAnswerOwnership {
+        // The gap is the point: a store Cellar hasn't been let into is where a player finds out
+        // *why* their games are missing, so it gets a line rather than silence. Every store, not
+        // just the ones that can answer about ownership — Battle.net's games are now withheld too,
+        // and silence there is exactly the confusion this line exists to prevent.
+        for store in GameStore.allCases where store != .standalone {
             // Grouped by who *answers*, not by who sold it: a DRM-free game bought on Steam is
             // filed under "no store" and is still waiting on the Steam sign-in.
             let hidden = games.filter { $0.gatingStore == store && !$0.isVisible }
             guard !hidden.isEmpty, !all else { continue }
             let unchecked = hidden.filter { if case .unknown = $0.ownership { return true }; return false }
-            if !unchecked.isEmpty {
-                print(Term.yellow("\(unchecked.count) \(store.displayName) game\(unchecked.count == 1 ? "" : "s") not checked.")
-                      + " " + (StoreLibrary.verdict(store: store, ownership: unchecked[0].ownership).fix ?? ""))
+            if !unchecked.isEmpty, let fix = unchecked[0].verdict.fix {
+                let noun = "game\(unchecked.count == 1 ? "" : "s")"
+                let why = StoreLibrary.isConnected(store) ? "not checked" : "waiting on \(store.displayName)"
+                print(Term.yellow("\(unchecked.count) \(store.displayName) \(noun) \(why).") + " " + fix)
             }
         }
     }
@@ -67,7 +75,7 @@ struct LibraryCommand: ParsableCommand {
         switch store {
         case .steam:      return SteamAccount.state.accountName.map { "signed in as \($0)" } ?? "not signed in"
         case .gog:        return GOGAuth.isSignedIn ? "signed in" : "not signed in"
-        case .battlenet:  return "Cellar can't check what you own here"
+        case .battlenet:  return "added by you — Cellar can't check what you own here"
         case .standalone: return "no store"
         }
     }

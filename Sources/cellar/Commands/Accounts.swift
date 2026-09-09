@@ -54,9 +54,17 @@ struct Accounts: ParsableCommand {
         }
 
         // Battle.net — the honest row. Blizzard publishes no readable signed-in state, so this is a
-        // `·` forever and never a ✗ (see skills/ux.md, "Honesty is a UX rule").
-        row(state: .unknown, store: "Battle.net",
-            detail: "Blizzard doesn't publish who is signed in — sign in inside the client")
+        // `·` forever and never a ✓ or a ✗ (see skills/ux.md, "Honesty is a UX rule"). The only
+        // thing that varies is whether the player has told Cellar the account exists, which is what
+        // decides whether Blizzard's games are listed at all.
+        if StoreLibrary.BattleNetAccount.isAdded {
+            row(state: .unknown, store: "Battle.net",
+                detail: "added by you — its games are listed. Cellar can't check it; you sign in inside the client")
+            print("    " + Term.dim("cellar battlenet forget  to hide them again"))
+        } else {
+            row(state: .unknown, store: "Battle.net",
+                detail: "not added — its games stay hidden. cellar battlenet add")
+        }
     }
 
     private enum State { case yes, no, unknown }

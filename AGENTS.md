@@ -81,9 +81,12 @@ The differences are real, not cosmetic — the three that bite hardest:
 
 - **Battle.net has no silent installer.** Steam's takes `/S`; Blizzard's does not exist. Setup must
   *warn the player* that a window will open, or an unexplained pause reads as a hang.
-- **Battle.net does not publish who is signed in.** Steam writes `loginusers.vdf`. So Cellar never
-  shows a Battle.net sign-in step and never a ✗ beside "account" — it folds signing in into "open the
-  client", the one screen where the player can act on it.
+- **Battle.net does not publish who is signed in, or what you own.** Steam writes `loginusers.vdf`.
+  So Cellar never shows a Battle.net sign-in step and never a ✓ or ✗ beside "account" — signing in
+  is folded into "open the client", the one screen where the player can act on it. But the library
+  still has to know whether this store is the player's, or Diablo IV shows up on a Mac that has
+  never opened Battle.net. So Accounts asks once — "Add" (`cellar battlenet add`), a self-report,
+  never called a sign-in — and `StoreLibrary.verdict` withholds the store's games until it is given.
 - **Signing in is account-level, never per game — and Steam is asked exactly once.** The single
   Steam sign-in is Steam's QR device flow (`SteamAccount`), and it covers both *what you own* and
   *downloading it*. There is no Web API key and no separate download session; the in-bottle Windows

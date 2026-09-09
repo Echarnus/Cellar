@@ -152,17 +152,25 @@ struct AccountsSection: View {
         }
     }
 
-    /// Battle.net: Blizzard publishes no readable signed-in state, so this row never claims one and
-    /// offers no sign-in button — signing in is folded into opening the client, on the game's screen.
+    /// Battle.net: Blizzard publishes no readable signed-in state, so this row never claims one —
+    /// but it does have to *ask*, because the library will not list a store nobody has connected,
+    /// and asking is the only way Cellar can ever know this one. The button adds the account; it
+    /// does not sign in, and the words are careful not to suggest otherwise. Signing in still
+    /// happens inside Blizzard's client, the first time it opens.
     private var battleNetRow: some View {
         AccountRow(
             store: .battlenet,
             title: "Battle.net",
-            state: .unknowable,
-            detail: "Blizzard doesn't publish who is signed in, so Cellar won't guess. Sign in inside the client, from a Battle.net game.",
-            actionTitle: nil,
-            busy: runner.busy,
-            action: {})
+            state: state.battleNetAdded ? .addedByYou : .notAdded,
+            detail: state.battleNetAdded
+                ? "Added by you, so Blizzard's games are in your library. Cellar can't check this one — you sign in inside Battle.net when it opens."
+                : "Blizzard doesn't publish who is signed in, so Cellar has to ask. Add it and its games appear; you sign in inside Battle.net itself.",
+            actionTitle: state.battleNetAdded ? "Remove" : "Add",
+            busy: runner.busy) {
+                runner.run(["battlenet", state.battleNetAdded ? "forget" : "add"],
+                           title: state.battleNetAdded ? "Removing Battle.net" : "Adding Battle.net",
+                           then: { refresh() })
+            }
     }
 }
 
@@ -180,6 +188,9 @@ struct StoreAccountState {
     var steamClientAccount: String?
     var gogSignedIn = false
     var gogAccount: String?
+    /// Whether the player has told Cellar they have a Battle.net account. Not a sign-in: it is the
+    /// only thing Cellar can know about Blizzard, and it decides whether its games are listed.
+    var battleNetAdded = false
     /// False until the first read, so the UI never states something it hasn't checked yet.
     var isLoaded = false
 
@@ -192,6 +203,7 @@ struct StoreAccountState {
             steamClientAccount: SteamBottle.sharedLoggedInAccount,
             gogSignedIn: GOGAuth.isSignedIn,
             gogAccount: GOGAuth.cachedUsername,
+            battleNetAdded: StoreLibrary.BattleNetAccount.isAdded,
             isLoaded: true)
     }
 }
@@ -205,6 +217,11 @@ enum AccountState {
     case signedOut
     /// The store publishes nothing Cellar can read. Never a ✗ — see skills/ux.md.
     case unknowable
+    /// The player said this store is theirs, and Cellar has no way to confirm it. Deliberately not
+    /// drawn as a ✓: the mark and the word both say who is doing the claiming.
+    case addedByYou
+    /// Nothing published *and* nothing claimed — so this store's games are not listed yet.
+    case notAdded
 }
 
 /// One store's sign-in state, as position + mark + word (never colour alone).
@@ -258,6 +275,12 @@ struct AccountRow: View {
         case .unknowable:
             Label("Not published", systemImage: "questionmark.circle")
                 .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+        case .addedByYou:
+            Label("Added by you", systemImage: "person.crop.circle.badge.questionmark")
+                .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+        case .notAdded:
+            Label("Not added", systemImage: "circle.dashed")
+                .font(.caption.weight(.medium)).foregroundStyle(.secondary)
         }
     }
 
@@ -267,6 +290,8 @@ struct AccountRow: View {
         case .signedInUnnamed:     return "signed in"
         case .signedOut:           return "not signed in"
         case .unknowable:          return "sign-in state not published by this store"
+        case .addedByYou:          return "added by you, not verified by the store"
+        case .notAdded:            return "not added, so its games are not listed"
         }
     }
 }
