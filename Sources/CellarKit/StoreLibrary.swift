@@ -267,7 +267,7 @@ public enum StoreLibrary {
     public static func refreshAll(progress: (String) -> Void = { _ in }) {
         if SteamAccount.isSignedIn {
             progress("Checking your Steam library…")
-            try? refreshSteam(progress: progress)
+            _ = try? refreshSteam(progress: progress)
         }
         if GOGAuth.isSignedIn {
             progress("Checking your GOG library…")

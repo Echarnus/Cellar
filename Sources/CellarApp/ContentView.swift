@@ -79,6 +79,22 @@ final class Library: ObservableObject {
     }
 
     var current: GameSummary? { games.first { $0.slug == selected } }
+
+    /// Why the library is empty, named per store rather than assumed to be Steam's fault. Cellar
+    /// speaks to three stores; only one of them signs in with a QR code.
+    var signInReason: String {
+        let stores = Set(withheld.map(\.gatingStore)).filter(\.canAnswerOwnership)
+        if stores == [.steam] || (stores.contains(.steam) && stores.count > 1 && !steam.isUsable) {
+            return steam.summary
+        }
+        if stores == [.gog] {
+            return "Not signed in to GOG. One sign-in covers your whole GOG library."
+        }
+        if stores.isEmpty {
+            return "Cellar hasn't been able to ask your stores what you own yet."
+        }
+        return "Cellar lists a game once its store confirms you own it, and it hasn't been able to ask yet."
+    }
 }
 
 struct ContentView: View {
@@ -243,15 +259,17 @@ struct ContentView: View {
                 }
                 .buttonStyle(.bordered).controlSize(.small)
             } else {
+                // Which store is actually missing decides the sentence. Telling a GOG-only player
+                // to scan a Steam QR code names the wrong problem *and* the wrong fix.
                 Text("Sign in to see your games").font(.callout.weight(.semibold))
-                Text(lib.steam.summary)
+                Text(lib.signInReason)
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("Sign in to Steam") {
+                Button("Sign in") {
                     NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
                 }
                 .buttonStyle(.borderedProminent).controlSize(.small)
                 if !lib.withheld.isEmpty {
-                    Text("\(lib.withheld.count) supported games are waiting behind it.")
+                    Text("\(lib.withheld.count) supported \(lib.withheld.count == 1 ? "game is" : "games are") waiting behind it.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }

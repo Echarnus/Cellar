@@ -101,6 +101,22 @@ public struct GameFacts: Sendable {
     /// Free text: the caveats, the hardware something was tested on, the known patch-day breakage.
     public let notes: String?
 
+    public init(developer: String? = nil, released: String? = nil, engine: String? = nil,
+                graphicsAPI: String? = nil, anticheat: String? = nil, drm: String? = nil,
+                online: String? = nil, requiresAccount: String? = nil, status: String? = nil,
+                notes: String? = nil) {
+        self.developer = developer
+        self.released = released
+        self.engine = engine
+        self.graphicsAPI = graphicsAPI
+        self.anticheat = anticheat
+        self.drm = drm
+        self.online = online
+        self.requiresAccount = requiresAccount
+        self.status = status
+        self.notes = notes
+    }
+
     /// The facts worth printing as a spec list, in reading order, skipping what a profile omits.
     public var about: [(label: String, value: String)] {
         [("Developer", developer), ("Released", released),
@@ -169,10 +185,16 @@ public struct GameSummary: Identifiable, Sendable {
         case play       // ready
     }
 
-    /// A game screen never asks for a sign-in any more: signing in is an account-level fact, done
-    /// once in Settings, and a game whose store isn't signed in is not in the library to be looked
-    /// at. `.signIn` survives for the one store that genuinely signs in per client window and
-    /// publishes nothing Cellar can read beforehand.
+    /// Cellar's *own* sign-in is an account-level fact, done once in Settings, and a game whose
+    /// store hasn't been signed in is not in the library to be looked at — so a game screen never
+    /// asks for that one.
+    ///
+    /// `.signIn` survives for a different thing entirely: the store **client inside the bottle**.
+    /// A Steamworks or Denuvo game talks to a running Steam while it plays, and that client keeps
+    /// its own session, which Cellar cannot supply from a token. Downloading the game no longer
+    /// walks the player past a client sign-in on the way, so this is now the only place that step
+    /// is named — and leaving it out meant a game showing "Ready to play" and then failing its
+    /// licence check with nothing on screen having warned anyone.
     public var nextStep: NextStep {
         if !runnerInstalled { return .setup }
         // The store client only has to exist for a game that talks to it while it runs. A game
@@ -180,9 +202,11 @@ public struct GameSummary: Identifiable, Sendable {
         // invented step — and a 1.4 GB one.
         if needsLiveSession, store.descriptor.installsClientInBottle, !clientInstalled { return .setup }
         if !gameInstalled { return .install }
-        // Battle.net installs *and* signs in inside its own window, so for its games the two are
-        // one step; every other store is signed in once, in Settings, before the game is listed.
-        if store == .battlenet, account == nil { return .signIn }
+        // Only asked where Cellar can actually *read* that nobody is signed in. Battle.net publishes
+        // nothing comparable, so it never gets a ✗ beside an account and never a sign-in step —
+        // signing in stays folded into opening the client.
+        if needsLiveSession, store.descriptor.installsClientInBottle,
+           store.descriptor.canDetectSignIn, account == nil { return .signIn }
         return .play
     }
 
@@ -223,12 +247,14 @@ public struct GameSummary: Identifiable, Sendable {
                 : "Cellar installs the Windows runtime, then opens Blizzard's installer — that one needs a few clicks from you, because Battle.net ships no silent install."
         case .signIn:
             // A token store is signed in once for the whole account; a client store is signed in
-            // inside its own window. Promising the wrong one is exactly the dishonesty ux.md forbids.
+            // inside its own window. Promising the wrong one is exactly the dishonesty ux.md forbids
+            // — and for Steam the player has *already* signed in to Cellar, so this has to say
+            // plainly that it is a different session and why the game insists on it.
             switch store.descriptor.authStyle {
             case .cellarHeldToken:
                 return "Sign in to \(store.displayName) once — it covers every \(store.displayName) game, not just this one."
             case .inClientWindow, .none:
-                return "Sign in to your \(store.descriptor.accountNoun). A \(store.displayName) window opens; the QR code with the mobile app is quickest."
+                return "\(name) checks its DRM against a running \(store.displayName) client, and that client keeps its own sign-in — the one you gave Cellar can't be handed to it. A \(store.displayName) window opens; the QR code with the mobile app is quickest. Once, for every \(store.displayName) game."
             }
         case .install:
             switch store {
@@ -670,6 +696,12 @@ public enum Game {
                 guard SteamBottle.isInstalled(in: plan.prefix) else {
                     throw CellarError.invalidArgument(
                         "\(plan.name) needs a running Steam client for its DRM, and this bottle has none. Run: cellar setup --profile \(plan.slug)")
+                }
+                // Starting a client nobody is signed in to just moves the failure to the game's own
+                // licence check, where it looks like the game is broken. Say it here instead.
+                guard SteamBottle.loggedInAccount(in: plan.prefix) != nil else {
+                    throw CellarError.invalidArgument(
+                        "\(plan.name) checks its DRM against a running Steam client, and nobody is signed in to the one in this bottle — that client keeps its own session, separate from the sign-in you gave Cellar. Sign in once: cellar steam open \(plan.slug)")
                 }
                 progress("Starting Steam quietly for \(plan.name)'s DRM, then launching the game…")
                 try SteamBottle.launchAlongside(runner: wine, exe: exe, appID: appID,

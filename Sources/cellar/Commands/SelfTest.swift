@@ -133,6 +133,40 @@ struct SelfTest: ParsableCommand {
         try check(!GameStore.battlenet.canAnswerOwnership && GameStore.steam.canAnswerOwnership,
                   "Library gate: only the stores that publish entitlements are asked")
 
+        // 9. The readiness ladder, against fabricated states. Cellar downloads a Steam game itself
+        // now, which no longer walks the player past the in-bottle client's sign-in — so a game
+        // whose DRM talks to a running client must still *ask* for it, or the app shows "Ready to
+        // play" and the game dies on its licence check with nothing having warned anybody. That is
+        // a claim about the player's machine, so it is pinned here rather than left to a launch.
+        func summary(store: GameStore, live: Bool, client: Bool, account: String?,
+                     installed: Bool) -> GameSummary {
+            GameSummary(slug: "x", name: "X", store: store, appID: 1, iconPath: nil,
+                        runnerInstalled: true, clientInstalled: client, account: account,
+                        gameInstalled: installed, running: false, productCode: "Fen",
+                        ownership: .owned, needsLiveSession: live, artworkAppID: nil,
+                        artPortraitURL: nil, artHeroURL: nil, needsClientAtRuntime: live,
+                        facts: GameFacts(developer: nil, released: nil, engine: nil, graphicsAPI: nil,
+                                         anticheat: nil, drm: nil, online: nil, requiresAccount: nil,
+                                         status: nil, notes: nil),
+                        runnerID: "wineforge", backend: "d3dmetal", bottleName: "x")
+        }
+        try check(summary(store: .steam, live: true, client: true, account: nil, installed: true)
+                    .nextStep == .signIn,
+                  "Readiness: a downloaded DRM game whose in-bottle Steam has no sign-in asks for one")
+        try check(summary(store: .steam, live: true, client: true, account: "kennethdc", installed: true)
+                    .nextStep == .play,
+                  "Readiness: with that client signed in, the same game is ready")
+        try check(summary(store: .steam, live: false, client: false, account: nil, installed: true)
+                    .nextStep == .play,
+                  "Readiness: a game that needs no live session never waits on a client it won't use")
+        try check(summary(store: .steam, live: false, client: false, account: nil, installed: false)
+                    .nextStep == .install,
+                  "Readiness: and it goes straight to installing, with no 1.4 GB client first")
+        // Blizzard publishes no sign-in state, so Cellar must never put a ✗ or a sign-in step there.
+        try check(summary(store: .battlenet, live: true, client: true, account: nil, installed: true)
+                    .nextStep == .play,
+                  "Readiness: Battle.net is never asked for a sign-in Cellar cannot check")
+
         print(Term.green("All selftests passed."))
     }
 }

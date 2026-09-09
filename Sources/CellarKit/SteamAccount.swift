@@ -25,7 +25,10 @@ public enum SteamAccount {
         /// presence is the difference between "signed in" and "was signed in" — see `State`.
         public var rejectedAt: Date?
         public var rejectionReason: String?
-        /// The last time the session was used successfully, so age is measured from real use.
+        /// The last time the session was known to work. **Not** what age is measured from: a Steam
+        /// refresh token's life runs from when it was issued, not from when it was last used, so
+        /// using this for `ageInDays` would quietly under-report how close a session is to ending.
+        /// Kept because "last worked on 3 September" is the useful thing to know when one fails.
         public var lastUsedAt: Date?
 
         public var isRejected: Bool { rejectedAt != nil }

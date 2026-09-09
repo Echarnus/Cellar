@@ -24,6 +24,10 @@ struct ResetCommand: ParsableCommand {
     func run() throws {
         var items = Reset.plan()
         if keepRunners { items.removeAll { $0.url == Paths.runners } }
+        // Sizes only make sense for files; a keychain item has none and is not pretended to.
+        func size(_ item: Reset.Item) -> String {
+            item.url == nil ? "no disk space" : Reset.humanSize(item.bytes)
+        }
 
         guard !items.isEmpty else {
             print(Term.green("Nothing to remove.") + " Cellar has no state on this Mac.")
@@ -33,8 +37,8 @@ struct ResetCommand: ParsableCommand {
         print(Term.bold("This removes:"))
         for item in items {
             print("  \(Term.yellow("×")) \(item.title)")
-            print("      \(Term.dim(Reset.humanSize(item.bytes) + " · " + item.cost))")
-            print("      \(Term.dim(item.url.path))")
+            print("      \(Term.dim(size(item) + " · " + item.cost))")
+            if let url = item.url { print("      \(Term.dim(url.path))") }
         }
         print(Term.bold("Total: ") + Reset.humanSize(Reset.totalBytes(items)))
         if let warning = Reset.saveGameWarning(in: items) {

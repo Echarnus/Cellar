@@ -112,7 +112,7 @@ public enum DepotTool {
         if let output {
             // A sign-in that fails is answered by the caller reading the state, not by a throw:
             // "you closed the app without scanning" is not an error worth a stack of red text.
-            try? runStreaming(args: args, output: output)
+            _ = try? runStreaming(args: args, output: output)
         } else {
             try? runInheritingIO(args: args)
         }
@@ -266,6 +266,14 @@ public enum DepotTool {
         try p.run()
 
         let deadline = timeout.map { Date().addingTimeInterval($0) }
+        // The loop below blocks in `availableData`, so it only notices the deadline when the tool
+        // says something. A watchdog is what makes the timeout mean anything for a process that has
+        // gone quiet — a stalled content server, a connection that never completes.
+        if let timeout {
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak p] in
+                if p?.isRunning == true { p?.terminate() }
+            }
+        }
         var stoppedEarly = false
         var buffer = Data()
         let handle = pipe.fileHandleForReading
