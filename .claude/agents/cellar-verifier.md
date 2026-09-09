@@ -36,12 +36,26 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
 - **Web** ([`skills/web.md`](../../skills/web.md)): change is in `gen-site.py`, not hand-edited HTML;
   `python3 Scripts/gen-site.py` regenerates; the Download CTA points at the versionless `Cellar.dmg`;
   theme/responsive/a11y hold; generator stays Python-3.9-safe.
+- **Wine/runners/bottles** ([`skills/wine-and-runners.md`](../../skills/wine-and-runners.md)): no
+  `/usr/bin/arch` wrapper (SIP strips `DYLD_*`); the environment is inherited **and** the caller's
+  `WINE*`/`DYLD_*`/`D3DM*`/`MTL_*`/`GST_*`/`GRAPHICS_BACKEND` stripped; `WINEDLLOVERRIDES` **merged,
+  not assigned over**; no chatty command routed through `Shell.run` (pipe deadlock — `inheritIO` or
+  concurrent drains). Demand evidence a **game actually started**, and that teardown left no orphan
+  `wineserver`/`Agent.exe`.
 - **Shell/packaging** ([`skills/shell-and-packaging.md`](../../skills/shell-and-packaging.md)):
-  `set -e` + SDK-unset present; Info.plist keys correct and in sync across both scripts; zip names
-  don't collide on a case-insensitive FS; DMG stays versionless.
-- **Profile:** required fields present; `store` named; the store's own identifier present
-  (`steam_appid`, or `product_code` + `install_dir` + `exe`); DRM/anti-cheat honest; `status` +
+  `set -eu` (or a stated reason it is still `set -e`) + SDK-unset present; temp dirs cleaned from an
+  `EXIT` trap; Info.plist keys correct and in sync across both scripts; zip names don't collide on a
+  case-insensitive FS; DMG stays versionless.
+- **Python** ([`skills/python.md`](../../skills/python.md)): stdlib only; Python-3.9-safe; every
+  value interpolated into HTML escaped; explicit `encoding` on `open()`; output deterministic.
+- **CI** ([`skills/ci.md`](../../skills/ci.md)): least-privilege `permissions:`; third-party actions
+  pinned to a commit SHA; no `${{ }}` inside a `run:`; `pull_request`, not `pull_request_target`.
+  Verified by an actual run.
+- **Profile** ([`skills/profiles.md`](../../skills/profiles.md)): required fields present; `store`
+  named and spelled from the known vocabulary; the store's own identifier present (`steam_appid`, or
+  `product_code` + `install_dir` + `exe`); DRM/anti-cheat honest and separate; `status` +
   tested-hardware `notes` — and `status = "playable"` only where somebody actually played it.
+  Parser-safe: scalars only, no `#` inside values, no duplicate key names across sections.
 
 ## 3. Hard project rules (AGENTS.md → *Hard project rules*)
 No bundled D3DMetal or game files; no DRM/anti-cheat circumvention; nothing gitignored is being

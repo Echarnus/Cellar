@@ -165,10 +165,20 @@ per language:
   (AttributeGraph crash from detail-pane animation, `HSplitView` not `NavigationSplitView`, the
   hand-built menu bar, keeping logic in CellarKit) live there — read it before touching
   `Sources/**`.
+- **Wine, runners, backends, bottles** → [`skills/wine-and-runners.md`](skills/wine-and-runners.md).
+  The four load-bearing launch findings (no `/usr/bin/arch`, inherit-then-strip the environment,
+  merge `WINEDLLOVERRIDES`), why WineForge is the default, bottle hygiene and teardown.
+- **Game profiles** (`profiles/*.toml`) → [`skills/profiles.md`](skills/profiles.md). Three parsers
+  read a profile and they disagree — scalars only, no `#` in values, no reliance on section scoping.
 - **HTML / CSS / JS** (the static site) → [`skills/web.md`](skills/web.md). Theme-aware, responsive,
   no build step, data-driven from profiles.
+- **Python** (`Scripts/gen-site.py`) → [`skills/python.md`](skills/python.md). Stdlib only, Python
+  3.9 floor, escape every interpolation.
 - **Shell + packaging + Info.plist** → [`skills/shell-and-packaging.md`](skills/shell-and-packaging.md).
-  POSIX `sh`, `set -e`, the SDK-unset rule, case-insensitive-FS zip-naming trap, versionless DMG.
+  POSIX `sh`, `set -eu`, ShellCheck, the SDK-unset rule, case-insensitive-FS zip-naming trap,
+  versionless DMG.
+- **CI / releases / Pages** (`.github/workflows/`) → [`skills/ci.md`](skills/ci.md). Least-privilege
+  `permissions:`, pin third-party actions to a SHA, never interpolate `${{ }}` into a `run:`.
 
 ## Adding a game
 
@@ -176,7 +186,8 @@ A game is a `profiles/<slug>.toml` — copy the closest existing one (`planet-co
 `diablo-4` for Battle.net, `witcher-3` for GOG). Name its **`store`**, record verified facts (AppID *or* `product_code` +
 `install_dir` + `exe`, engine, graphics API, arch), state DRM/anti-cheat **honestly**, pick `backend`
 + `fallback_backend`, and give a `status` + `notes` naming the hardware you tested on. The app shows
-those facts verbatim, so "untested" must say so. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+those facts verbatim, so "untested" must say so. See [`skills/profiles.md`](skills/profiles.md) for
+the schema and its parser traps, and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Git & releases
 
@@ -212,7 +223,8 @@ These are correctness *and* legality constraints. They override any convenience.
 ## AI configuration in this repo
 
 - [`AGENTS.md`](AGENTS.md) (this file) — portable guidelines, read by every agent tool.
-- [`skills/`](skills/) — portable, tool-agnostic best-practice guides (UX, Swift, web, shell).
+- [`skills/`](skills/) — portable, tool-agnostic best-practice guides: UX, Swift, Wine/runners,
+  profiles, web, Python, shell/packaging, CI. Index: [`skills/README.md`](skills/README.md).
 - [`agents/`](agents/) — portable agent definitions (the verifier).
 - [`.claude/`](.claude/) — **Claude-specific.** Claude Code does not read `AGENTS.md` directly, so
   [`.claude/CLAUDE.md`](.claude/CLAUDE.md) `@`-imports it, and `.claude/skills/` + `.claude/agents/`

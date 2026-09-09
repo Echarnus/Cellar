@@ -1,7 +1,8 @@
 # Skill: HTML / CSS / JS for the Cellar site
 
 Best practices for the GitHub Pages landing page. Portable guide; Claude's auto-discovered copy is
-`.claude/skills/cellar-web/SKILL.md`. Read [`../AGENTS.md`](../AGENTS.md) first.
+`.claude/skills/cellar-web/SKILL.md`. Read [`../AGENTS.md`](../AGENTS.md) first. This file is about
+the **page**; the generator that emits it has its own guide, [`python.md`](python.md).
 
 ## What the site is
 
@@ -21,7 +22,10 @@ bundler, npm, or a runtime dependency.
 - **Edit the generator, then regenerate and look.** `python3 Scripts/gen-site.py`, then open
   `site/index.html`. A site change is verified by rendering it, not by reading the Python.
 - **Keep `gen-site.py` Python 3.9-safe.** It uses `tomllib` with a hand-rolled fallback parser for
-  older Pythons — don't assume 3.11.
+  older Pythons — and 3.9 is what this machine runs, so the fallback is the live local path. Details
+  and the cross-parser traps: [`python.md`](python.md) · [`profiles.md`](profiles.md).
+- **Escape every interpolated value.** Game names, statuses and URLs all come from profiles and all
+  land in HTML — see [`python.md`](python.md) for which interpolations currently skip it.
 
 ## HTML/CSS quality bar (Apple-calibre)
 
@@ -32,18 +36,31 @@ bundler, npm, or a runtime dependency.
   definition inside the dark block. Paint an explicit background on `body`.
 - **Responsive:** relative units, flexbox/grid, `max-width:100%` on media. The body never scrolls
   horizontally; wide content scrolls inside its own container.
-- **Accessible:** visible focus states, sufficient contrast (WCAG AA), respect
-  `@media (prefers-reduced-motion: reduce)` for animations, hit targets ≥ 44px.
+- **Accessible:** visible focus states, **contrast ≥ 4.5:1 for body text and ≥ 3:1 for large text and
+  UI components** (WCAG 2.2 AA), respect `@media (prefers-reduced-motion: reduce)` for animations,
+  hit targets ≥ 44px. Honour `prefers-contrast: more` if you add a low-contrast decorative treatment.
 - **Self-contained:** inline the CSS/JS. External assets only from well-known CDNs, always
   version-pinned; prefer none. Copy local images into `site/` (the generator copies the app icon to
   `site/icon.png`).
 - **Fast:** no blocking third-party scripts; images sized; animations are cheap transforms/opacity.
+  Cover art is `loading="lazy"` and degrades to a `.noimg` placeholder via `onerror` — keep that
+  fallback, because the Steam CDN is not ours and will occasionally 404.
 
-## Verify
+## Verify — measure it, don't eyeball it
 
 `python3 Scripts/gen-site.py` succeeds; `site/index.html` opens with correct title, working Download
-CTA, one card per profile, the app icon present, balanced tags, and no unrendered template markers;
-looks right in light and dark and at a narrow width.
+CTA, one card per profile, the app icon present, balanced tags, and no unrendered template markers.
+Then actually check the claims:
 
-Related: [`swift.md`](swift.md) · [`shell-and-packaging.md`](shell-and-packaging.md) ·
+1. **Contrast:** sample the real foreground/background pairs (browser devtools reports the ratio on
+   any text node) in **both** appearances. "Looks fine in dark mode" is how 3.9:1 body text ships.
+2. **Keyboard:** tab through the page — every interactive element reachable, focus always visible,
+   order matches the visual layout.
+3. **Structure:** one `<h1>`, headings not skipping levels, every `<img>` with a real `alt`. A
+   markup validator or an automated accessibility pass (axe, Lighthouse) catches these in seconds and
+   is worth running whenever the generator's HTML changes shape.
+4. **Narrow width and reduced motion:** no horizontal body scroll; animations actually stop.
+
+Related: [`python.md`](python.md) · [`profiles.md`](profiles.md) · [`ux.md`](ux.md) ·
+[`ci.md`](ci.md) · [`shell-and-packaging.md`](shell-and-packaging.md) ·
 [`../agents/verifier.md`](../agents/verifier.md)
