@@ -76,13 +76,11 @@ struct AccountsSection: View {
         }
         steamQRCode = nil
         steamQRReader = SteamQRCodeReader()
-        runner.run(["steam", "login"], title: "Waiting for the QR scan", observe: { chunk in
+        runner.run(["steam", "login"], title: "Waiting for the QR scan", observe: { line in
             // DepotDownloader only *draws* the challenge, as terminal ASCII sized for a monospace
             // font — unscannable in a GUI. Read it back into modules and draw it properly. Steam
             // rotates the code, so later blocks replace it.
-            for line in chunk.split(separator: "\n", omittingEmptySubsequences: false) {
-                if let matrix = steamQRReader.consume(String(line)) { steamQRCode = matrix }
-            }
+            if let matrix = steamQRReader.consume(line) { steamQRCode = matrix }
         }, then: {
             steamQRCode = nil       // the code is spent either way
             refresh()

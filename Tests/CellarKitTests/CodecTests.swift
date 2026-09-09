@@ -204,6 +204,34 @@ struct CodecTests {
         #expect(reader.consume(lines.last!) == nil, "the trailing quiet row has nothing left to emit")
     }
 
+    @Test("A code split across pipe reads is still recovered, at any boundary")
+    func qrSurvivesChunkBoundaries() {
+        // The app reads the CLI through a pipe, and a pipe breaks wherever it likes. Feeding the
+        // reader whatever each read happened to contain meant a module row arriving as two
+        // fragments was counted as two short rows, so the matrix never squared up and the player
+        // watched a spinner instead of a QR. The runner now assembles whole lines before the
+        // observer sees them; this is that guarantee, checked at every possible split point.
+        let matrix = Self.fixtureMatrix(size: 29)
+        let text = draw(matrix, quietModules: 4).joined(separator: "\n") + "\n"
+        let characters = Array(text)
+
+        for boundary in 1..<characters.count {
+            let chunks = [String(characters[..<boundary]), String(characters[boundary...])]
+            var reader = SteamQRCodeReader()
+            var pending = ""
+            var decoded: [[Bool]]?
+            for chunk in chunks {                       // exactly what CellarRunner.absorb does
+                pending += chunk
+                while let newline = pending.firstIndex(of: "\n") {
+                    let line = String(pending[pending.startIndex..<newline])
+                    pending = String(pending[pending.index(after: newline)...])
+                    if let emitted = reader.consume(line) { decoded = emitted }
+                }
+            }
+            #expect(decoded == matrix, "lost the code when the pipe broke at \(boundary)")
+        }
+    }
+
     /// Render a module matrix the way DepotDownloader does: two characters per module, a quiet
     /// zone either side, and a whitespace-only line above and below.
     private func draw(_ matrix: [[Bool]], quietModules: Int) -> [String] {

@@ -1,5 +1,6 @@
 import ArgumentParser
 import CellarKit
+import Foundation
 
 @main
 struct Cellar: ParsableCommand {
@@ -65,6 +66,14 @@ struct Cellar: ParsableCommand {
     /// point, every failure — lands in the rolling log. The app drives this CLI for its actions, so
     /// this one place covers both front-ends.
     static func main() {
+        // Line-buffer stdout. C's default for a non-TTY is a 4 KB *block* buffer, and the app reads
+        // this CLI through a pipe — so output reached it in 4096-byte lumps rather than as lines.
+        // For the Steam QR that was the whole bug: DepotDownloader draws the challenge in under a
+        // second, but the first lump cut it mid-row and the rest of it sat in the buffer until Steam
+        // rotated the code ~20s later and pushed the count past the next 4096. Flushing per line
+        // costs nothing here and makes what the player sees match what Cellar is doing.
+        setvbuf(stdout, nil, _IOLBF, 0)
+
         let arguments = Array(CommandLine.arguments.dropFirst())
         // Reading the log must not write to it.
         let quiet = arguments.first == "logs"

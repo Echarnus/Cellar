@@ -42,6 +42,8 @@ final class CellarRunner: ObservableObject {
     private var committed: String = ""
     /// Whether the running command reports stage markers (only `launch --machine-progress` does).
     private var readsStages = false
+    /// The running command's line observer, if it asked for one.
+    private var lineObserver: (@MainActor (String) -> Void)?
 
     init() {}
 
@@ -54,8 +56,13 @@ final class CellarRunner: ObservableObject {
         log = committed + pending
     }
 
-    /// `observe` sees each chunk of output as it arrives, for a caller that has to react to
-    /// something mid-run rather than after exit — the Steam QR challenge is the reason it exists.
+    /// `observe` sees the output **one complete line at a time**, as it arrives, for a caller that
+    /// has to react to something mid-run rather than after exit — the Steam QR challenge is the
+    /// reason it exists.
+    ///
+    /// Whole lines, not raw reads: a pipe breaks wherever it likes, so handing a caller the chunks
+    /// meant a QR row straddling a read arrived as two short rows and the matrix never squared up.
+    /// `absorb` already assembles lines for the activity log, so the observer rides along with it.
     ///
     /// `stages` says this command was asked to report its steps. Only then is the output read for
     /// markers: every other command's output belongs to the player verbatim, and a line that
@@ -67,6 +74,7 @@ final class CellarRunner: ObservableObject {
         busy = true; busyTitle = title; phase = .working
         stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
         readsStages = stages
+        lineObserver = observe
 
         // Redact once, use everywhere. `args` can carry a credential the player just pasted — the
         // GOG sign-in hands this method their one-time OAuth code — and it reaches two places from
@@ -90,7 +98,7 @@ final class CellarRunner: ObservableObject {
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
                 guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
-                Task { @MainActor in self.absorb(s); observe?(s) }
+                Task { @MainActor in self.absorb(s) }
             }
             do {
                 try process.run()
@@ -117,7 +125,10 @@ final class CellarRunner: ObservableObject {
                 CellarLog.debug(.app, "\(shown) exited with \(status).")
             }
             await MainActor.run {
+                // Absorb first — that flushes any last line without a newline through the observer
+                // — then let the observer go, so it cannot outlive the command that installed it.
                 self.absorb("\n(exit \(process.terminationStatus))\n")
+                self.lineObserver = nil
                 self.process = nil
                 self.busy = false
                 self.phase = .idle
@@ -168,6 +179,7 @@ final class CellarRunner: ObservableObject {
                 if reached == .playing { phase = .playing }
             } else {
                 committed += line + "\n"
+                lineObserver?(line)
             }
         }
         log = committed + pending
