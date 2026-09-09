@@ -5,11 +5,16 @@ iteration — GitFlow's long-lived branches would be overhead with no payoff.
 
 ## Branches
 
-- **`main`** is always releasable. CI (`.github/workflows/ci.yml`) builds and self-tests every push
-  and PR on a macOS runner, so `main` stays green.
-- **Feature branches** (`feature/…`, or a worktree branch) → open a PR → merge to `main`. Prefer a
-  squash or merge commit; keep `main`'s history readable.
+- **`main`** is always releasable. CI (`.github/workflows/ci.yml`) builds, tests and self-tests every
+  push and PR on a macOS runner, so `main` stays green.
+- **Commit straight to `main`.** With one maintainer, a PR per change is review nobody performs plus
+  a branch to clean up afterwards. What keeps `main` releasable is the verification ladder in
+  [`AGENTS.md`](../AGENTS.md) — run it, then push. Agents included: they do not need to ask.
+- **Branch when it buys something**: work spanning several sessions, a change worth reading as a diff
+  first, or one you want CI to vet before it lands. Then PR → merge. That is the exception now, not
+  the default.
 - No `develop` branch. No release branches — a release is just a tag on `main`.
+- **Never force-push or rewrite published history.**
 
 ## Versioning
 

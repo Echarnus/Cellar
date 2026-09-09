@@ -28,11 +28,11 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 | `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the store plugins (`Store.swift`, `Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation. **All logic lives here.** |
 | `Sources/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
 | `Sources/CellarUI/` | The app's presentation primitives — store marks, lockups, the generated cover, and `Snapshot`, which renders a SwiftUI view to pixels. A library rather than part of the app, because **a test cannot import an executable**. |
-| `Tests/` | `CellarKitTests` (engine logic, the profile database) and `CellarUITests` (marks rendered offscreen and measured). Run with `sh Scripts/test.sh`. |
+| `Tests/CellarKitTests/` | Unit tests over the engine — parsing, the store table, launch routes, the readiness ladder and its copy, the profile database. Fast, hermetic, no Wine. |
+| `Tests/CellarUITests/` | Store marks rendered offscreen and measured, plus the snapshot sheet. |
+| `Tests/CellarIntegrationTests/` | Integration tests, tiered: bottles and app bundles always; a real runner, prefix and Windows game behind `CELLAR_IT=1`. See [`docs/TESTING.md`](docs/TESTING.md). |
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
-| `Tests/CellarKitTests/` | Unit tests — parsing, the store table, launch routes, the readiness ladder and its copy. Fast, hermetic, no Wine. |
-| `Tests/CellarIntegrationTests/` | Integration tests, tiered: bottles and app bundles always; a real runner, prefix and Windows game behind `CELLAR_IT=1`. See [`docs/TESTING.md`](docs/TESTING.md). |
 | `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `test.sh` (the test runner). |
 | `docs/` | `ARCHITECTURE.md`, `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
 | `.github/workflows/` | `ci.yml`, `release.yml`, `pages.yml`. |
@@ -44,12 +44,11 @@ Swift 6 toolchain, Apple Silicon, macOS 13+.
 
 ```sh
 swift build                       # debug build
-sh Scripts/test.sh                # the test suite (headless, ~0.5s)
+sh Scripts/test.sh                # the test suite, headless (~0.5s) — what CI runs
+sh Scripts/test.sh --integration  # + the Wine tiers: real runner, real prefix, real Windows game
 swift run cellar doctor           # sanity-check the machine
 swift build -c release            # release build (what CI and the app installer use)
 swift run cellar selftest         # in-repo smoke test
-sh Scripts/test.sh                # unit tests + hermetic integration tier (what CI runs)
-sh Scripts/test.sh --integration  # + the Wine tiers: real prefix, real Windows game
 sh Scripts/install-app.sh         # build + install ~/Applications/Cellar.app
 python3 Scripts/gen-site.py       # regenerate the Pages site into site/
 ```
@@ -180,11 +179,21 @@ those facts verbatim, so "untested" must say so. See [`CONTRIBUTING.md`](CONTRIB
 
 ## Git & releases
 
-- **Trunk-based.** `main` is always releasable; feature branch → PR → `main`. Releases are SemVer
-  tags (`vMAJOR.MINOR.PATCH`) on `main`. Full strategy: [`docs/RELEASING.md`](docs/RELEASING.md).
+- **Trunk-based, and literally so: commit and push straight to `main`.** One person works on this
+  repo, so a PR per change buys review that nobody performs and costs a branch, a merge and a stale
+  copy of the work. **Push to `main` when the change is verified** — an agent does not need to ask.
+  Releases are SemVer tags (`vMAJOR.MINOR.PATCH`) on `main`. Full strategy:
+  [`docs/RELEASING.md`](docs/RELEASING.md).
+- **What makes it safe is the ladder, not the ceremony.** `main` must stay releasable, so the price
+  of pushing to it directly is that the verification ladder above is not optional. Climb it, then
+  push.
+- **Branches and PRs are still fine when they earn their keep** — work that will span sessions, a
+  change worth reading as a diff before it lands, or anything you want CI to check first. Use one
+  deliberately, not by default.
 - **Commit messages:** state what was done, one subject line; a body only when the *why* isn't
   obvious. **No attribution trailers** (no `Co-Authored-By`, no "Generated with").
-- **Never** push to `main`/`master`, force-push, or merge on the user's behalf — open a PR.
+- **Still never force-push or rewrite published history**, and never delete a branch someone else's
+  session is working in.
 
 ## Hard project rules (never violate)
 
