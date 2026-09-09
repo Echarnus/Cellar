@@ -483,9 +483,12 @@ FAQ_SECTIONS = [
          "Mac and macOS version, the game and its profile, which backend you used, and the log from "
          "the run that failed.</p>"),
         ("How do I remove a game, or Cellar itself?",
-         "<p>Removing a game deletes its bottle. Take care with Steam games: they share one Steam "
-         "install and one library folder, so removing the wrong thing can take another game's files "
-         "with it — Cellar tells you what is at stake before it does anything.</p>"
+         "<p>There is <b>no Remove button in the app yet</b>. A bottle is deleted from the command "
+         "line — <code>cellar prefix remove &lt;name&gt;</code> — and that is a plain delete: no "
+         "confirmation, and no summary of what else lives in there.</p>"
+         "<p>Which matters most for Steam, because every Steam bottle shares one Steam install and "
+         "one library folder. Deleting the wrong bottle can take another game's files with it, and "
+         "nothing will stop you. Check what a bottle holds before you remove it.</p>"
          "<p>To remove Cellar entirely: drag the app to the Trash and delete "
          "<code>~/Library/Application&nbsp;Support/Cellar</code>. Nothing is installed outside "
          "those two places.</p>"),
