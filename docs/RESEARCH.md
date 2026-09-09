@@ -16,8 +16,21 @@ Apple announcements, the Steam Subscriber Agreement, upstream repos). Key findin
 - **Proton doesn't run on macOS:** it needs native Vulkan (macOS has only Metal) and the Linux Steam
   client's compatibility-tool hook (absent on macOS). GPTK/CrossOver is the closest equivalent.
 - **Rosetta 2** translates x86-64 → ARM64 (AVX/AVX2 since macOS 15). **Sunset:** general-purpose
-  Rosetta is removed in **macOS 28 (fall 2027)**; macOS 27 is the last full-Rosetta release. Apple
-  keeps a **gaming-focused subset** afterward — a partial mitigation, not a guarantee.
+  Rosetta is removed in **macOS 28 (fall 2027)**; macOS 27 ("Golden Gate", Apple-Silicon-only) is
+  the last full-Rosetta release. Apple keeps a **gaming-focused subset** afterward, scoped to
+  "older unmaintained gaming titles that rely on Intel-based frameworks" — a partial mitigation,
+  not a guarantee, and never confirmed to cover a Wine layer.
+- **ARM64EC + FEX is the post-Rosetta architecture.** Wine has had full **ARM64EC** support since
+  **10.0** (Jan 2025): Wine's own PE DLLs are native ARM while x86-64 app code goes through a
+  pluggable emulator. **FEX** (MIT) is that emulator. CodeWeavers integrated FEX for Linux ARM64
+  in Nov 2025 and shipped the **first Mac ARM64 CrossOver preview in July 2026** — no D3DMetal and
+  no D3D12 in that build yet, no bottle conversion, many launchers broken; **CrossOver 27** (early
+  2027) is the target for a usable version. Both halves being free software is what makes this
+  reachable for Cellar — see [ROADMAP.md](ROADMAP.md) Phase 4.
+- **D3DMetal 4 / GPTK 4** (WWDC 2026, macOS 27) drops Intel Macs and targets **Metal 4**
+  (neural rendering, MetalFX frame interpolation), faster than GPTK 3 at DX12. Whether Apple ships
+  **ARM64EC** D3DMetal DLLs is the open question that decides if the native path keeps the fast
+  renderer or falls back to DXVK/VKD3D on MoltenVK.
 
 ## Tooling landscape
 
@@ -56,7 +69,16 @@ Apple announcements, the Steam Subscriber Agreement, upstream repos). Key findin
 - PC2 DRM / store page: <https://store.steampowered.com/app/2688950/Planet_Coaster_2/> · anti-cheat DB: <https://www.gamingonlinux.com/anticheat/>
 - DepotDownloader: <https://github.com/SteamRE/DepotDownloader> · SteamCMD: <https://developer.valvesoftware.com/wiki/SteamCMD>
 - Steam Subscriber Agreement: <https://store.steampowered.com/subscriber_agreement/>
-- Rosetta sunset: <https://www.macrumors.com/2025/06/10/apple-to-phase-out-rosetta-2/>
+- Rosetta sunset: <https://www.macrumors.com/2025/06/10/apple-to-phase-out-rosetta-2/> ·
+  Apple's notice: <https://support.apple.com/en-gb/102527>
+- CrossOver Mac ARM64 preview (Jul 2026):
+  <https://www.codeweavers.com/blog/mjohnson/2026/7/31/crossover-preview-the-right-to-bear-arm64-on-mac> ·
+  <https://appleinsider.com/articles/26/07/31/first-apple-silicon-native-crossover-build-in-testing-as-rosettas-end-nears>
+- CodeWeavers PortJump / Intel-app support changes:
+  <https://www.codeweavers.com/blog/orudge/2026/6/19/portjump-update-upcoming-changes-to-macos-support-for-intel-based-applications>
+- FEX-Emu (MIT): <https://github.com/FEX-Emu/FEX> · ARM64EC notes:
+  <https://wiki.fex-emu.com/index.php/Development:ARM64EC>
+- GPTK 4 / Metal 4: <https://appleinsider.com/articles/26/06/17/apples-game-porting-toolkit-4-is-a-big-improvement-for-modern-game-coders>
 
 ## Update 2026-09-07 — Planet Coaster 2 running on M5, and the runner that does it
 

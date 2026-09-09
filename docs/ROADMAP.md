@@ -88,13 +88,61 @@ Next in this direction, not yet done:
   launcher's own client credentials — a bigger surface and a bigger judgement call than GOG's.
 - Generate a profile from a store's metadata, so adding a game is not hand-writing TOML.
 
+## Phase 6 — Native ARM64EC runner (the Rosetta exit)
+
+The whole stack below the game is x86-64 today and runs on Rosetta 2. macOS 27 is the last release
+with general-purpose Rosetta; macOS 28 (fall 2027) keeps only a subset for "older unmaintained
+gaming titles that rely on Intel-based frameworks" — Apple has **not** said a Wine layer qualifies,
+so Cellar does not plan as if it does.
+
+The exit is not "stop translating x86" — the game is an x86-64 Windows binary and always will be.
+It is **moving the x86 translation from Rosetta into our own layer**: an arm64 Wine hosting an
+ARM64EC PE world, with FEX as the emulator behind it. That is exactly the architecture CodeWeavers
+shipped as a CrossOver Mac ARM64 preview in July 2026, and both halves are free software
+(Wine LGPL-2.1+, FEX MIT), so the free stack can follow it.
+
+Target layering, versus today:
+
+| Layer | Today (Phase 1-3) | Phase 6 |
+|---|---|---|
+| Wine host binaries | x86-64 Mach-O → Rosetta | **arm64 Mach-O → native** |
+| Wine's PE DLLs | x86-64 PE → Rosetta | **ARM64EC PE → native** |
+| Renderer (D3DMetal/DXVK) | x86-64 PE → Rosetta | **ARM64EC PE → native** |
+| Game code | x86-64 PE → Rosetta | x86-64 PE → **FEX, in-layer** |
+
+Work Cellar owns:
+
+- [x] Runner architecture is a first-class, *measured* property — `RunnerArchitecture`
+      (`x86_64` / `arm64ec`), `RunnerInstall.measuredArchitectures` via `lipo`, and a
+      `Runner arch` check in `cellar doctor` that reports what is installed rather than assuming
+- [ ] Catalog entry for the arm64ec runner (artifacts + `emulator: "FEX"`) once a free build exists
+- [ ] Per-profile runner pinning, so a game can stay on the x86_64 runner while others move
+- [ ] Bottle migration: ARM64EC prefixes are not convertible from x86-64 ones — `cellar prefix`
+      needs a "recreate on the new runner, keep the game files" path
+- [ ] Re-verify the whole matrix (Steam client, Battle.net, PC2, Diablo IV) on the native runner
+
+Upstream gates, none of them ours (revisit each macOS/CrossOver release):
+
+1. **A free prebuilt arm64 macOS Wine with the ARM64EC hook** — Gcenx, Sikarugir or WineForge
+   packaging it. Wine has had ARM64EC support since 10.0 (Jan 2025); macOS packaging is the gap.
+2. **FEX's macOS port** usable as that hook. CodeWeavers made a custom FEX work on macOS in July
+   2026; FEX is MIT and CodeWeavers upstreams first, so this is likely but not yet done in public.
+3. **An ARM64EC renderer.** Apple's D3DMetal 4 (GPTK 4 / Metal 4, Apple-Silicon-only, macOS 27) is
+   the fast path if Apple ships ARM64EC DLLs; DXVK + VKD3D-Proton on MoltenVK rebuilt for arm64ec
+   is the fully-free fallback that needs no Apple decision. Keeping that fallback working is why
+   the DXVK path stays first-class.
+
+Timing: CrossOver 27 (the commercial reference) is penciled in for early 2027. Cellar's own
+deadline is macOS 28 in fall 2027, and staying on macOS 27 is a valid user-facing answer until
+the native runner is real.
+
 ## Known risks tracked across phases
 
-- **Rosetta sunset** — general-purpose Rosetta is removed in macOS 28 (fall 2027); Apple keeps a
-  gaming-focused subset (which this GPTK/Wine use case falls under). macOS already shows an "Intel app
-  support ending" notice for the x86_64 GPTK runner — harmless on macOS 26/27. `cellar doctor`
-  surfaces the timeline. **Migration target:** add a native **ARM64EC Wine** runner (Wine 10+ ARM64EC,
-  native-ARM CrossOver preview, GPTK 4 / Metal 4) as it matures into a free build; the x86_64 game
-  code still runs via the retained Rosetta/ARM64EC x86 emulation regardless.
+- **Rosetta sunset** — see Phase 6. General-purpose Rosetta is removed in macOS 28 (fall 2027);
+  the retained gaming subset is a *partial mitigation, not a guarantee* for a Wine layer. macOS
+  already shows an "Intel app support ending" notice for the x86_64 runner — harmless on macOS
+  26/27. `cellar doctor` reports the measured runner architecture and the horizon.
+- **Renderer lock-in** — D3DMetal is Apple's, proprietary, and only Apple can make it ARM64EC.
+  The DXVK/VKD3D + MoltenVK path is the hedge and must keep working, even while it is slower.
 - **GPTK license** — keep D3DMetal user-supplied; keep the DXVK/MoltenVK path fully functional.
 - **Maintenance** — upstream fixes, community-owned profiles, small core (lessons from Whisky's end).

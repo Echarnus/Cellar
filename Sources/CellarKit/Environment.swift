@@ -64,6 +64,42 @@ public enum SystemEnvironment {
         FileManager.default.fileExists(atPath: path) ? path : nil
     }
 
+    /// Reports what the installed runners are actually built for, and how that lands against the
+    /// Rosetta timeline: full Rosetta through macOS 27, gaming-only subset from macOS 28 (2027).
+    static func runnerArchitectureCheck(macOSMajor: Int) -> CheckResult {
+        let installed = RunnerManager.installed()
+        guard !installed.isEmpty else {
+            return .init("Runner arch", .info, "no runner installed",
+                hint: "Install one: cellar runner install \(RunnerCatalog.defaultID)")
+        }
+
+        let rosettaBound = installed.filter(\.needsRosetta)
+        let native = installed.filter { !$0.needsRosetta }
+        let summary = installed
+            .map { "\($0.spec.id)=\($0.needsRosetta ? "x86_64" : "arm64ec")" }
+            .joined(separator: ", ")
+
+        if rosettaBound.isEmpty {
+            return .init("Runner arch", .ok, summary,
+                hint: "Native ARM64EC runner — independent of Rosetta. The game's own x86-64 code "
+                    + "is translated inside the layer.")
+        }
+        if !native.isEmpty {
+            return .init("Runner arch", .ok, summary,
+                hint: "A native ARM64EC runner is installed alongside x86_64 ones; prefer it from "
+                    + "macOS 28 on (profiles can pin a runner).")
+        }
+        if macOSMajor >= 28 {
+            return .init("Runner arch", .warn, summary,
+                hint: "Every installed runner is x86_64 and general Rosetta is gone in macOS \(macOSMajor). "
+                    + "These now rely on Apple's gaming-only Rosetta subset, which is not guaranteed "
+                    + "to cover a Wine layer. Migration target: a native ARM64EC runner (FEX).")
+        }
+        return .init("Runner arch", .info, summary,
+            hint: "x86_64 under Rosetta 2 — fine through macOS 27. Tracked migration: a native "
+                + "ARM64EC + FEX runner, see docs/ROADMAP.md Phase 5.")
+    }
+
     /// The full diagnostic battery printed by `cellar doctor`.
     public static func diagnostics() -> [CheckResult] {
         var checks: [CheckResult] = []
@@ -93,13 +129,17 @@ public enum SystemEnvironment {
                 hint: "Install with: softwareupdate --install-rosetta --agree-to-license"))
         } else if version.majorVersion >= 28 {
             checks.append(.init("Rosetta 2", .warn, "general Rosetta removed in macOS \(version.majorVersion)",
-                hint: "The x86_64 runner now depends on Apple's retained gaming-only Rosetta subset. "
-                    + "Prefer a native ARM64 runner if one is available (cellar runner list)."))
+                hint: "An x86_64 runner now depends on Apple's retained gaming-only Rosetta subset. "
+                    + "Prefer a native ARM64EC runner if one is available (cellar runner list)."))
         } else {
             checks.append(.init("Rosetta 2", .ok, "installed & functional",
                 hint: "macOS may show an 'Intel app support ending' notice for the runner — harmless: "
                     + "Rosetta works through macOS 27, and Apple keeps a gaming subset after."))
         }
+
+        // Runner architecture — the thing that actually decides whether the sunset bites.
+        // Measured from the installed wine binary, not taken from the catalog's word for it.
+        checks.append(runnerArchitectureCheck(macOSMajor: version.majorVersion))
 
         // Homebrew (arm)
         if let brew = armHomebrew {
