@@ -38,7 +38,7 @@ needs_live_session          = true
 requires_account            = "Battle.net"
 online                      = "always-online (shared world, seasons, co-op)"
 status                      = "untested"
-notes                       = "Configured from CrossOver/Proton evidence, not yet run on Kenneth's M5. CrossOver reports Diablo IV working on macOS 26.x with D3DMetal when MSync is on (Cellar sets WINEMSYNC=1 already). A Season 14 (patch 3.1.0, 2026-06-30) launch crash was reported on CrossOver 26.2 / macOS 26.5.2 — expect turbulence around patch days."
+notes                       = "Configured from CrossOver/Proton evidence, not yet run on Kenneth's M5. CrossOver reports Diablo IV working on macOS 26.x with D3DMetal when a fast sync is on (Cellar turns on the one your runner has — WFUSync on WineForge, msync on Sikarugir). A Season 14 (patch 3.1.0, 2026-06-30) launch crash was reported on CrossOver 26.2 / macOS 26.5.2 — expect turbulence around patch days."
 
 [runner]
 # Same runner as the Steam titles: Wine 11.17 + CrossOver patches, carrying Apple D3DMetal 3.0.
@@ -54,8 +54,9 @@ metalfx_upscaling = true
 retina            = false
 
 [env]
-# Expose AVX/AVX2 to the translated game, and keep msync on — CrossOver's Diablo IV guidance is
-# explicit that MSync must be enabled with D3DMetal. WineRunner already sets WINEMSYNC=1.
+# Expose AVX/AVX2 to the translated game. Fast sync (CrossOver's Diablo IV guidance: MSync must be
+# on with D3DMetal) is set by WineRunner from what the runner implements — WFUSync on WineForge,
+# msync on Sikarugir; see `cellar doctor` → Fast sync.
 ROSETTA_ADVERTISE_AVX = "1"
 # Battle.net asks for a geolocation shim Wine has no implementation for; disabling it keeps the
 # client's log readable. Cellar merges this with the backend's own overrides rather than replacing

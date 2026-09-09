@@ -100,6 +100,24 @@ public enum SystemEnvironment {
                 + "ARM64EC + FEX runner, see docs/ROADMAP.md Phase 5.")
     }
 
+    /// Which fast-sync path each installed runner will actually take, read from its binary.
+    /// One line per runner, because the answer differs per build and a player comparing two
+    /// runners deserves to see why one feels smoother.
+    static func fastSyncChecks() -> [CheckResult] {
+        RunnerManager.installed().map { install in
+            let sync = install.fastSync
+            let name = "Fast sync"
+            if sync.variables.isEmpty {
+                return .init(name, .warn, "\(install.spec.id): none — every wait goes through wineserver",
+                    hint: "This Wine build has no msync/WFUSync. Prefer: cellar runner install \(RunnerCatalog.defaultID)")
+            }
+            return .init(name, .ok, "\(install.spec.id): \(sync.summary)",
+                hint: sync == .unknown
+                    ? "Could not read the runner's ntdll.so; every known variable is set just in case."
+                    : nil)
+        }
+    }
+
     /// The full diagnostic battery printed by `cellar doctor`.
     public static func diagnostics() -> [CheckResult] {
         var checks: [CheckResult] = []
@@ -140,6 +158,7 @@ public enum SystemEnvironment {
         // Runner architecture — the thing that actually decides whether the sunset bites.
         // Measured from the installed wine binary, not taken from the catalog's word for it.
         checks.append(runnerArchitectureCheck(macOSMajor: version.majorVersion))
+        checks.append(contentsOf: fastSyncChecks())
 
         // The Dock shim. Cosmetic, so never a failure — but say so plainly rather than let a
         // storefront client quietly turn up in the Dock with no explanation.
@@ -188,11 +207,17 @@ public enum SystemEnvironment {
                 hint: "Optional; only used for repo workflows."))
         }
 
-        // Default runner (Wine 10 + Apple D3DMetal 3.0) — the modern-DX path
+        // Default runner (Wine 11 + Apple D3DMetal 3.0) — the modern-DX path. `hasD3DMetal` knows
+        // both layouts; checking only the Sikarugir renderer directory reported the default
+        // WineForge graft as MISSING while it was running games.
         let defaultID = RunnerCatalog.defaultID
         if let runner = RunnerManager.find(id: defaultID) {
-            let d3d = runner.renderer("d3dmetal") != nil ? "D3DMetal present" : "D3DMetal MISSING"
-            checks.append(.init("Runner (\(defaultID))", .ok, "installed — \(d3d)"))
+            let d3d = runner.hasD3DMetal
+                ? "D3DMetal present" + (runner.hasMetalFXShim ? ", MetalFX shims present" : "")
+                : "D3DMetal MISSING"
+            checks.append(.init("Runner (\(defaultID))", runner.hasD3DMetal ? .ok : .warn, "installed — \(d3d)",
+                hint: runner.hasD3DMetal ? nil
+                    : "The graft is incomplete. Delete \(runner.root.path) and run: cellar runner install \(defaultID)"))
         } else {
             checks.append(.init("Runner (\(defaultID))", .info, "not installed",
                 hint: "Install it with: cellar runner install \(defaultID)   (or just run: cellar setup)"))

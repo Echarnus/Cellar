@@ -171,8 +171,10 @@ same retry loop the Steam path uses (`ProcessWatch.superviseStart`).
 - **No kernel anti-cheat.** It runs under Proton on Steam Deck (ProtonDB: Gold) and under CrossOver on
   macOS, neither of which a ring-0 driver would allow. Blizzard's protection is user-space.
 - **Always-online**, even solo — there is no store-free launch path; the client stays up alongside it.
-- **D3DMetal works, with msync on.** CrossOver's Diablo IV guidance is explicit that MSync must be
-  enabled with D3DMetal; `WineRunner` already sets `WINEMSYNC=1`.
+- **D3DMetal works, with a fast sync on.** CrossOver's Diablo IV guidance is explicit that MSync
+  must be enabled with D3DMetal. `WineRunner` sets the fast sync the runner actually implements —
+  found 2026-09-09: WineForge has no msync at all (`WINEMSYNC=1` was a no-op there), its equivalent
+  is **WFUSync** (`WINEWFUSYNC=1`), which Cellar now reads from the runner's `ntdll.so` and sets.
 - **Patch days are turbulent.** A launch crash was reported on CrossOver 26.2 / macOS 26.5.2 after
   Season 14 (patch 3.1.0, 2026-06-30). Recorded in the profile's `notes` rather than glossed over.
 - **Artwork.** Battle.net publishes none addressable by product code. Diablo IV is also sold on Steam

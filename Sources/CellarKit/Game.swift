@@ -33,6 +33,9 @@ public struct GamePlan {
     public let artHeroURL: String?
     /// What the profile says about the game itself — shown in the app's information panel.
     public let facts: GameFacts
+    /// `metalfx_upscaling = true`: present the NVIDIA identity so the game's DLSS option becomes
+    /// MetalFX. Only takes effect on D3DMetal with a runtime that ships the shims (`WineRunner.usesMetalFX`).
+    public var metalFXUpscaling: Bool = false
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
@@ -444,7 +447,8 @@ public enum Game {
                 online: fields["online"],
                 requiresAccount: fields["requires_account"],
                 status: fields["status"],
-                notes: fields["notes"])
+                notes: fields["notes"]),
+            metalFXUpscaling: fields["metalfx_upscaling"]?.lowercased() == "true"
         )
     }
 
@@ -460,7 +464,7 @@ public enum Game {
     /// The bottle's Wine runner, if the runner is installed.
     public static func wineRunner(_ plan: GamePlan) -> WineRunner? {
         guard let install = RunnerManager.find(id: plan.runnerID) else { return nil }
-        return WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
+        return WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling)
     }
 
     // MARK: - Store-aware state
@@ -535,7 +539,7 @@ public enum Game {
         }
 
         let install = try RunnerManager.install(spec, progress: step)
-        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
+        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling)
 
         if !FileManager.default.fileExists(atPath: plan.prefix.path) {
             step("Creating bottle '\(plan.bottleName)'…")
@@ -613,7 +617,7 @@ public enum Game {
             throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
         }
         let install = try RunnerManager.install(spec, progress: step)
-        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend)
+        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling)
         if !FileManager.default.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path) {
             step("Initialising the Wine prefix…")
             try wine.initializePrefix(); try wine.setWindowsVersion("win10")

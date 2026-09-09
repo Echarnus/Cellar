@@ -238,13 +238,15 @@ thirty years. Wine is LGPL-2.1+; its source is at
 
 With thanks to the people whose work Cellar installs and drives:
 
-- **[CodeWeavers / CrossOver](https://www.codeweavers.com/crossover)** — the macOS patches (the Mac
-  driver, msync) that make Wine fast on a Mac. Cellar uses only their public
+- **[CodeWeavers / CrossOver](https://www.codeweavers.com/crossover)** — the macOS patches, the Mac
+  driver above all, that make Wine run well on a Mac. Cellar uses only their public
   [LGPL sources](https://github.com/CodeWeavers/wine), never CrossOver itself.
 - **[WineForge](https://github.com/Alien4042x/WineForge)** — the default runner: Wine 11 with the
-  CrossOver patches, prebuilt for macOS.
+  CrossOver patches and its own **WFUSync** fast sync, prebuilt for macOS.
 - **[Sikarugir](https://github.com/Sikarugir-App)** — the Wine 10 runner and the wrapper template
   Cellar takes D3DMetal from.
+- **[marzent / msync](https://github.com/marzent/wine-msync)** — Mach-semaphore fast sync for Wine
+  on macOS, the Wine 10 runner's fast path.
 - **[Gcenx](https://github.com/Gcenx)** — the Game Porting Toolkit runner build, and years of
   Wine-on-macOS packaging.
 - **Apple D3DMetal** — DirectX 11/12 → Metal, grafted from a runner at run time under Apple's
@@ -255,9 +257,11 @@ With thanks to the people whose work Cellar installs and drives:
 The same list is in the app: **Cellar › About Cellar**, and **Settings › About**.
 
 Cellar does **not** fork Wine. The macOS-specific speedups that exist — CodeWeavers' Mac driver
-work, msync, the coming ARM64EC + FEX runner — are already upstream or in the runners Cellar
-installs, and the measured bottleneck ([docs/RESEARCH.md](docs/RESEARCH.md)) is Rosetta translating
-draw-call submission, which no Wine patch touches. Fixes go upstream; see
+work, WFUSync and msync, MetalFX through D3DMetal, the coming ARM64EC + FEX runner — are already
+upstream or in the runners Cellar installs; Cellar's job is to **switch them on correctly**, which
+it reads from the runner rather than assumes (`cellar doctor` → *Fast sync*). The measured
+bottleneck ([docs/RESEARCH.md](docs/RESEARCH.md)) is Rosetta translating draw-call submission,
+which no Wine patch touches. Fixes go upstream; see
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#why-cellar-does-not-fork-wine).
 
 ## License

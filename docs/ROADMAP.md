@@ -40,7 +40,8 @@ generalized into a per-game profile system, then given a native GUI.
 
 - [ ] macOS app over the same `CellarKit` core (no Electron)
 - [ ] Prefix UI, profile browser with one-click install, GPTK import wizard (drag-drop, never bundled)
-- [ ] Per-game settings (MetalFX / Retina / Esync), live logs
+- [x] Per-game MetalFX (`metalfx_upscaling`, honoured since 2026-09-09) · fast sync read from the runner
+- [ ] Per-game Retina / sync overrides in the app, live logs
 - [ ] Optional "Send to Steam" (non-Steam shortcut) and native-Steam bridge (behind a flag)
 - [ ] App signing + notarization
 

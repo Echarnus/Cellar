@@ -55,16 +55,23 @@ that does not is not Wine's to give:
 
 | macOS-specific speedup | Where it lives | How Cellar gets it |
 |---|---|---|
-| **msync** — Mach-semaphore synchronisation, the macOS answer to esync/fsync | CodeWeavers' patches, carried by WineForge and Sikarugir | `WINEMSYNC=1` in every launch environment (`Wine.swift`) |
+| **Fast sync** — mutexes and events without a wineserver round trip; macOS has no futex, so every build brings its own | **WFUSync** in WineForge (Wine 11; its own, on `os_sync_wait_on_address`, macOS 14.4+). **msync** (marzent's Mach-semaphore patch) + esync in Sikarugir (Wine 10). WineForge carries *no* msync/esync — measured on the shipped `ntdll.so`, 2026-09-09 | `FastSync` reads which variables the runner's `ntdll.so` understands and `WineRunner` sets exactly those — `WINEWFUSYNC=1` or `WINEMSYNC=1`/`WINEESYNC=1`. `cellar doctor` → *Fast sync* shows the answer |
 | **Mac driver work** — window/event path, Metal surfaces | CodeWeavers' public `winecx` sources, carried by WineForge | the default runner |
 | **D3DMetal** — DirectX → Metal without a Vulkan hop | Apple, grafted into the runner | `D3DMETAL_RUNTIME_DIR` |
+| **MetalFX** — Apple's upscaler, reached through the game's DLSS option | D3DMetal's `nvngx`/`nvapi64` shims, in the grafted runtime | a profile's `metalfx_upscaling = true` switches the launch to the NVIDIA identity (`D3DMETAL_UPSCALER_PROFILE=nvidia`, `D3DM_ENABLE_METALFX=1`) — only when the shims are present, else AMD/FidelityFX |
 | **ARM64EC + FEX** — no Rosetta: a native arm64 Wine translating only the game | Upstream Wine (ARM64EC since 10.0) + CodeWeavers' FEX integration, being upstreamed | the *Rosetta Sunset* migration, tracked in `docs/ROADMAP.md` |
+
+The lesson in the first row is the general one: the gains exist upstream, and Cellar's real work
+is **switching them on correctly**. Until 2026-09-09 Cellar set `WINEMSYNC=1` for every runner —
+right for Sikarugir, silently ignored by WineForge, so the default runner ran every game on the
+slow path. Reading the runner instead of assuming is what fixed it, and what keeps it fixed when
+the next build brings yet another variable.
 
 The measured wall (`docs/RESEARCH.md`) is **Rosetta translating draw-call submission** — CPU time
 spent between the game and D3DMetal, not inside Wine's own code. No Wine patch moves that number;
 the ARM64EC runner does, and that work is happening upstream, where a fork could only lag it.
 
-A fork would also mean building and signing Wine ourselves — CrossOver patches, msync, the
+A fork would also mean building and signing Wine ourselves — CrossOver patches, a sync backend, the
 `__wine_unix_call` compatibility path D3DMetal needs — which is exactly the maintenance load that
 ended Whisky. Cellar's rule is the opposite: **fixes go upstream** (to Wine, DXVK, or the runner
 projects) and Cellar installs prebuilt, LGPL Wine. If a genuine macOS-only improvement ever

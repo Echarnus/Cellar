@@ -244,4 +244,115 @@ struct RunnerTests {
         #expect(wine.serverRunning == false)
         wine.killServer()   // must be a safe no-op
     }
+
+    // MARK: - Fast sync and MetalFX
+    //
+    // Both were found the same day: the default runner ran with no fast sync because Cellar set
+    // the variable a different build understands, and `metalfx_upscaling = true` sat in two
+    // profiles that nothing read. So the environment is derived from what the runner ships.
+
+    /// A runner whose `ntdll.so` is a file containing only the given variable names — enough for
+    /// the probe, which scans for those strings exactly as it would in the real 5 MB binary.
+    private func runner(named name: String, ntdllMentions variables: [String]?,
+                        withMetalFXShim: Bool = false) throws -> RunnerInstall {
+        TestHome.ensure()
+        let root = TestHome.scratch("runner-\(name)")
+        let wine = root.appendingPathComponent("wine", isDirectory: true)
+        let unix = wine.appendingPathComponent("lib/wine/x86_64-unix", isDirectory: true)
+        try FileManager.default.createDirectory(at: unix, withIntermediateDirectories: true)
+        if let variables {   // nil: a runner with no ntdll.so to read at all
+            try Data("padding \(variables.joined(separator: " ")) padding".utf8)
+                .write(to: unix.appendingPathComponent("ntdll.so"))
+        }
+        let external = wine.appendingPathComponent("lib/d3dmetal/external", isDirectory: true)
+        try FileManager.default.createDirectory(at: external, withIntermediateDirectories: true)
+        try Data().write(to: external.appendingPathComponent("libd3dshared.dylib"))
+        if withMetalFXShim {
+            let pe = wine.appendingPathComponent("lib/d3dmetal/wine/x86_64-windows", isDirectory: true)
+            try FileManager.default.createDirectory(at: pe, withIntermediateDirectories: true)
+            for dll in ["nvngx.dll", "nvapi64.dll"] { try Data().write(to: pe.appendingPathComponent(dll)) }
+        }
+        return RunnerInstall(spec: RunnerCatalog.wineforge, root: root,
+                             wineBinary: wine.appendingPathComponent("bin/wine"))
+    }
+
+    @Test("A WineForge build gets WINEWFUSYNC and not the msync variable it would ignore")
+    func wineForgeGetsWFUSync() throws {
+        let install = try runner(named: "wfusync", ntdllMentions: ["WINEWFUSYNC"])
+        #expect(install.fastSync.summary == "WFUSync")
+        let env = WineRunner(install: install, prefix: TestHome.scratch("wine-wfusync")).environment()
+        #expect(env["WINEWFUSYNC"] == "1")
+        #expect(env["WINEMSYNC"] == nil, "a variable the build does not know is noise, not a setting")
+        #expect(env["WINEESYNC"] == nil)
+    }
+
+    @Test("A Sikarugir-style build gets msync + esync, the variables it actually implements")
+    func sikarugirGetsMsync() throws {
+        let install = try runner(named: "msync", ntdllMentions: ["WINEMSYNC", "WINEESYNC"])
+        #expect(install.fastSync.summary == "msync + esync")
+        let env = WineRunner(install: install, prefix: TestHome.scratch("wine-msync")).environment()
+        #expect(env["WINEMSYNC"] == "1")
+        #expect(env["WINEESYNC"] == "1")
+        #expect(env["WINEWFUSYNC"] == nil)
+    }
+
+    @Test("A build with no fast sync at all is reported, not silently given the slow path")
+    func noFastSyncIsNamed() throws {
+        let install = try runner(named: "slowsync", ntdllMentions: [])
+        #expect(install.fastSync == .none)
+        #expect(install.fastSync.summary == "none")
+    }
+
+    @Test("With no readable ntdll.so every known variable is set — an unknown one costs nothing")
+    func unreadableNtdllSetsEverything() throws {
+        // Not the shared stub: on a Mac with a real runner installed the sandbox links that runner
+        // in, and its genuine ntdll.so would answer instead of the "nothing to read" case.
+        let install = try runner(named: "no-ntdll", ntdllMentions: nil)
+        #expect(install.fastSync == .unknown)
+        let env = WineRunner(install: install, prefix: TestHome.scratch("wine-unknown-sync")).environment()
+        for variable in ["WINEWFUSYNC", "WINEMSYNC", "WINEESYNC"] { #expect(env[variable] == "1") }
+    }
+
+    @Test("A profile's WINEWFUSYNC=0 still wins — the profile is the escape hatch")
+    func profileCanDisableFastSync() throws {
+        let install = try runner(named: "wfusync-off", ntdllMentions: ["WINEWFUSYNC"])
+        let env = WineRunner(install: install, prefix: TestHome.scratch("wine-wfusync-off"))
+            .environment(extra: ["WINEWFUSYNC": "0"])
+        #expect(env["WINEWFUSYNC"] == "0")
+    }
+
+    @Test("metalfx_upscaling presents the NVIDIA identity only when the runtime ships the shims")
+    func metalFXNeedsTheShims() throws {
+        let bare = try runner(named: "metalfx-bare", ntdllMentions: ["WINEWFUSYNC"])
+        #expect(!bare.hasMetalFXShim)
+        let wine = WineRunner(install: bare, prefix: TestHome.scratch("wine-mfx-bare"), backend: .d3dmetal, metalFX: true)
+        #expect(!wine.usesMetalFX, "asking for MetalFX without nvngx.dll would be a promise the runtime cannot keep")
+        let env = wine.environment()
+        #expect(env["D3DMETAL_UPSCALER_PROFILE"] == "amd")
+        #expect(env["D3DM_ENABLE_METALFX"] == nil)
+
+        let shimmed = try runner(named: "metalfx", ntdllMentions: ["WINEWFUSYNC"], withMetalFXShim: true)
+        #expect(shimmed.hasMetalFXShim)
+        let on = WineRunner(install: shimmed, prefix: TestHome.scratch("wine-mfx"), backend: .d3dmetal, metalFX: true)
+        #expect(on.usesMetalFX)
+        let onEnv = on.environment()
+        #expect(onEnv["D3DMETAL_UPSCALER_PROFILE"] == "nvidia")
+        #expect(onEnv["D3DM_ENABLE_METALFX"] == "1")
+        #expect(onEnv["D3DM_VENDOR_ID"] == "4318")
+        #expect(onEnv["WINEDLLOVERRIDES"]?.contains("nvngx=b") == true)
+        #expect(onEnv["WINEDLLOVERRIDES"]?.contains("gameoverlayrenderer64=d") == true,
+                "the overlay fix survives the identity switch")
+
+        let off = WineRunner(install: shimmed, prefix: TestHome.scratch("wine-mfx-off"), backend: .d3dmetal, metalFX: false)
+        #expect(!off.usesMetalFX, "a profile that did not ask keeps the AMD identity")
+        #expect(off.environment()["D3DMETAL_UPSCALER_PROFILE"] == "amd")
+    }
+
+    @Test("metalfx_upscaling is read from the profile — the field is no longer decorative")
+    func metalFXComesFromTheProfile() throws {
+        let on = try TestHome.plan("[graphics]\nbackend = \"d3dmetal\"\nmetalfx_upscaling = true", slug: "mfx-on")
+        #expect(on.metalFXUpscaling)
+        let off = try TestHome.plan("[graphics]\nbackend = \"d3dmetal\"", slug: "mfx-off")
+        #expect(!off.metalFXUpscaling)
+    }
 }

@@ -13,22 +13,36 @@ public struct WineRunner {
     public let prefix: URL       // WINEPREFIX
     public let install: RunnerInstall?
     public let backend: GraphicsBackend
+    /// The profile asked for MetalFX (`metalfx_upscaling = true`). Honoured only where the runtime
+    /// can deliver it — see `environment()`.
+    public let metalFX: Bool
 
     public init(binary: URL, prefix: URL) {
         self.binary = binary
         self.prefix = prefix
         self.install = nil
         self.backend = .d3dmetal
+        self.metalFX = false
     }
 
-    public init(install: RunnerInstall, prefix: URL, backend: GraphicsBackend = .d3dmetal) {
+    public init(install: RunnerInstall, prefix: URL, backend: GraphicsBackend = .d3dmetal, metalFX: Bool = false) {
         self.binary = install.wineBinary
         self.prefix = prefix
         self.install = install
         self.backend = backend
+        self.metalFX = metalFX
     }
 
-    /// Base environment. msync is the preferred fast sync on macOS; esync is the fallback.
+    /// Whether this launch will actually present the NVIDIA identity and so get MetalFX: asked
+    /// for by the profile, on a runtime that ships the `nvngx`/`nvapi64` shims, on D3DMetal.
+    public var usesMetalFX: Bool {
+        metalFX && backend == .d3dmetal && (install?.hasMetalFXShim ?? false)
+    }
+
+    /// Base environment. The fast-sync variables are the ones this build's `ntdll.so` recognises
+    /// (`FastSync`) — WineForge wants `WINEWFUSYNC`, Sikarugir `WINEMSYNC`/`WINEESYNC`, and a
+    /// variable a build does not know is ignored, which is how the default runner ran without any
+    /// fast sync until this was measured.
     public func environment(extra: [String: String] = [:]) -> [String: String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         // Start from the caller's environment (TMPDIR, USER, LANG, __CF_USER_TEXT_ENCODING…) and
@@ -43,12 +57,11 @@ public struct WineRunner {
         for (k, v) in [
             "WINEPREFIX": prefix.path,
             "WINEDEBUG": "-all",
-            "WINEESYNC": "1",
-            "WINEMSYNC": "1",
             "WINEBOOT_HIDE_DIALOG": "1",
             "PATH": "\(binary.deletingLastPathComponent().path):/usr/bin:/bin:/usr/sbin:/sbin",
             "HOME": home,
         ] { env[k] = v }
+        for variable in (install?.fastSync ?? .unknown).variables { env[variable] = "1" }
 
         if let install, install.isWineForgeStyle {
             // WineForge: backend selected by GRAPHICS_BACKEND + *_RUNTIME_DIR, DLLs forced native.
@@ -67,12 +80,24 @@ public struct WineRunner {
             switch backend {
             case .d3dmetal:
                 env["GRAPHICS_BACKEND"] = "d3dmetal"
-                // AMD identity → FidelityFX upscaler profile; the D3DMetal README's default.
-                env["D3DMETAL_UPSCALER_PROFILE"] = "amd"
-                env["D3DM_VENDOR_ID"] = "4098"
-                env["D3DM_DEVICE_ID"] = "29631"
-                env["D3DM_DEVICE_DESCRIPTION"] = "AMD Radeon RX 6800 XT"
-                env["WINEDLLOVERRIDES"] = "atidxx64,amdxc64,amd_fidelityfx_upscaler_dx12,amd_fidelityfx_framegeneration_dx12=n,b;dxgi,d3d10,d3d10core,d3d11,d3d12=n,b"
+                if usesMetalFX {
+                    // NVIDIA identity: the game takes its DLSS path, D3DMetal's nvngx shim answers
+                    // it with MetalFX. Apple's own upscaler on Apple's own GPU — the GPU-side lever
+                    // for a GPU-bound scene. Both blocks are WineForge's documented identities.
+                    env["D3DMETAL_UPSCALER_PROFILE"] = "nvidia"
+                    env["D3DM_VENDOR_ID"] = "4318"
+                    env["D3DM_DEVICE_ID"] = "10370"
+                    env["D3DM_DEVICE_DESCRIPTION"] = "NVIDIA GeForce RTX 4080"
+                    env["D3DM_ENABLE_METALFX"] = "1"
+                    env["WINEDLLOVERRIDES"] = "dxgi,d3d10,d3d10core,d3d11,d3d12=n,b;nvapi,nvapi64,nvngx=b"
+                } else {
+                    // AMD identity → FidelityFX upscaler profile; the D3DMetal README's default.
+                    env["D3DMETAL_UPSCALER_PROFILE"] = "amd"
+                    env["D3DM_VENDOR_ID"] = "4098"
+                    env["D3DM_DEVICE_ID"] = "29631"
+                    env["D3DM_DEVICE_DESCRIPTION"] = "AMD Radeon RX 6800 XT"
+                    env["WINEDLLOVERRIDES"] = "atidxx64,amdxc64,amd_fidelityfx_upscaler_dx12,amd_fidelityfx_framegeneration_dx12=n,b;dxgi,d3d10,d3d10core,d3d11,d3d12=n,b"
+                }
             case .dxmt:
                 env["GRAPHICS_BACKEND"] = "dxmt"
                 env["WINEDLLOVERRIDES"] = "dxgi,d3d10,d3d10core,d3d11,d3d12,winemetal=b"

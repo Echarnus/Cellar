@@ -53,9 +53,26 @@ micro-optimisation until you remove it:
 
 ## Sync primitives
 
-`WINEMSYNC=1` and `WINEESYNC=1` are both set. **msync is the macOS-preferred fast sync; esync is the
-fallback.** CrossOver's Diablo IV guidance is explicit that msync must be on with D3DMetal, so don't
-"clean up" either variable without a game to test against.
+**Every macOS Wine build brings its own fast sync, switched on by its own variable, and ignores the
+others.** Sikarugir (Wine 10) implements msync + esync (`WINEMSYNC`, `WINEESYNC`); WineForge
+(Wine 11) implements neither and ships **WFUSync** (`WINEWFUSYNC`, on `os_sync_wait_on_address`).
+For months Cellar set `WINEMSYNC=1` everywhere — right for Sikarugir, a no-op on the default runner,
+which therefore ran every game through wineserver. So the variables are not a constant: `FastSync`
+scans the runner's `ntdll.so` for the names it recognises and `WineRunner` sets exactly those
+(all three when the file cannot be read — an unknown variable costs nothing, a missing one costs
+the fast path). `cellar doctor` prints the result per runner as *Fast sync*. Check that line
+before believing any sync setting; verify a new runner by `strings` on its `ntdll.so`, not by
+its README. CrossOver's Diablo IV guidance that msync must be on with D3DMetal still stands for
+builds that have it; a profile's `[env]` can force a variable either way (`WINEWFUSYNC = "0"`).
+
+## MetalFX
+
+`metalfx_upscaling = true` in a profile's `[graphics]` presents the **NVIDIA identity** (WineForge's
+documented block: `D3DMETAL_UPSCALER_PROFILE=nvidia`, `D3DM_ENABLE_METALFX=1`, `nvapi,nvapi64,nvngx=b`)
+so the game's DLSS option becomes MetalFX. `WineRunner.usesMetalFX` honours it only on D3DMetal and
+only when the grafted runtime ships `nvngx.dll` + `nvapi64.dll` (`RunnerInstall.hasMetalFXShim`);
+otherwise the launch keeps the AMD/FidelityFX identity, and `cellar doctor` says whether the shims
+are there. It is a GPU-side lever — it does nothing for a CPU-bound (Rosetta-bound) scene.
 
 ## Choosing a runner (why WineForge, and why not the others)
 
