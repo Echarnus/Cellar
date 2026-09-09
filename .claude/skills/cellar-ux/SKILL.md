@@ -23,6 +23,10 @@ landed. Key rules:
   logo the player can see is wrong. Put the real mark on screen, zoom in, copy the geometry. Not
   every mark is a disc — ask `StoreMark.outline(of:size:)` before ringing one. Never leave a blank
   cover either: `GeneratedCover` draws a deterministic one.
+- **Then judge it at the size *and scale* it ships at.** A 12pt chip is 24 device pixels; detail finer
+  than a pixel is static, however authentic. Zoom to inspect, never to approve — `Scripts/test.sh`'s
+  `markSurvivesAtDeviceScale` renders at 2× because an 8× render once passed a mark the app showed as
+  mush.
 - **Copy:** sentence case, say what will happen in one sentence, name the window the player will see,
   and end every player-facing error with the command or button that fixes it.
 - **Accessibility:** icon-only controls get `.accessibilityLabel` + `.help`; rows combine into one

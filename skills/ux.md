@@ -75,6 +75,13 @@ Notes that are easy to get wrong:
 - **A mark is not obliged to be a disc.** GOG's is a light rounded tile among saturated circles,
   which is a *stronger* signal, not a lapse — but anything drawing around a mark must ask
   `StoreMark.outline(of:size:)` rather than assuming a circle.
+- **Judge a mark at the size *and scale* the player gets, not the one you drew it at.** Authentic and
+  unreadable is not an improvement on wrong. The app's commonest marks are a **12pt** filter chip and
+  a **13pt** section heading — 24 device pixels on a 2× screen — so detail finer than a pixel becomes
+  grey static however correct the geometry is. GOG's mark therefore drops to a single glyph below
+  20pt. Zoom a snapshot to *inspect* a mark, never to *approve* one: `markSurvivesAtDeviceScale`
+  renders at 2× for exactly this reason, and it exists because an 8× render passed a mark the app
+  showed as mush.
 - **Never leave a blank cover.** Steam publishes key art per AppID; Battle.net publishes none a
   launcher may hotlink. `GeneratedCover` composes a deterministic gradient and monogram instead —
   deterministic because a cover that changed colour between launches would read as a bug.
