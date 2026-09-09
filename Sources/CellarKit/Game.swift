@@ -132,6 +132,9 @@ public struct GameSummary: Identifiable, Sendable {
     /// "nobody" — only trust it as a negative when `store.descriptor.canDetectSignIn`.
     public let account: String?
     public let gameInstalled: Bool     // the game's files are on disk
+    /// Whether the bottle exists on disk. Not the same question as `clientInstalled` — a GOG or
+    /// standalone game never has a client, but it still has a bottle to remove.
+    public let bottleExists: Bool
     public let running: Bool           // the store's client is up
     /// Battle.net's equivalent of an AppID — how its client names this game (`Fen` = Diablo IV).
     public let productCode: String?
@@ -229,7 +232,7 @@ public struct GameSummary: Identifiable, Sendable {
 
     public init(slug: String, name: String, store: GameStore, appID: Int?, iconPath: String?,
                 runnerInstalled: Bool, clientInstalled: Bool, account: String?, gameInstalled: Bool,
-                running: Bool, productCode: String?, artworkAppID: Int?,
+                bottleExists: Bool, running: Bool, productCode: String?, artworkAppID: Int?,
                 artPortraitURL: String?, artHeroURL: String?,
                 needsClientAtRuntime: Bool, facts: GameFacts, runnerID: String, backend: String,
                 bottleName: String) {
@@ -242,6 +245,7 @@ public struct GameSummary: Identifiable, Sendable {
         self.clientInstalled = clientInstalled
         self.account = account
         self.gameInstalled = gameInstalled
+        self.bottleExists = bottleExists
         self.running = running
         self.productCode = productCode
         self.artworkAppID = artworkAppID
@@ -273,6 +277,7 @@ public enum Game {
                 clientInstalled: clientInstalled,
                 account: clientInstalled ? signedInAccount(plan) : nil,
                 gameInstalled: isGameInstalled(plan),
+                bottleExists: FileManager.default.fileExists(atPath: plan.prefix.path),
                 running: storeClientRunning(plan),
                 productCode: plan.productCode,
                 // Only Steam publishes free cover art keyed on an app id; everything else has to
@@ -298,6 +303,15 @@ public enum Game {
             names.insert(fields["bottle"] ?? ref.slug)
         }
         return names
+    }
+
+    /// Every profile that lives in this bottle. Usually just one — a bottle is per-game by default
+    /// — but a profile can opt into sharing one, and a removal has to know before it takes the
+    /// bottle away from games that were never mentioned.
+    public static func slugs(sharingBottle bottleName: String) -> [String] {
+        ProfileStore.all().filter { ref in
+            (ProfileStore.fields(ref)["bottle"] ?? ref.slug) == bottleName
+        }.map(\.slug)
     }
 
     public static func plan(slug: String) throws -> GamePlan {

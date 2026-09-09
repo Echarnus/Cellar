@@ -89,6 +89,17 @@ public struct StoreDescriptor: Sendable {
     /// a game is starting (see `DockShim`). Deliberately a list of the client's own processes and
     /// nothing else: anything not named here — the game, a mod tool, an installer — keeps its icon.
     public let clientProcessNames: [String]
+    /// What survives when a game from this store is removed, in the player's words. Shown on every
+    /// uninstall: what a player actually fears is losing the account or the other games, and for
+    /// Steam that fear is well founded — one install and one sign-in serve every Steam game.
+    public let uninstallKeepsNote: String
+    /// What the store's client does once the files are gone, or nil when there is no client to do
+    /// anything. Stops a re-appearing "Install" button reading as a failed uninstall.
+    public let uninstallClientNote: String?
+    /// Whether the client has to be closed before a game's files can be removed. A running client
+    /// holds the files open and rewrites its manifests as it exits, which is how a half-deleted
+    /// library happens — so Cellar closes it first, and says so beforehand.
+    public let requiresClientClosedToUninstall: Bool
 
     /// Whether one sign-in covers the whole account rather than one bottle. Drives the Accounts
     /// screen: a store that is signed in once is listed once, not once per game.
@@ -127,7 +138,12 @@ public extension GameStore {
                 // matters at launch. Honest answer: the client window.
                 authStyle: .inClientWindow,
                 installsClientInBottle: true,
-                clientProcessNames: SteamBottle.clientProcesses)
+                clientProcessNames: SteamBottle.clientProcesses,
+                // The one thing that must never be collateral damage: the shared install holds the
+                // sign-in and every other Steam game's files.
+                uninstallKeepsNote: "Your Steam sign-in and the shared Steam install, so every other Steam game keeps working.",
+                uninstallClientNote: "Steam shows the game as not installed the next time it opens — the files are gone, the licence isn't.",
+                requiresClientClosedToUninstall: true)
         case .battlenet:
             return StoreDescriptor(
                 store: .battlenet,
@@ -141,7 +157,10 @@ public extension GameStore {
                 installLocation: "the Battle.net app",
                 authStyle: .inClientWindow,
                 installsClientInBottle: true,
-                clientProcessNames: BattleNetBottle.clientProcesses)
+                clientProcessNames: BattleNetBottle.clientProcesses,
+                uninstallKeepsNote: "Battle.net itself, your sign-in, and anything else installed in this bottle.",
+                uninstallClientNote: "Battle.net offers the game as an install again next time it starts. That is it noticing the files are gone, not a failed uninstall.",
+                requiresClientClosedToUninstall: true)
         case .standalone:
             return StoreDescriptor(
                 store: .standalone,
@@ -155,7 +174,10 @@ public extension GameStore {
                 installLocation: "a direct download",
                 authStyle: .none,
                 installsClientInBottle: false,
-                clientProcessNames: [])   // no client, so nothing of Cellar's to hide
+                clientProcessNames: [],   // no client, so nothing of Cellar's to hide
+                uninstallKeepsNote: "Nothing else to keep — a standalone game brings no client and no account.",
+                uninstallClientNote: nil,
+                requiresClientClosedToUninstall: false)
         case .gog:
             return StoreDescriptor(
                 store: .gog,
@@ -170,8 +192,12 @@ public extension GameStore {
                 installLocation: "your GOG library",
                 authStyle: .cellarHeldToken,
                 installsClientInBottle: false,
-                clientProcessNames: [])   // pure HTTP, no client to hide
-
+                clientProcessNames: [],   // pure HTTP, no client to hide
+                uninstallKeepsNote: "Your GOG sign-in, which covers your whole library.",
+                // GOG ships an Inno Setup installer, so it ships an uninstaller too — running it is
+                // what takes the registry entries with the files.
+                uninstallClientNote: "Cellar runs the game's own GOG uninstaller first, silently, so nothing is left in the bottle's registry.",
+                requiresClientClosedToUninstall: false)
         }
     }
 

@@ -9,6 +9,9 @@ struct GameDetailView: View {
     let onChange: () -> Void
     @AppStorage("showHUD") private var showHUD = false
     @State private var showDetails = false
+    /// True while a removal is being measured. Walking a 36 GB Steam library takes a few seconds,
+    /// and a menu item that appears to do nothing for that long reads as broken.
+    @State private var measuringRemoval = false
 
     var body: some View {
         ScrollView {
@@ -78,13 +81,17 @@ struct GameDetailView: View {
             // Green means "go" for Play; every other step is tinted by the store whose client is
             // about to appear, so the button and the window that opens belong to each other.
             .tint(game.nextStep == .play ? .green : game.store.tint)
-            .disabled(runner.busy || primaryIsManual)
+            .disabled(runner.busy || measuringRemoval || primaryIsManual)
             .keyboardShortcut(.defaultAction)
             .help(game.actionHint)
 
             if runner.busy {
                 ProgressView().controlSize(.small)
                 Text(runner.busyTitle).font(.callout).foregroundStyle(.secondary)
+            } else if measuringRemoval {
+                ProgressView().controlSize(.small)
+                Text("Working out what would be deleted…")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
             overflowMenu
@@ -113,6 +120,17 @@ struct GameDetailView: View {
             }
             Divider()
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
+            // Removal is last and on its own, where destructive actions belong. Each entry states
+            // what it takes, and neither does anything until the confirmation has been read.
+            if game.gameInstalled || game.bottleExists {
+                Divider()
+                if game.gameInstalled {
+                    Button("Uninstall \(game.name)…") { confirmRemoval(scope: .game) }
+                }
+                if game.bottleExists {
+                    Button("Remove the bottle '\(game.bottleName)'…") { confirmRemoval(scope: .bottle) }
+                }
+            }
         } label: {
             Image(systemName: "ellipsis.circle").font(.title3)
         }
@@ -275,6 +293,16 @@ struct GameDetailView: View {
 
     private func act(_ args: [String], _ title: String) {
         runner.run(args, title: title, then: { onChange() })
+    }
+
+    /// Show what removal would take, and only then run it — through the CLI, like every other
+    /// side-effecting action, so the app inherits the same tested path (and its activity log).
+    private func confirmRemoval(scope: RemovalScope) {
+        measuringRemoval = true
+        UninstallConfirmation.ask(for: game, scope: scope, measured: { measuringRemoval = false }) {
+            act(["uninstall", game.slug, "--yes"] + (scope == .bottle ? ["--bottle"] : []),
+                scope == .bottle ? "Removing the bottle" : "Uninstalling")
+        }
     }
 }
 
