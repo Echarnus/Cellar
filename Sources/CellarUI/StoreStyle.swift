@@ -64,7 +64,10 @@ public struct StoreBadge: View {
 
     public var body: some View {
         StoreMark(store: store, size: diameter)
-            .overlay(Circle().strokeBorder(.background.opacity(0.92), lineWidth: diameter * 0.10))
+            // The ring has to follow the mark's own outline: GOG's is a rounded tile, and a circle
+            // drawn round a square reads as a mistake rather than as a badge.
+            .overlay(StoreMark.outline(of: store, size: diameter)
+                .strokeBorder(.background.opacity(0.92), lineWidth: diameter * 0.10))
             .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
             .accessibilityHidden(true)   // the row already says the store in words
     }

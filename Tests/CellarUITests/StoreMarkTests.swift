@@ -29,7 +29,9 @@ struct StoreMarkTests {
     }
 
     static func geometry(_ store: GameStore, size: CGFloat) -> MarkGeometry {
-        MarkGeometry(bitmap: render(store, size: size))
+        // GOG's mark is the odd one out: dark letters on a white tile, where the others are white
+        // ink on a saturated disc. Measure each the way it is actually drawn.
+        MarkGeometry(bitmap: render(store, size: size), ink: store == .gog ? .dark : .light)
     }
 
     // MARK: - Every mark
@@ -56,8 +58,11 @@ struct StoreMarkTests {
     /// Each mark's disc carries its store's accent, and CellarKit's descriptor is where that colour
     /// is defined. If a mark's own gradient drifts away from the descriptor, the app and the CLI
     /// start describing the same store differently.
+    ///
+    /// GOG is not in the list: its mark is a white tile, by GOG's own design, and the purple that
+    /// stands for GOG in Cellar lives in the lockup around it rather than in the mark.
     @Test("each disc is recognisably its store's colour",
-          arguments: [GameStore.steam, .battlenet, .gog])
+          arguments: [GameStore.steam, .battlenet])
     func discMatchesDescriptorHue(store: GameStore) {
         let drawn = Self.geometry(store, size: 32).discColour
         let declared = store.descriptor.accentColorComponents
@@ -116,32 +121,77 @@ struct StoreMarkTests {
 
     // MARK: - Battle.net
 
-    /// The orb is two wound arcs around an open centre. When the inner stroke grows past its own
-    /// radius the arc closes up and the middle fills in — the "blob" that shipped.
+    /// The orb is three orbits crossing around an open centre. Fill that centre in and it is a
+    /// blob; the "portal" is the part a player recognises.
     @Test("Blizzard's orb has an open centre", arguments: sizes)
     func battleNetIsNotABlob(size: CGFloat) {
         let g = Self.geometry(.battlenet, size: size)
         let opening = g.holeWidth(at: (x: 0.5, y: 0.5))
-        // Merely *having* a gap is not enough — the shipped version had one and still read as a
-        // blob. The inner arc's stroke has to stay well under its own radius, and 0.10 of the box
-        // is the width at which the portal is still visible in a 14pt library row.
+        // Merely *having* a gap is not enough — a version shipped with one and still read as a
+        // blob. 0.10 of the box is the width at which the portal is still visible in a 14pt row.
         #expect(opening > 0.10,
                 """
                 Battle.net at \(Int(size))pt: the orb's centre is only \(round2(opening)) of the box \
-                across — the inner arc has thickened until the portal closed into a blob
+                across — the blades have thickened until the portal closed into a blob
+                """)
+    }
+
+    /// Three arms, at 120° to each other. This is the assertion that separates the real orb from
+    /// the spiral Cellar drew before it was held next to Blizzard's: a spiral also has an open
+    /// centre and also looks deliberate, but it is not the same shape turned a third of the way
+    /// round. Measured in wedges, because that is a property of the *shape*, not of how it was
+    /// built — it would still hold if the blades were redrawn as Béziers tomorrow.
+    @Test("Blizzard's orb has three arms, not one spiral", arguments: [CGFloat(22), 32])
+    func battleNetIsThreeFold(size: CGFloat) {
+        let g = Self.geometry(.battlenet, size: size)
+        let wedges = [0.0, 120.0, 240.0].map { g.inkCoverage(wedge: $0) }
+        let spread = (wedges.max() ?? 0) - (wedges.min() ?? 0)
+        #expect(wedges.allSatisfy { $0 > 0.10 },
+                "Battle.net at \(Int(size))pt: a third of the orb is empty — \(wedges.map(round2))")
+        #expect(spread < 0.06,
+                """
+                Battle.net at \(Int(size))pt: the three thirds of the orb carry \(wedges.map(round2)) \
+                of ink — that is not a mark with three-fold symmetry
                 """)
     }
 
     // MARK: - GOG
 
-    /// GOG's mark is its initial on the brand's purple. Purple does real work here: Steam and
-    /// Battle.net are both blue, so GOG is the one store colour can help tell apart — though it
-    /// still never carries the distinction alone.
-    @Test("GOG's disc is purple, not blue")
-    func gogIsPurple() {
-        let c = Self.geometry(.gog, size: 32).discColour
-        #expect(c.r > c.g && c.b > c.g,
-                "GOG's disc measured r=\(round2(c.r)) g=\(round2(c.g)) b=\(round2(c.b)) — that is not purple")
+    /// GOG's mark is the white tile with `gog` over `com` — the mark GOG actually uses. Cellar drew
+    /// a purple disc with a "G" on it for a while, which GOG has never used: an invented logo is
+    /// worse than a clumsy one, because the player learns something that matches nothing.
+    @Test("GOG's mark is a light tile with dark letters, not a coloured disc", arguments: sizes)
+    func gogIsTheWordmarkTile(size: CGFloat) {
+        let bitmap = Self.render(.gog, size: size)
+        let tile = MarkGeometry(bitmap: bitmap, ink: .light).inkCoverage      // the white field
+        let letters = MarkGeometry(bitmap: bitmap, ink: .dark).inkCoverage    // the dark wordmark
+
+        #expect(tile > 0.55,
+                """
+                GOG at \(Int(size))pt: only \(pct(tile)) of the mark is light — GOG's is a white \
+                tile, and a dark or tinted one is a different logo
+                """)
+        #expect(letters > 0.08 && letters < 0.40,
+                """
+                GOG at \(Int(size))pt: the dark letters cover \(pct(letters)) of the tile — the \
+                wordmark has either vanished or flooded it
+                """)
+    }
+
+    /// Two lines, not one. The tile says `gog` over `com`, and a band of clear tile separates them;
+    /// lose that and the mark is a smudge rather than a wordmark.
+    @Test("GOG's wordmark is set on two lines", arguments: [CGFloat(22), 32])
+    func gogHasTwoLines(size: CGFloat) {
+        let rows = Self.geometry(.gog, size: size).inkByRow
+        let inked = rows.enumerated().filter { $0.element > 0.05 }.map(\.offset)
+        guard let first = inked.first, let last = inked.last else {
+            Issue.record("GOG at \(Int(size))pt drew no letters at all")
+            return
+        }
+        // Somewhere between the first and last inked row there has to be a clear gap — the leading.
+        let gap = (first...last).contains { rows[$0] < 0.02 }
+        #expect(gap,
+                "GOG at \(Int(size))pt: no clear band between the two lines — `gog` and `com` have run together")
     }
 
     @Test("the three branded marks are told apart by more than colour")

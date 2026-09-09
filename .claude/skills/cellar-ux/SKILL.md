@@ -18,8 +18,11 @@ landed. Key rules:
 - **Stores are told apart by three signals together:** position (grouped sections), mark (the store's
   real logo, drawn as vectors in `StoreMark.swift`), and word (its name, including in a11y labels).
   Colour never carries it alone — Steam and Battle.net are both blue.
-- **Marks are drawn, never bundled.** Shipping Valve's or Blizzard's artwork breaks a hard rule in
-  `AGENTS.md`. Never leave a blank cover either: `GeneratedCover` draws a deterministic one.
+- **Marks are drawn, never bundled — but traced, never remembered, and never invented.** Shipping
+  Valve's or Blizzard's artwork breaks a hard rule in `AGENTS.md`; drawing one from memory ships a
+  logo the player can see is wrong. Put the real mark on screen, zoom in, copy the geometry. Not
+  every mark is a disc — ask `StoreMark.outline(of:size:)` before ringing one. Never leave a blank
+  cover either: `GeneratedCover` draws a deterministic one.
 - **Copy:** sentence case, say what will happen in one sentence, name the window the player will see,
   and end every player-facing error with the command or button that fixes it.
 - **Accessibility:** icon-only controls get `.accessibilityLabel` + `.help`; rows combine into one

@@ -30,6 +30,32 @@ public struct StoreMark: View {
         case .standalone: StandaloneMark(size: size)
         }
     }
+
+    /// The mark's own silhouette, for anything that has to ring or clip it.
+    ///
+    /// Not every mark is a disc: GOG's is a rounded tile, and a badge ring that assumed a circle
+    /// would cut its corners off. Anything drawing *around* a mark asks here rather than guessing.
+    public static func outline(of store: GameStore, size: CGFloat) -> AnyInsettableShape {
+        switch store {
+        case .gog:  AnyInsettableShape(RoundedRectangle(cornerRadius: size * GOGMark.corner, style: .continuous))
+        default:    AnyInsettableShape(Circle())
+        }
+    }
+}
+
+/// A type-erased `InsettableShape`, so `outline(of:size:)` can hand back either a circle or a tile
+/// and callers can still `strokeBorder` it. SwiftUI's own `AnyShape` loses insettability.
+public struct AnyInsettableShape: InsettableShape {
+    private let makePath: @Sendable (CGRect) -> Path
+    private let makeInset: @Sendable (CGFloat) -> AnyInsettableShape
+
+    public init<S: InsettableShape & Sendable>(_ shape: S) {
+        makePath = { shape.path(in: $0) }
+        makeInset = { AnyInsettableShape(shape.inset(by: $0)) }
+    }
+
+    public func path(in rect: CGRect) -> Path { makePath(rect) }
+    public func inset(by amount: CGFloat) -> AnyInsettableShape { makeInset(amount) }
 }
 
 /// Valve's mark: the valve wheel, the smaller wheel, and the handle that runs out to the rim, on
@@ -105,58 +131,233 @@ private struct MarkDisc: Shape {
     }
 }
 
-/// Blizzard's mark: the Battle.net orb — two hooked arcs winding into a portal, on its cyan-blue.
+/// Blizzard's mark: the Battle.net orb — three tapered orbits crossing around an open centre, on
+/// its flat blue.
+///
+/// The orb is not a spiral, which is the shape it is most often mistaken for (and the shape Cellar
+/// drew until it was held next to the real thing). It is three **orbit arcs** at 120° to each other,
+/// each a slice of the same flattened ellipse, each swelling from a whisker-thin tail to a blunt
+/// head. What makes it read as Battle.net rather than as an atom is that they cross, and that the
+/// three inner edges leave a curved triangle open in the middle.
+///
+/// The disc is flat `#008DE3` — sampled off Blizzard's own mark, which carries no gradient.
 private struct BattleNetMark: View {
     let size: CGFloat
 
     var body: some View {
         ZStack {
-            Circle().fill(
-                LinearGradient(colors: [Color(.sRGB, red: 0.16, green: 0.73, blue: 1.0, opacity: 1),
-                                        Color(.sRGB, red: 0.0, green: 0.40, blue: 0.85, opacity: 1)],
-                               startPoint: .top, endPoint: .bottom))
+            Circle().fill(Color(.sRGB, red: 0.0, green: 0.553, blue: 0.890, opacity: 1))
 
-            // Outer sweep: most of a ring, opened at the lower right so it reads as a spiral
-            // rather than a plain circle.
-            Circle()
-                .trim(from: 0.06, to: 0.78)
-                .stroke(.white, style: StrokeStyle(lineWidth: size * 0.115, lineCap: .round))
-                .frame(width: size * 0.62)
-                .rotationEffect(.degrees(-90))
-
-            // Inner sweep, wound the other way — the hook that closes the orb. Its stroke has to
-            // stay well under its own radius: at the old 0.13 on a 0.28 circle the line was nearly
-            // half the diameter, so the arc closed up and the centre of the orb read as a blob.
-            Circle()
-                .trim(from: 0.06, to: 0.72)
-                .stroke(.white, style: StrokeStyle(lineWidth: size * 0.095, lineCap: .round))
-                .frame(width: size * 0.34)
-                .rotationEffect(.degrees(90))
+            ForEach([0.0, 120.0, 240.0], id: \.self) { turn in
+                OrbitBlade()
+                    .fill(.white)
+                    .rotationEffect(.degrees(turn))
+            }
         }
         .frame(width: size, height: size)
     }
 }
 
-/// GOG's mark: the purple disc with its initial. GOG's own logo is a wordmark, and "GOG" set at
-/// 14pt is a smudge — so the mark keeps the brand's purple and its first letter, which is what
-/// actually reads at library-row size. Purple also does real work here: Steam and Battle.net are
-/// both blue, so GOG is the one store colour can help distinguish (it still never carries it alone).
+/// One of the orb's three orbits: an arc of a flattened ellipse, drawn as a filled outline so it
+/// can taper — a stroked path cannot change width along its length.
+///
+/// The arc is sampled rather than fitted to Béziers on purpose: the taper is the whole character of
+/// the mark, and a sampled centreline with an offset normal is the one construction where the
+/// profile stays exactly what the numbers say at every size.
+private struct OrbitBlade: Shape {
+    /// Semi-axes of the orbit, in fractions of the box. Flattened hard — `b` is what sets how close
+    /// the arc passes to the middle, and so how large the triangle in the centre comes out.
+    var a: CGFloat = 0.415
+    var b: CGFloat = 0.200
+    /// Where the arc starts and ends on that ellipse, in degrees. Just over half a turn, so each
+    /// blade wraps one end of its orbit and crosses both of its neighbours.
+    var start: CGFloat = 128
+    var end: CGFloat = 384
+    /// Half the blade at its widest, in fractions of the box.
+    var halfWidth: CGFloat = 0.046
+    /// Where along the arc that widest point falls (0 = head, 1 = tail), and how fast it falls away.
+    var headFullness: CGFloat = 0.55
+    var tailFullness: CGFloat = 1.5
+    /// The head is cut blunt rather than run out to a point — Blizzard's does the same, and a
+    /// second whisker at both ends would disappear at 11pt.
+    var headWidth: CGFloat = 0.30
+
+    private static let samples = 160
+
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height)
+        let cx = rect.minX + s / 2, cy = rect.minY + s / 2
+        let peak = pow(headFullness, headFullness) * pow(tailFullness, tailFullness)
+            / pow(headFullness + tailFullness, headFullness + tailFullness)
+
+        // Centreline point and unit normal at fraction `u` along the arc.
+        func frame(_ u: CGFloat) -> (point: CGPoint, normal: CGPoint) {
+            let t = (start + (end - start) * u) * .pi / 180
+            let p = CGPoint(x: cx + a * s * cos(t), y: cy + b * s * sin(t))
+            // Perpendicular to the tangent (-a sin t, b cos t).
+            var n = CGPoint(x: b * cos(t), y: a * sin(t))
+            let len = sqrt(n.x * n.x + n.y * n.y)
+            if len > 0 { n = CGPoint(x: n.x / len, y: n.y / len) }
+            return (p, n)
+        }
+
+        /// Half-width at `u`: a skewed bell, fat near the head, run out to nothing at the tail.
+        func width(_ u: CGFloat) -> CGFloat {
+            let bell = pow(max(u, 0), headFullness) * pow(max(1 - u, 0), tailFullness) / peak
+            let blunt = headWidth * max(0, 1 - u / 0.22)      // keeps the head from coming to a point
+            return halfWidth * s * max(bell, blunt)
+        }
+
+        var path = Path()
+        for i in 0...Self.samples {
+            let u = CGFloat(i) / CGFloat(Self.samples)
+            let f = frame(u), w = width(u)
+            let p = CGPoint(x: f.point.x + f.normal.x * w, y: f.point.y + f.normal.y * w)
+            if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
+        }
+        for i in stride(from: Self.samples, through: 0, by: -1) {
+            let u = CGFloat(i) / CGFloat(Self.samples)
+            let f = frame(u), w = width(u)
+            path.addLine(to: CGPoint(x: f.point.x - f.normal.x * w, y: f.point.y - f.normal.y * w))
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// GOG's mark: the white tile with `gog` over `com` in dark blocky lowercase.
+///
+/// Cellar used to draw a purple disc with a "G" on it. That was an invention — GOG has never used
+/// it — and inventing a competitor's logo is the one thing worse than drawing it badly: the player
+/// learns a mark that will not match anything they see on gog.com or in GOG Galaxy.
+///
+/// The real mark is a **rounded white tile**, two lines of stencil-blocky lowercase inside it. It is
+/// the odd one out among the marks — light where the others are saturated, square where the others
+/// are round — and that is an advantage, not a problem: it is told apart by shape and by value, not
+/// by hue, which is what `skills/ux.md` asks for. The letters are drawn from square strokes rather
+/// than set in a font, so nothing depends on what is installed and the counters stay open at 11pt.
+///
+/// The tile keeps a hairline edge so it does not dissolve into a light-mode background.
 private struct GOGMark: View {
     let size: CGFloat
 
+    /// GOG's near-black, warm rather than neutral, as measured off the mark.
+    private var ink: Color { Color(.sRGB, red: 0.16, green: 0.14, blue: 0.13, opacity: 1) }
+
+    /// The tile's corner, as a fraction of the mark. Shared with `StoreMark.outline(of:size:)` so a
+    /// badge's ring can never disagree with the tile it is drawn around.
+    static let corner: CGFloat = 0.13
+
     var body: some View {
+        let corner = size * Self.corner
         ZStack {
-            Circle().fill(
-                LinearGradient(colors: [Color(.sRGB, red: 0.72, green: 0.38, blue: 0.90, opacity: 1),
-                                        Color(.sRGB, red: 0.44, green: 0.16, blue: 0.66, opacity: 1)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing))
-            Text("G")
-                .font(.system(size: size * 0.66, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                // The glyph's own bearing sits it slightly high in the circle; nudge it back.
-                .offset(y: size * 0.01)
+            RoundedRectangle(cornerRadius: corner, style: .continuous)
+                .fill(.white)
+            BlockWord(lines: ["gog", "com"])
+                .fill(ink)
+                .padding(size * 0.12)
         }
         .frame(width: size, height: size)
+        .overlay(
+            RoundedRectangle(cornerRadius: corner, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.14), lineWidth: max(0.5, size * 0.02)))
+    }
+}
+
+/// Two lines of blocky lowercase, drawn as rectangles on a pixel grid.
+///
+/// GOG's logotype is a stencil face: square counters, one uniform stroke, no curves anywhere. That
+/// is a shape a grid reproduces honestly and a font does not — and at the sizes this mark is used,
+/// a real typeface would hint itself into a smudge while square strokes stay square.
+///
+/// The grid below is **traced off the mark**, not sketched from memory: each glyph is two units of
+/// stroke around a four-unit counter, and the two details that make the word read as *gog* rather
+/// than as *909* are both in here — the `g`'s crossbar stops one unit short of the right stem, and
+/// the `g` carries a real descender that drops below the `o`'s baseline.
+private struct BlockWord: Shape {
+    let lines: [String]
+
+    /// The glyphs, drawn as they are: `#` is ink, `.` is paper. Rows are the grid's rows, so a
+    /// glyph with more rows (the `g`) hangs below the others' baseline.
+    private static let glyphs: [Character: [String]] = [
+        "g": ["########",
+              "########",
+              "##....##",
+              "##....##",
+              "##....##",
+              "##....##",
+              "#####.##",
+              "#####.##",
+              "......##",
+              "########",
+              "########"],
+        "o": ["########",
+              "########",
+              "##....##",
+              "##....##",
+              "##....##",
+              "##....##",
+              "########",
+              "########"],
+        "c": ["#######",
+              "#######",
+              "##.....",
+              "##.....",
+              "##.....",
+              "##.....",
+              "#######",
+              "#######"],
+        "m": ["########",
+              "########",
+              "##.##.##",
+              "##.##.##",
+              "##.##.##",
+              "##.##.##",
+              "##.##.##",
+              "##.##.##"],
+    ]
+
+    /// Units between two letters, and between the two lines.
+    private static let letterGap = 1, lineGap = 2
+
+    private static func width(of line: String) -> Int {
+        let glyphs = line.compactMap { Self.glyphs[$0] }
+        guard !glyphs.isEmpty else { return 1 }
+        return glyphs.reduce(0) { $0 + ($1.first?.count ?? 0) } + (glyphs.count - 1) * letterGap
+    }
+
+    private static func height(of line: String) -> Int {
+        line.compactMap { Self.glyphs[$0]?.count }.max() ?? 1
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let columns = lines.map(Self.width(of:)).max() ?? 1
+        let rows = lines.map(Self.height(of:)).reduce(0, +) + (lines.count - 1) * Self.lineGap
+        // One square cell, so the strokes stay square whatever box the mark is given.
+        let cell = min(rect.width / CGFloat(columns), rect.height / CGFloat(rows))
+        let originX = rect.midX - cell * CGFloat(columns) / 2
+        let originY = rect.midY - cell * CGFloat(rows) / 2
+
+        var path = Path()
+        var top = 0
+        for line in lines {
+            // Centre a narrower line against the widest one.
+            var left = CGFloat(columns - Self.width(of: line)) / 2
+
+            for character in line {
+                guard let glyph = Self.glyphs[character] else { continue }
+                for (row, pattern) in glyph.enumerated() {
+                    for (column, cellInk) in pattern.enumerated() where cellInk == "#" {
+                        path.addRect(CGRect(x: originX + (left + CGFloat(column)) * cell,
+                                            y: originY + (CGFloat(top) + CGFloat(row)) * cell,
+                                            width: cell, height: cell))
+                    }
+                }
+                left += CGFloat((glyph.first?.count ?? 0) + Self.letterGap)
+            }
+            top += Self.height(of: line) + Self.lineGap
+        }
+        return path
     }
 }
 

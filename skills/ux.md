@@ -47,7 +47,7 @@ inherits it, rather than special-casing a store in a view.
 ## Telling the stores apart
 
 A game's store decides what every button does next, so it is primary information, never a footnote.
-It is carried by **three signals, always together** — see `Sources/CellarApp/StoreStyle.swift`:
+It is carried by **three signals, always together** — see `Sources/CellarUI/StoreStyle.swift`:
 
 | Signal | Where |
 |---|---|
@@ -63,6 +63,18 @@ Notes that are easy to get wrong:
   assets, and a logo PNG in `Resources/` would break it. Vector marks keep the repo asset-free, stay
   crisp at any size, and work offline. Use is nominative — labelling where a game came from, not
   claiming endorsement (`NOTICE`).
+- **Trace the mark, never draw it from memory — and never invent one.** Drawn-in-code is a
+  distribution rule, not a licence to approximate: the player knows these logos, and a wrong one
+  reads as a fake. Every mark so far has been wrong at least once from being sketched rather than
+  looked at — Steam's wheels swapped, Blizzard's orb drawn as a *spiral* when it is three crossing
+  orbits, and GOG given an invented purple "G" disc when its mark is the white `gog`/`com` tile. An
+  invented mark is the worst of the three: it teaches the player something that matches nothing they
+  will ever see on the store. Put the real mark on screen next to the drawing, zoom in, and copy the
+  geometry — the numbers in `StoreMark.swift` are measurements, and the comments say what they were
+  measured from.
+- **A mark is not obliged to be a disc.** GOG's is a light rounded tile among saturated circles,
+  which is a *stronger* signal, not a lapse — but anything drawing around a mark must ask
+  `StoreMark.outline(of:size:)` rather than assuming a circle.
 - **Never leave a blank cover.** Steam publishes key art per AppID; Battle.net publishes none a
   launcher may hotlink. `GeneratedCover` composes a deterministic gradient and monogram instead —
   deterministic because a cover that changed colour between launches would read as a bug.

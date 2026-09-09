@@ -107,9 +107,10 @@ Three targets, and the split matters:
 **`Tests/CellarUITests` renders SwiftUI offscreen and measures the pixels.** That is what lets a
 user-visible change be checked in the background instead of taking over the machine — and it is a
 real check, not a proxy: the marks are drawn, then measured. It asserts the *identifying* properties
-of each mark (Steam's big wheel upper-right and open, Blizzard's orb not filled in) rather than exact
-pixels, because a test that broke on every gradient nudge would be deleted within a week, and one
-that passes a mirrored logo is worthless. When you add a view worth verifying, put it in `CellarUI`.
+of each mark (Steam's big wheel upper-right and open, Blizzard's orb three-armed and not filled in,
+GOG's mark a light tile carrying two lines of dark wordmark) rather than exact pixels, because a test
+that broke on every gradient nudge would be deleted within a week, and one that passes a mirrored
+logo is worthless. When you add a view worth verifying, put it in `CellarUI`.
 
 Every run also writes `.build/ui-snapshots/store-marks-{light,dark}.png` — every mark, both themes,
 every size it is used at, in one image. **Open that instead of launching the app** for a first look;

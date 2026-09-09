@@ -10,12 +10,22 @@ import CellarUI
 /// Everything is in fractions of the mark's box, so the same numbers hold at 11pt and at 64pt.
 struct MarkGeometry {
     let bitmap: Snapshot.Bitmap
+    /// Which way round the mark is drawn. Most are white ink on a saturated disc; GOG's is the
+    /// opposite — dark letters on a white tile — and every measurement here needs to know which,
+    /// or "the ink" comes out meaning "the background".
+    var ink: Ink = .light
 
-    /// A pixel counts as the mark's ink when it is much lighter than the disc it sits on. Every
-    /// store mark is white ink on a saturated disc, so one threshold serves all of them.
-    static let inkThreshold = 0.72
+    enum Ink { case light, dark }
 
-    private func isInk(_ p: Snapshot.Bitmap.Pixel) -> Bool { p.luminance >= Self.inkThreshold }
+    static let lightInkThreshold = 0.72
+    static let darkInkThreshold = 0.38
+
+    private func isInk(_ p: Snapshot.Bitmap.Pixel) -> Bool {
+        switch ink {
+        case .light: p.luminance >= Self.lightInkThreshold
+        case .dark:  p.luminance <= Self.darkInkThreshold
+        }
+    }
 
     /// Fraction of the box covered by ink. Catches a mark that vanished, and a mark that filled in.
     var inkCoverage: Double {
@@ -146,6 +156,40 @@ struct MarkGeometry {
             }
         }
         return blobs
+    }
+
+    /// Ink coverage inside one 120° wedge measured from the middle, as a fraction of that wedge.
+    ///
+    /// This is what tells a three-armed orb from a spiral. Both have an open centre and both look
+    /// deliberate; only the orb comes out the same in all three wedges however it is turned.
+    /// `turn` is in degrees, clockwise from straight up.
+    func inkCoverage(wedge turn: Double, width: Double = 120) -> Double {
+        let cx = Double(bitmap.width) / 2, cy = Double(bitmap.height) / 2
+        let radius = min(cx, cy)
+        var inked = 0, total = 0
+        bitmap.forEachPixel { x, y, p in
+            let dx = Double(x) - cx, dy = Double(y) - cy
+            guard dx * dx + dy * dy <= radius * radius else { return }
+            // Angle clockwise from straight up, 0…360.
+            var angle = atan2(dx, -dy) * 180 / .pi
+            if angle < 0 { angle += 360 }
+            var delta = abs(angle - turn)
+            if delta > 180 { delta = 360 - delta }
+            guard delta <= width / 2 else { return }
+            total += 1
+            if isInk(p) { inked += 1 }
+        }
+        return total > 0 ? Double(inked) / Double(total) : 0
+    }
+
+    /// The ink in each row of the mark, as a fraction of the row's width — the profile that shows a
+    /// two-line wordmark has actually got two lines, with a clear band between them.
+    var inkByRow: [Double] {
+        (0..<bitmap.height).map { y in
+            var n = 0
+            for x in 0..<bitmap.width where isInk(bitmap[x, y]) { n += 1 }
+            return Double(n) / Double(bitmap.width)
+        }
     }
 
     /// Average colour of the disc behind the mark, sampled just inside the rim at the four
