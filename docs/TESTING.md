@@ -175,6 +175,31 @@ as a sentence naming the fix:
 The download lands inside the throwaway `CELLAR_HOME` and goes with it, so the tier never touches a
 real bottle — and never leaves 2 GB behind on a passing run.
 
+### Running it unattended
+
+The QR scan is the **only** interactive step, and it is not per run. DepotDownloader keeps a refresh
+token that Cellar reuses silently for about **200 days** (`SteamAccount.expectedLifetimeInDays`), so
+one scan buys months of unattended runs — a nightly job, a pre-release step, a self-hosted runner.
+
+The sandbox makes that work by **copying** the machine's session in when the tier is on:
+`shared/steam-account.json` and `tools/depotdownloader/` from the real
+`~/Library/Application Support/Cellar` into the throwaway `CELLAR_HOME`. Copied rather than linked,
+because the tool refreshes its token store as it works and a test must never write into the real
+sign-in. `SteamAccount.state` is signed in only when *both* files are present, which is why both are
+brought across.
+
+Two things end the unattended run, and both say so in the log rather than failing quietly:
+
+- **The token ages out.** Steam's refusal is reported as *"your Steam sign-in has expired"* and the
+  tier skips. One scan resets the clock.
+- **`cellar reset`** deletes `tools/depotdownloader` and `steam-account.json` on purpose — it is
+  the *start over* command, and it lists "one QR scan to sign in again" as the cost. Don't reset the
+  Mac that runs the tier, or budget a scan afterwards.
+
+Using a dedicated Steam account for the runner is a reasonable choice — Fallout Shelter is free, so it
+costs nothing — but it changes nothing above: it still signs in once, by QR, and its token ages the
+same way.
+
 ---
 
 ## Where this sits in the verification ladder

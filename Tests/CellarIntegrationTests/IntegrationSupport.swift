@@ -65,6 +65,7 @@ enum IT {
             if environment[key] != url.path { setenv(key, url.path, 1) }
         }
         linkRealRunners()
+        if steamTierEnabled { copyRealSteamSession() }
         return root
     }()
 
@@ -90,6 +91,43 @@ enum IT {
             guard !fm.fileExists(atPath: link.path) else { continue }
             try? fm.createSymbolicLink(at: link, withDestinationURL: runner)
         }
+    }
+
+    /// The real installation's root — what `Paths.appSupport` would be without `CELLAR_HOME`.
+    private static var realHome: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("Cellar", isDirectory: true)
+    }
+
+    /// Bring the machine's Steam session into the sandbox, so tier D can use it.
+    ///
+    /// `SteamAccount.state` is signed in only when *both* `shared/steam-account.json` and
+    /// DepotDownloader's stored token exist under `Paths.appSupport` — and the sandbox relocates
+    /// that root to a throwaway directory. Without this, the tier would report "no Steam sign-in"
+    /// on a Mac that scanned the QR an hour ago, and nothing the operator did could make it run.
+    ///
+    /// **Copied, not linked**, unlike the runners: DepotDownloader refreshes its token store as it
+    /// works, and a test must never be able to write into the player's real sign-in. The copy is
+    /// what makes the tier automatable — one scan, then unattended runs until the token ages out.
+    /// Only done when the tier is on, so an ordinary run never puts a credential in a temp dir.
+    private static func copyRealSteamSession() {
+        let fm = FileManager.default
+        let record = realHome.appendingPathComponent("shared/steam-account.json")
+        let tools = realHome.appendingPathComponent("tools/depotdownloader", isDirectory: true)
+        guard fm.fileExists(atPath: record.path), fm.fileExists(atPath: tools.path) else {
+            log("no Steam session in \(realHome.path) to bring into the sandbox")
+            return
+        }
+
+        try? fm.createDirectory(at: Paths.shared, withIntermediateDirectories: true)
+        try? fm.removeItem(at: SteamAccount.recordFile)
+        try? fm.copyItem(at: record, to: SteamAccount.recordFile)
+
+        try? fm.createDirectory(at: DepotTool.root.deletingLastPathComponent(),
+                                withIntermediateDirectories: true)
+        try? fm.removeItem(at: DepotTool.root)
+        try? fm.copyItem(at: tools, to: DepotTool.root)
+        log("Steam session copied from the real installation: \(SteamAccount.state.summary)")
     }
 
     static func scratch(_ label: String) -> URL {
@@ -301,8 +339,11 @@ enum IT {
         guard machineCanRunWine else {
             return "this Mac cannot run x86-64 Windows (Apple Silicon + Rosetta required)"
         }
+        // The sandbox has to exist — and have the real session copied in — before asking.
+        ensure()
         guard let credentials = SteamAccount.credentials else {
-            return "no Steam sign-in — run `cellar steam login` (one QR scan) and try again"
+            return "no Steam sign-in on this Mac — run `cellar steam login` (one QR scan); "
+                 + "it then stays valid for about 200 days, unless `cellar reset` removes it"
         }
         switch DepotTool.access(appID: game.appID, credentials: credentials) {
         case .available:
