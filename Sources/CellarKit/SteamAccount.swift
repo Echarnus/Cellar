@@ -131,15 +131,25 @@ public enum SteamAccount {
     /// Sign in by QR — the only sign-in Cellar asks for.
     ///
     /// `output` receives DepotDownloader's lines as they arrive, which is how the app turns the
-    /// drawn challenge into a scannable code. The account name comes from the tool's own success
-    /// line; capturing it is what makes every *later* run silent, because a stored token can only
-    /// be looked up by the username it was stored under.
+    /// drawn challenge into a scannable code. Capturing the account name is what makes every
+    /// *later* run silent, because a stored token can only be looked up by the username it was
+    /// stored under.
+    ///
+    /// The name comes from the tool's success line when it prints one — but it only does when
+    /// Steam also returns new Steam Guard data, and a plain approval in the mobile app usually
+    /// doesn't. So the token store is the authority: a name that gained a token during this run is
+    /// the account that just signed in.
     @discardableResult
     public static func signIn(output: ((String) -> Void)? = nil) throws -> State {
+        let started = Date()
+        let before = Set(DepotTool.storedAccounts.flatMap(\.names).map { $0.lowercased() })
         var captured: String?
         try DepotTool.signIn(credentials: .qr) { line in
             if let name = accountName(inSuccessLine: line) { captured = name }
             output?(line)
+        }
+        if captured == nil {
+            captured = accountName(storedSince: started, previously: before, stores: DepotTool.storedAccounts)
         }
         guard let captured else {
             // No success line: the scan was never completed, or Steam refused. Leave any previous
@@ -159,6 +169,23 @@ public enum SteamAccount {
         guard let i = parts.firstIndex(of: "-username"), i + 1 < parts.count else { return nil }
         let name = parts[i + 1].trimmingCharacters(in: CharacterSet(charactersIn: "'\"`.,"))
         return name.isEmpty ? nil : name
+    }
+
+    /// Which account a sign-in that started at `started` stored a token for, read from the stores
+    /// (newest first). Only a store written since `started` counts — an untouched store means no
+    /// approval happened. Within it, a name that is new wins; failing that (signing in again as the
+    /// same person) a store holding exactly one name is unambiguous. Anything else is nil rather
+    /// than a guess, because the wrong name would make every later download ask again.
+    static func accountName(storedSince started: Date, previously: Set<String>,
+                            stores: [(names: [String], modified: Date)]) -> String? {
+        // A second's slack: file systems round modification times.
+        for store in stores where store.modified >= started.addingTimeInterval(-1) {
+            if let fresh = store.names.first(where: { !previously.contains($0.lowercased()) }) {
+                return fresh
+            }
+            if store.names.count == 1 { return store.names[0] }
+        }
+        return nil
     }
 
     /// Sign out: forget the token *and* the record. Both, always — a record left behind would show

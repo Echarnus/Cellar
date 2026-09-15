@@ -19,12 +19,10 @@ public enum DepotTool {
     /// A home directory of Cellar's own, handed to every DepotDownloader run.
     ///
     /// This is load-bearing, not tidiness. DepotDownloader keeps its Steam token in .NET *isolated
-    /// storage*, whose location is derived from the process's `HOME` and hashed — so with the real
-    /// home directory, Cellar could neither tell that a session existed nor delete it. It looked
-    /// beside the binary for an `account.config` that .NET never writes there, which meant "signed
-    /// in for downloads" was permanently false, sign-out did nothing, and every download re-asked
-    /// for a QR scan. Pinning `HOME` puts the store somewhere Cellar owns, so the session can be
-    /// seen, reused and genuinely revoked.
+    /// storage*, whose location is hashed and derived by the runtime. Some runtimes derive it from
+    /// `HOME`, and pinning it keeps anything they write somewhere Cellar owns. DepotDownloader 3.4.0
+    /// does **not** honour it on macOS — its store lands under `~/Library/Application Support` —
+    /// which is why `storedSessionFiles` searches every root rather than trusting this one.
     public static var home: URL { root.appendingPathComponent("home", isDirectory: true) }
 
     public static var isInstalled: Bool { FileManager.default.isExecutableFile(atPath: binary.path) }
@@ -179,6 +177,17 @@ public enum DepotTool {
     /// is knowable only by using it, which is what `SteamAccount.note` watches for.
     public static var hasStoredSession: Bool { !storedSessionFiles.isEmpty }
 
+    /// The accounts DepotDownloader holds a token for, with when each store was last written —
+    /// newest store first. Names only; the tokens are never read into Cellar.
+    static var storedAccounts: [(names: [String], modified: Date)] {
+        storedSessionFiles.map { file in
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            return (DepotAccountStore.accountNames(in: file), modified)
+        }
+        .sorted { $0.modified > $1.modified }
+    }
+
     /// Every `account.config` that could hold this machine's Steam token.
     ///
     /// Cellar pins `HOME` so the store lands somewhere it owns, but .NET's isolated storage is
@@ -188,7 +197,7 @@ public enum DepotTool {
     /// path risks giving.
     static var storedSessionFiles: [URL] {
         var found: [URL] = []
-        for root in [home, isolatedStorageFallback] {
+        for root in [home, isolatedStorageRoot, isolatedStorageFallback] {
             guard let e = FileManager.default.enumerator(
                 at: root, includingPropertiesForKeys: [.fileSizeKey]) else { continue }
             for case let file as URL in e where file.lastPathComponent == "account.config" {
@@ -199,8 +208,15 @@ public enum DepotTool {
         return found
     }
 
-    /// Where .NET puts isolated storage when `HOME` is the real one — the location Cellar used to
-    /// be blind to.
+    /// Where DepotDownloader 3.4.0 (.NET 8) really writes its store on macOS. .NET resolves this
+    /// folder from the user database, not from `HOME`, so pinning `HOME` does not move it — and a
+    /// sign-in that landed here while Cellar looked elsewhere was reported as never having happened.
+    static var isolatedStorageRoot: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/IsolatedStorage", isDirectory: true)
+    }
+
+    /// Where older .NET runtimes put isolated storage on Unix.
     static var isolatedStorageFallback: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".local/share/IsolatedStorage", isDirectory: true)
