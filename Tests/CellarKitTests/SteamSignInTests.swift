@@ -42,6 +42,23 @@ struct SteamSignInTests {
         #expect(DepotAccountStore.accountNames(inCompressed: emptied).isEmpty)
     }
 
+    @Test("A session Steam refused stays 'expired', named, even though the token is already gone")
+    func rejectionOutranksTheEmptiedStore() {
+        var record = SteamAccount.SignIn(accountName: "kennethdc", signedInAt: Date(), lastUsedAt: Date())
+        #expect(SteamAccount.state(record: record, storedAccountNames: ["kennethdc"])
+                == .signedIn(account: "kennethdc", days: 0, aging: false))
+        // A store without this account — emptied out of band — is no session.
+        #expect(SteamAccount.state(record: record, storedAccountNames: []) == .signedOut)
+        #expect(SteamAccount.state(record: record, storedAccountNames: ["someoneelse"]) == .signedOut)
+        // DepotDownloader deletes the token before printing the rejection, so the store is empty by
+        // the time Cellar notes it. The player must still be told whose session ended, and why.
+        record.rejectedAt = Date()
+        record.rejectionReason = "accessdenied"
+        #expect(SteamAccount.state(record: record, storedAccountNames: [])
+                == .expired(account: "kennethdc", reason: "accessdenied"))
+        #expect(SteamAccount.state(record: nil, storedAccountNames: ["kennethdc"]) == .signedOut)
+    }
+
     // MARK: - Choosing the account
 
     @Test("A name that gained a token during the sign-in is the one that signed in")

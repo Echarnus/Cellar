@@ -111,13 +111,22 @@ public enum SteamAccount {
     /// deletes Cellar's tools directory, and claiming a session Cellar cannot use would be exactly
     /// the kind of unverified ✓ this project refuses to draw.
     public static var state: State {
-        // The token has to be stored under *this* account — see `DepotTool.storedAccountNames`.
-        guard let record, DepotTool.storedAccountNames.contains(record.accountName.lowercased()) else {
-            return .signedOut
-        }
+        state(record: record, storedAccountNames: DepotTool.storedAccountNames)
+    }
+
+    /// The decision behind `state`, apart from the disk.
+    ///
+    /// A rejection is checked **before** the store: DepotDownloader deletes a refused token and only
+    /// then prints `Access token was rejected`, so by the time `note` records the rejection the store
+    /// never holds the name — and checking the store first turned every expiry into a nameless
+    /// "not signed in". Otherwise the token has to be stored under *this* account; a store file with
+    /// no such name is not a session (see `DepotTool.storedAccountNames`).
+    static func state(record: SignIn?, storedAccountNames: Set<String>) -> State {
+        guard let record else { return .signedOut }
         if record.isRejected {
             return .expired(account: record.accountName, reason: record.rejectionReason ?? "session ended")
         }
+        guard storedAccountNames.contains(record.accountName.lowercased()) else { return .signedOut }
         return .signedIn(account: record.accountName, days: record.ageInDays, aging: record.isAging)
     }
 

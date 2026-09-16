@@ -186,8 +186,6 @@ public enum DepotTool {
     ///
     /// Presence is the only thing that can honestly be claimed — whether the token is still *valid*
     /// is knowable only by using it, which is what `SteamAccount.note` watches for.
-    public static var hasStoredSession: Bool { !storedAccountNames.isEmpty }
-
     /// Every account name holding a token, lowercased (DepotDownloader's keys are case-insensitive).
     ///
     /// A store *file* is not a session: when Steam refuses a token, DepotDownloader deletes it from
