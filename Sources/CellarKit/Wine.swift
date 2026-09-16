@@ -194,7 +194,19 @@ public struct WineRunner {
         run(["--version"]).stdout.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Create the prefix. Suppresses the Mono/Gecko first-run dialogs so init is headless.
+    /// Overrides that keep `wineboot` from putting anything on screen. Mono and Gecko would offer
+    /// to install themselves; the Mac graphics driver would show Wine's own "Please wait… the Wine
+    /// configuration is being updated" box — a window with a wine glass on it, in the middle of
+    /// Cellar, that the player can do nothing with. With `winemac.drv` disabled Wine falls back to
+    /// its null display driver, so the box is drawn nowhere. WineForge ignores the
+    /// `WINEBOOT_HIDE_DIALOG` that Proton honours, which is why this is done with the driver.
+    ///
+    /// Only for `wineboot`, and only with the server waited out afterwards: a Windows program
+    /// started into a session whose desktop has the null driver would have invisible windows. The
+    /// next session loads the real driver and registers the real GPU and displays again.
+    static let headlessBootOverrides = "mscoree=d;mshtml=d;winemac.drv=d"
+
+    /// Create the prefix, with nothing on screen while it happens (`headlessBootOverrides`).
     /// A wow64 Wine build (Sikarugir) produces both `Program Files` trees, which the 32-bit Steam
     /// client + 64-bit games need.
     ///
@@ -205,12 +217,32 @@ public struct WineRunner {
     @discardableResult
     public func initializePrefix() throws -> [HomeFolder] {
         try FileManager.default.createDirectory(at: prefix, withIntermediateDirectories: true)
-        let result = run(["wineboot", "--init"], extraEnv: ["WINEDLLOVERRIDES": "mscoree=d;mshtml=d"])
+        let result = run(["wineboot", "--init"], extraEnv: ["WINEDLLOVERRIDES": Self.headlessBootOverrides])
         guard result.succeeded else {
             throw CellarError.ioFailure("wineboot --init failed: \(result.stderr)")
         }
         waitForServer()
         return HomeFolderAccess.redirectDeniedUserShellFolders(in: prefix)
+    }
+
+    /// Wine rebuilds a prefix whenever the runner's `wine.inf` differs from the one the prefix was
+    /// built from — after a runner update — and it does so *on the next launch*, with the same
+    /// "Please wait" box on screen. Doing it here first, headless, leaves that launch nothing to do.
+    /// On the normal path this is one stat and one small read.
+    public func updatePrefixIfStale() {
+        guard let inf = wineInf, PrefixFreshness.needsUpdate(prefix: prefix, wineInf: inf),
+              !serverRunning else { return }
+        CellarLog.info(.runner, "Updating bottle '\(prefix.lastPathComponent)' for the new runner.",
+                       subject: prefix.lastPathComponent)
+        run(["wineboot", "--update"], extraEnv: ["WINEDLLOVERRIDES": Self.headlessBootOverrides])
+        waitForServer()
+    }
+
+    /// The `wine.inf` this runner builds prefixes from.
+    private var wineInf: URL? {
+        let root = install?.wineRoot ?? binary.deletingLastPathComponent().deletingLastPathComponent()
+        let inf = root.appendingPathComponent("share/wine/wine.inf")
+        return FileManager.default.fileExists(atPath: inf.path) ? inf : nil
     }
 
     /// Set the Windows version (run after initializePrefix so the registry hive exists).
@@ -279,5 +311,24 @@ extension GraphicsBackend {
         case .vkd3d: return "dxvk"      // no separate vkd3d renderer ships; DXVK dir is the closest
         case .wined3d: return "none"    // builtin Wine D3D: no prepend
         }
+    }
+}
+
+/// Wine's own test for "this prefix needs updating", made without starting Wine.
+///
+/// `wineboot` writes the modification time of the `wine.inf` it applied into
+/// `<prefix>/.update-timestamp`; every Wine process started afterwards compares the two and rebuilds
+/// the prefix when they differ. The file may also say `disable`, which turns the check off.
+public enum PrefixFreshness {
+    public static func needsUpdate(prefix: URL, wineInf: URL) -> Bool {
+        // No registry means no prefix yet — building one is `initializePrefix`'s job, not an update.
+        guard FileManager.default.fileExists(atPath: prefix.appendingPathComponent("system.reg").path),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: wineInf.path),
+              let modified = attributes[.modificationDate] as? Date else { return false }
+        guard let recorded = try? String(contentsOf: prefix.appendingPathComponent(".update-timestamp"),
+                                         encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines) else { return true }
+        if recorded == "disable" { return false }
+        return recorded != String(Int(modified.timeIntervalSince1970))
     }
 }

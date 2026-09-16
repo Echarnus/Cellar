@@ -408,10 +408,19 @@ extension GameSummary {
     /// One word for where this game stands, shared by the pill and by VoiceOver.
     var statusText: String {
         switch nextStep {
-        case .setup:   return "Set-up needed"
+        case .setup:   return "Needs repair"
         case .signIn:  return "Sign in"
         case .install: return "Not installed"
         case .play:    return "Ready"
+        }
+    }
+
+    var statusSymbol: String {
+        switch nextStep {
+        case .setup:   return "wrench.and.screwdriver"
+        case .signIn:  return "person.crop.circle"
+        case .install: return "arrow.down.circle"
+        case .play:    return "checkmark.circle.fill"
         }
     }
 

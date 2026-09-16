@@ -19,6 +19,11 @@ final class CellarRunner: ObservableObject {
     /// out of the CLI's prose, so the launch window can say "second try" in its own words instead
     /// of quoting a line about the D3DMetal startup race at someone who wants to play a game.
     @Published private(set) var attempt: Int = 0
+    /// Where an install stands, when the running command is `install --machine-progress`. Nil for
+    /// every other command, and until the install has said which phase it is in.
+    @Published private(set) var installProgress: InstallProgress?
+    /// The game being installed, so only its page draws the bar.
+    @Published private(set) var installingSlug: String?
 
     /// A launch does not end when the game starts: `cellar launch` stays alive for the whole session
     /// so it can close the layer afterwards. Without this distinction the app spends a two-hour play
@@ -73,6 +78,7 @@ final class CellarRunner: ObservableObject {
         guard !busy else { return }
         busy = true; busyTitle = title; phase = .working
         stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
+        installProgress = nil; installingSlug = nil
         readsStages = stages
         lineObserver = observe
 
@@ -132,6 +138,8 @@ final class CellarRunner: ObservableObject {
                 self.process = nil
                 self.busy = false
                 self.phase = .idle
+                self.installProgress = nil
+                self.installingSlug = nil
                 self.exitCode = process.terminationStatus
                 then?()
             }
@@ -148,6 +156,15 @@ final class CellarRunner: ObservableObject {
         run(["launch", slug, "--machine-progress"] + (showHUD ? ["--hud"] : []),
             title: "Launching", stages: true, then: then)
         launchingSlug = slug
+    }
+
+    /// Install a game, asking the CLI to report its phases so the page can draw a progress bar.
+    /// Its own method for the same reason `launch` is: the flag that feeds the bar should not be
+    /// something a call site has to remember.
+    func install(slug: String, title: String, then: (@MainActor () -> Void)? = nil) {
+        guard !busy else { return }
+        run(["install", slug, "--machine-progress"], title: title, stages: true, then: then)
+        installingSlug = slug
     }
 
     /// The game currently being launched, if the running command is a launch.
@@ -173,7 +190,9 @@ final class CellarRunner: ObservableObject {
         while let newline = pending.firstIndex(of: "\n") {
             let line = String(pending[pending.startIndex..<newline])
             pending = String(pending[pending.index(after: newline)...])
-            if readsStages, let reached = LaunchMarker.stage(in: line) {
+            if readsStages, let progress = InstallMarker.progress(in: line) {
+                installProgress = progress
+            } else if readsStages, let reached = LaunchMarker.stage(in: line) {
                 stage = reached
                 if reached == .starting { attempt += 1 }
                 if reached == .playing { phase = .playing }

@@ -18,12 +18,13 @@ struct GameSummaryTests {
                          gameInstalled: Bool = true,
                          bottleExists: Bool = true,
                          running: Bool = false,
+                         needsLiveSession: Bool = true,
                          needsClientAtRuntime: Bool = true) -> GameSummary {
         GameSummary(slug: "fixture", name: "Fixture", store: store, appID: 1, iconPath: nil,
                     runnerInstalled: runnerInstalled, clientInstalled: clientInstalled,
                     account: account, gameInstalled: gameInstalled, bottleExists: bottleExists,
                     running: running,
-                    productCode: nil, artworkAppID: nil, artPortraitURL: nil, artHeroURL: nil,
+                    productCode: nil, needsLiveSession: needsLiveSession, artworkAppID: nil, artPortraitURL: nil, artHeroURL: nil,
                     needsClientAtRuntime: needsClientAtRuntime,
                     facts: GameFacts(developer: nil, released: nil, engine: nil, graphicsAPI: nil,
                                      anticheat: nil, drm: nil, online: nil, requiresAccount: nil,
@@ -33,24 +34,43 @@ struct GameSummaryTests {
 
     // MARK: - The ladder
 
-    @Test("A missing runner is a setup step, whatever else is true")
-    func noRunnerMeansSetup() {
-        #expect(summary(runnerInstalled: false).nextStep == .setup)
-        #expect(summary(runnerInstalled: false, clientInstalled: false,
-                        account: nil, gameInstalled: false).nextStep == .setup)
+    @Test("A game that isn't installed is one Install away, whatever still has to be set up",
+          arguments: GameStore.allCases)
+    func installCoversSetup(_ store: GameStore) {
+        // Install sets up the runtime, the bottle and any client before it fetches the game, so a
+        // separate "Set up" first would be a button that asks the player nothing.
+        #expect(summary(store: store, runnerInstalled: false, clientInstalled: false,
+                        account: nil, gameInstalled: false).nextStep == .install)
+        #expect(summary(store: store, clientInstalled: false, gameInstalled: false).nextStep == .install)
     }
 
-    @Test("A missing store client is a setup step")
-    func noClientMeansSetup() {
+    @Test("Setup survives only as repair: the game is there, what it runs on is not")
+    func setupIsRepair() {
+        #expect(summary(runnerInstalled: false).nextStep == .setup)
         #expect(summary(clientInstalled: false).nextStep == .setup)
+        // A game that needs no live client is not sent to repair one it never uses.
+        #expect(summary(clientInstalled: false, needsLiveSession: false).nextStep == .play)
     }
 
-    @Test("The ladder climbs setup → sign in → install → play")
+    @Test("The ladder climbs install → sign in → play")
     func ladderOrder() {
-        #expect(summary(runnerInstalled: false).nextStep == .setup)
-        #expect(summary(account: nil).nextStep == .signIn)
         #expect(summary(gameInstalled: false).nextStep == .install)
+        #expect(summary(account: nil).nextStep == .signIn)
         #expect(summary().nextStep == .play)
+    }
+
+    @Test("Install copy says when the first game also sets up the runtime")
+    func installCopyNamesFirstTimeSetup() {
+        for store in [GameStore.steam, .gog, .standalone] {
+            let first = summary(store: store, runnerInstalled: false, gameInstalled: false).actionHint
+            #expect(first.contains("Windows runtime"), "a few silent minutes read as a stall: \(store)")
+            let later = summary(store: store, gameInstalled: false).actionHint
+            #expect(!later.contains("Windows runtime"), "only the first time: \(store)")
+        }
+        let blizzard = summary(store: .battlenet, clientInstalled: false, account: nil,
+                               gameInstalled: false).actionHint
+        #expect(blizzard.contains("clicks from you"),
+                "Install now runs Blizzard's installer, so it inherits the warning")
     }
 
     @Test("Battle.net is never asked to sign in, because Cellar cannot tell")
@@ -92,6 +112,7 @@ struct GameSummaryTests {
           arguments: GameStore.allCases)
     func everyStateHasCopy(_ store: GameStore) {
         let states = [summary(store: store, runnerInstalled: false),
+                      summary(store: store, runnerInstalled: false, gameInstalled: false),
                       summary(store: store, account: nil),
                       summary(store: store, gameInstalled: false),
                       summary(store: store)]

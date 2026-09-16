@@ -101,6 +101,8 @@ struct GameDetailView: View {
             Label("Playing", systemImage: "play.circle.fill")
                 .font(.callout.weight(.medium)).foregroundStyle(.green)
                 .help("\(game.name) is running. Quit the game and Cellar closes the layer.")
+        } else if runner.busy, runner.installingSlug == game.slug {
+            InstallProgressBar(game: game.name, store: game.store, progress: runner.installProgress)
         } else if runner.busy {
             ProgressView().controlSize(.small)
             Text(runner.busyTitle).font(.callout).foregroundStyle(.secondary)
@@ -165,7 +167,7 @@ struct GameDetailView: View {
     /// A heads-up shown only where a store is about to behave in a way the player would otherwise
     /// read as a bug. Setting the expectation costs one line; a mystery window costs a support thread.
     @ViewBuilder private var notice: some View {
-        if game.nextStep == .setup && !game.store.descriptor.hasSilentInstaller {
+        if game.setupPending && game.nextStep != .play && !game.store.descriptor.hasSilentInstaller {
             Notice(symbol: "hand.raised.fill", tint: game.store.tint,
                    title: "\(game.store.displayName)'s installer needs a few clicks",
                    detail: "Blizzard ships no silent installer. Partway through setup its window opens — click through it and leave the app running. Cellar picks up from there.")
@@ -188,9 +190,7 @@ struct GameDetailView: View {
 
     private var chips: some View {
         HStack(spacing: 8) {
-            Chip(game.nextStep == .play ? "Ready to play" : "Setup required",
-                 system: game.nextStep == .play ? "checkmark.circle.fill" : "wrench.and.screwdriver",
-                 tint: game.nextStep == .play ? .green : .orange)
+            Chip(game.statusText, system: game.statusSymbol, tint: game.statusTint)
             // Each store identifies a game its own way — an AppID, a product code, or neither.
             // Showing the right one is a small honesty that saves a support round-trip.
             switch game.store {
@@ -303,8 +303,9 @@ struct GameDetailView: View {
             // One verb for every store. The route still differs — Cellar downloads a Steam or GOG
             // game itself and opens Blizzard's client for a Battle.net one — but that is a fact
             // about the store, not something the player should have to know to press a button.
-            act(["install", game.slug],
-                game.store == .battlenet ? "Opening Battle.net" : "Downloading \(game.name)")
+            runner.install(slug: game.slug,
+                           title: game.store == .battlenet ? "Opening Battle.net" : "Downloading \(game.name)",
+                           then: { onChange() })
         }
     }
 

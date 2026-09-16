@@ -221,18 +221,29 @@ public struct GameSummary: Identifiable, Sendable {
     /// is named — and leaving it out meant a game showing "Ready to play" and then failing its
     /// licence check with nothing on screen having warned anyone.
     public var nextStep: NextStep {
-        if !runnerInstalled { return .setup }
-        // The store client only has to exist for a game that talks to it while it runs. A game
-        // Cellar downloads and launches itself needs no client, so demanding one would be an
-        // invented step — and a 1.4 GB one.
-        if needsLiveSession, store.descriptor.installsClientInBottle, !clientInstalled { return .setup }
+        // Install sets up whatever is missing before it fetches the game, so a game that isn't on
+        // disk yet is one button away, never two. A separate "Set up" step asked the player for
+        // nothing they could decide — Cellar can see what is missing and just do it.
         if !gameInstalled { return .install }
+        // What is left of `.setup` is repair: the files are there but the runtime or the client the
+        // game runs against has gone (a reset, a removed runner).
+        if setupPending { return .setup }
         // Only asked where Cellar can actually *read* that nobody is signed in. Battle.net publishes
         // nothing comparable, so it never gets a ✗ beside an account and never a sign-in step —
         // signing in stays folded into opening the client.
         if needsLiveSession, store.descriptor.installsClientInBottle,
            store.descriptor.canDetectSignIn, account == nil { return .signIn }
         return .play
+    }
+
+    /// Whether install has to set things up before the game itself — the runtime, or a store
+    /// client. The client only has to exist for a game that talks to it while it runs, and for
+    /// Battle.net, where Blizzard installs games from inside it. A game Cellar downloads and
+    /// launches itself needs none, and demanding one would be an invented 1.4 GB step.
+    public var setupPending: Bool {
+        if !runnerInstalled { return true }
+        guard store.descriptor.installsClientInBottle, !clientInstalled else { return false }
+        return needsLiveSession || !store.descriptor.hasSilentInstaller
     }
 
     /// The primary button's title. Store-specific on purpose: "Install" means something different
@@ -282,11 +293,18 @@ public struct GameSummary: Identifiable, Sendable {
                 return "\(name) checks its DRM against a running \(store.displayName) client, and that client keeps its own sign-in — the one you gave Cellar can't be handed to it. A \(store.displayName) window opens; the QR code with the mobile app is quickest. Once, for every \(store.displayName) game."
             }
         case .install:
+            // The first game on a Mac also fetches the Windows runtime. Saying so up front is what
+            // keeps a few extra minutes from reading as a stall.
+            let first = setupPending
+                ? " The first time, Cellar also sets up the Windows runtime — a few extra minutes." : ""
             switch store {
-            case .steam:      return "Cellar downloads it from your Steam library with the sign-in you already gave it. No Steam window, nothing to click."
-            case .battlenet:  return "Battle.net opens. Sign in if you haven't, then install the game from there. Cellar takes over once the files are down."
-            case .gog:        return "Cellar downloads it from your GOG library and installs it. No client, and nothing runs alongside the game."
-            case .standalone: return "Cellar downloads the game's files straight from your library — no store client involved."
+            case .steam:      return "Cellar downloads it from your Steam library with the sign-in you already gave it. No Steam window, nothing to click." + first
+            case .battlenet:
+                return setupPending
+                    ? "Cellar sets up the Windows runtime, then Blizzard's installer opens — it needs a few clicks from you, because Battle.net ships no silent install. Then install the game from Battle.net."
+                    : "Battle.net opens. Sign in if you haven't, then install the game from there. Cellar takes over once the files are down."
+            case .gog:        return "Cellar downloads it from your GOG library and installs it. No client, and nothing runs alongside the game." + first
+            case .standalone: return "Cellar downloads the game's files straight from your library — no store client involved." + first
             }
         case .play:
             return needsClientAtRuntime
@@ -517,7 +535,8 @@ public enum Game {
     /// Minimal-setup pipeline: ensure runner → bottle → initialised prefix → the store's client.
     /// Idempotent: safe to re-run; skips steps already done.
     @discardableResult
-    public static func setUp(_ plan: GamePlan, progress: (String) -> Void) throws -> WineRunner {
+    public static func setUp(_ plan: GamePlan, progress: (String) -> Void,
+                             phase: (InstallProgress) -> Void = { _ in }) throws -> WineRunner {
         func step(_ message: String) {
             CellarLog.debug(.setup, message, subject: plan.slug)
             progress(message)
@@ -538,9 +557,13 @@ public enum Game {
             step("Warning: runner '\(spec.id)' is deprecated — \(why)")
         }
 
+        if RunnerManager.find(id: spec.id) == nil { phase(InstallProgress(.runtime)) }
         let install = try RunnerManager.install(spec, progress: step)
         let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling)
 
+        if !FileManager.default.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path) {
+            phase(InstallProgress(.bottle))
+        }
         if !FileManager.default.fileExists(atPath: plan.prefix.path) {
             step("Creating bottle '\(plan.bottleName)'…")
             try PrefixManager.create(name: plan.bottleName, backend: plan.graphicsBackend, runner: plan.runnerID)
@@ -567,6 +590,7 @@ public enum Game {
             }
         } else {
             step("Wine prefix already initialised.")
+            wine.updatePrefixIfStale()
         }
 
         switch plan.store {
@@ -576,11 +600,13 @@ public enum Game {
             // a 1.4 GB client it will never start. Setting one up anyway would be an invented step,
             // and the game screen already promises not to demand it (`GameSummary.nextStep`).
             if plan.needsLiveSession {
+                if !SteamBottle.isInstalled(in: plan.prefix) { phase(InstallProgress(.client)) }
                 try SteamBottle.install(runner: wine, progress: step)
             } else {
                 step("No Steam client needed — this game runs without a live Steam session.")
             }
         case .battlenet:
+            if !BattleNetBottle.isInstalled(in: plan.prefix) { phase(InstallProgress(.client)) }
             try BattleNetBottle.install(runner: wine, progress: step)
         case .gog:
             step("No store client needed — GOG games are DRM-free, so Cellar installs and runs them directly.")
@@ -629,7 +655,8 @@ public enum Game {
     }
 
     /// Ask the store's client to install the game (or, for a standalone title, say what to run).
-    public static func installGame(_ plan: GamePlan, progress: (String) -> Void = { _ in }) throws {
+    public static func installGame(_ plan: GamePlan, progress: (String) -> Void = { _ in },
+                                   phase: (InstallProgress) -> Void = { _ in }) throws {
         func step(_ message: String) {
             CellarLog.debug(.install, message, subject: plan.slug)
             progress(message)
@@ -657,9 +684,16 @@ public enum Game {
             step("Downloading \(plan.name) from your Steam library (AppID \(appID))…")
             // `progress` is non-escaping and the download does not outlive this call — the tool's
             // output is handed over line by line while it runs.
+            phase(InstallProgress(.downloading))
             try withoutActuallyEscaping(progress) { report in
-                try DepotTool.fetch(appID: appID, into: plan.depotGameDir,
-                                    credentials: credentials, output: report)
+                try withoutActuallyEscaping(phase) { phase in
+                    try DepotTool.fetch(appID: appID, into: plan.depotGameDir, credentials: credentials) { line in
+                        if let fraction = DepotProgress.fraction(in: line) {
+                            phase(InstallProgress(.downloading, fraction: fraction))
+                        }
+                        report(line)
+                    }
+                }
             }
             SteamDRM.markAppDirectory(plan.depotGameDir, appID: appID)
             step("Downloaded to \(plan.depotGameDir.path)")
@@ -676,7 +710,9 @@ public enum Game {
             guard GOGAuth.isSignedIn else {
                 throw CellarError.invalidArgument("Not signed in to GOG. Run: cellar gog login")
             }
+            phase(InstallProgress(.downloading))
             let parts = try GOGInstall.download(productID: productID, progress: step)
+            phase(InstallProgress(.installing))
             try GOGInstall.install(setup: parts[0], slug: plan.slug, runner: wine, progress: step)
             guard plan.directLaunchExe != nil else {
                 throw CellarError.ioFailure(
@@ -695,9 +731,16 @@ public enum Game {
                     "Not signed in to Steam. One scan covers every Steam game: cellar steam login")
             }
             progress("Downloading \(plan.name) from your Steam library (AppID \(appID))…")
+            phase(InstallProgress(.downloading))
             try withoutActuallyEscaping(progress) { report in
-                try DepotTool.fetch(appID: appID, into: plan.depotGameDir,
-                                    credentials: credentials, output: report)
+                try withoutActuallyEscaping(phase) { phase in
+                    try DepotTool.fetch(appID: appID, into: plan.depotGameDir, credentials: credentials) { line in
+                        if let fraction = DepotProgress.fraction(in: line) {
+                            phase(InstallProgress(.downloading, fraction: fraction))
+                        }
+                        report(line)
+                    }
+                }
             }
             progress("Downloaded to \(plan.depotGameDir.path)")
         }
@@ -771,6 +814,9 @@ public enum Game {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
         }
+        // After a runner update Wine would rebuild the prefix inside this launch, with its own
+        // "Please wait" box on screen. Do it first, where nothing is drawn.
+        wine.updatePrefixIfStale()
 
         // No live-session DRM and the exe is on disk → run it directly, no client at all.
         if plan.canLaunchStoreFree && !forceStore {

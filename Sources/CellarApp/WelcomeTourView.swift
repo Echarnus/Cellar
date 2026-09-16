@@ -115,8 +115,8 @@ struct WelcomeTourView: View {
             VStack(alignment: .leading, spacing: 12) {
                 StepRow(number: 1, title: "Sign in to the store",
                         detail: "A game comes from Steam, Battle.net or GOG. One sign-in covers every game from that store — you are not asked again per game.")
-                StepRow(number: 2, title: "Set up the game",
-                        detail: "Cellar downloads the Wine runner and builds the game its own bottle. The first one takes a few minutes; the ones after are quick.")
+                StepRow(number: 2, title: "Install",
+                        detail: "One button. Cellar gets the Windows runtime, builds the game its own bottle and downloads it — with a progress bar. The first game takes a few extra minutes; the ones after are quick.")
                 StepRow(number: 3, title: "Play",
                         detail: "Press Play. Cellar starts whatever the game needs alongside it, and shuts all of it down when you quit.")
             }

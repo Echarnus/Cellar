@@ -23,6 +23,10 @@ struct Install: ParsableCommand {
     @Flag(help: "Install even if Cellar hasn't confirmed you own it.")
     var force = false
 
+    @Flag(name: .customLong("machine-progress"),
+          help: "Also print a marker line as the install moves through its steps, for the Cellar app's progress bar.")
+    var machineProgress = false
+
     func run() throws {
         let plan = try Game.plan(slug: slug)
         // Who answers for this game — not always the store it is filed under. A DRM-free game
@@ -56,8 +60,18 @@ struct Install: ParsableCommand {
         }
 
         print(Term.bold("Installing \(plan.name)") + Term.dim("  (\(plan.store.displayName))"))
-        try Game.setUp(plan) { print("  " + Term.dim($0)) }
-        try Game.installGame(plan) { print("  " + Term.dim($0)) }
+        // DepotDownloader reports once per file, so thousands of times; the bar only needs to hear
+        // about a change it could draw.
+        var lastReported: InstallProgress?
+        func report(_ progress: InstallProgress) {
+            guard machineProgress else { return }
+            if let last = lastReported, last.phase == progress.phase,
+               let was = last.fraction, let now = progress.fraction, abs(now - was) < 0.001 { return }
+            lastReported = progress
+            print(InstallMarker.line(progress))
+        }
+        try Game.setUp(plan, progress: { print("  " + Term.dim($0)) }, phase: report)
+        try Game.installGame(plan, progress: { print("  " + Term.dim($0)) }, phase: report)
         if Game.isGameInstalled(plan) {
             print(Term.green("Installed.") + " Play it with: cellar launch \(slug)")
         } else {

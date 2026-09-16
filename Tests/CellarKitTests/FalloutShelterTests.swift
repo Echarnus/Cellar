@@ -126,8 +126,8 @@ struct FalloutShelterTests {
     @Test("With a runner present but no files, Cellar offers Download and does not promise Play")
     func firstStepIsDownload() throws {
         _ = try Self.plan()
-        // Without a runner every game's next step is `.setup`, which would say nothing about this
-        // profile. The stub satisfies `RunnerManager` and is never executed.
+        // With a runner present the hint is about this game, not about the first-time runtime.
+        // The stub satisfies `RunnerManager` and is never executed.
         TestHome.installStubRunner()
         let summary = try #require(Game.summaries().first { $0.slug == Self.slug })
 
