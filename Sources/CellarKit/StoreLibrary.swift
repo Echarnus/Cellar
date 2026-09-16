@@ -184,6 +184,10 @@ public enum StoreLibrary {
     /// One question per game, because Steam offers no way to ask about several at once without a
     /// second credential — and this way the answer comes from the same session that would do the
     /// installing, so "owned" means "Cellar can install this", not "an id appeared in a list".
+    ///
+    /// The questions are asked side by side, not in turn. Each one is a whole Steam sign-in, so in
+    /// turn the wait grew by three or four seconds with every game in the database; side by side it
+    /// grows by one round per `steamCheckWidth` games.
     @discardableResult
     public static func refreshSteam(progress: (String) -> Void = { _ in }) throws -> [String: Ownership] {
         guard let credentials = SteamAccount.credentials,
@@ -195,9 +199,16 @@ public enum StoreLibrary {
         guard !appIDs.isEmpty else { return [:] }
 
         var answers = loadSteamCache()?.apps ?? [:]
-        for (index, appID) in appIDs.sorted().enumerated() {
-            progress("Asking Steam about game \(index + 1) of \(appIDs.count)…")
-            switch DepotTool.access(appID: appID, credentials: credentials) {
+        let total = appIDs.count
+        progress(steamCheckProgress(total: total, answered: 0))
+        let verdicts = askSideBySide(appIDs.sorted(), width: steamCheckWidth) { appID, slot in
+            DepotTool.access(appID: appID, credentials: credentials,
+                             loginID: steamLoginIDBase + UInt32(slot))
+        } answered: { count in
+            if count < total { progress(steamCheckProgress(total: total, answered: count)) }
+        }
+        for (appID, verdict) in verdicts {
+            switch verdict {
             case .available:      answers["\(appID)"] = .owned
             case .unavailable:    answers["\(appID)"] = .notOwned
             case .unknown(let why):
@@ -208,6 +219,63 @@ public enum StoreLibrary {
         }
         saveSteamCache(SteamCache(checkedAt: Date(), account: account, apps: answers))
         return answers
+    }
+
+    /// How every progress sentence of a Steam library check begins. The Accounts screen reads
+    /// `cellar steam login`'s output and recognises the check by it (`SteamAccount.signInPhase`).
+    static let steamCheckLead = "Asking Steam "
+
+    /// The progress sentence while `answered` of `total` checks are in. Never "your N games" —
+    /// which of them are yours is the question being asked.
+    static func steamCheckProgress(total: Int, answered: Int) -> String {
+        let asking = total == 1 ? "whether you own this game…" : "which of \(total) games you own…"
+        let sentence = steamCheckLead + asking
+        return answered == 0 ? sentence : "\(sentence) \(answered) of \(total) answered"
+    }
+
+    /// How many Steam checks run at once. Steam holds about five sessions per account and turns the
+    /// sixth away (`AlreadyLoggedInElsewhere` — measured with six probes started together), so four
+    /// leaves a session free for a download running at the same time.
+    static let steamCheckWidth = 4
+
+    /// Logon ids for concurrent checks ("CEL" + the slot). Distinct from DepotDownloader's default,
+    /// so a download running at the same time is not signed out by a check.
+    static let steamLoginIDBase: UInt32 = 0x4345_4C00
+
+    /// Run `ask` over `items`, at most `width` at a time, and return every answer.
+    ///
+    /// `ask` is handed a slot in `0..<width` that no other running call holds — which is what the
+    /// Steam checks turn into a logon id. `answered` is called on the caller's thread after each
+    /// answer with how many are in, so a non-thread-safe progress callback stays safe to use.
+    static func askSideBySide<Item: Hashable & Sendable, Answer: Sendable>(
+        _ items: [Item], width: Int,
+        ask: @escaping @Sendable (Item, Int) -> Answer,
+        answered: (Int) -> Void = { _ in }
+    ) -> [Item: Answer] {
+        guard !items.isEmpty else { return [:] }
+        let shared = SideBySideState<Item, Answer>()
+        let done = DispatchSemaphore(value: 0)
+        let workers = max(1, min(width, items.count))
+        for slot in 0..<workers {
+            DispatchQueue.global(qos: .userInitiated).async {
+                while true {
+                    let item: Item? = shared.lock.withLock {
+                        guard shared.next < items.count else { return nil }
+                        defer { shared.next += 1 }
+                        return items[shared.next]
+                    }
+                    guard let item else { return }
+                    let answer = ask(item, slot)
+                    shared.lock.withLock { shared.answers[item] = answer }
+                    done.signal()
+                }
+            }
+        }
+        for count in 1...items.count {
+            done.wait()
+            answered(count)
+        }
+        return shared.lock.withLock { shared.answers }
     }
 
     /// Every Steam app id the profile database knows about — including a `standalone` profile that
@@ -341,4 +409,12 @@ public enum StoreLibrary {
             _ = try? refreshGOG()
         }
     }
+}
+
+/// The queue and the answers `StoreLibrary.askSideBySide` shares between its workers. Every access
+/// goes through `lock`.
+private final class SideBySideState<Item: Hashable, Answer>: @unchecked Sendable {
+    let lock = NSLock()
+    var next = 0
+    var answers: [Item: Answer] = [:]
 }

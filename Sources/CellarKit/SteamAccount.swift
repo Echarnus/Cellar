@@ -220,14 +220,14 @@ public enum SteamAccount {
         case approved
         /// The CLI recorded the sign-in. Cellar's state now says signed in.
         case signedIn
-        /// Checking what the account owns, one game at a time — the CLI's own progress sentence.
+        /// Checking what the account owns — the CLI's own progress sentence, counting answers in.
         case checkingLibrary(String)
     }
 
     public static func signInPhase(after line: String) -> SignInPhase? {
         let text = line.trimmingCharacters(in: .whitespaces)
         if text.hasPrefix("Signed in as ") { return .signedIn }
-        if text.hasPrefix("Asking Steam about game") { return .checkingLibrary(text) }
+        if text.hasPrefix(StoreLibrary.steamCheckLead) { return .checkingLibrary(text) }
         if accountName(inSuccessLine: text) != nil || isSessionEstablished(text) { return .approved }
         return nil
     }

@@ -148,37 +148,85 @@ public enum DepotTool {
     /// process is killed as soon as it does. That is deliberately the *same* question as "can I
     /// install this", asked of the same credential that would do the installing: it covers a lapsed
     /// family-share or a region lock, which a list of owned app ids would not.
-    public static func access(appID: Int, credentials: Credentials, timeout: TimeInterval = 90) -> Access {
+    ///
+    /// Safe to run several at once, which is how `StoreLibrary.refreshSteam` asks about a whole
+    /// library in about the time one check takes — provided each concurrent run passes its own
+    /// `loginID`. Steam ends a session when another signs in with the same logon id, and every
+    /// DepotDownloader run defaults to the same one.
+    public static func access(appID: Int, credentials: Credentials, loginID: UInt32? = nil,
+                              timeout: TimeInterval = 90) -> Access {
         guard (try? install()) != nil else { return .unknown("DepotDownloader isn't installed") }
-        let scratch = Paths.cache.appendingPathComponent("ownership", isDirectory: true)
+        // One scratch directory per app: every run deletes its own when it is done, and a shared
+        // one would be pulled out from under a check still running beside it.
+        let scratch = Paths.cache.appendingPathComponent("ownership/\(appID)", isDirectory: true)
         try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         var args = ["-app", "\(appID)", "-os", "windows", "-osarch", "64",
                     "-manifest-only", "-dir", scratch.path]
         args += credentials.arguments
+        if let loginID { args += ["-loginid", "\(loginID)"] }
 
-        var verdict: Access?
+        // Steam turns away a sign-in when the account already holds as many sessions as it allows —
+        // `AlreadyLoggedInElsewhere`, with nothing wrong with the account. Checks are short-lived,
+        // so one frees up within seconds and the question is asked again rather than left
+        // unanswered.
+        var result: Access = .unknown("Steam didn't answer")
+        for attempt in 1...busyAttempts {
+            let verdict = probe(args: args, timeout: timeout)
+            guard verdict == .busy else {
+                result = verdict?.access ?? .unknown("Steam didn't answer")
+                break
+            }
+            result = .unknown("Steam kept turning the sign-in away")
+            if attempt < busyAttempts { Thread.sleep(forTimeInterval: 1.5 * Double(attempt)) }
+        }
+
+        if case .available = result { sessionRecordLock.withLock { SteamAccount.noteSuccess() } }
+        try? FileManager.default.removeItem(at: scratch)
+        return result
+    }
+
+    static let busyAttempts = 3
+
+    /// One run of the tool, stopped the moment a line settles the question.
+    private static func probe(args: [String], timeout: TimeInterval) -> ProbeVerdict? {
+        var verdict: ProbeVerdict?
         // Killing the process the moment the verdict is in is what keeps this cheap: a manifest for
         // a large game is tens of megabytes, and none of it is needed to answer the question.
         _ = try? runStreaming(args: args, timeout: timeout) { line in
-            SteamAccount.note(line)
-            guard verdict == nil else { return }
-            if line.contains("is not available from this account") {
-                verdict = .unavailable
-            } else if line.contains("Processing depot") || line.contains("Got manifest request code")
-                        || line.contains("Using app branch") {
-                verdict = .available
-            } else if line.contains("Access token was rejected") {
-                verdict = .unknown("your Steam sign-in has expired")
-            } else if line.contains("Couldn't find any depots to download") {
-                // Owned, but nothing to fetch for Windows/64-bit — a profile problem, not ownership.
-                verdict = .unknown("Steam lists no Windows depot for this app")
-            }
+            sessionRecordLock.withLock { SteamAccount.note(line) }
+            if verdict == nil { verdict = probeVerdict(in: line) }
         } stopWhen: { verdict != nil }
-
-        if case .available = verdict { SteamAccount.noteSuccess() }
-        try? FileManager.default.removeItem(at: scratch)
-        return verdict ?? .unknown("Steam didn't answer")
+        return verdict
     }
+
+    /// What one line of an ownership probe settles, if anything.
+    enum ProbeVerdict: Equatable {
+        case answer(Access)
+        /// Steam turned the sign-in away for now; asking again shortly is expected to work.
+        case busy
+
+        var access: Access? { if case .answer(let access) = self { return access }; return nil }
+    }
+
+    static func probeVerdict(in line: String) -> ProbeVerdict? {
+        if line.contains("is not available from this account") {
+            return .answer(.unavailable)
+        } else if line.contains("Processing depot") || line.contains("Got manifest request code")
+                    || line.contains("Using app branch") {
+            return .answer(.available)
+        } else if line.contains("Access token was rejected") {
+            return .answer(.unknown("your Steam sign-in has expired"))
+        } else if line.contains("Couldn't find any depots to download") {
+            // Owned, but nothing to fetch for Windows/64-bit — a profile problem, not ownership.
+            return .answer(.unknown("Steam lists no Windows depot for this app"))
+        } else if line.contains("AlreadyLoggedInElsewhere") {
+            return .busy
+        }
+        return nil
+    }
+
+    /// Serialises the read-modify-write of the sign-in record when checks run side by side.
+    private static let sessionRecordLock = NSLock()
 
     // MARK: - The stored session
 

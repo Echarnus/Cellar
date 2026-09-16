@@ -100,8 +100,14 @@ struct SteamSignInTests {
     @Test("The CLI's own sentences move the panel on, and QR noise does not")
     func laterPhases() {
         #expect(SteamAccount.signInPhase(after: "Signed in as kennethdc.") == .signedIn)
-        #expect(SteamAccount.signInPhase(after: "  Asking Steam about game 2 of 5…")
-                == .checkingLibrary("Asking Steam about game 2 of 5…"))
+        // Built by the same function `refreshSteam` prints with, so the wording and the screen
+        // that reads it cannot drift apart.
+        for (total, answered) in [(6, 0), (6, 2), (1, 0)] {
+            let sentence = StoreLibrary.steamCheckProgress(total: total, answered: answered)
+            #expect(SteamAccount.signInPhase(after: "  " + sentence) == .checkingLibrary(sentence))
+        }
+        #expect(StoreLibrary.steamCheckProgress(total: 6, answered: 2)
+                == "Asking Steam which of 6 games you own… 2 of 6 answered")
         for line in ["  Use the Steam Mobile App to sign in with this QR code:", "  ██▀▀██  ▄▄",
                      "Connecting to Steam3... Done!", "Logging in with QR code...", ""] {
             #expect(SteamAccount.signInPhase(after: line) == nil, "\(line)")
