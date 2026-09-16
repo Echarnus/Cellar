@@ -58,6 +58,9 @@ struct SteamCommand: ParsableCommand {
             }
             switch SteamAccount.state {
             case .signedIn(let account, _, _):
+                // Logged because nothing else is: a caller that believes it is signed out lands
+                // here on every press, and without this line the log shows only the presses.
+                CellarLog.info(.account, "Steam sign-in skipped, already signed in — \(SteamAccount.diagnosis)")
                 print(Term.green("Already signed in as \(account)."))
                 print(Term.dim("  " + SteamAccount.state.summary))
                 print(Term.dim("  Replace it by signing out first: cellar steam login --forget"))

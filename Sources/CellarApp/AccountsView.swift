@@ -197,7 +197,10 @@ struct StoreAccountState {
     static let unknown = StoreAccountState()
 
     static func current() -> StoreAccountState {
-        StoreAccountState(
+        // The app reads this itself instead of asking the CLI, so the two can disagree — and when
+        // they do, this line beside the CLI's is the only place it shows.
+        CellarLog.debug(.account, SteamAccount.diagnosis)
+        return StoreAccountState(
             steam: SteamAccount.state,
             steamClientAccount: SteamBottle.sharedLoggedInAccount,
             gogSignedIn: GOGAuth.isSignedIn,

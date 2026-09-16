@@ -188,6 +188,9 @@ public enum DepotTool {
         .sorted { $0.modified > $1.modified }
     }
 
+    /// Where `storedSessionFiles` looks, in order.
+    static var sessionSearchRoots: [URL] { [home, isolatedStorageRoot, isolatedStorageFallback] }
+
     /// Every `account.config` that could hold this machine's Steam token.
     ///
     /// Cellar pins `HOME` so the store lands somewhere it owns, but .NET's isolated storage is
@@ -197,7 +200,7 @@ public enum DepotTool {
     /// path risks giving.
     static var storedSessionFiles: [URL] {
         var found: [URL] = []
-        for root in [home, isolatedStorageRoot, isolatedStorageFallback] {
+        for root in sessionSearchRoots {
             guard let e = FileManager.default.enumerator(
                 at: root, includingPropertiesForKeys: [.fileSizeKey]) else { continue }
             for case let file as URL in e where file.lastPathComponent == "account.config" {

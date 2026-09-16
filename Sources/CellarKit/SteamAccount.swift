@@ -120,6 +120,24 @@ public enum SteamAccount {
 
     public static var isSignedIn: Bool { state.isUsable }
 
+    /// Why Cellar believes what it believes, for the rolling log. `state` needs the record *and* a
+    /// token store, and when two processes disagree about either (an app built before the store
+    /// moved, a CLI built after) the player sees a Sign in button that does nothing. This line is
+    /// what makes that visible. Never the account name: the log is exported and posted in public.
+    public static var diagnosis: String {
+        let verdict: String
+        switch state {
+        case .signedOut:             verdict = "signed out"
+        case .signedIn(_, let d, _): verdict = "signed in (\(d) days)"
+        case .expired(_, let why):   verdict = "expired (\(why))"
+        }
+        let stores = DepotTool.storedSessionFiles
+        let found = stores.isEmpty
+            ? "no token store under " + DepotTool.sessionSearchRoots.map(\.path).joined(separator: ", ")
+            : "token store at " + stores.map(\.path).joined(separator: ", ")
+        return "Steam \(verdict) — record: \(record == nil ? "none" : "present"), \(found)"
+    }
+
     /// How to authenticate the next DepotDownloader run, or nil when nobody is signed in.
     public static var credentials: DepotTool.Credentials? {
         guard case .signedIn(let account, _, _) = state else { return nil }
@@ -143,20 +161,42 @@ public enum SteamAccount {
     public static func signIn(output: ((String) -> Void)? = nil) throws -> State {
         let started = Date()
         let before = Set(DepotTool.storedAccounts.flatMap(\.names).map { $0.lowercased() })
+        CellarLog.info(.account, "Steam sign-in started — \(diagnosis)")
         var captured: String?
+        var capturedFrom = "success line"
+        var qrCodes = 0
+        var reader = SteamQRCodeReader()
+        var tail: [String] = []
         try DepotTool.signIn(credentials: .qr) { line in
             if let name = accountName(inSuccessLine: line) { captured = name }
+            if reader.consume(line) != nil { qrCodes += 1 }
+            // The tail explains a sign-in that never drew a code. QR rows are noise, and the
+            // success line names the account, so neither is kept.
+            if !line.contains("█"), !line.contains("-username"),
+               !line.trimmingCharacters(in: .whitespaces).isEmpty {
+                tail.append(line)
+                if tail.count > 8 { tail.removeFirst() }
+            }
             output?(line)
         }
         if captured == nil {
             captured = accountName(storedSince: started, previously: before, stores: DepotTool.storedAccounts)
+            capturedFrom = "token store"
         }
+        let seconds = Int(Date().timeIntervalSince(started))
         guard let captured else {
             // No success line: the scan was never completed, or Steam refused. Leave any previous
             // record alone — a failed attempt is not a sign-out.
+            let why = qrCodes == 0
+                ? "DepotDownloader exited without drawing a QR code"
+                : "\(qrCodes) QR code\(qrCodes == 1 ? "" : "s") shown, no approval arrived"
+            CellarLog.warn(.account, "Steam sign-in didn't complete after \(seconds)s: \(why). "
+                + "Last output: \(tail.isEmpty ? "none" : tail.joined(separator: " · "))")
             return state
         }
         write(SignIn(accountName: captured, signedInAt: Date(), lastUsedAt: Date()))
+        CellarLog.info(.account, "Steam sign-in completed after \(seconds)s, account read from the "
+            + "\(capturedFrom) — \(diagnosis)")
         return state
     }
 
