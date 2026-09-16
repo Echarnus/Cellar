@@ -64,8 +64,10 @@ struct Launch: ParsableCommand {
                         + " Run: cellar \(plan.store.rawValue) login  and sign in first.")
                 }
             case .inClientWindow, .none:
-                print(Term.yellow("Nobody is signed in to this bottle's \(plan.store.displayName) yet.")
-                    + " Run: cellar \(plan.store.rawValue) open \(slug)  and sign in first.")
+                if plan.needsLiveSession {
+                    print(Term.yellow("\(plan.store.displayName)'s window opens first so you can sign in to it.")
+                        + " \(plan.name) starts once you're in — once, for every \(plan.store.displayName) game.")
+                }
             }
         }
 

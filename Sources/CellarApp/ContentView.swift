@@ -409,7 +409,6 @@ extension GameSummary {
     var statusText: String {
         switch nextStep {
         case .setup:   return "Needs repair"
-        case .signIn:  return "Sign in"
         case .install: return "Not installed"
         case .play:    return "Ready"
         }
@@ -418,7 +417,6 @@ extension GameSummary {
     var statusSymbol: String {
         switch nextStep {
         case .setup:   return "wrench.and.screwdriver"
-        case .signIn:  return "person.crop.circle"
         case .install: return "arrow.down.circle"
         case .play:    return "checkmark.circle.fill"
         }
@@ -427,7 +425,6 @@ extension GameSummary {
     var statusTint: Color {
         switch nextStep {
         case .setup:   return .orange
-        case .signIn:  return store.tint
         case .install: return .secondary
         case .play:    return .green
         }

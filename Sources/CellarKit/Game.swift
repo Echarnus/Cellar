@@ -75,7 +75,9 @@ public struct GamePlan {
 
     /// Who is being launched and by which route — what the launch stages are worded from.
     public var launchContext: LaunchContext {
-        LaunchContext(game: name, store: store, throughClient: !canLaunchStoreFree)
+        LaunchContext(game: name, store: store, throughClient: !canLaunchStoreFree,
+                      signsInFirst: needsLiveSession && store.descriptor.installsClientInBottle
+                          && store.descriptor.canDetectSignIn && Game.signedInAccount(self) == nil)
     }
 
     /// Command-line fragments that identify the *game's own* process, so a supervised launch never
@@ -205,21 +207,17 @@ public struct GameSummary: Identifiable, Sendable {
     /// The single most useful next action given the current state.
     public enum NextStep: Sendable {
         case setup      // no runner, or no store client yet
-        case signIn     // the client is there and we can see nobody is signed in
-        case install    // signed in (or we can't tell), game not installed
+        case install    // game not installed
         case play       // ready
     }
 
-    /// Cellar's *own* sign-in is an account-level fact, done once in Settings, and a game whose
-    /// store hasn't been signed in is not in the library to be looked at — so a game screen never
-    /// asks for that one.
+    /// Signing in is never a step of its own on a game's page. Cellar's sign-in is account-level,
+    /// done once in Settings, and a game whose store hasn't been signed in is not in the library.
     ///
-    /// `.signIn` survives for a different thing entirely: the store **client inside the bottle**.
-    /// A Steamworks or Denuvo game talks to a running Steam while it plays, and that client keeps
-    /// its own session, which Cellar cannot supply from a token. Downloading the game no longer
-    /// walks the player past a client sign-in on the way, so this is now the only place that step
-    /// is named — and leaving it out meant a game showing "Ready to play" and then failing its
-    /// licence check with nothing on screen having warned anyone.
+    /// The store **client inside the bottle** is the one sign-in left, and it is folded into Play
+    /// (`clientSignInPending`): a Steamworks or Denuvo game talks to a running Steam, whose session
+    /// Cellar cannot supply from a token. A separate "Sign in to Steam" button beside a Settings
+    /// row already saying "Signed in" read as Cellar asking twice.
     public var nextStep: NextStep {
         // Install sets up whatever is missing before it fetches the game, so a game that isn't on
         // disk yet is one button away, never two. A separate "Set up" step asked the player for
@@ -228,12 +226,16 @@ public struct GameSummary: Identifiable, Sendable {
         // What is left of `.setup` is repair: the files are there but the runtime or the client the
         // game runs against has gone (a reset, a removed runner).
         if setupPending { return .setup }
-        // Only asked where Cellar can actually *read* that nobody is signed in. Battle.net publishes
-        // nothing comparable, so it never gets a ✗ beside an account and never a sign-in step —
-        // signing in stays folded into opening the client.
-        if needsLiveSession, store.descriptor.installsClientInBottle,
-           store.descriptor.canDetectSignIn, account == nil { return .signIn }
         return .play
+    }
+
+    /// Whether Play first opens the store client's window for the player to sign in to it.
+    ///
+    /// Only where Cellar can actually *read* that nobody is signed in. Battle.net publishes nothing
+    /// comparable, so it is never promised a sign-in — signing in stays folded into its client.
+    public var clientSignInPending: Bool {
+        needsLiveSession && store.descriptor.installsClientInBottle
+            && store.descriptor.canDetectSignIn && account == nil
     }
 
     /// Whether install has to set things up before the game itself — the runtime, or a store
@@ -251,7 +253,6 @@ public struct GameSummary: Identifiable, Sendable {
     public var actionTitle: String {
         switch nextStep {
         case .setup:   return "Set up"
-        case .signIn:  return "Sign in to \(store.displayName)"
         case .install:
             switch store {
             case .steam:      return "Install"
@@ -267,7 +268,6 @@ public struct GameSummary: Identifiable, Sendable {
         switch nextStep {
         case .play:   return "play.fill"
         case .setup:  return "wrench.and.screwdriver.fill"
-        case .signIn: return "person.crop.circle.fill"
         case .install: return store == .battlenet ? "arrow.up.forward.app.fill" : "arrow.down.circle.fill"
         // (GOG and Steam both download, so both get the download mark.)
         }
@@ -281,17 +281,6 @@ public struct GameSummary: Identifiable, Sendable {
             return store.descriptor.hasSilentInstaller
                 ? "Cellar installs the Windows runtime and \(store.displayName) for this game. One click, a few minutes."
                 : "Cellar installs the Windows runtime, then opens Blizzard's installer — that one needs a few clicks from you, because Battle.net ships no silent install."
-        case .signIn:
-            // A token store is signed in once for the whole account; a client store is signed in
-            // inside its own window. Promising the wrong one is exactly the dishonesty ux.md forbids
-            // — and for Steam the player has *already* signed in to Cellar, so this has to say
-            // plainly that it is a different session and why the game insists on it.
-            switch store.descriptor.authStyle {
-            case .cellarHeldToken:
-                return "Sign in to \(store.displayName) once — it covers every \(store.displayName) game, not just this one."
-            case .inClientWindow, .none:
-                return "\(name) checks its DRM against a running \(store.displayName) client, and that client keeps its own sign-in — the one you gave Cellar can't be handed to it. A \(store.displayName) window opens; the QR code with the mobile app is quickest. Once, for every \(store.displayName) game."
-            }
         case .install:
             // The first game on a Mac also fetches the Windows runtime. Saying so up front is what
             // keeps a few extra minutes from reading as a stall.
@@ -307,6 +296,9 @@ public struct GameSummary: Identifiable, Sendable {
             case .standalone: return "Cellar downloads the game's files straight from your library — no store client involved." + first
             }
         case .play:
+            if clientSignInPending {
+                return "Ready. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game."
+            }
             return needsClientAtRuntime
                 ? "Ready. Play starts \(store.displayName) quietly in the background and closes the whole layer when you quit."
                 : "Ready. Play runs the game directly — no store client at all — and closes the layer when you quit."
@@ -318,7 +310,8 @@ public struct GameSummary: Identifiable, Sendable {
 
     /// Who is being launched and by which route — what the launch window words its steps from.
     public var launchContext: LaunchContext {
-        LaunchContext(game: name, store: store, throughClient: needsClientAtRuntime)
+        LaunchContext(game: name, store: store, throughClient: needsClientAtRuntime,
+                      signsInFirst: clientSignInPending)
     }
     /// What the profile says about the game — the app's information panel.
     public let facts: GameFacts
@@ -852,15 +845,18 @@ public enum Game {
                     throw CellarError.invalidArgument(
                         "\(plan.name) needs a running Steam client for its DRM, and this bottle has none. Run: cellar setup --profile \(plan.slug)")
                 }
-                // Starting a client nobody is signed in to just moves the failure to the game's own
-                // licence check, where it looks like the game is broken. Say it here instead.
-                guard SteamBottle.loggedInAccount(in: plan.prefix) != nil else {
-                    throw CellarError.invalidArgument(
-                        "\(plan.name) checks its DRM against a running Steam client, and nobody is signed in to the one in this bottle — that client keeps its own session, separate from the sign-in you gave Cellar. Sign in once: cellar steam open \(plan.slug)")
+                // A client nobody is signed in to would move the failure to the game's own licence
+                // check, where it looks like the game is broken. So Play opens the client's window
+                // and waits for the sign-in — the one step Cellar cannot take for the player.
+                if SteamBottle.loggedInAccount(in: plan.prefix) == nil {
+                    stage(.signIn)
+                    try SteamBottle.waitForClientSignIn(runner: wine, game: plan.name, showHUD: showHUD,
+                                                        gameEnv: plan.env, progress: progress)
                 }
                 progress("Starting Steam quietly for \(plan.name)'s DRM, then launching the game…")
                 try SteamBottle.launchAlongside(runner: wine, exe: exe, appID: appID,
-                                                showHUD: showHUD, gameEnv: plan.env, progress: progress)
+                                                showHUD: showHUD, gameEnv: plan.env, progress: progress,
+                                                stage: stage)
                 return .direct(exeName: exe.lastPathComponent)
             }
             guard SteamBottle.isInstalled(in: plan.prefix) else {

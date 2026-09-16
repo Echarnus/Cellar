@@ -10,11 +10,14 @@ public struct LaunchContext: Sendable {
     public let store: GameStore
     /// Whether the launch goes through the store's client rather than running the exe directly.
     public let throughClient: Bool
+    /// Whether the launch first waits for the player to sign in to the store client in the bottle.
+    public let signsInFirst: Bool
 
-    public init(game: String, store: GameStore, throughClient: Bool) {
+    public init(game: String, store: GameStore, throughClient: Bool, signsInFirst: Bool = false) {
         self.game = game
         self.store = store
         self.throughClient = throughClient
+        self.signsInFirst = signsInFirst
     }
 }
 
@@ -31,6 +34,8 @@ public struct LaunchContext: Sendable {
 public enum LaunchStage: String, Sendable, CaseIterable {
     /// Resolving the profile, the runner and the bottle.
     case preparing
+    /// Waiting for the player to sign in to the store client's own window.
+    case signIn
     /// Bringing the store's client up and waiting until it can take a command.
     case client
     /// Issuing the launch — a `steam://rungameid`, a Battle.net `--exec`, or the exe itself.
@@ -48,8 +53,10 @@ public enum LaunchStage: String, Sendable, CaseIterable {
     ///
     /// `running` and after are outcomes, not steps, so they are not in the list.
     public static func sequence(_ context: LaunchContext) -> [LaunchStage] {
-        context.throughClient ? [.preparing, .client, .starting, .waiting]
-                              : [.preparing, .starting, .waiting]
+        // Signing in brings the client up with its window, so there is no separate quiet start.
+        if context.signsInFirst { return [.preparing, .signIn, .starting, .waiting] }
+        return context.throughClient ? [.preparing, .client, .starting, .waiting]
+                                     : [.preparing, .starting, .waiting]
     }
 
     /// The heading for this step. Store-specific where the promise differs: Steam comes up silently,
@@ -57,6 +64,7 @@ public enum LaunchStage: String, Sendable, CaseIterable {
     public func title(_ context: LaunchContext) -> String {
         switch self {
         case .preparing: return "Preparing the bottle"
+        case .signIn:    return "Sign in to \(context.store.displayName)"
         case .client:    return "Opening \(context.store.displayName)"
         case .starting:  return "Starting \(context.game)"
         case .waiting:   return "Waiting for \(context.game) to appear"
@@ -72,6 +80,9 @@ public enum LaunchStage: String, Sendable, CaseIterable {
         switch self {
         case .preparing:
             return "Checking the Windows runtime and this game's bottle."
+        case .signIn:
+            let store = context.store.displayName
+            return "\(store)'s window is open. Sign in there — the QR code with the \(store) mobile app is quickest. It's once, for every \(store) game, and \(game) starts as soon as you're in."
         case .client:
             switch context.store {
             case .steam:

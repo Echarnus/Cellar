@@ -309,12 +309,13 @@ struct SelfTest: ParsableCommand {
                                          status: nil, notes: nil),
                         runnerID: "wineforge", backend: "d3dmetal", bottleName: "x")
         }
-        try check(summary(store: .steam, live: true, client: true, account: nil, installed: true)
-                    .nextStep == .signIn,
-                  "Readiness: a downloaded DRM game whose in-bottle Steam has no sign-in asks for one")
+        let unsigned = summary(store: .steam, live: true, client: true, account: nil, installed: true)
+        try check(unsigned.nextStep == .play && unsigned.clientSignInPending
+                    && LaunchStage.sequence(unsigned.launchContext).contains(.signIn),
+                  "Readiness: a downloaded DRM game whose in-bottle Steam has no sign-in asks for one as it plays")
         try check(summary(store: .steam, live: true, client: true, account: "kennethdc", installed: true)
-                    .nextStep == .play,
-                  "Readiness: with that client signed in, the same game is ready")
+                    .clientSignInPending == false,
+                  "Readiness: with that client signed in, the same game is not asked again")
         try check(summary(store: .steam, live: false, client: false, account: nil, installed: true)
                     .nextStep == .play,
                   "Readiness: a game that needs no live session never waits on a client it won't use")
@@ -323,7 +324,7 @@ struct SelfTest: ParsableCommand {
                   "Readiness: and it goes straight to installing, with no 1.4 GB client first")
         // Blizzard publishes no sign-in state, so Cellar must never put a ✗ or a sign-in step there.
         try check(summary(store: .battlenet, live: true, client: true, account: nil, installed: true)
-                    .nextStep == .play,
+                    .clientSignInPending == false,
                   "Readiness: Battle.net is never asked for a sign-in Cellar cannot check")
 
         print(Term.green("All selftests passed."))

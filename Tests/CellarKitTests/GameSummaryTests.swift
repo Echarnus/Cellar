@@ -52,10 +52,12 @@ struct GameSummaryTests {
         #expect(summary(clientInstalled: false, needsLiveSession: false).nextStep == .play)
     }
 
-    @Test("The ladder climbs install → sign in → play")
+    @Test("The ladder climbs install → play, with no sign-in rung of its own")
     func ladderOrder() {
         #expect(summary(gameInstalled: false).nextStep == .install)
-        #expect(summary(account: nil).nextStep == .signIn)
+        // Signing in to the in-bottle client is folded into Play: a separate "Sign in to Steam"
+        // beside a Settings row saying "Signed in" read as Cellar asking twice.
+        #expect(summary(account: nil).nextStep == .play)
         #expect(summary().nextStep == .play)
     }
 
@@ -86,18 +88,22 @@ struct GameSummaryTests {
         #expect(ready.nextStep == .play)
     }
 
-    @Test("The in-bottle client is the only thing a game's page asks a sign-in for")
+    @Test("Only the in-bottle client's sign-in is still asked for, and only as part of Play")
     func onlyTheInBottleClientAsksForSignIn() {
         // Steam's client lives in the bottle and keeps its own session, which Cellar cannot supply
-        // from a token — so a Steamworks game has to name that step or it fails its licence check
-        // with nothing on screen having warned anyone.
-        #expect(summary(store: .steam, account: nil).nextStep == .signIn)
+        // from a token — so a Steamworks game must still say so, or it fails its licence check with
+        // nothing on screen having warned anyone.
+        let steam = summary(store: .steam, account: nil)
+        #expect(steam.clientSignInPending)
+        #expect(steam.launchContext.signsInFirst)
+        #expect(!summary(store: .steam).clientSignInPending, "a signed-in client is not asked again")
+        #expect(!summary(store: .steam, account: nil, needsLiveSession: false).clientSignInPending,
+                "a game that never talks to the client never waits on its sign-in")
 
-        // GOG is the other way round: Cellar holds the token, no client is stood up in the bottle,
-        // and the game is DRM-free once downloaded. Signing in is account-level, so it belongs to
-        // the Accounts screen and never to a game's page (AGENTS.md). Asking here would be an
-        // invented step in front of a game that is genuinely ready.
-        #expect(summary(store: .gog, account: nil).nextStep == .play)
+        // GOG holds a Cellar token and stands no client up; Battle.net cannot be read. Neither is
+        // ever promised a sign-in it will not get.
+        #expect(!summary(store: .gog, account: nil).clientSignInPending)
+        #expect(!summary(store: .battlenet, account: nil).clientSignInPending)
     }
 
     @Test("Standalone games skip sign-in entirely — there is no account")
@@ -136,11 +142,12 @@ struct GameSummaryTests {
         #expect(summary(store: .standalone, gameInstalled: false).actionTitle == "Download")
     }
 
-    @Test("The sign-in button names the store, so it is never an anonymous verb")
-    func signInNamesTheStore() {
-        // Steam is the only store that reaches `.signIn` from a game's page, so it is the only
-        // one whose button can be checked for naming its store rather than saying a bare "Sign in".
-        #expect(summary(store: .steam, account: nil).actionTitle == "Sign in to Steam")
+    @Test("A client that still needs a sign-in keeps the Play button, and its hint says what opens")
+    func pendingClientSignInStillPlays() {
+        let pending = summary(store: .steam, account: nil)
+        #expect(pending.actionTitle == "Play")
+        #expect(pending.actionHint.contains("Steam's window"))
+        #expect(pending.actionHint.contains("sign in"))
     }
 
     @Test("Setup copy warns about Battle.net's non-silent installer, and only Battle.net's")
@@ -163,8 +170,7 @@ struct GameSummaryTests {
         #expect(!gog.lowercased().contains("sign in"))
 
         let steam = summary(store: .steam, account: nil).actionHint
-        #expect(steam.contains("window opens"), "Steam's sign-in happens in Steam's own window")
-        #expect(steam.contains("QR"))
+        #expect(steam.contains("window"), "Steam's sign-in happens in Steam's own window")
     }
 
     @Test("Play copy tells the truth about whether a client comes up alongside the game")
@@ -181,7 +187,6 @@ struct GameSummaryTests {
     func symbolsMatchTheAction() {
         #expect(summary().actionSymbol == "play.fill")
         #expect(summary(runnerInstalled: false).actionSymbol == "wrench.and.screwdriver.fill")
-        #expect(summary(account: nil).actionSymbol == "person.crop.circle.fill")
         #expect(summary(gameInstalled: false).actionSymbol == "arrow.down.circle.fill")
         #expect(summary(store: .battlenet, gameInstalled: false).actionSymbol == "arrow.up.forward.app.fill",
                 "Battle.net opens outward; it does not download here")

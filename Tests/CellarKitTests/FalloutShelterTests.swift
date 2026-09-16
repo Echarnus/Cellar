@@ -141,7 +141,7 @@ struct FalloutShelterTests {
         // The step that must *not* appear. A standalone game stands up no client, so demanding one
         // would invent a 1.4 GB detour on the way to a game that does not need it.
         #expect(summary.nextStep != .setup)
-        #expect(summary.nextStep != .signIn)
+        #expect(!summary.clientSignInPending)
     }
 
     @Test("It carries a Steam appid but must never be dressed as a Steam game")

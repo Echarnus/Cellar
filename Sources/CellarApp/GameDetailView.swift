@@ -179,6 +179,12 @@ struct GameDetailView: View {
             Notice(symbol: "clock.fill", tint: game.store.tint,
                    title: "The install runs with no window",
                    detail: "GOG ships a normal Windows installer and Cellar runs it silently, so there is nothing to watch for a few minutes. The activity log below is the progress.")
+        } else if game.nextStep == .play && game.clientSignInPending {
+            // The player already signed in to Cellar, so a second sign-in needs its reason on the
+            // page — or it reads as Cellar forgetting the first one.
+            Notice(symbol: "person.crop.circle.badge.questionmark", tint: game.store.tint,
+                   title: "\(game.store.displayName) asks you to sign in once more",
+                   detail: "Your sign-in in Settings lists and downloads your games. \(game.name)'s DRM checks the \(game.store.displayName) app instead, which keeps a sign-in of its own. The first time you press Play, its window opens — the QR code with the mobile app is quickest. Every \(game.store.displayName) game shares it.")
         } else if game.nextStep == .play && game.store == .battlenet {
             Notice(symbol: "bolt.horizontal.circle.fill", tint: game.store.tint,
                    title: "Battle.net stays open while you play",
@@ -291,14 +297,6 @@ struct GameDetailView: View {
             LaunchSplashWindow.present(game: game, runner: runner)
         case .setup:
             act(["setup", "--profile", game.slug], "Setting up")
-        case .signIn:
-            // A store whose token Cellar holds is signed in once, for the account — so the button
-            // opens Accounts rather than pretending there is a per-game client to open.
-            if game.store.descriptor.signsInOnce {
-                NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
-            } else {
-                act([game.store.rawValue, "open", game.slug], "Opening \(game.store.displayName)")
-            }
         case .install:
             // One verb for every store. The route still differs — Cellar downloads a Steam or GOG
             // game itself and opens Blizzard's client for a Battle.net one — but that is a fact

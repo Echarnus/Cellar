@@ -462,9 +462,11 @@ public extension SteamBottle {
     /// keeping the download path free of the client's install dialog.
     static func launchAlongside(runner: WineRunner, exe: URL, appID: Int, showHUD: Bool = false,
                                 gameEnv: [String: String] = [:],
-                                progress: (String) -> Void = { _ in }) throws {
+                                progress: (String) -> Void = { _ in },
+                                stage: (LaunchStage) -> Void = { _ in }) throws {
         SteamDRM.markAppDirectory(exe.deletingLastPathComponent(), appID: appID)
         if !isRunning {
+            stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
             try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv)
             for _ in 0..<20 {
@@ -478,9 +480,52 @@ public extension SteamBottle {
         // What steam_api looks at when a game was not started by the client.
         env["SteamAppId"] = "\(appID)"
         env["SteamGameId"] = "\(appID)"
+        stage(.starting)
         progress("Launching \(exe.lastPathComponent)…")
         try runner.spawn([exe.path], extraEnv: env,
                          log: Paths.logs.appendingPathComponent("game-\(exe.deletingPathExtension().lastPathComponent).log"))
+    }
+}
+
+public extension SteamBottle {
+    /// Open the client's own window and wait until the player has signed in to it.
+    ///
+    /// The client in the bottle keeps its own session, and the token the player gave Cellar cannot
+    /// be handed to it. Asking for that as a separate step on the game's page read as Cellar asking
+    /// twice, so it is folded into Play instead: the window opens, and the game starts once
+    /// `loginusers.vdf` names an account — a file Steam writes, rather than a hope that Steam
+    /// queues a launch behind its login screen.
+    ///
+    /// Throws when the player closes Steam first, or never signs in, so the launch fails with the
+    /// reason instead of starting a game that would die on its licence check.
+    static func waitForClientSignIn(runner: WineRunner, game: String, showHUD: Bool = false,
+                                    gameEnv: [String: String] = [:], timeout: TimeInterval = 15 * 60,
+                                    progress: (String) -> Void = { _ in }) throws {
+        guard loggedInAccount(in: runner.prefix) == nil else { return }
+        progress("Opening Steam so you can sign in to it — once, for every Steam game…")
+        // A client already up in the tray only needs its window brought forward; a cold start shows
+        // the sign-in window by itself.
+        try launchClient(runner: runner, extraArgs: isRunning ? ["steam://open/main"] : [],
+                         showHUD: showHUD, gameEnv: gameEnv, dock: .visible)
+        let deadline = Date().addingTimeInterval(timeout)
+        var seenRunning = false
+        var goneFor = 0
+        while Date() < deadline {
+            Thread.sleep(forTimeInterval: 2)
+            if loggedInAccount(in: runner.prefix) != nil {
+                progress("Signed in to Steam. Starting \(game)…")
+                Thread.sleep(forTimeInterval: 6)   // let the client finish logging on
+                return
+            }
+            if isRunning { seenRunning = true; goneFor = 0 } else if seenRunning { goneFor += 1 }
+            // Several polls, not one: Steam restarts itself while it updates on first run.
+            if goneFor >= 10 {
+                throw CellarError.invalidArgument(
+                    "Steam was closed before anyone signed in to it, so \(game) wasn't started. Press Play to try again.")
+            }
+        }
+        throw CellarError.invalidArgument(
+            "Nobody signed in to Steam, so \(game) wasn't started — its DRM needs the client signed in. Press Play to try again.")
     }
 }
 
