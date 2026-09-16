@@ -28,6 +28,9 @@ The full guide is [`skills/swift.md`](../../../skills/swift.md); read it. Key ru
   trigger a fatal AttributeGraph cycle on launch. Use `HSplitView`; present auxiliary UI (Settings)
   as a separate `NSWindow`, not a sheet. The menu bar is hand-built in `main.swift` (keep
   App/Edit/Window, ⌘Q); bridge menu/button → window via the `.cellarOpenSettings` `Notification`.
+  **Never start a process from a view body** (or a lazy property one reads): `waitUntilExit()`
+  spins the run loop mid-update, and on macOS 27 the window then silently never redraws. Use
+  `Shell.locate`, not `Shell.which`.
 - **Verify** (not by reading the diff): build clean → `swift run cellar selftest` → for GUI, `sh
   Scripts/install-app.sh` and launch and exercise the path.
 

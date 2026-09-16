@@ -134,6 +134,40 @@ public enum StoreLibrary {
         GameStore.allCases.contains { $0 != .standalone && isConnected($0) }
     }
 
+    /// What an empty library is telling the player.
+    public enum EmptyLibrary: Sendable, Equatable {
+        /// There are games, the search or filter just hides them all.
+        case noMatches
+        /// A store is being asked right now; the sentence is its own progress line.
+        case checking(String)
+        /// A connected store that can answer hasn't been asked yet — a check that never ran, or
+        /// was cut short. Not "you own nothing": nobody knows yet.
+        case unchecked
+        /// Connected, and every store that can answer has: none of the supported games are theirs.
+        case nothingOwned
+        /// No store connected.
+        case signIn
+    }
+
+    /// **Why the library is empty** — in this order, because each earlier answer makes the later
+    /// ones untrue. A player who just scanned the QR code and sees "Sign in to see your games"
+    /// while Steam is still answering is told their sign-in failed; one who sees "none of your
+    /// games are supported" before anything was asked is told something nobody checked.
+    public static func emptyLibrary(hasGames: Bool, checking: String?, hasConnectedStore: Bool,
+                                    uncheckedWithheld: Int) -> EmptyLibrary {
+        if hasGames { return .noMatches }
+        if let checking { return .checking(checking) }
+        guard hasConnectedStore else { return .signIn }
+        return uncheckedWithheld > 0 ? .unchecked : .nothingOwned
+    }
+
+    /// Whether a withheld game is waiting on a store that is connected and *could* answer but
+    /// hasn't — the one case where checking again, not signing in, is the fix.
+    public static func isUnchecked(_ game: GameSummary) -> Bool {
+        guard case .unknown = game.ownership, game.gatingStore.canAnswerOwnership else { return false }
+        return isConnected(game.gatingStore)
+    }
+
     // MARK: - Steam
 
     /// What Cellar last learned from Steam, cached because `Game.summaries()` runs on every library

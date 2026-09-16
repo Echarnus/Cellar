@@ -105,8 +105,12 @@ struct AccountsSection: View {
                 steamQRCode = nil
                 steamSignInProgress = "Signed in. Checking which games you own…"
                 accountsChanged()           // the row says so now, not after every game is checked
+                // …and the library says it is checking, not "sign in", while the answers come in.
+                NotificationCenter.default.post(name: .cellarLibraryChecking,
+                                                object: "Checking which games you own…")
             case .checkingLibrary(let sentence)?:
                 steamSignInProgress = sentence
+                NotificationCenter.default.post(name: .cellarLibraryChecking, object: sentence)
             case nil:
                 break
             }

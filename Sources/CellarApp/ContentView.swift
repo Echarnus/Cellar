@@ -34,6 +34,9 @@ final class Library: ObservableObject {
     /// Whether any store is signed in (or, for Battle.net, added) — once one is, the library stops
     /// asking the player to sign in.
     @Published var hasConnectedStore = false
+    /// A store's ownership check in progress, as its own progress sentence — set by Accounts while
+    /// a sign-in goes on to ask Steam, cleared when that command ends.
+    @Published var checking: String?
 
     func refresh() {
         // A store that has just been set up now has its own artwork on disk; re-resolve so its
@@ -46,7 +49,7 @@ final class Library: ObservableObject {
         games = all.filter(\.isVisible)
         // What the sidebar just decided, on record: a reload that "does nothing" is otherwise
         // indistinguishable from one that ran and read a signed-out Steam.
-        CellarLog.debug(.app, "Library refreshed: \(games.count) shown, \(withheld.count) withheld — \(SteamAccount.diagnosis)")
+        CellarLog.debug(.app, "Library refreshed: \(games.count) shown, \(withheld.count) withheld, \(hasConnectedStore ? "a store connected" : "no store connected") — \(SteamAccount.diagnosis)")
         guard selected == nil || !games.contains(where: { $0.slug == selected }) else { return }
         let remembered = UserDefaults.standard.string(forKey: Library.lastSelectedKey)
         if let remembered, games.contains(where: { $0.slug == remembered }) {
@@ -134,7 +137,13 @@ struct ContentView: View {
         }
         .frame(minWidth: 880, minHeight: 580)
         .onAppear { lib.refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: .cellarAccountsChanged)) { _ in lib.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarAccountsChanged)) { _ in
+            lib.checking = nil
+            lib.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarLibraryChecking)) { note in
+            lib.checking = note.object as? String
+        }
     }
 
     // MARK: - Sidebar
@@ -275,18 +284,26 @@ struct ContentView: View {
     /// the reason and the single action that fixes it, not an apology.
     @ViewBuilder private var emptyLibrary: some View {
         VStack(spacing: 8) {
-            if !lib.games.isEmpty {
+            switch emptyState {
+            case .noMatches:
                 Text("No games match.").font(.caption).foregroundStyle(.secondary)
-            } else if lib.hasConnectedStore {
+            case .checking(let sentence):
+                // Signed in, answers still coming: the one state that must never read as "sign in".
+                ProgressView().controlSize(.small)
+                Text("Checking your library").font(.callout.weight(.semibold))
+                Text(sentence)
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            case .unchecked:
+                Text("Your library hasn't been checked yet").font(.callout.weight(.semibold))
+                Text("You're signed in. Cellar lists a game once its store confirms you own it.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                checkLibraryButton("Check now").buttonStyle(.borderedProminent)
+            case .nothingOwned:
                 Text("Nothing here yet.").font(.callout.weight(.semibold))
                 Text("Signed in, but none of the games Cellar supports are in your library.")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("Check again") {
-                    runner.run(["library", "--refresh"], title: "Checking your library",
-                               then: { lib.refresh() })
-                }
-                .buttonStyle(.bordered).controlSize(.small)
-            } else {
+                checkLibraryButton("Check again").buttonStyle(.bordered)
+            case .signIn:
                 // Which store is actually missing decides the sentence. Telling a GOG-only player
                 // to scan a Steam QR code names the wrong problem *and* the wrong fix.
                 Text("Sign in to see your games").font(.callout.weight(.semibold))
@@ -303,6 +320,26 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity).padding(.top, 24).padding(.horizontal, 8)
+    }
+
+    private static let checkingTitle = "Checking your library"
+
+    private var emptyState: StoreLibrary.EmptyLibrary {
+        // The sidebar's own "Check now" is a check in progress too.
+        let ownCheck = runner.busy && runner.busyTitle == Self.checkingTitle
+            ? "Asking your stores which games you own…" : nil
+        return StoreLibrary.emptyLibrary(
+            hasGames: !lib.games.isEmpty,
+            checking: lib.checking ?? ownCheck,
+            hasConnectedStore: lib.hasConnectedStore,
+            uncheckedWithheld: lib.withheld.filter(StoreLibrary.isUnchecked).count)
+    }
+
+    private func checkLibraryButton(_ title: String) -> some View {
+        Button(title) {
+            runner.run(["library", "--refresh"], title: Self.checkingTitle, then: { lib.refresh() })
+        }
+        .controlSize(.small).disabled(runner.busy)
     }
 
     private var footer: some View {

@@ -63,6 +63,11 @@ CLI itself. Two traps, one of which is live in the codebase today.
 `CellarApp` is a hand-rolled `NSApplication` hosting SwiftUI in an `NSHostingView` (a SwiftPM
 executable can't use a `@main` App scene). That host has sharp edges we've already hit:
 
+- **Never start a process (or anything that spins the run loop) from a view body** — including a
+  lazy property a body reads. `Shell.run`'s `waitUntilExit()` pumps the main run loop, and on
+  macOS 27 doing that mid-update leaves the hosting view unable to apply *any* later change: no
+  crash, no log, the window just keeps its first render (the library logged "4 shown" and drew
+  "Sign in"). Resolve paths with `Shell.locate` (file system only); do real work in actions.
 - **No `.animation(value:)` / `.transition` on the detail pane, and no `NavigationSplitView`.** Both
   trigger a **fatal AttributeGraph precondition cycle** (Abort trap 6) on launch under
   `NSHostingView`. Use **`HSplitView`**. Only *local* animation is safe (e.g. a row's hover state).

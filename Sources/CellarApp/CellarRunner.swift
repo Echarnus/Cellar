@@ -30,13 +30,14 @@ final class CellarRunner: ObservableObject {
     /// session claiming to be "Launching".
     enum Phase { case idle, working, playing }
 
-    /// Resolved on first use, never in `init`.
+    /// Resolved on first use — which is inside a view body (the library footer asks whether the CLI
+    /// exists), so it must never start a process.
     ///
-    /// `Shell.which` spawns a subprocess. SwiftUI creates a `@StateObject` lazily, during the first
-    /// evaluation of the view graph — so doing this in `init` meant forking a process from inside
-    /// `NSHostingView.layout()`, and this app aborts in AttributeGraph when layout re-enters
-    /// (skills/swift.md). Deferring it keeps view-graph evaluation free of side effects.
-    private lazy var binary: String = Shell.which("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
+    /// It used to be `Shell.which`, and `waitUntilExit()` spins the main run loop. From inside a
+    /// SwiftUI update on macOS 27 that leaves the hosting view's graph unable to apply any later
+    /// change: the library refreshed, logged "4 shown", and the window kept drawing "Sign in" and
+    /// "0 games" forever. `Shell.locate` reads PATH with the file system instead.
+    private lazy var binary: String = Shell.locate("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
 
     /// The running command, so it can be called off.
     private var process: Process?

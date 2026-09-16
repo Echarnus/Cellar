@@ -44,6 +44,18 @@ public enum Shell {
         )
     }
 
+    /// Resolve an executable on PATH **without starting a process** — safe to call from a view
+    /// body, where `which` (and the run loop its `waitUntilExit` spins) is not.
+    public static func locate(_ name: String,
+                              path: String? = ProcessInfo.processInfo.environment["PATH"]) -> String? {
+        guard let path else { return nil }
+        for directory in path.split(separator: ":") where !directory.isEmpty {
+            let candidate = "\(directory)/\(name)"
+            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        return nil
+    }
+
     /// Resolve an executable on PATH (like `which`).
     public static func which(_ name: String) -> String? {
         let result = run("/usr/bin/which", [name])

@@ -12,6 +12,9 @@ extension Notification.Name {
     /// Posted when a store is signed in, signed out, added or removed, so the library re-reads
     /// which games are the player's.
     static let cellarAccountsChanged = Notification.Name("cellar.accountsChanged")
+    /// Posted while a sign-in goes on to ask the store which games are owned; `object` is the
+    /// progress sentence. The next `cellarAccountsChanged` after the command ends clears it.
+    static let cellarLibraryChecking = Notification.Name("cellar.libraryChecking")
     /// Posted by Settings' "Review folder access…" button — the same window first run shows, in its
     /// status-board form.
     static let cellarOpenFolderAccess = Notification.Name("cellar.openFolderAccess")
