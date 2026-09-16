@@ -34,6 +34,19 @@ struct Launch: ParsableCommand {
         print(LaunchMarker.line(stage))
     }
 
+    /// Work a launch has to do before the game can start — Steam's first update — reported the way
+    /// `install` reports its phases, so the launch window can draw the same bar.
+    private func updateReporter() -> (InstallProgress) -> Void {
+        var last: InstallProgress?
+        return { progress in
+            guard machineProgress else { return }
+            if let was = last?.fraction, let now = progress.fraction, last?.phase == progress.phase,
+               abs(now - was) < 0.001 { return }
+            last = progress
+            print(InstallMarker.line(progress))
+        }
+    }
+
     func run() throws {
         let plan = try Game.plan(slug: slug)
 
@@ -71,7 +84,8 @@ struct Launch: ParsableCommand {
             }
         }
 
-        let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore, stage: report) {
+        let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore, stage: report,
+                                    update: updateReporter()) {
             print("  " + Term.dim($0))
         }
         print(Term.green("\(plan.name) is up."))

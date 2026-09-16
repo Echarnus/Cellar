@@ -131,7 +131,7 @@ struct SteamCommand: ParsableCommand {
             row("runner", RunnerManager.find(id: plan.runnerID) != nil, plan.runnerID)
             row("client", SteamBottle.isInstalled(in: prefix),
                 SteamBottle.isInstalled(in: prefix)
-                    ? (SteamBottle.isClientUpdated(in: prefix) ? "installed, self-updated" : "bootstrapper only — updates on first launch")
+                    ? (SteamBottle.isClientUpdated(in: prefix) ? "installed, self-updated" : "bootstrapper only — Cellar updates it before Steam first opens")
                     : "not installed")
             let account = SteamBottle.loggedInAccount(in: prefix)
             row("account", account != nil, account ?? "nobody logged in — cellar steam open \(slug)")
@@ -155,6 +155,7 @@ struct SteamCommand: ParsableCommand {
             let plan = try Game.plan(slug: slug)
             try requireSteamProfile(plan)
             let wine = try requireReadyBottle(plan)
+            try SteamBottle.updateClient(runner: wine, progress: { print("  " + Term.dim($0)) })
             print(Term.dim("Launching Steam in bottle '\(plan.bottleName)'. A window will open — log in and install your games."))
             try SteamBottle.launchClient(runner: wine)
         }

@@ -86,7 +86,9 @@ struct Setup: ParsableCommand {
             print("")
             print(Term.dim("Opening \(store.displayName) in the bottle… (a window will appear; sign in and install your game)"))
             switch store {
-            case .steam:      try SteamBottle.launchClient(runner: wine, gameEnv: plan.env)
+            case .steam:
+                try SteamBottle.updateClient(runner: wine, progress: { print("  " + Term.dim($0)) })
+                try SteamBottle.launchClient(runner: wine, gameEnv: plan.env)
             case .battlenet:  try BattleNetBottle.launchClient(runner: wine, gameEnv: plan.env)
             case .gog, .standalone: break   // no client in the bottle to open
             }

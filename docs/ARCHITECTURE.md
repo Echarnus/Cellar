@@ -234,6 +234,20 @@ Two rules keep it honest:
   `.hidden`. Choosing *Open Steam* is `.visible`, because a window the player has to come back to
   needs a Dock icon to come back *to*.
 
+The same shim has a second, stronger mode for the one start the player should not see at all:
+**Steam's first self-update.** `SteamSetup.exe` only drops a bootstrapper, which downloads the real
+client (two passes, ~570 MB) the first time it runs and draws its own Windows progress window to say
+so. Wine's null display driver — what keeps `wineboot`'s box away — does not work here: the
+bootstrapper logs *"failed to initialize update status ui, or create initial window"* and does
+nothing. So `SteamClientUpdate` starts it with `CELLAR_WINDOW_HIDE` set as well, and in those
+processes the shim makes NSWindow's ordering calls (`orderWindow:relativeTo:`, `orderFront:`,
+`makeKeyAndOrderFront:`, `orderFrontRegardless`) no-ops: the window exists, it is never on screen.
+Progress comes from Steam's own `logs/bootstrap_log.txt`, read by shape (`(N … M KB)`, localised),
+and reaches the app as `InstallPhase.clientUpdate` markers — the install bar during Install, the same
+bar under *Preparing* in the launch window when Play meets a bootstrapper-only Steam. Done is
+`package/steam_client_win64.installed` plus a quiet log; the invisible session is then ended with
+`wineserver -k`, so the next start draws normally.
+
 The shim is a universal dylib (a runner may be x86_64 under Rosetta or arm64), built by
 `Scripts/build-dock-shim.sh` and installed beside the CLI. If it is missing, `DockShim.environment`
 returns nothing and launches behave exactly as they did before — a cosmetic feature must never be

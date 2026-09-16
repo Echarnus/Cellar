@@ -42,13 +42,13 @@ struct SteamBottleTests {
     @Test("The bootstrapper alone is not a working client")
     func bootstrapperIsNotUpdated() throws {
         // The installer drops a ~9 MB steam.exe; only after its first self-update is there a
-        // steamclient64.dll. Reporting "ready" in between sends the player to a client that can't
+        // package/steam_client_win64.installed. Reporting "ready" in between sends the player to a client that can't
         // launch anything.
         let prefix = try bottle(steamFiles: ["steam.exe": "MZ"])
         #expect(SteamBottle.isInstalled(in: prefix))
         #expect(SteamBottle.isClientUpdated(in: prefix) == false)
 
-        let updated = try bottle(steamFiles: ["steam.exe": "MZ", "steamclient64.dll": "MZ"])
+        let updated = try bottle(steamFiles: ["steam.exe": "MZ", "package/steam_client_win64.installed": ""])
         #expect(SteamBottle.isClientUpdated(in: updated))
     }
 

@@ -162,6 +162,12 @@ struct LaunchSplashView: View {
                               state: state(of: index),
                               detail: state(of: index) == .current ? stage.detail(game.launchContext) : nil)
             }
+            // Work the launch has to finish before the game can start — Steam's first update — gets
+            // the same bar as Install, instead of Steam's own window appearing over this one.
+            if let update = runner.installProgress, (runner.stage ?? .preparing) == .preparing {
+                InstallProgressBar(game: game.name, store: game.store, progress: update)
+                    .padding(.leading, 26)
+            }
             if runner.attempt > 1 {
                 Label("Try \(runner.attempt). The first one didn't stick — that is normal here, and Cellar keeps going.",
                       systemImage: "arrow.clockwise")

@@ -51,10 +51,18 @@ public enum SteamBottle {
     }
 
     /// Whether the client has completed its first self-update (the installer only drops a ~9 MB
-    /// bootstrapper; a real client has `steamclient64.dll`).
+    /// bootstrapper). See `SteamClientUpdate.isComplete` for why that is not `steamclient64.dll`.
     public static func isClientUpdated(in prefix: URL) -> Bool {
-        FileManager.default.fileExists(
-            atPath: steamDirectory(in: prefix).appendingPathComponent("steamclient64.dll").path)
+        SteamClientUpdate.isComplete(inSteamDirectory: steamDirectory(in: prefix))
+    }
+
+    /// Bring a bootstrapper-only install up to a real client, with Steam's own update window kept
+    /// off screen and its progress handed to `fraction` instead. A no-op once it has been done.
+    public static func updateClient(runner: WineRunner, progress: (String) -> Void = { _ in },
+                                    fraction: (Double?) -> Void = { _ in }) throws {
+        guard isInstalled(in: runner.prefix), !isClientUpdated(in: runner.prefix) else { return }
+        try SteamClientUpdate.run(runner: runner, steamDirectory: steamDirectory(in: runner.prefix),
+                                  fraction: fraction, progress: progress)
     }
 
     // MARK: - One Steam, every bottle
@@ -261,7 +269,6 @@ public enum SteamBottle {
                 "SteamSetup.exe finished but steam.exe is missing from \(sharedInstall.path). Run: cellar steam share --repair")
         }
         progress("Steam installed — shared by every Steam game, so this is the only time it downloads.")
-        progress("It fetches the full client (~1.4 GB) on first launch.")
     }
 
     /// Write steam.cfg so the bootstrapper stops self-updating. Only valid AFTER the first update:

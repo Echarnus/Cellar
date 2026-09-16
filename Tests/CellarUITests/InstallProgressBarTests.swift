@@ -17,6 +17,7 @@ struct InstallProgressBarTests {
         ("Planet Coaster 2", .steam, InstallProgress(.runtime)),
         ("Planet Coaster 2", .steam, InstallProgress(.bottle)),
         ("Diablo IV", .battlenet, InstallProgress(.client)),
+        ("Planet Coaster 2", .steam, InstallProgress(.clientUpdate, fraction: 0.16)),
         ("Planet Coaster 2", .steam, InstallProgress(.downloading, fraction: 0.42)),
         ("The Witcher 3", .gog, InstallProgress(.installing)),
     ]
@@ -49,10 +50,10 @@ struct InstallProgressBarTests {
                 }
             }
             .padding(20)
-            .frame(width: 400, height: 460, alignment: .topLeading)
+            .frame(width: 400, height: 540, alignment: .topLeading)
             .environment(\.colorScheme, scheme)
 
-            let bitmap = Snapshot.render(sheet, size: CGSize(width: 400, height: 460), scale: 2,
+            let bitmap = Snapshot.render(sheet, size: CGSize(width: 400, height: 540), scale: 2,
                                          background: scheme == .dark ? Color(white: 0.13) : Color(white: 0.97))
             let data = try #require(bitmap.pngData())
             let url = ContactSheetTests.outputDirectory

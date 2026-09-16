@@ -595,6 +595,10 @@ public enum Game {
             if plan.needsLiveSession {
                 if !SteamBottle.isInstalled(in: plan.prefix) { phase(InstallProgress(.client)) }
                 try SteamBottle.install(runner: wine, progress: step)
+                // Done here rather than on first Play, where Steam would draw its own update window.
+                try SteamBottle.updateClient(runner: wine, progress: step) {
+                    phase(InstallProgress(.clientUpdate, fraction: $0))
+                }
             } else {
                 step("No Steam client needed — this game runs without a live Steam session.")
             }
@@ -753,6 +757,7 @@ public enum Game {
                 throw CellarError.invalidArgument(
                     "Windows Steam isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
             }
+            try SteamBottle.updateClient(runner: wine)
             try SteamBottle.launchClient(runner: wine, showHUD: showHUD, gameEnv: plan.env)
         case .battlenet:
             guard BattleNetBottle.isInstalled(in: plan.prefix) else {
@@ -777,6 +782,7 @@ public enum Game {
     @discardableResult
     public static func launch(_ plan: GamePlan, showHUD: Bool = false, forceStore: Bool = false,
                               stage: (LaunchStage) -> Void = { _ in },
+                              update: (InstallProgress) -> Void = { _ in },
                               progress: (String) -> Void = { _ in }) throws -> LaunchRoute {
         stage(.preparing)
         // Every progress line the player reads is also kept, so a session can be reconstructed
@@ -790,7 +796,7 @@ public enum Game {
             subject: plan.slug)
         do {
             let route = try route(plan, showHUD: showHUD, forceStore: forceStore,
-                                  progress: step, stage: stage)
+                                  progress: step, stage: stage, update: update)
             Diagnostics.playSessionBegan(slug: plan.slug, name: plan.name, route: route.logDescription)
             return route
         } catch {
@@ -802,7 +808,8 @@ public enum Game {
     /// Pick the route and take it. Split out of `launch` so the logging above wraps every path.
     private static func route(_ plan: GamePlan, showHUD: Bool, forceStore: Bool,
                               progress: (String) -> Void,
-                              stage: (LaunchStage) -> Void) throws -> LaunchRoute {
+                              stage: (LaunchStage) -> Void,
+                              update: (InstallProgress) -> Void) throws -> LaunchRoute {
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
@@ -835,6 +842,11 @@ public enum Game {
         case .steam:
             guard let appID = plan.appID else {
                 throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid to launch.")
+            }
+            // A bottle set up before Cellar did Steam's first update itself still has only the
+            // bootstrapper, which would put Steam's own update window on screen mid-launch.
+            try SteamBottle.updateClient(runner: wine, progress: progress) {
+                update(InstallProgress(.clientUpdate, fraction: $0))
             }
             // Cellar downloaded this copy, so Steam has no appmanifest for it and `rungameid` would
             // find nothing. The game's own DRM still wants a live session, so the client is brought

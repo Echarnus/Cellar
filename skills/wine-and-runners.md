@@ -127,6 +127,11 @@ Two Wine-adjacent specifics worth keeping in mind here:
 
 - **Steam bootstrap pin.** `steam.cfg`'s `BootStrapperInhibitAll` must be written *after* the first
   self-update; written before, the bootstrapper has no client and exits in ~2 s.
+- **Steam's first update happens in Cellar, not in Steam's window.** The bootstrapper will not run
+  under Wine's null display driver ("failed to initialize update status ui"), so `SteamClientUpdate`
+  hides its windows with the Dock shim (`CELLAR_WINDOW_HIDE`) instead and reads progress from
+  `bootstrap_log.txt`. "Updated" means `package/steam_client_win64.installed`, not
+  `steamclient64.dll` — that one already exists after the first of two passes.
 - **Battle.net renders its UI in embedded Chromium.** `HardwareAcceleration: "false"` in
   `Battle.net.config` is load-bearing — with GPU acceleration under Wine you get a spinning logo and
   no login form. The client rewrites its own config on exit, so re-applying it is a command

@@ -57,6 +57,16 @@ public enum DockShim {
         ]
     }
 
+    /// Environment that keeps every window of `processNames` off the screen as well as out of the
+    /// Dock — for a start the player should not see at all (Steam's first update). Empty when the
+    /// shim is not installed, in which case those windows appear as they always did.
+    public static func environment(hidingWindowsOf processNames: [String]) -> [String: String] {
+        var env = environment(hiding: processNames)
+        guard !env.isEmpty else { return [:] }
+        env["CELLAR_WINDOW_HIDE"] = processNames.joined(separator: ",")
+        return env
+    }
+
     /// Environment that hides `store`'s client. `dock == .visible` returns nothing, for the screens
     /// where the client *is* what the player asked for and needs to be findable in the Dock.
     public static func environment(for store: GameStore, dock: DockPresence) -> [String: String] {

@@ -15,6 +15,13 @@
  * process — the game above all — is left completely alone, so a name Cellar does not know about
  * still gets its icon.
  *
+ * The same library can also keep a process's windows off screen entirely, for the one start Cellar
+ * wants to happen unseen: Steam's first self-update. Its bootstrapper refuses to run without a
+ * window ("failed to initialize update status ui") — Wine's null display driver is not enough — so
+ * the window is created as normal and simply never ordered onto the screen. A process named in
+ * CELLAR_WINDOW_HIDE gets that treatment; Cellar reads the update's progress from Steam's log and
+ * shows it in its own window, and ends that session once the update is done.
+ *
  * Built by Scripts/build-dock-shim.sh for both architectures, because a runner may be x86_64
  * (running under Rosetta) or arm64.
  */
@@ -84,26 +91,52 @@ static void swap(Class cls, SEL selector, IMP replacement, void *original)
 {
     Method method = class_getInstanceMethod(cls, selector);
     if (!method) return;
-    *(IMP *)original = method_setImplementation(method, replacement);
+    IMP previous = method_setImplementation(method, replacement);
+    if (original) *(IMP *)original = previous;
+}
+
+/* Every way a window gets onto the screen, made to do nothing. Wine's window class overrides some
+ * of these and calls through to NSWindow, so replacing NSWindow's is enough. */
+static void cellar_order_window(id self, SEL cmd, long place, long other) { (void)self; (void)cmd; (void)place; (void)other; }
+static void cellar_order_sender(id self, SEL cmd, id sender) { (void)self; (void)cmd; (void)sender; }
+static void cellar_order_plain(id self, SEL cmd) { (void)self; (void)cmd; }
+
+static bool this_process_is_listed(const char *variable)
+{
+    const char *list = getenv(variable);
+    if (!list || !*list) return false;
+    /* Wine runs one unix process per Windows process, with the .exe as its first argument. */
+    if (*_NSGetArgc() < 2) return false;
+    return name_is_listed(executable_name((*_NSGetArgv())[1]), list);
 }
 
 __attribute__((constructor))
 static void cellar_dock_shim_init(void)
 {
-    const char *hidden = getenv("CELLAR_DOCK_HIDE");
-    if (!hidden || !*hidden) return;
-
-    /* Wine runs one unix process per Windows process, with the .exe as its first argument. */
-    if (*_NSGetArgc() < 2) return;
-    if (!name_is_listed(executable_name((*_NSGetArgv())[1]), hidden)) return;
+    bool hide_dock = this_process_is_listed("CELLAR_DOCK_HIDE");
+    bool hide_windows = this_process_is_listed("CELLAR_WINDOW_HIDE");
+    if (!hide_dock && !hide_windows) return;
 
     /* AppKit is not linked: a process that never draws should not pay for it. */
     if (!dlopen("/System/Library/Frameworks/AppKit.framework/AppKit", RTLD_LAZY)) return;
-    Class application = objc_getClass("NSApplication");
-    if (!application) return;
 
-    swap(application, sel_registerName("setActivationPolicy:"),
-         (IMP)cellar_set_activation_policy, &original_set_policy);
-    swap(application, sel_registerName("activationPolicy"),
-         (IMP)cellar_activation_policy, &original_policy);
+    if (hide_dock) {
+        Class application = objc_getClass("NSApplication");
+        if (application) {
+            swap(application, sel_registerName("setActivationPolicy:"),
+                 (IMP)cellar_set_activation_policy, &original_set_policy);
+            swap(application, sel_registerName("activationPolicy"),
+                 (IMP)cellar_activation_policy, &original_policy);
+        }
+    }
+
+    if (hide_windows) {
+        Class window = objc_getClass("NSWindow");
+        if (window) {
+            swap(window, sel_registerName("orderWindow:relativeTo:"), (IMP)cellar_order_window, NULL);
+            swap(window, sel_registerName("orderFront:"), (IMP)cellar_order_sender, NULL);
+            swap(window, sel_registerName("makeKeyAndOrderFront:"), (IMP)cellar_order_sender, NULL);
+            swap(window, sel_registerName("orderFrontRegardless"), (IMP)cellar_order_plain, NULL);
+        }
+    }
 }

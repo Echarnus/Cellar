@@ -15,6 +15,9 @@ public enum InstallPhase: String, Sendable, CaseIterable {
     case bottle
     /// Installing the store's client into the bottle.
     case client
+    /// The client's first self-update: Steam's installer is only a bootstrapper, and the real
+    /// client arrives the first time it runs. Cellar runs that start with no window and shows it here.
+    case clientUpdate
     /// Fetching the game's files.
     case downloading
     /// Running the game's own installer (GOG).
@@ -25,6 +28,7 @@ public enum InstallPhase: String, Sendable, CaseIterable {
         case .runtime:     return "Getting the Windows runtime"
         case .bottle:      return "Building \(game)'s bottle"
         case .client:      return "Installing \(store.displayName) into the bottle"
+        case .clientUpdate: return "Updating \(store.displayName)"
         case .downloading: return "Downloading \(game)"
         case .installing:  return "Installing \(game)"
         }
@@ -41,6 +45,8 @@ public enum InstallPhase: String, Sendable, CaseIterable {
             return store.descriptor.hasSilentInstaller
                 ? "Silent — there is nothing to click."
                 : "Blizzard's installer opens a window — click through it."
+        case .clientUpdate:
+            return "Its first start fetches the full client — once, for every \(store.displayName) game."
         case .downloading:
             return "Straight from your library. You can keep using your Mac."
         case .installing:
