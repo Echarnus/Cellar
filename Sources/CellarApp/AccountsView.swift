@@ -23,6 +23,8 @@ struct AccountsSection: View {
     /// every few seconds, so this is replaced as each redraw arrives.
     @State private var steamQRCode: [[Bool]]?
     @State private var steamQRReader = SteamQRCodeReader()
+    /// What the sign-in is doing once the phone has approved. Replaces the code, which is spent.
+    @State private var steamSignInProgress: String?
     @State private var gogSignInFailed: String?
 
     var body: some View {
@@ -75,14 +77,34 @@ struct AccountsSection: View {
             return
         }
         steamQRCode = nil
+        steamSignInProgress = nil
         steamQRReader = SteamQRCodeReader()
         runner.run(["steam", "login"], title: "Waiting for the QR scan", observe: { line in
             // DepotDownloader only *draws* the challenge, as terminal ASCII sized for a monospace
             // font — unscannable in a GUI. Read it back into modules and draw it properly. Steam
             // rotates the code, so later blocks replace it.
-            if let matrix = steamQRReader.consume(line) { steamQRCode = matrix }
+            if let matrix = steamQRReader.consume(line) {
+                if steamSignInProgress == nil { steamQRCode = matrix }
+                return
+            }
+            // After the phone approves, the command still finishes the session and checks the
+            // library. Leaving the spent code up for that long reads as "the scan did nothing".
+            switch SteamAccount.signInPhase(after: line) {
+            case .approved?:
+                steamQRCode = nil
+                if steamSignInProgress == nil { steamSignInProgress = "Approved. Finishing sign-in…" }
+            case .signedIn?:
+                steamQRCode = nil
+                steamSignInProgress = "Signed in. Checking which games you own…"
+                refresh()           // the row says so now, not after every game is checked
+            case .checkingLibrary(let sentence)?:
+                steamSignInProgress = sentence
+            case nil:
+                break
+            }
         }, then: {
             steamQRCode = nil       // the code is spent either way
+            steamSignInProgress = nil
             refresh()
         })
     }
@@ -91,10 +113,12 @@ struct AccountsSection: View {
         if let steamQRCode {
             QRCodePanel(modules: steamQRCode)
         } else if runner.busy, runner.busyTitle == "Waiting for the QR scan" {
-            // The gap between launching the tool and its first output is real; name it.
+            // The gap between launching the tool and its first output is real; name it. So is the
+            // gap between approving on the phone and the command finishing.
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Asking Steam for a sign-in code…").font(.callout).foregroundStyle(.secondary)
+                Text(steamSignInProgress ?? "Asking Steam for a sign-in code…")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             .padding(.leading, 46)
         }

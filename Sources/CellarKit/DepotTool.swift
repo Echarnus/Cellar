@@ -44,7 +44,11 @@ public enum DepotTool {
 
         var arguments: [String] {
             switch self {
-            case .qr: return ["-qr"]
+            // `-remember-password` is what makes DepotDownloader ask Steam for a *persistent*
+            // session (`IsPersistentSession`). Without it the QR login hands back a short-lived
+            // token: the ownership checks straight after signing in worked, and three minutes later
+            // Steam refused it with AccessDenied — so the sign-in evaporated on its own.
+            case .qr: return ["-qr", "-remember-password"]
             case .session(let username), .password(let username):
                 return ["-username", username, "-remember-password"]
             case .anonymous: return []
@@ -98,8 +102,8 @@ public enum DepotTool {
     }
 
     /// Sign in only — no download. Steam has no "log in" verb of its own here, so we ask for the
-    /// smallest possible job (`-app 480`, Valve's free Spacewar SDK sample, into a scratch dir) and
-    /// stop as soon as the session is established. The point is the side effect: DepotDownloader
+    /// smallest possible job (`-app 480`, Valve's free Spacewar SDK sample, into a scratch dir) and,
+    /// when the output is streamed, stop as soon as the session is established. The point is the side effect: DepotDownloader
     /// writes a refresh token to its own account store, so every later download is silent.
     public static func signIn(credentials: Credentials, output: ((String) -> Void)? = nil) throws {
         try install()
@@ -110,7 +114,14 @@ public enum DepotTool {
         if let output {
             // A sign-in that fails is answered by the caller reading the state, not by a throw:
             // "you closed the app without scanning" is not an error worth a stack of red text.
-            _ = try? runStreaming(args: args, output: output)
+            //
+            // Stop at the licence list. Left alone the tool goes on to fetch Spacewar, and the
+            // player — who has already approved on their phone — watches a spent QR code while it does.
+            var established = false
+            _ = try? runStreaming(args: args, output: { line in
+                if SteamAccount.isSessionEstablished(line) { established = true }
+                output(line)
+            }, stopWhen: { established })
         } else {
             try? runInheritingIO(args: args)
         }
@@ -175,7 +186,16 @@ public enum DepotTool {
     ///
     /// Presence is the only thing that can honestly be claimed — whether the token is still *valid*
     /// is knowable only by using it, which is what `SteamAccount.note` watches for.
-    public static var hasStoredSession: Bool { !storedSessionFiles.isEmpty }
+    public static var hasStoredSession: Bool { !storedAccountNames.isEmpty }
+
+    /// Every account name holding a token, lowercased (DepotDownloader's keys are case-insensitive).
+    ///
+    /// A store *file* is not a session: when Steam refuses a token, DepotDownloader deletes it from
+    /// the store and rewrites the file — a few bytes, no tokens. Counting the file would keep saying
+    /// "signed in" about an account whose session is gone.
+    public static var storedAccountNames: Set<String> {
+        Set(storedAccounts.flatMap(\.names).map { $0.lowercased() })
+    }
 
     /// The accounts DepotDownloader holds a token for, with when each store was last written —
     /// newest store first. Names only; the tokens are never read into Cellar.

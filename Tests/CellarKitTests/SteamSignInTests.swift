@@ -26,6 +26,22 @@ struct SteamSignInTests {
         #expect(DepotAccountStore.accountNames(inCompressed: full.prefix(full.count / 2)).count <= 1)
     }
 
+    @Test("The QR sign-in asks Steam for a persistent session")
+    func qrSessionIsPersistent() {
+        // Without -remember-password DepotDownloader sets IsPersistentSession = false, and Steam's
+        // short-lived token was refused with AccessDenied minutes after a working sign-in.
+        #expect(DepotTool.Credentials.qr.arguments == ["-qr", "-remember-password"])
+    }
+
+    @Test("A store emptied by a refused token holds no session")
+    func emptiedStoreIsNoSession() {
+        // What DepotDownloader writes back after `Access token was rejected`: the file survives,
+        // the token does not. Only names count as a session.
+        let emptied = Self.store(tokens: [], guard: [])
+        #expect(!emptied.isEmpty)
+        #expect(DepotAccountStore.accountNames(inCompressed: emptied).isEmpty)
+    }
+
     // MARK: - Choosing the account
 
     @Test("A name that gained a token during the sign-in is the one that signed in")
@@ -49,6 +65,31 @@ struct SteamSignInTests {
         #expect(SteamAccount.accountName(storedSince: start, previously: [], stores: untouched) == nil)
         let ambiguous = [(names: ["a", "b"], modified: start.addingTimeInterval(5))]
         #expect(SteamAccount.accountName(storedSince: start, previously: ["a", "b"], stores: ambiguous) == nil)
+    }
+
+    // MARK: - Progress after the phone approves
+
+    @Test("The approval is seen as soon as Steam logs the session on, with or without the success line")
+    func approvalIsRecognised() {
+        // The exact sentences DepotDownloader 3.4.0 prints (Steam3Session.cs).
+        #expect(SteamAccount.signInPhase(after: "Got 23 licenses for account!") == .approved)
+        #expect(SteamAccount.signInPhase(after: "  Unable to get license list: Timeout ") == .approved)
+        #expect(SteamAccount.signInPhase(
+            after: "  Success! Next time you can login with -username kennethdc -remember-password instead of -qr.")
+            == .approved)
+        #expect(SteamAccount.isSessionEstablished("Got 0 licenses for account!"))
+    }
+
+    @Test("The CLI's own sentences move the panel on, and QR noise does not")
+    func laterPhases() {
+        #expect(SteamAccount.signInPhase(after: "Signed in as kennethdc.") == .signedIn)
+        #expect(SteamAccount.signInPhase(after: "  Asking Steam about game 2 of 5…")
+                == .checkingLibrary("Asking Steam about game 2 of 5…"))
+        for line in ["  Use the Steam Mobile App to sign in with this QR code:", "  ██▀▀██  ▄▄",
+                     "Connecting to Steam3... Done!", "Logging in with QR code...", ""] {
+            #expect(SteamAccount.signInPhase(after: line) == nil, "\(line)")
+            #expect(!SteamAccount.isSessionEstablished(line))
+        }
     }
 
     // MARK: - Fixture

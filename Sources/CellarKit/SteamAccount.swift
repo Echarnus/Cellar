@@ -111,7 +111,10 @@ public enum SteamAccount {
     /// deletes Cellar's tools directory, and claiming a session Cellar cannot use would be exactly
     /// the kind of unverified ✓ this project refuses to draw.
     public static var state: State {
-        guard let record, DepotTool.hasStoredSession else { return .signedOut }
+        // The token has to be stored under *this* account — see `DepotTool.storedAccountNames`.
+        guard let record, DepotTool.storedAccountNames.contains(record.accountName.lowercased()) else {
+            return .signedOut
+        }
         if record.isRejected {
             return .expired(account: record.accountName, reason: record.rejectionReason ?? "session ended")
         }
@@ -198,6 +201,33 @@ public enum SteamAccount {
         CellarLog.info(.account, "Steam sign-in completed after \(seconds)s, account read from the "
             + "\(capturedFrom) — \(diagnosis)")
         return state
+    }
+
+    /// Where a running `cellar steam login` has got to, read from one line of its output — so the app
+    /// can take the QR code away the moment the phone approves, instead of leaving a spent code on
+    /// screen while the sign-in finishes and the library is checked.
+    public enum SignInPhase: Equatable, Sendable {
+        /// Steam accepted the scan. The code is spent; the session is being finished.
+        case approved
+        /// The CLI recorded the sign-in. Cellar's state now says signed in.
+        case signedIn
+        /// Checking what the account owns, one game at a time — the CLI's own progress sentence.
+        case checkingLibrary(String)
+    }
+
+    public static func signInPhase(after line: String) -> SignInPhase? {
+        let text = line.trimmingCharacters(in: .whitespaces)
+        if text.hasPrefix("Signed in as ") { return .signedIn }
+        if text.hasPrefix("Asking Steam about game") { return .checkingLibrary(text) }
+        if accountName(inSuccessLine: text) != nil || isSessionEstablished(text) { return .approved }
+        return nil
+    }
+
+    /// DepotDownloader's line once Steam has logged the session on and answered with the account's
+    /// licences (`Got 12 licenses for account!`). The token is saved before logon starts, so from
+    /// here the sign-in has nothing left to do.
+    public static func isSessionEstablished(_ line: String) -> Bool {
+        line.contains("licenses for account") || line.contains("Unable to get license list")
     }
 
     /// DepotDownloader announces a completed device login with:
