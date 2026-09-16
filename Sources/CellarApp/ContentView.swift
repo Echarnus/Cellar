@@ -40,6 +40,9 @@ final class Library: ObservableObject {
         withheld = all.filter { !$0.isVisible }
         steam = SteamAccount.state
         games = all.filter(\.isVisible)
+        // What the sidebar just decided, on record: a reload that "does nothing" is otherwise
+        // indistinguishable from one that ran and read a signed-out Steam.
+        CellarLog.debug(.app, "Library refreshed: \(games.count) shown, \(withheld.count) withheld — \(SteamAccount.diagnosis)")
         guard selected == nil || !games.contains(where: { $0.slug == selected }) else { return }
         let remembered = UserDefaults.standard.string(forKey: Library.lastSelectedKey)
         if let remembered, games.contains(where: { $0.slug == remembered }) {

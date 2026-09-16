@@ -144,9 +144,13 @@ public enum SteamAccount {
         case .expired(_, let why):   verdict = "expired (\(why))"
         }
         let stores = DepotTool.storedSessionFiles
+        // "Signed out" with a record *and* a store present means the store no longer holds this
+        // account's token — say so, or that case reads exactly like a missing file.
+        let holdsAccount = record.map { DepotTool.storedAccountNames.contains($0.accountName.lowercased()) }
         let found = stores.isEmpty
             ? "no token store under " + DepotTool.sessionSearchRoots.map(\.path).joined(separator: ", ")
             : "token store at " + stores.map(\.path).joined(separator: ", ")
+                + (holdsAccount.map { $0 ? " (holds this account)" : " (does NOT hold this account)" } ?? "")
         return "Steam \(verdict) — record: \(record == nil ? "none" : "present"), \(found)"
     }
 
