@@ -127,6 +127,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 880, minHeight: 580)
         .onAppear { lib.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarAccountsChanged)) { _ in lib.refresh() }
     }
 
     // MARK: - Sidebar

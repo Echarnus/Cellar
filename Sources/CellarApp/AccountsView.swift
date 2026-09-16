@@ -37,6 +37,14 @@ struct AccountsSection: View {
         }
     }
 
+    /// Every sign-in, sign-out and add ends here. Accounts is its own window, so the library in the
+    /// main window has to be *told* — without this a player who just signed in keeps looking at
+    /// "Sign in to see your games" until they happen to press reload.
+    private func accountsChanged() {
+        refresh()
+        NotificationCenter.default.post(name: .cellarAccountsChanged, object: nil)
+    }
+
     // MARK: - Steam: one row, one action
 
     private var steamRow: some View {
@@ -72,7 +80,7 @@ struct AccountsSection: View {
         if case .signedIn = state.steam {
             runner.run(["steam", "login", "--forget"], title: "Signing out", then: {
                 steamQRCode = nil
-                refresh()
+                accountsChanged()
             })
             return
         }
@@ -96,7 +104,7 @@ struct AccountsSection: View {
             case .signedIn?:
                 steamQRCode = nil
                 steamSignInProgress = "Signed in. Checking which games you own…"
-                refresh()           // the row says so now, not after every game is checked
+                accountsChanged()           // the row says so now, not after every game is checked
             case .checkingLibrary(let sentence)?:
                 steamSignInProgress = sentence
             case nil:
@@ -105,7 +113,7 @@ struct AccountsSection: View {
         }, then: {
             steamQRCode = nil       // the code is spent either way
             steamSignInProgress = nil
-            refresh()
+            accountsChanged()
         })
     }
 
@@ -153,14 +161,14 @@ struct AccountsSection: View {
                 actionTitle: state.gogSignedIn ? "Sign out" : "Sign in",
                 busy: runner.busy) {
                     if state.gogSignedIn {
-                        runner.run(["gog", "logout"], title: "Signing out", then: { refresh() })
+                        runner.run(["gog", "logout"], title: "Signing out", then: { accountsChanged() })
                     } else {
                         gogSignInFailed = nil
                         GOGSignInWindow.present { result in
                             switch result {
                             case .code(let code):
                                 runner.run(["gog", "login", "--code", code],
-                                           title: "Signing in to GOG", then: { refresh() })
+                                           title: "Signing in to GOG", then: { accountsChanged() })
                             case .cancelled:
                                 break   // no error: closing the window is a legitimate answer
                             case .failed(let why):
@@ -192,7 +200,7 @@ struct AccountsSection: View {
             busy: runner.busy) {
                 runner.run(["battlenet", state.battleNetAdded ? "forget" : "add"],
                            title: state.battleNetAdded ? "Removing Battle.net" : "Adding Battle.net",
-                           then: { refresh() })
+                           then: { accountsChanged() })
             }
     }
 }

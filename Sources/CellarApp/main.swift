@@ -9,6 +9,9 @@ extension Notification.Name {
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.
     static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
+    /// Posted when a store is signed in, signed out, added or removed, so the library re-reads
+    /// which games are the player's.
+    static let cellarAccountsChanged = Notification.Name("cellar.accountsChanged")
     /// Posted by Settings' "Review folder access…" button — the same window first run shows, in its
     /// status-board form.
     static let cellarOpenFolderAccess = Notification.Name("cellar.openFolderAccess")
