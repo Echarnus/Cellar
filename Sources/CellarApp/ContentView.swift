@@ -31,6 +31,9 @@ final class Library: ObservableObject {
     @Published var withheld: [GameSummary] = []
     /// The one Steam sign-in, so the empty state can name the fix rather than shrug.
     @Published var steam: SteamAccount.State = .signedOut
+    /// Whether any store is signed in (or, for Battle.net, added) — once one is, the library stops
+    /// asking the player to sign in.
+    @Published var hasConnectedStore = false
 
     func refresh() {
         // A store that has just been set up now has its own artwork on disk; re-resolve so its
@@ -39,6 +42,7 @@ final class Library: ObservableObject {
         let all = Game.summaries()
         withheld = all.filter { !$0.isVisible }
         steam = SteamAccount.state
+        hasConnectedStore = StoreLibrary.hasConnectedStore
         games = all.filter(\.isVisible)
         // What the sidebar just decided, on record: a reload that "does nothing" is otherwise
         // indistinguishable from one that ran and read a signed-out Steam.
@@ -244,8 +248,11 @@ struct ContentView: View {
     /// This has to sit *below* the sections rather than only in the empty state: one Battle.net game
     /// is enough to make the library non-empty, and then five Steam games and a GOG game go missing
     /// with nothing on screen to explain it. A count and the action is the whole fix.
+    ///
+    /// Only until a store is connected, though: a player signed in to one store has already found
+    /// Accounts, and a standing "sign in" under their games reads as though that sign-in failed.
     @ViewBuilder private var withheldNotice: some View {
-        if !lib.withheld.isEmpty, !lib.games.isEmpty {
+        if !lib.withheld.isEmpty, !lib.games.isEmpty, !lib.hasConnectedStore {
             VStack(alignment: .leading, spacing: 6) {
                 Divider().padding(.vertical, 4)
                 Text("\(lib.withheld.count) more \(lib.withheld.count == 1 ? "game" : "games") once you sign in")
@@ -270,7 +277,7 @@ struct ContentView: View {
         VStack(spacing: 8) {
             if !lib.games.isEmpty {
                 Text("No games match.").font(.caption).foregroundStyle(.secondary)
-            } else if lib.steam.isUsable {
+            } else if lib.hasConnectedStore {
                 Text("Nothing here yet.").font(.callout.weight(.semibold))
                 Text("Signed in, but none of the games Cellar supports are in your library.")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)

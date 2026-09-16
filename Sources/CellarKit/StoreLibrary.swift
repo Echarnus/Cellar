@@ -128,6 +128,12 @@ public enum StoreLibrary {
         }
     }
 
+    /// **Has the player connected at least one real store?** A player who has, has already found
+    /// Accounts — asking them to "sign in" again reads as though that sign-in did not take.
+    public static var hasConnectedStore: Bool {
+        GameStore.allCases.contains { $0 != .standalone && isConnected($0) }
+    }
+
     // MARK: - Steam
 
     /// What Cellar last learned from Steam, cached because `Game.summaries()` runs on every library
