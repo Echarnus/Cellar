@@ -196,9 +196,7 @@ struct SteamCommand: ParsableCommand {
         func run() throws {
             let plan = try Game.plan(slug: slug)
             try requireSteamProfile(plan)
-            let bundle = try AppBundle.generate(
-                name: plan.name, slug: plan.slug, cellarBinary: AppBundle.resolveCellarBinary(),
-                prefix: plan.prefix, appID: plan.appID)
+            let bundle = try AppBundle.generate(for: plan, cellarBinary: AppBundle.resolveCellarBinary())
             print(Term.green("Created ") + bundle.app.path)
 
             guard let configDir = SteamShortcuts.userdataConfigDir() else {

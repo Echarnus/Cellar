@@ -128,17 +128,18 @@ struct GameDetailView: View {
                 Button("Download game") { act(["install", game.slug], "Downloading \(game.name)") }
                 Button("Install through the Steam client") { act(["steam", "install", game.slug], "Installing") }
                 Button("Add to Steam library") { act(["steam", "add", game.slug], "Adding") }
-                Button("Create Steam app in ~/Applications") { act(["steam", "app", game.slug], "Creating app") }
             case .battlenet:
                 Button("Open Battle.net") { act(["battlenet", "open", game.slug], "Opening Battle.net") }
                 Button("Re-apply Battle.net settings") { act(["battlenet", "configure", game.slug], "Configuring") }
-                Button("Create Battle.net app in ~/Applications") { act(["battlenet", "app", game.slug], "Creating app") }
             case .gog:
                 Button("Download and install from GOG") { act(["gog", "install", game.slug], "Installing") }
                 Button("GOG accounts…") { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
             case .standalone:
                 Button("Download game") { act(["install", game.slug], "Downloading \(game.name)") }
             }
+            // The game's own app — its name, its icon — whatever store it came from. A wrapper for
+            // the store client is not offered on a game's page: there it read as the game's app.
+            Button("Add \(game.name) to Applications") { act(["app", game.slug], "Adding to Applications") }
             Divider()
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
             // Removal is last and on its own, where destructive actions belong. Each entry states

@@ -1,13 +1,16 @@
 import Foundation
 
 /// Generates minimal double-clickable macOS .apps in ~/Applications whose launcher calls `cellar`:
-/// one per game (`cellar launch <slug>`, also the Steam non-Steam-shortcut target) and one per
-/// bottle for the Windows Steam client itself (`cellar steam open <slug>`). Game launchers get the
-/// game's own icon, extracted from the bottle and converted to `.icns`.
+/// one per game (`cellar launch <slug>`, also the Steam non-Steam-shortcut target) and, on request,
+/// one per bottle for its store client (`cellar steam open <slug>`). Game launchers get the game's
+/// own icon, extracted from the bottle and converted to `.icns`.
 public enum AppBundle {
     public struct Generated {
         public let app: URL
         public let launcher: URL   // Contents/MacOS/launcher — the Steam shortcut target
+        /// Whether the bundle carries its own icon. False means Finder shows a generic app tile,
+        /// which for a game launcher means its icon could not be found yet (not installed).
+        public let hasIcon: Bool
     }
 
     /// Where generated launchers are written. `CELLAR_APPLICATIONS_DIR` redirects it, so a test can
@@ -61,10 +64,19 @@ public enum AppBundle {
     /// bottle is known (so the app shows the game's artwork in Launchpad/Finder, not a blank tile).
     @discardableResult
     public static func generate(name: String, slug: String, cellarBinary: String,
-                                prefix: URL? = nil, appID: Int? = nil) throws -> Generated {
+                                prefix: URL? = nil, appID: Int? = nil,
+                                installRoots: [URL] = []) throws -> Generated {
         try generate(name: name, identifier: "it.clercq.cellar.\(slug)",
                      cellarBinary: cellarBinary, arguments: ["launch", slug],
-                     icon: resolveGameICNS(slug: slug, prefix: prefix, appID: appID))
+                     icon: resolveGameICNS(slug: slug, prefix: prefix, appID: appID, installRoots: installRoots))
+    }
+
+    /// The game launcher for a profile, whatever store it came from — what "Add to Applications"
+    /// makes. Named after the game and wearing the game's icon, never the store's.
+    @discardableResult
+    public static func generate(for plan: GamePlan, cellarBinary: String) throws -> Generated {
+        try generate(name: plan.name, slug: plan.slug, cellarBinary: cellarBinary,
+                     prefix: plan.prefix, appID: plan.appID, installRoots: plan.installRoots)
     }
 
     /// A bottle's store client as its own app: `Steam (<Bottle>).app` → `cellar steam open <slug>`,
@@ -114,12 +126,18 @@ public enum AppBundle {
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: launcher.path)
 
         var iconEntry = ""
+        var hasIcon = false
+        let dest = resources.appendingPathComponent("app.icns")
         if let icon, fm.fileExists(atPath: icon.path) {
-            let dest = resources.appendingPathComponent("app.icns")
             try? fm.removeItem(at: dest)
             try fm.copyItem(at: icon, to: dest)
-            iconEntry = "<key>CFBundleIconFile</key><string>app</string>\n"
+            hasIcon = true
+        } else {
+            // Regenerating must never cost a bundle the icon it already wears: finding none this
+            // time (a moved install, a cleared cache) is no reason to turn it back into a blank tile.
+            hasIcon = fm.fileExists(atPath: dest.path)
         }
+        if hasIcon { iconEntry = "<key>CFBundleIconFile</key><string>app</string>\n" }
 
         let plist = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -149,7 +167,7 @@ public enum AppBundle {
         // Finder caches icons per bundle path; touching the bundle makes it re-read Info.plist.
         Shell.run("/usr/bin/touch", [app.path])
 
-        return Generated(app: app, launcher: launcher)
+        return Generated(app: app, launcher: launcher, hasIcon: hasIcon)
     }
 
     // MARK: - Icons
@@ -167,7 +185,7 @@ public enum AppBundle {
     /// a previously-extracted cached icon, or a fresh extraction of the game's own icon from the
     /// bottle (converted from its Windows `.ico`). Returns nil if none can be produced.
     public static func resolveGameICNS(slug: String, prefix: URL?, appID: Int?,
-                                       installDir: String? = nil) -> URL? {
+                                       installRoots: [URL] = []) -> URL? {
         let fm = FileManager.default
         // 1. user-supplied <profiles>/<slug>.icns
         for dir in Paths.profileSearchPaths {
@@ -179,25 +197,22 @@ public enum AppBundle {
         if fm.fileExists(atPath: cached.path) { return cached }
         // 3. extract from the bottle
         guard let prefix,
-              let ico = findGameICO(prefix: prefix, appID: appID, installDir: installDir) else { return nil }
+              let ico = findGameICO(prefix: prefix, appID: appID, installRoots: installRoots) else { return nil }
         try? fm.createDirectory(at: cached.deletingLastPathComponent(), withIntermediateDirectories: true)
         return convertICOtoICNS(ico, to: cached) ? cached : nil
     }
 
     /// Locate a Windows `.ico` for the game inside the bottle: the game's own `game.ico` in its
     /// install directory (from the appmanifest), else the largest desktop-shortcut icon Steam keeps
-    /// in `steam/games` (skipping Steam's own built-ins). Stores other than Steam keep no icon
-    /// registry, so for those the profile's `install_dir` is scanned for the biggest `.ico` it holds.
-    static func findGameICO(prefix: URL, appID: Int?, installDir: String? = nil) -> URL? {
+    /// in `steam/games` (skipping Steam's own built-ins). Before either, the game's install roots
+    /// (`GamePlan.installRoots`) are scanned for the biggest `.ico` they hold — that is the only
+    /// source for stores with no icon registry, and for a Steam game Cellar downloaded itself,
+    /// which lives under `drive_c/Games/<slug>` where no Steam client ever saw it.
+    static func findGameICO(prefix: URL, appID: Int?, installRoots: [URL] = []) -> URL? {
         let fm = FileManager.default
         let steam = prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam")
 
-        if let installDir {
-            let roots = ["drive_c/Program Files (x86)/\(installDir)",
-                         "drive_c/Program Files/\(installDir)",
-                         "drive_c/Games/\(installDir)"].map { prefix.appendingPathComponent($0) }
-            if let ico = roots.compactMap({ largestICO(in: $0) }).first { return ico }
-        }
+        if let ico = installRoots.lazy.compactMap({ largestICO(in: $0) }).first { return ico }
 
         if let appID,
            let manifest = try? String(contentsOf: steam.appendingPathComponent("steamapps/appmanifest_\(appID).acf"), encoding: .utf8),

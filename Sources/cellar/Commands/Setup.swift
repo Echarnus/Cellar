@@ -77,6 +77,9 @@ struct Setup: ParsableCommand {
         if store == .steam {
             print("  • " + Term.bold("cellar steam add \(profile)")
                 + Term.dim("   — add it to your native Steam library + ~/Applications."))
+        } else {
+            print("  • " + Term.bold("cellar app \(profile)")
+                + Term.dim("   — add \(plan.name) to ~/Applications."))
         }
 
         if openClient && store.descriptor.installsClientInBottle {

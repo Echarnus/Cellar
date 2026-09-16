@@ -94,6 +94,47 @@ struct BottleLifecycleTests {
         #expect(parsed?["CFBundlePackageType"] as? String == "APPL")
     }
 
+    /// The case that shipped broken: a Steam game Cellar downloaded itself lives in
+    /// `drive_c/Games/<slug>`, where no Steam client ever registered its icon.
+    @Test("A game launcher wears the game's icon, found in its install root — and keeps it on regeneration")
+    func gameLauncherTakesGameIcon() throws {
+        let home = IT.ensure()
+        let fm = FileManager.default
+        let slug = "it-icon-\(UUID().uuidString.prefix(6))"
+        let prefix = home.appendingPathComponent("icon-fixtures/\(slug)", isDirectory: true)
+        let gameDir = prefix.appendingPathComponent("drive_c/Games/\(slug)", isDirectory: true)
+        try fm.createDirectory(at: gameDir, withIntermediateDirectories: true)
+        defer {
+            try? fm.removeItem(at: prefix)
+            try? fm.removeItem(at: Paths.cache.appendingPathComponent("icons/\(slug).icns"))
+        }
+
+        // A real .ico, made the way a Windows build would ship one, so the sips/iconutil path runs.
+        let png = prefix.appendingPathComponent("source.png")
+        let generic = "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns"
+        #expect(Shell.run("/usr/bin/sips", ["-s", "format", "png", "-Z", "256", generic, "--out", png.path]).succeeded)
+        #expect(Shell.run("/usr/bin/sips", ["-s", "format", "ico", png.path,
+                                            "--out", gameDir.appendingPathComponent("game.ico").path]).succeeded)
+
+        let generated = try AppBundle.generate(name: "IT Icon Game \(slug)", slug: slug,
+                                               cellarBinary: "/usr/local/bin/cellar",
+                                               prefix: prefix, installRoots: [gameDir])
+        defer { try? fm.removeItem(at: generated.app) }
+
+        #expect(generated.hasIcon, "the game's .ico must become the bundle icon, not a blank tile")
+        #expect(fm.fileExists(atPath: generated.app.appendingPathComponent("Contents/Resources/app.icns").path))
+        #expect(generated.app.lastPathComponent == "IT Icon Game \(slug).app",
+                "the app is named after the game, never the store")
+
+        // Now nothing can be found — no bottle, no cache — and the bundle must still keep its icon.
+        try fm.removeItem(at: Paths.cache.appendingPathComponent("icons/\(slug).icns"))
+        let again = try AppBundle.generate(name: "IT Icon Game \(slug)", slug: slug,
+                                           cellarBinary: "/usr/local/bin/cellar")
+        #expect(again.hasIcon, "regenerating must not strip the icon the bundle already had")
+        let plist = try String(contentsOf: again.app.appendingPathComponent("Contents/Info.plist"), encoding: .utf8)
+        #expect(plist.contains("<key>CFBundleIconFile</key><string>app</string>"))
+    }
+
     @Test("A store-client app points at that store's open command", arguments: [GameStore.steam, .battlenet])
     func storeClientBundle(_ store: GameStore) throws {
         IT.ensure()

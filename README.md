@@ -181,8 +181,8 @@ cellar gog library                  # everything you own that runs on Windows
 Surface it like a native game:
 
 ```sh
-cellar steam add planet-coaster-2   # generates ~/Applications/Planet Coaster 2.app
-                                    # and a non-Steam shortcut (quit Steam first)
+cellar app planet-coaster-2         # ~/Applications/Planet Coaster 2.app, with the game's icon (any store)
+cellar steam add planet-coaster-2   # the same .app, plus a non-Steam shortcut (quit Steam first)
 ```
 
 Taking a game back off the machine:

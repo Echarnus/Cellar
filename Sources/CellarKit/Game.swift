@@ -357,7 +357,7 @@ public enum Game {
                 store: plan.store,
                 appID: plan.appID,
                 iconPath: AppBundle.resolveGameICNS(slug: plan.slug, prefix: plan.prefix,
-                                                    appID: plan.appID, installDir: plan.installDir)?.path,
+                                                    appID: plan.appID, installRoots: plan.installRoots)?.path,
                 runnerInstalled: RunnerManager.find(id: plan.runnerID) != nil,
                 clientInstalled: clientInstalled,
                 account: clientInstalled ? signedInAccount(plan) : nil,

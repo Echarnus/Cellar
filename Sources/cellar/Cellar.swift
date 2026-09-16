@@ -48,6 +48,7 @@ struct Cellar: ParsableCommand {
             SteamCommand.self,
             BattleNetCommand.self,
             GogCommand.self,
+            AppCommand.self,
             Accounts.self,
             Launch.self,
             UninstallCommand.self,
