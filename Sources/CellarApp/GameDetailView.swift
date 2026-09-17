@@ -269,7 +269,7 @@ struct GameDetailView: View {
     private var activityLog: some View {
         DisclosureGroup(isExpanded: $showDetails) {
             ScrollView {
-                Text(runner.log.isEmpty ? "Ready." : runner.log)
+                Text(runner.log.isEmpty ? "Nothing has run yet." : runner.log)
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(6)

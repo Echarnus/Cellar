@@ -446,7 +446,7 @@ extension GameSummary {
         switch nextStep {
         case .setup:   return "Needs repair"
         case .install: return "Not installed"
-        case .play:    return "Ready"
+        case .play:    return "Installed"
         }
     }
 

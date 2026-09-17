@@ -136,7 +136,7 @@ struct WelcomeTourView: View {
     private var accountsPage: some View {
         VStack(alignment: .leading, spacing: 0) {
             PageHeading(title: "Sign in to your stores",
-                        subtitle: "Sign in once per store and every game from it is ready. You can do this later instead — Settings, or ⌘⇧A — and Cellar works fine until you do.")
+                        subtitle: "Sign in once per store and every game you own there can be installed. You can do this later instead — Settings, or ⌘⇧A — and Cellar works fine until you do.")
             StoreSignInPanel(activityHeight: 78)
                 .frame(maxHeight: .infinity)
         }

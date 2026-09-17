@@ -297,11 +297,11 @@ public struct GameSummary: Identifiable, Sendable {
             }
         case .play:
             if clientSignInPending {
-                return "Ready. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game."
+                return "Installed. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game."
             }
             return needsClientAtRuntime
-                ? "Ready. Play starts \(store.displayName) quietly in the background and closes the whole layer when you quit."
-                : "Ready. Play runs the game directly — no store client at all — and closes the layer when you quit."
+                ? "Installed. Play starts \(store.displayName) quietly in the background and closes the whole layer when you quit."
+                : "Installed. Play runs the game directly — no store client at all — and closes the layer when you quit."
         }
     }
 

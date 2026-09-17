@@ -294,8 +294,8 @@ struct SelfTest: ParsableCommand {
 
         // 9. The readiness ladder, against fabricated states. Cellar downloads a Steam game itself
         // now, which no longer walks the player past the in-bottle client's sign-in — so a game
-        // whose DRM talks to a running client must still *ask* for it, or the app shows "Ready to
-        // play" and the game dies on its licence check with nothing having warned anybody. That is
+        // whose DRM talks to a running client must still *ask* for it, or the app shows it installed
+        // and playable and the game dies on its licence check with nothing having warned anybody. That is
         // a claim about the player's machine, so it is pinned here rather than left to a launch.
         func summary(store: GameStore, live: Bool, client: Bool, account: String?,
                      installed: Bool) -> GameSummary {

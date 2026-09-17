@@ -83,9 +83,9 @@ struct BattleNetCommand: ParsableCommand {
                     ?? Term.dim("not detectable — Battle.net keeps its session private; sign in inside the client")))
             row("running", BattleNetBottle.isRunning, BattleNetBottle.isRunning ? "yes" : "no")
             if let product = plan.productCode {
-                let ready = Game.isGameInstalled(plan)
-                row("game", ready,
-                    ready ? "\(plan.name) installed (product \(product))"
+                let installed = Game.isGameInstalled(plan)
+                row("game", installed,
+                    installed ? "\(plan.name) installed (product \(product))"
                           : "\(plan.name) not installed — cellar battlenet install \(slug)")
             }
             print(Term.dim("  logs: \(Paths.logs.path)"))

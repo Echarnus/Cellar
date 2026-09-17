@@ -159,7 +159,7 @@ struct GogCommand: ParsableCommand {
             print(Term.bold("Installing \(plan.name) from GOG"))
             _ = try Game.setUp(plan) { print("  " + Term.dim($0)) }
             try Game.installGame(plan) { print("  " + Term.dim($0)) }
-            print(Term.green("Ready.") + " Play with: cellar launch \(slug)  (no store client at all)")
+            print(Term.green("Installed.") + " Play with: cellar launch \(slug)  (no store client at all)")
         }
     }
 }
