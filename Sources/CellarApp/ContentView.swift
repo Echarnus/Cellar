@@ -21,7 +21,7 @@ final class Library: ObservableObject {
     static let lastSelectedKey = "lastSelectedGame"
 
     enum Filter: String, CaseIterable, Identifiable {
-        case all = "All", ready = "Ready", installed = "Installed", notInstalled = "Not installed"
+        case all = "All", installed = "Installed", notInstalled = "Not installed"
         var id: String { rawValue }
     }
 
@@ -66,7 +66,6 @@ final class Library: ObservableObject {
                 && {
                     switch filter {
                     case .all: return true
-                    case .ready: return game.nextStep == .play
                     case .installed: return game.gameInstalled
                     case .notInstalled: return !game.gameInstalled
                     }
