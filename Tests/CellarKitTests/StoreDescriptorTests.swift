@@ -53,7 +53,6 @@ struct StoreDescriptorTests {
         #expect(GameStore.gog.descriptor.canDetectSignIn, "Cellar holds GOG's token itself")
         #expect(GameStore.battlenet.descriptor.canDetectSignIn == false,
                 "Blizzard publishes no signed-in state — Cellar must not guess one")
-        #expect(GameStore.standalone.descriptor.canDetectSignIn == false, "nothing to sign in to")
     }
 
     /// Battle.net's installer has no silent switch, which is why setup has to warn that a window
@@ -94,9 +93,7 @@ struct StoreDescriptorTests {
               arguments: [("steam", GameStore.steam), ("Steam", .steam), ("  STEAM  ", .steam),
                           ("battlenet", .battlenet), ("battle.net", .battlenet),
                           ("blizzard", .battlenet), ("bnet", .battlenet),
-                          ("gog", .gog), ("gog.com", .gog), ("gog-galaxy", .gog),
-                          ("standalone", .standalone), ("none", .standalone),
-                          ("direct", .standalone), ("drm-free", .standalone)])
+                          ("gog", .gog), ("gog.com", .gog), ("gog-galaxy", .gog)])
         func recognisedSpellings(raw: String, expected: GameStore) {
             #expect(GameStore(profileValue: raw) == expected)
         }
@@ -105,7 +102,9 @@ struct StoreDescriptorTests {
         /// deliberately, not silently classify a Battle.net game as a Steam one and drive the wrong
         /// pipeline at it.
         @Test("anything unrecognised is nil, never a guess",
-              arguments: ["epic", "itch", "", "   ", "steamm", "gogo"])
+              arguments: ["epic", "itch", "", "   ", "steamm", "gogo",
+                           // Every game comes from a store; "no store" is not a store.
+                           "standalone", "none", "direct", "drm-free"])
         func unknownValuesAreNil(raw: String) {
             #expect(GameStore(profileValue: raw) == nil)
         }

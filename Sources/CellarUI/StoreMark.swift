@@ -62,7 +62,6 @@ public struct StoreMark: View {
         case .steam:      SteamMark(size: size)
         case .battlenet:  BattleNetMark(size: size)
         case .gog:        GOGMark(size: size)
-        case .standalone: StandaloneMark(size: size)
         }
     }
 
@@ -428,21 +427,5 @@ private struct BlockWord: Shape {
             top += Self.height(of: line) + Self.lineGap
         }
         return path
-    }
-}
-
-/// No store: a plain box, so "these files are just on disk" reads as deliberately different from
-/// the two branded marks rather than as a store Cellar failed to identify.
-private struct StandaloneMark: View {
-    let size: CGFloat
-
-    var body: some View {
-        ZStack {
-            Circle().fill(Color(.sRGB, red: 0.42, green: 0.44, blue: 0.48, opacity: 1))
-            Image(systemName: "shippingbox.fill")
-                .font(.system(size: size * 0.5, weight: .semibold))
-                .foregroundStyle(.white)
-        }
-        .frame(width: size, height: size)
     }
 }

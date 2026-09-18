@@ -48,11 +48,13 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
 
 - **`[game]`** — `slug` (must equal the filename), `name`, `developer`, `engine`, `graphics_api`,
   `architecture`, `released`, and **`store`**.
-- **`store` decides the whole pipeline** — `steam` | `battlenet` | `standalone`. It selects which
+- **`store` decides the whole pipeline** — `steam` | `battlenet` | `gog`. It selects which
   client `cellar setup` installs, what "installed" and "signed in" mean, how a launch is issued, and
   the words the player reads. Steam games are addressed by `steam_appid`; Battle.net games by
   `product_code` + `install_dir` + `exe` (Blizzard publishes no numeric id and keeps its install
-  locations in a binary database Cellar does not parse).
+  locations in a binary database Cellar does not parse). Every game comes from a store: a DRM-free
+  Steam game is still `steam`, with `needs_live_session = false` so Cellar downloads the depot and
+  runs the exe without standing Windows Steam up in the bottle.
 - **`[compatibility]`** — `anticheat`, `drm`, `requires_account`, `online`, `status`, `notes`.
 - **`[runner]`** — `id`, `windows_version`. **`[graphics]`** — `backend`, `fallback_backend`.
 - **`[install]`** — `method`, plus the id the method needs.
@@ -63,7 +65,7 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
 `gen-site.py` maps these to labels and CSS classes; a value outside the set silently falls back:
 
 - `status`: **`playable` | `experimental` | `untested`**. An unknown value renders as *Untested*.
-- `store`: **`steam` | `battlenet` | `standalone`**. An unknown value is treated as Steam — which
+- `store`: **`steam` | `battlenet` | `gog`**. An unknown value is treated as Steam — which
   would put a Battle.net game down the Steam pipeline. Spell it exactly.
 
 ## Honesty rules (these are not style preferences)

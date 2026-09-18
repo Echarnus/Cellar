@@ -13,15 +13,16 @@ graphics_api  = "DirectX 11"
 architecture  = "x86-64"
 released      = "2016-02-26"
 
-# No store client at all: the files are fetched with DepotDownloader and the exe is run directly.
-store         = "standalone"
+# A Steam game that needs no Steam client: the files are fetched with DepotDownloader and the exe
+# is run directly (`needs_live_session = false` below).
+store         = "steam"
 
 [compatibility]
 anticheat                   = "none"
 drm                         = "none (DRM-free)"
 # DRM-free: no Steam needed to play. Cellar downloads it with DepotDownloader and launches the exe
 # directly — no Windows Steam client involved at all. This is the Proton-like ideal case.
-needs_live_steam            = false
+needs_live_session          = false
 requires_account            = "none"
 online                      = "single-player + co-op"
 status                      = "untested"

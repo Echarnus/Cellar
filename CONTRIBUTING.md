@@ -9,8 +9,9 @@ A game is supported by adding a `profiles/<slug>.toml`. Start from the closest e
 [`profiles/planet-coaster-2.toml`](profiles/planet-coaster-2.toml) for a Steam title,
 [`profiles/diablo-4.toml`](profiles/diablo-4.toml) for a Battle.net one. A good profile:
 
-- names its **`store`** — `steam`, `battlenet`, or `standalone` (no client; files on disk). This one
-  field decides how Cellar installs, launches and describes the game;
+- names its **`store`** — `steam`, `battlenet` or `gog`. Every game comes from a store; a DRM-free
+  Steam game is still `steam`, with `needs_live_session = false` so no Steam client is stood up. This
+  one field decides how Cellar installs, launches and describes the game;
 - identifies the game the way its store does: `steam_appid` for Steam, or `product_code` +
   `install_dir` + `exe` for Battle.net (the last two are how Cellar knows it is installed and
   running, since Blizzard keeps that in a database Cellar doesn't parse);

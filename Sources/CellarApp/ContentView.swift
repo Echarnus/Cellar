@@ -96,7 +96,7 @@ final class Library: ObservableObject {
     /// Why the library is empty, named per store rather than assumed to be Steam's fault. Cellar
     /// speaks to three stores; only one of them signs in with a QR code.
     var signInReason: String {
-        let allStores = Set(withheld.map(\.gatingStore))
+        let allStores = Set(withheld.map(\.store))
         // Battle.net first, because it is the one store whose sentence is not about ownership at
         // all: Blizzard publishes nothing to check, so what is missing is the player's own word.
         if allStores == [.battlenet] {
@@ -106,10 +106,10 @@ final class Library: ObservableObject {
         // answered "no" to is withheld for a reason a sign-in cannot change — counting it here is
         // how a signed-in player gets told they are not signed in.
         let unasked = withheld.filter { game in
-            if case .unknown = game.ownership { return game.gatingStore.canAnswerOwnership }
+            if case .unknown = game.ownership { return game.store.canAnswerOwnership }
             return false
         }
-        let stores = Set(unasked.map(\.gatingStore))
+        let stores = Set(unasked.map(\.store))
         if stores.contains(.steam), !steam.isUsable { return steam.summary }
         if stores == [.gog], !GOGAuth.isSignedIn {
             return "Not signed in to GOG. One sign-in covers your whole GOG library."

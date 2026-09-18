@@ -63,7 +63,7 @@ struct GameSummaryTests {
 
     @Test("Install copy says when the first game also sets up the runtime")
     func installCopyNamesFirstTimeSetup() {
-        for store in [GameStore.steam, .gog, .standalone] {
+        for store in [GameStore.steam, .gog] {
             let first = summary(store: store, runnerInstalled: false, gameInstalled: false).actionHint
             #expect(first.contains("Windows runtime"), "a few silent minutes read as a stall: \(store)")
             let later = summary(store: store, gameInstalled: false).actionHint
@@ -106,10 +106,17 @@ struct GameSummaryTests {
         #expect(!summary(store: .battlenet, account: nil).clientSignInPending)
     }
 
-    @Test("Standalone games skip sign-in entirely — there is no account")
-    func standaloneSkipsSignIn() {
-        #expect(summary(store: .standalone, account: nil, gameInstalled: false).nextStep == .install)
-        #expect(summary(store: .standalone, account: nil).nextStep == .play)
+    @Test("A Steam game with no live-session DRM never waits on the in-bottle client")
+    func steamWithoutLiveSessionSkipsClient() {
+        let bare = summary(store: .steam, clientInstalled: false, account: nil, gameInstalled: false,
+                           needsLiveSession: false, needsClientAtRuntime: false)
+        #expect(bare.nextStep == .install)
+        #expect(!bare.setupPending, "no 1.4 GB client for a game that never talks to it")
+        let installed = summary(store: .steam, clientInstalled: false, account: nil,
+                                needsLiveSession: false, needsClientAtRuntime: false)
+        #expect(installed.nextStep == .play)
+        #expect(!installed.clientSignInPending)
+        #expect(installed.actionHint.contains("no store client"))
     }
 
     // MARK: - Copy
@@ -139,7 +146,6 @@ struct GameSummaryTests {
         #expect(summary(store: .battlenet, account: nil, gameInstalled: false).actionTitle == "Open Battle.net",
                 "Battle.net does the installing; Cellar only opens the window")
         #expect(summary(store: .gog, gameInstalled: false).actionTitle == "Download")
-        #expect(summary(store: .standalone, gameInstalled: false).actionTitle == "Download")
     }
 
     @Test("A client that still needs a sign-in keeps the Play button, and its hint says what opens")
@@ -156,7 +162,7 @@ struct GameSummaryTests {
         #expect(blizzard.contains("clicks from you"),
                 "an unexplained pause while a Blizzard window opens reads as a hang")
 
-        for store in [GameStore.steam, .gog, .standalone] {
+        for store in [GameStore.steam, .gog] {
             let hint = summary(store: store, runnerInstalled: false).actionHint
             #expect(hint.contains("One click"))
         }

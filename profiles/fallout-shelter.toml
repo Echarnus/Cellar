@@ -13,10 +13,10 @@ steam_appid   = 588430
 architecture  = "x86-64"
 released      = "2017-03-29"
 
-# No store client at all: the files come from the Steam depot and the exe is run directly, the same
-# path Stardew Valley demonstrates. Steam's own app record lists no DRM and no third-party account,
-# and the game is single-player, so nothing has to be running alongside it.
-store         = "standalone"
+# A Steam game that needs no Steam client: `needs_live_session = false` below means the files come
+# from the Steam depot and the exe is run directly. Steam's own app record lists no DRM and no
+# third-party account, and the game is single-player, so nothing has to be running alongside it.
+store         = "steam"
 
 [compatibility]
 # Single-player only — Steam lists no multiplayer category, so there is no anti-cheat to translate.

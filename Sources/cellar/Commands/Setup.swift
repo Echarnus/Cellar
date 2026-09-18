@@ -7,8 +7,8 @@ struct Setup: ParsableCommand {
         discussion: """
         The minimal-setup path to play a game. Downloads the Wine runner (Wine + Apple D3DMetal),
         creates an isolated bottle, initialises it, and installs whichever client the game's profile
-        names — Windows Steam, or Blizzard's Battle.net. A standalone (DRM-free) profile skips the
-        client entirely.
+        names — Windows Steam, or Blizzard's Battle.net. A Steam game that never talks to a running
+        Steam (`needs_live_session = false`) skips the client entirely.
 
         Battle.net's installer is not silent: a window will open and want a few clicks. That is
         Blizzard's installer, not a hang.
@@ -35,7 +35,8 @@ struct Setup: ParsableCommand {
 
         let wine = try Game.setUp(plan) { print("  " + Term.dim($0)) }
 
-        if store != .standalone {
+        // A Steam game that runs without a live session has no client in its bottle to wrap.
+        if store != .steam || plan.needsLiveSession {
             let clientApp = try AppBundle.generateStoreClient(
                 store: store, bottle: plan.bottleName, slug: profile,
                 cellarBinary: AppBundle.resolveCellarBinary())
@@ -51,6 +52,8 @@ struct Setup: ParsableCommand {
         }
 
         switch store {
+        case .steam where !plan.needsLiveSession:
+            next("cellar install \(profile)", "downloads the game with the Steam sign-in you already gave.")
         case .steam:
             if let account = SteamBottle.sharedLoggedInAccount {
                 print("     " + Term.dim("Already signed in to Steam as \(account) — every Steam game shares it."))
@@ -70,8 +73,6 @@ struct Setup: ParsableCommand {
                 next("cellar gog login", "signs in to GOG once, for your whole library.")
                 next("cellar gog install \(profile)", "downloads and installs it. No client, no DRM.")
             }
-        case .standalone:
-            next("cellar install \(profile)", "downloads the game with the Steam sign-in you already gave.")
         }
         next("cellar launch \(profile)", "play.")
         if store == .steam {
@@ -82,7 +83,7 @@ struct Setup: ParsableCommand {
                 + Term.dim("   — add \(plan.name) to ~/Applications."))
         }
 
-        if openClient && store.descriptor.installsClientInBottle {
+        if openClient && store.descriptor.installsClientInBottle && Game.storeClientInstalled(plan) {
             print("")
             print(Term.dim("Opening \(store.displayName) in the bottle… (a window will appear; sign in and install your game)"))
             switch store {
@@ -90,7 +91,7 @@ struct Setup: ParsableCommand {
                 try SteamBottle.updateClient(runner: wine, progress: { print("  " + Term.dim($0)) })
                 try SteamBottle.launchClient(runner: wine, gameEnv: plan.env)
             case .battlenet:  try BattleNetBottle.launchClient(runner: wine, gameEnv: plan.env)
-            case .gog, .standalone: break   // no client in the bottle to open
+            case .gog: break   // no client in the bottle to open
             }
         }
     }

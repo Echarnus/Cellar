@@ -148,15 +148,6 @@ struct BottleLifecycleTests {
         #expect(script.contains("'\(store.rawValue)' 'open' 'it-fixture'"))
     }
 
-    @Test("A standalone game has no store client to wrap, and says so instead of making one")
-    func standaloneHasNoClientApp() throws {
-        IT.ensure()
-        #expect(throws: CellarError.self) {
-            _ = try AppBundle.generateStoreClient(store: .standalone, bottle: "b", slug: "s",
-                                                  cellarBinary: "/usr/local/bin/cellar")
-        }
-    }
-
     @Test("Regenerating a launcher overwrites in place rather than accumulating bundles")
     func regenerateIsIdempotent() throws {
         IT.ensure()

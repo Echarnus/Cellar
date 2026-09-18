@@ -80,14 +80,15 @@ struct SteamGameTests {
         #expect(plan.directLaunchExe == nil)
         #expect(plan.canLaunchStoreFree == false)
 
-        // 3. Runner + bottle. No store client: this game does not need one, and saying so is the
+        // 3. Runner + bottle. No Steam client: this game does not need one, and saying so is the
         //    difference between a 2 GB install and a 3.4 GB one.
         var progress: [String] = []
         _ = try Game.setUp(plan) { progress.append($0); IT.log($0) }
         #expect(fm.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path),
                 "no registry hive — the bottle never initialised")
-        #expect(progress.contains { $0.contains("No store client needed") },
-                "a store-free game must be told plainly that nothing else is being installed")
+        #expect(progress.contains { $0.contains("No Steam client needed") },
+                "a game with no live-session DRM must be told plainly that no client is being installed")
+        #expect(!SteamBottle.isInstalled(in: plan.prefix))
 
         // 4. The download, through Cellar's own call rather than a hand-rolled DepotDownloader
         //    command line — a test that drove the tool itself would pass while `fetchDepot` broke.

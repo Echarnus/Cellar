@@ -262,6 +262,12 @@ private func requireReadyBottle(_ plan: GamePlan) throws -> WineRunner {
             "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
     }
     guard SteamBottle.isInstalled(in: plan.prefix) else {
+        // Setup never installs Steam for a game that doesn't talk to it, so pointing there would
+        // send the player round in a circle.
+        if !plan.needsLiveSession {
+            throw CellarError.invalidArgument(
+                "\(plan.name) runs without a Steam client, so its bottle has none. Download it with: cellar install \(plan.slug)")
+        }
         throw CellarError.invalidArgument(
             "Windows Steam isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
     }

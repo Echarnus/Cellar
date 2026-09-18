@@ -289,8 +289,6 @@ struct SelfTest: ParsableCommand {
                   "Library gate: once added, a store that can never answer shows its games, saying so")
         try check(!GameStore.battlenet.canAnswerOwnership && GameStore.steam.canAnswerOwnership,
                   "Library gate: only the stores that publish entitlements are asked")
-        try check(StoreLibrary.isConnected(.standalone),
-                  "Library gate: a game with no storefront is never withheld for want of one")
 
         // 9. The readiness ladder, against fabricated states. Cellar downloads a Steam game itself
         // now, which no longer walks the player past the in-bottle client's sign-in — so a game

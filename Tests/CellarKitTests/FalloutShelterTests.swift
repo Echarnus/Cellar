@@ -8,10 +8,10 @@ import Testing
 /// is the opposite: one real game, checked in detail, because Fallout Shelter is the shape Cellar is
 /// least able to fake and most likely to break — **a Steam game that runs with no Steam at all**.
 ///
-/// It carries a `steam_appid` (that is where its files come from) while declaring `store =
-/// "standalone"` (that is how it launches). Two things follow, and both have gone wrong before:
-/// Cellar must not treat it as a Steam game for artwork or for the client it stands up, and it must
-/// still find a copy the *Windows Steam client* installed, because a player may well have one.
+/// It is `store = "steam"` with `needs_live_session = false`: Steam is where it is owned and where
+/// its files come from, but nothing talks to a running client. Two things follow: Cellar must not
+/// stand Windows Steam up in its bottle, and it must still find a copy the *Windows Steam client*
+/// installed, because a player may well have one.
 ///
 /// The integration counterpart — actually downloading and running it — is `SteamGameTests`.
 @Suite(.serialized)
@@ -48,20 +48,13 @@ struct FalloutShelterTests {
         #expect(plan.installMethod == "depot", "no store client installs this — Cellar fetches the depot itself")
     }
 
-    @Test("It is a Steam-sourced game that declares no store, which is the whole point of it")
-    func storeFreeButSteamSourced() throws {
+    @Test("It is a Steam game that needs no live Steam session, which is the whole point of it")
+    func steamGameWithoutLiveSession() throws {
         let plan = try Self.plan()
-        #expect(plan.store == .standalone)
+        #expect(plan.store == .steam)
         #expect(plan.needsLiveSession == false,
                 "Steam lists no DRM and no third-party account for 588430; requiring a live client would be inventing one")
         #expect(plan.launchExe == "FalloutShelter.exe")
-    }
-
-    @Test("Nothing about it promises a store client will be installed")
-    func noClientIsStoodUp() throws {
-        let plan = try Self.plan()
-        #expect(plan.store.descriptor.installsClientInBottle == false,
-                "a standalone game must not stand up Windows Steam in its bottle — that is the cost this profile exists to avoid")
     }
 
     // MARK: - Where its files are looked for
@@ -123,7 +116,7 @@ struct FalloutShelterTests {
 
     // MARK: - What the player is told
 
-    @Test("With a runner present but no files, Cellar offers Download and does not promise Play")
+    @Test("With a runner present but no files, Cellar offers Install and does not promise Play")
     func firstStepIsDownload() throws {
         _ = try Self.plan()
         // With a runner present the hint is about this game, not about the first-time runtime.
@@ -133,27 +126,22 @@ struct FalloutShelterTests {
 
         #expect(summary.gameInstalled == false)
         #expect(summary.nextStep == .install)
-        // "Download", not "Install": nothing else is going to do the installing, so the button says
-        // what Cellar is about to do itself.
-        #expect(summary.actionTitle == "Download")
+        #expect(summary.actionTitle == "Install")
+        #expect(summary.actionHint.contains("No Steam window"))
         #expect(summary.needsLiveSession == false)
 
-        // The step that must *not* appear. A standalone game stands up no client, so demanding one
-        // would invent a 1.4 GB detour on the way to a game that does not need it.
+        // The step that must *not* appear. This game never talks to a running Steam, so demanding
+        // the Windows client would invent a 1.4 GB detour on the way to a game that does not need it.
         #expect(summary.nextStep != .setup)
         #expect(!summary.clientSignInPending)
     }
 
-    @Test("It carries a Steam appid but must never be dressed as a Steam game")
-    func doesNotBorrowSteamArtwork() throws {
+    @Test("It is filed under Steam and wears Steam's artwork")
+    func usesSteamArtwork() throws {
         _ = try Self.plan()
         let summary = try #require(Game.summaries().first { $0.slug == Self.slug })
-
-        // Same trap Stardew Valley documents: `steam_appid` says where the *files* come from, and
-        // says nothing about which store the player is dealing with.
-        #expect(summary.store == .standalone)
-        #expect(summary.artworkAppID == nil,
-                "a standalone game must not pull Steam's cover art — the store marks would then lie about it")
+        #expect(summary.store == .steam)
+        #expect(summary.artworkAppID == 588430)
     }
 
     @Test("Its honesty is intact: untested says untested, and the notes are the evidence")

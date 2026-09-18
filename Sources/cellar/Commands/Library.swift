@@ -57,10 +57,8 @@ struct LibraryCommand: ParsableCommand {
         // *why* their games are missing, so it gets a line rather than silence. Every store, not
         // just the ones that can answer about ownership — Battle.net's games are now withheld too,
         // and silence there is exactly the confusion this line exists to prevent.
-        for store in GameStore.allCases where store != .standalone {
-            // Grouped by who *answers*, not by who sold it: a DRM-free game bought on Steam is
-            // filed under "no store" and is still waiting on the Steam sign-in.
-            let hidden = games.filter { $0.gatingStore == store && !$0.isVisible }
+        for store in GameStore.allCases {
+            let hidden = games.filter { $0.store == store && !$0.isVisible }
             guard !hidden.isEmpty, !all else { continue }
             let unchecked = hidden.filter { if case .unknown = $0.ownership { return true }; return false }
             if !unchecked.isEmpty, let fix = unchecked[0].verdict.fix {
@@ -76,7 +74,6 @@ struct LibraryCommand: ParsableCommand {
         case .steam:      return SteamAccount.state.accountName.map { "signed in as \($0)" } ?? "not signed in"
         case .gog:        return GOGAuth.isSignedIn ? "signed in" : "not signed in"
         case .battlenet:  return "added by you — Cellar can't check what you own here"
-        case .standalone: return "no store"
         }
     }
 

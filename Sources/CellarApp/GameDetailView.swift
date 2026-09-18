@@ -81,7 +81,7 @@ struct GameDetailView: View {
             // Green means "go" for Play; every other step is tinted by the store whose client is
             // about to appear, so the button and the window that opens belong to each other.
             .tint(game.nextStep == .play ? .green : game.store.tint)
-            .disabled(runner.busy || measuringRemoval || primaryIsManual)
+            .disabled(runner.busy || measuringRemoval)
             .keyboardShortcut(.defaultAction)
             .help(game.actionHint)
 
@@ -126,9 +126,16 @@ struct GameDetailView: View {
             Divider()
             switch game.store {
             case .steam:
-                Button("Open Steam") { act(["steam", "open", game.slug], "Opening Steam") }
+                // A game with no live-session DRM gets no Steam client in its bottle, so the
+                // client's own actions are only offered where there is (or will be) one.
+                let hasClient = game.needsLiveSession || game.clientInstalled
+                if hasClient {
+                    Button("Open Steam") { act(["steam", "open", game.slug], "Opening Steam") }
+                }
                 Button("Download game") { act(["install", game.slug], "Downloading \(game.name)") }
-                Button("Install through the Steam client") { act(["steam", "install", game.slug], "Installing") }
+                if hasClient {
+                    Button("Install through the Steam client") { act(["steam", "install", game.slug], "Installing") }
+                }
                 Button("Add to Steam library") { act(["steam", "add", game.slug], "Adding") }
             case .battlenet:
                 Button("Open Battle.net") { act(["battlenet", "open", game.slug], "Opening Battle.net") }
@@ -136,8 +143,6 @@ struct GameDetailView: View {
             case .gog:
                 Button("Download and install from GOG") { act(["gog", "install", game.slug], "Installing") }
                 Button("GOG accounts…") { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
-            case .standalone:
-                Button("Download game") { act(["install", game.slug], "Downloading \(game.name)") }
             }
             // The game's own app — its name, its icon — whatever store it came from. A wrapper for
             // the store client is not offered on a game's page: there it read as the game's app.
@@ -171,10 +176,6 @@ struct GameDetailView: View {
             Notice(symbol: "hand.raised.fill", tint: game.store.tint,
                    title: "\(game.store.displayName)'s installer needs a few clicks",
                    detail: "Blizzard ships no silent installer. Partway through setup its window opens — click through it and leave the app running. Cellar picks up from there.")
-        } else if game.nextStep == .install && game.store == .standalone {
-            Notice(symbol: "terminal.fill", tint: .secondary,
-                   title: "This download runs in Terminal",
-                   detail: "Steam Guard prompts for a code, which needs a real terminal. Copy the command from the ••• menu and run it, then come back.")
         } else if game.nextStep == .install && game.store == .gog {
             Notice(symbol: "clock.fill", tint: game.store.tint,
                    title: "The install runs with no window",
@@ -206,11 +207,13 @@ struct GameDetailView: View {
                 Chip(game.appID.map { "AppID \($0)" } ?? "No AppID", system: "number")
             case .battlenet:
                 Chip(game.productCode.map { "Product " + $0 } ?? "No product code", system: "tag")
-            case .standalone:
-                Chip("No store", system: "shippingbox")
             }
-            Chip(game.needsClientAtRuntime ? "Needs \(game.store.displayName) running" : "Runs on its own",
-                 system: game.needsClientAtRuntime ? "link" : "bolt.fill")
+            // From the profile, not from what is on disk: before the download, a game that never
+            // talks to its store must not be labelled as needing it.
+            let needsClient = game.needsClientAtRuntime && game.needsLiveSession
+                && game.store.descriptor.installsClientInBottle
+            Chip(needsClient ? "Needs \(game.store.displayName) running" : "Runs on its own",
+                 system: needsClient ? "link" : "bolt.fill")
             Spacer()
         }
     }
@@ -282,11 +285,6 @@ struct GameDetailView: View {
     }
 
     // MARK: - Behaviour
-
-    /// True when the next step is something Cellar cannot do for the player from a button.
-    private var primaryIsManual: Bool {
-        game.nextStep == .install && game.store == .standalone
-    }
 
     private func primary() {
         switch game.nextStep {

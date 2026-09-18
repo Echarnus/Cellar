@@ -29,9 +29,7 @@ struct Install: ParsableCommand {
 
     func run() throws {
         let plan = try Game.plan(slug: slug)
-        // Who answers for this game — not always the store it is filed under. A DRM-free game
-        // bought on Steam has no client and is still Steam's to confirm.
-        let gate = StoreLibrary.gatingStore(for: plan)
+        let gate = plan.store
 
         // Every check that can refuse this install happens *before* the first byte is downloaded.
         // Setting a bottle up fetches a Wine runner — gigabytes — so discovering the sign-in is
@@ -86,7 +84,7 @@ struct Install: ParsableCommand {
 extension StoreLibrary {
     /// Re-ask the one store that answers per game, when a single game's answer is missing.
     static func refreshSteamIfSteam(_ plan: GamePlan) throws {
-        guard gatingStore(for: plan) == .steam, plan.appID != nil else { return }
+        guard plan.store == .steam, plan.appID != nil else { return }
         try refreshSteam()
     }
 }

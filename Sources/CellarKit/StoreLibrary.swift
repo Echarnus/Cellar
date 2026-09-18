@@ -52,18 +52,16 @@ public extension GameStore {
         switch self {
         case .steam, .gog: return "Sign in to \(displayName)"
         case .battlenet:   return "Add Battle.net in Accounts"
-        case .standalone:  return "Sign in to the store the files come from"
         }
     }
 
     /// Steam and GOG both publish, to a signed-in Cellar, exactly what the account owns. Blizzard
-    /// publishes neither entitlements nor a sign-in state, and a standalone game has no store to
-    /// ask. Those two can never be checked, so hiding their games would mean pretending they don't
-    /// exist — they are shown, with the section saying plainly that Cellar cannot check.
+    /// publishes neither entitlements nor a sign-in state, so it can never be checked — its games
+    /// are gated on the player's own word instead (`BattleNetAccount`).
     var canAnswerOwnership: Bool {
         switch self {
-        case .steam, .gog:            return true
-        case .battlenet, .standalone: return false
+        case .steam, .gog: return true
+        case .battlenet:   return false
         }
     }
 }
@@ -118,20 +116,19 @@ public enum StoreLibrary {
     ///
     /// Two of the three are facts Cellar reads: a Steam session it holds, a GOG token it holds.
     /// Battle.net is the player's word (`BattleNetAccount`), because Blizzard publishes nothing to
-    /// read. `standalone` has no store to connect to, so it is never in the way of its own games.
+    /// read.
     public static func isConnected(_ store: GameStore) -> Bool {
         switch store {
         case .steam:      return SteamAccount.isSignedIn
         case .gog:        return GOGAuth.isSignedIn
         case .battlenet:  return BattleNetAccount.isAdded
-        case .standalone: return true
         }
     }
 
     /// **Has the player connected at least one real store?** A player who has, has already found
     /// Accounts — asking them to "sign in" again reads as though that sign-in did not take.
     public static var hasConnectedStore: Bool {
-        GameStore.allCases.contains { $0 != .standalone && isConnected($0) }
+        GameStore.allCases.contains { isConnected($0) }
     }
 
     /// What an empty library is telling the player.
@@ -164,8 +161,8 @@ public enum StoreLibrary {
     /// Whether a withheld game is waiting on a store that is connected and *could* answer but
     /// hasn't — the one case where checking again, not signing in, is the fix.
     public static func isUnchecked(_ game: GameSummary) -> Bool {
-        guard case .unknown = game.ownership, game.gatingStore.canAnswerOwnership else { return false }
-        return isConnected(game.gatingStore)
+        guard case .unknown = game.ownership, game.store.canAnswerOwnership else { return false }
+        return isConnected(game.store)
     }
 
     // MARK: - Steam
@@ -318,16 +315,14 @@ public enum StoreLibrary {
         return shared.lock.withLock { shared.answers }
     }
 
-    /// Every Steam app id the profile database knows about — including a `standalone` profile that
-    /// carries a `steam_appid`, because that game is fetched from the player's Steam account too
-    /// (Stardew Valley), so Steam is the store that gates it.
+    /// Every Steam app id the profile database knows about.
     public static func steamAppIDsInProfiles() -> Set<Int> {
         var ids: Set<Int> = []
         for ref in ProfileStore.all() {
             let fields = ProfileStore.fields(ref)
             guard let appID = fields["steam_appid"].flatMap({ Int($0) }) else { continue }
             let store = GameStore(profileValue: fields["store"]) ?? .default
-            guard store == .steam || store == .standalone else { continue }
+            guard store == .steam else { continue }
             ids.insert(appID)
         }
         return ids
@@ -408,27 +403,12 @@ public enum StoreLibrary {
 
     // MARK: - One answer for any game
 
-    /// **Which store actually answers for this game** — not always the one the profile names.
-    ///
-    /// A `standalone` profile carrying a `steam_appid` (Stardew Valley) is DRM-free and needs no
-    /// client, but its files still come out of the player's Steam account, so Steam is who says
-    /// whether they own it. Gating it as "no store, nobody to ask" would put a game in the library
-    /// that Cellar cannot actually download.
-    public static func gatingStore(for plan: GamePlan) -> GameStore {
-        if plan.store == .standalone, plan.appID != nil { return .steam }
-        return plan.store
-    }
-
     /// The ownership of one planned game, from cache only — safe to call for every profile on every
     /// library refresh.
     public static func ownership(of plan: GamePlan) -> Ownership {
         switch plan.store {
         case .steam:
             guard let appID = plan.appID else { return .unknown("This profile has no steam_appid.") }
-            return steamOwnership(appID: appID)
-        case .standalone:
-            // A standalone profile that names a Steam app id is still fetched from Steam.
-            guard let appID = plan.appID else { return .unknown("No store to ask.") }
             return steamOwnership(appID: appID)
         case .gog:
             return gogOwnership(productID: plan.gogProductID)

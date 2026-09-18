@@ -130,12 +130,12 @@ struct ProfileParsingTests {
         try """
         [game]
         name = "Overridden By Test"
-        store = "standalone"
+        store = "gog"
         """.write(to: url, atomically: true, encoding: .utf8)
 
         let plan = try Game.plan(slug: slug)
         #expect(plan.name == "Overridden By Test")
-        #expect(plan.store == .standalone)
+        #expect(plan.store == .gog)
     }
 
     @Test("An unknown slug fails with a message that names the way out")

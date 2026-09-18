@@ -89,7 +89,8 @@ struct WindowsGameTests {
         [game]
         slug  = "it-windows-game"
         name  = "Integration Fixture"
-        store = "standalone"
+        store = "steam"
+        steam_appid = 1
 
         [compatibility]
         # DRM-free: no client has to be alive for this to run, which is what lets Cellar take the
@@ -111,7 +112,7 @@ struct WindowsGameTests {
         """, slug: "it-windows-game")
 
         let plan = try Game.plan(slug: slug)
-        #expect(plan.store == .standalone)
+        #expect(plan.store == .steam)
         #expect(plan.needsLiveSession == false)
         #expect(plan.env["CELLAR_INTEGRATION_MARKER"] == "1", "the profile's env must reach the game")
         defer {
@@ -124,12 +125,13 @@ struct WindowsGameTests {
         #expect(Game.isGameInstalled(plan) == false)
         #expect(summary(for: slug)?.nextStep == .install)
 
-        // 3. Set up: runner + bottle + initialised prefix. No store client — this game has no store.
+        // 3. Set up: runner + bottle + initialised prefix. No Steam client — nothing talks to one.
         var progress: [String] = []
         _ = try Game.setUp(plan) { progress.append($0); IT.log($0) }
         #expect(fm.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path))
-        #expect(progress.contains { $0.contains("No store client needed") },
-                "a standalone game must be told plainly that nothing else is being installed")
+        #expect(progress.contains { $0.contains("No Steam client needed") },
+                "a game with no live-session DRM must be told plainly that no client is being installed")
+        #expect(!SteamBottle.isInstalled(in: plan.prefix))
 
         // 4. The game's files arrive. Cellar never ships these; the test provides them.
         let exe = try IT.installGameFiles(source, into: plan, runner: runner)
@@ -190,7 +192,8 @@ struct WindowsGameTests {
         let runner = try IT.resolveRunner()
         let slug = IT.writeProfile("""
         [game]
-        store = "standalone"
+        store = "steam"
+        steam_appid = 1
         [compatibility]
         needs_live_session = false
         [runner]
@@ -209,8 +212,8 @@ struct WindowsGameTests {
             // The message a player actually gets. `Game.launch` never reaches `launchDirect`'s
             // "No launchable exe found" for this case — that one is only possible once the files
             // are on disk, because `canLaunchStoreFree` gates the direct route. With nothing
-            // installed, launch falls through to the store switch, and for a game with no store
-            // the honest answer is that it isn't installed yet.
+            // installed, launch falls through to the store switch, and for a game that never needs
+            // the client the honest answer is that it isn't installed yet — not "set up Steam".
             #expect(error.description.contains("isn't installed yet"))
             #expect(error.description.contains(plan.slug), "the message must name the game")
             #expect(error.description.contains("cellar install"),

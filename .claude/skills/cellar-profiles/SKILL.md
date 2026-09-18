@@ -14,8 +14,9 @@ changing a profile. Key rules:
   (Python cuts at any `#`, Swift only at `" #"`); and **don't rely on section scoping** — the Swift
   scan is flat and last-wins, so `[game] product_code` and `[install] product_code` are one key.
   The site can render differently locally than in CI; know which parser you exercised.
-- **`store` decides the whole pipeline** — `steam` | `battlenet` | `standalone`, spelled exactly (an
-  unknown value is treated as Steam). `status` is `playable` | `experimental` | `untested`.
+- **`store` decides the whole pipeline** — `steam` | `battlenet` | `gog`, spelled exactly (an
+  unknown value is treated as Steam). There is no "no store": a DRM-free Steam game is `steam` with
+  `needs_live_session = false`. `status` is `playable` | `experimental` | `untested`.
 - **Honesty is enforced.** The app shows these fields verbatim. `status` describes what *you ran*;
   `notes` names the hardware and OS; DRM and anti-cheat are stated precisely and separately (Denuvo
   is anti-tamper DRM, not anti-cheat). Untested means untested.

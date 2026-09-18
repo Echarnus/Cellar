@@ -97,19 +97,19 @@ bottle. Each profile names one with `store = "…"`, and that single field decid
 which installer `cellar setup` runs, what "installed" and "signed in" even mean, how a launch is
 issued, and what the app says to the player.
 
-| | **Steam** (`SteamBottle`) | **Battle.net** (`BattleNetBottle`) | **GOG** (`GOG*`) | **Standalone** |
-|---|---|---|---|---|
-| Client in the bottle | yes | yes | **none** | none |
-| Installer | `SteamSetup.exe /S` — silent | `Battle.net-Setup.exe` — **no silent switch**; a window opens and the player clicks through | the game's own Inno Setup installer, `/VERYSILENT` | none |
-| Client binaries | `steam.exe` | `Battle.net Launcher.exe` bootstraps `Battle.net.exe` | none | none |
-| Games addressed by | numeric AppID | product code (`Fen` = Diablo IV) | `gog_product_id` | a path |
-| Authentication | in the client's own window | in the client's own window | **OAuth 2.0 token Cellar holds** (keychain) | none |
-| "Signed in?" | readable — `config/loginusers.vdf` | **not observable**; folded into "open the client" | readable — Cellar owns the token | n/a |
-| "Installed?" | `appmanifest_<id>.acf`, `StateFlags 4` | the profile's `install_dir` + `exe` on disk | the exe on disk | the exe on disk |
-| Install a game | `steam://install/<id>` | no drivable URL — open the client | Cellar downloads + runs the installer | DepotDownloader |
-| Launch | `steam://rungameid/<id>` into a `-silent` client | `Battle.net.exe --exec="launch <product>"`, client warmed first | run the exe — nothing beside it | run the exe |
-| Uninstall | delete the install dir **inside the shared library**, plus its manifests; close the client first | delete the install dir; the client re-offers it as an install | run the game's own Inno uninstaller, then delete | delete the depot dir |
-| Public artwork | yes, per AppID | none a launcher may hotlink | yes, from the product API | none |
+| | **Steam** (`SteamBottle`) | **Battle.net** (`BattleNetBottle`) | **GOG** (`GOG*`) |
+|---|---|---|---|
+| Client in the bottle | yes — unless the game has no live-session DRM | yes | **none** |
+| Installer | `SteamSetup.exe /S` — silent | `Battle.net-Setup.exe` — **no silent switch**; a window opens and the player clicks through | the game's own Inno Setup installer, `/VERYSILENT` |
+| Client binaries | `steam.exe` | `Battle.net Launcher.exe` bootstraps `Battle.net.exe` | none |
+| Games addressed by | numeric AppID | product code (`Fen` = Diablo IV) | `gog_product_id` |
+| Authentication | in the client's own window | in the client's own window | **OAuth 2.0 token Cellar holds** (keychain) |
+| "Signed in?" | readable — `config/loginusers.vdf` | **not observable**; folded into "open the client" | readable — Cellar owns the token |
+| "Installed?" | `appmanifest_<id>.acf`, `StateFlags 4` | the profile's `install_dir` + `exe` on disk | the exe on disk |
+| Install a game | `steam://install/<id>` | no drivable URL — open the client | Cellar downloads + runs the installer |
+| Launch | `steam://rungameid/<id>` into a `-silent` client | `Battle.net.exe --exec="launch <product>"`, client warmed first | run the exe — nothing beside it |
+| Uninstall | delete the install dir **inside the shared library**, plus its manifests; close the client first | delete the install dir; the client re-offers it as an install | run the game's own Inno uninstaller, then delete |
+| Public artwork | yes, per AppID | none a launcher may hotlink | yes, from the product API |
 
 Three consequences worth stating plainly, because they shape the UI as much as the code:
 
@@ -200,10 +200,6 @@ asked of the same credential that would do the installing — so it covers a lap
 region lock, which a list of owned app ids would not. Answers are cached under `shared/libraries/`,
 keyed to the account, because `Game.summaries()` runs on every library refresh and must never make a
 network call.
-
-`StoreLibrary.gatingStore` handles the one crossover: a `standalone` profile carrying a
-`steam_appid` (Stardew Valley) needs no client but is still fetched from the player's Steam account,
-so **Steam** gates it.
 
 DepotDownloader only ever *draws* the QR challenge, as terminal ASCII, and prints no URL — so
 `SteamQRCode.swift` reads the drawing back into a module matrix and the app renders it at a scannable

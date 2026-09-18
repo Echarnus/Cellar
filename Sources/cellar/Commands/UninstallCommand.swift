@@ -111,10 +111,9 @@ struct UninstallCommand: ParsableCommand {
     /// uninstall is the best place to say that undoing it is one command.
     private func reinstallCommand(for game: GamePlan) -> String {
         switch game.store {
-        case .steam:      return "steam install \(game.slug)"
-        case .battlenet:  return "battlenet open \(game.slug)"
-        case .gog:        return "gog install \(game.slug)"
-        case .standalone: return "fetch-depot \(game.slug)"
+        case .steam:     return game.needsLiveSession ? "steam install \(game.slug)" : "install \(game.slug)"
+        case .battlenet: return "battlenet open \(game.slug)"
+        case .gog:       return "gog install \(game.slug)"
         }
     }
 }

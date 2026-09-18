@@ -43,8 +43,6 @@ public enum StoreIcon {
         case .gog:
             // Galaxy's icon file has been renamed across versions, so find it rather than name it.
             candidates = []
-        case .standalone:
-            return nil
         }
 
         if let hit = roots.flatMap({ root in candidates.map { URL(fileURLWithPath: "\(root)/\($0)") } })
@@ -101,8 +99,8 @@ public enum StoreIcon {
                 .first
 
         // GOG is pure HTTP — Cellar never stands a Galaxy client up in a bottle, so there is no
-        // Windows install to take an icon from. Standalone games have no client at all.
-        case .gog, .standalone:
+        // Windows install to take an icon from.
+        case .gog:
             return nil
         }
     }
@@ -126,7 +124,7 @@ public enum StoreIcon {
         case .battlenet:
             exeNames = ["Battle.net", "Battle.net Launcher"]
         // GOG has no client in a bottle, so Wine never sees a GOG executable to extract from.
-        case .gog, .standalone:
+        case .gog:
             return nil
         }
 

@@ -18,17 +18,13 @@ struct StoreTests {
                       ("bnet", .battlenet),
                       ("gog", .gog),
                       ("gog.com", .gog),
-                      ("gog-galaxy", .gog),
-                      ("standalone", .standalone),
-                      ("none", .standalone),
-                      ("direct", .standalone),
-                      ("drm-free", .standalone)])
+                      ("gog-galaxy", .gog)])
     func parsesKnownSpellings(_ input: String, _ expected: GameStore) {
         #expect(GameStore(profileValue: input) == expected)
     }
 
     @Test("An unknown or empty store is nil so the caller can fall back deliberately",
-          arguments: [nil, "", "   ", "epic", "itch", "steam2"])
+          arguments: [nil, "", "   ", "epic", "itch", "steam2", "standalone", "none", "drm-free"])
     func rejectsUnknownStores(_ input: String?) {
         #expect(GameStore(profileValue: input) == nil,
                 "mis-classifying a store silently would set up the wrong client in the bottle")
@@ -79,7 +75,7 @@ struct StoreTests {
         let indices = GameStore.allCases.map(\.sortIndex)
         #expect(Set(indices).count == indices.count)
         #expect(GameStore.steam.sortIndex < GameStore.battlenet.sortIndex)
-        #expect(GameStore.standalone.sortIndex == indices.max())
+        #expect(GameStore.battlenet.sortIndex < GameStore.gog.sortIndex)
     }
 
     @Test("Hex accents decode to the components the app draws with")
@@ -117,7 +113,6 @@ struct StoreTests {
         #expect(GameStore.steam.descriptor.canDetectSignIn)
         #expect(GameStore.gog.descriptor.canDetectSignIn)
         #expect(GameStore.battlenet.descriptor.canDetectSignIn == false)
-        #expect(GameStore.standalone.descriptor.canDetectSignIn == false)
     }
 
     @Test("A token store signs in once; a client store signs in per window")
@@ -130,20 +125,17 @@ struct StoreTests {
         }
     }
 
-    @Test("A store with nothing to sign in to has no account style")
-    func standaloneHasNoAuth() {
-        #expect(GameStore.standalone.descriptor.authStyle == .none)
-        #expect(GameStore.standalone.descriptor.installsClientInBottle == false)
+    @Test("GOG is the one store with no client in the bottle")
+    func gogHasNoClientInBottle() {
         #expect(GameStore.gog.descriptor.installsClientInBottle == false,
                 "GOG is pure HTTP — that is why it needs no per-bottle sign-in")
     }
 
-    @Test("A store that needs no client in the bottle is never asked to set one up",
-          arguments: [GameStore.gog, .standalone])
-    func clientlessStoresAreAlwaysReady(_ store: GameStore) throws {
+    @Test("A store that needs no client in the bottle is never asked to set one up")
+    func clientlessStoresAreAlwaysReady() throws {
         let plan = try TestHome.plan("""
         [game]
-        store = "\(store.rawValue)"
+        store = "gog"
         """)
         #expect(Game.storeClientInstalled(plan))
         #expect(Game.storeClientRunning(plan) == false)
@@ -156,7 +148,6 @@ struct StoreTests {
         #expect(Game.defaultInstallMethod(for: .steam) == "windows-steam-in-bottle")
         #expect(Game.defaultInstallMethod(for: .battlenet) == "battlenet-in-bottle")
         #expect(Game.defaultInstallMethod(for: .gog) == "gog-installer")
-        #expect(Game.defaultInstallMethod(for: .standalone) == "depot")
         #expect(Set(GameStore.allCases.map(Game.defaultInstallMethod(for:))).count == GameStore.allCases.count)
     }
 

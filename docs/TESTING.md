@@ -85,7 +85,7 @@ serialising removes any chance of a `setenv` racing a concurrent read.
 This is the test that answers the only question that matters — *does a Windows game start on this
 Mac?* — and it does it through Cellar's own calls, not a hand-rolled Wine command line:
 
-1. writes a `standalone`, `needs_live_session = false` profile;
+1. writes a `steam`, `needs_live_session = false` profile;
 2. asserts Cellar offers **Install** and refuses to promise Play;
 3. runs `Game.setUp` — runner, bottle, prefix, and no store client, said out loud;
 4. drops the game's files where the profile says they are;

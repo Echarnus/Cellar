@@ -71,8 +71,6 @@ struct ProfileDatabaseTests {
         case .gog:
             #expect(plan.gogProductID != nil, "'\(slug)' is a GOG game with no gog_product_id")
             #expect(plan.launchExe != nil, "a GOG game is launched directly, so it needs an exe")
-        case .standalone:
-            #expect(plan.launchExe != nil, "'\(slug)' has no store and no exe — there is nothing to run")
         }
     }
 
@@ -149,8 +147,7 @@ struct ProfileDatabaseTests {
         }
         if plan.store != .steam {
             // Only Steam publishes free cover art keyed on an app id; every other store has to
-            // bring URLs or fall back to Cellar's generated cover. Stardew Valley is the case that
-            // matters: it carries a steam_appid but is a `standalone` profile.
+            // bring URLs or fall back to Cellar's generated cover.
             let summary = Game.summaries().first { $0.slug == slug }
             #expect(summary?.artworkAppID == nil,
                     "'\(slug)' is not a Steam game, so it must not fetch Steam artwork")

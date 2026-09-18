@@ -48,7 +48,7 @@ generalized into a per-game profile system, then given a native GUI.
 ## Phase 4 — More than one store ✅ (Battle.net)
 
 - ✅ `GameStore` + `StoreDescriptor`: a profile names its storefront and that decides setup, install,
-  launch, readiness and copy. Steam / Battle.net / standalone.
+  launch, readiness and copy. Steam / Battle.net / GOG.
 - ✅ `BattleNetBottle`: install Blizzard's client into a bottle (interactive — it has no silent
   installer), write the `Battle.net.config` that makes its Chromium UI render under Wine, warm the
   client, launch by product code, and tear the whole layer down on exit.
@@ -59,7 +59,7 @@ generalized into a per-game profile system, then given a native GUI.
 - ✅ The profile database ships inside the app bundle and beside an installed CLI, so a new game
   reaches players without them copying TOML files — user profiles still win.
 - ⏳ Verify Diablo IV end-to-end on the M5 (install + play). The profile is `untested` until then.
-- ⏳ Further stores when a game needs one: GOG (DRM-free, closest to the standalone path), Epic.
+- ⏳ Further stores when a game needs one: Epic.
 
 ## Phase 5 — Sign in once ✅ (GOG + shared Steam)
 

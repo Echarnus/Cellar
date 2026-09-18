@@ -53,7 +53,6 @@ STORES = {  # profile store → how the site labels it
     "steam": {"label": "Steam", "cls": "steam"},
     "battlenet": {"label": "Battle.net", "cls": "battlenet"},
     "gog": {"label": "GOG", "cls": "gog"},
-    "standalone": {"label": "No store", "cls": "standalone"},
 }
 
 STATUS = {  # profile status → (label, css class)
@@ -154,7 +153,6 @@ CSS = """
   .tag.store.battlenet{background:rgba(0,162,232,.16);color:#0080ba}
   /* Purple: the other two stores are both blue, so GOG is the one colour can help tell apart. */
   .tag.store.gog{background:rgba(155,77,202,.16);color:#8438b8}
-  .tag.store.standalone{background:rgba(138,138,142,.18);color:var(--muted)}
   @media (prefers-color-scheme:dark){
     .tag.store.steam{color:#7ab8e8}
     .tag.store.battlenet{color:#4cc4ff}

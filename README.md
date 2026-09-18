@@ -48,7 +48,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full stack.
 
 ## Three storefronts, told apart properly
 
-A profile says `store = "steam"`, `"battlenet"`, `"gog"` or `"standalone"`, and that decides
+A profile says `store = "steam"`, `"battlenet"` or `"gog"`, and that decides
 everything downstream — which client `cellar setup` installs (if any), what "installed" and "signed
 in" mean, how a launch is issued, and what the app tells you. The differences are real, and Cellar
 refuses to paper over them:

@@ -130,7 +130,7 @@ that a window resizes or a click lands — but it catches the wrong-looking befo
 
 ## Stores are a first-class concept
 
-A game names the storefront it came from (`store = "steam" | "battlenet" | "gog" | "standalone"`),
+A game names the storefront it came from (`store = "steam" | "battlenet" | "gog"`),
 and that one field decides the whole pipeline: which client `cellar setup` installs (if any), what
 "installed" and "signed in" mean, how a launch is issued, and the words the player reads. Read
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → *The store layer* for the comparison table.

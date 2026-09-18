@@ -93,6 +93,9 @@ public enum Uninstall {
         var kept: [String] = []
         var warnings: [String] = []
         var blockers: [String] = []
+        // Whether this bottle really has the store's client. A Steam game with no live-session DRM
+        // never gets one, so nothing may be said about — or waited on for — a client that isn't there.
+        let clientInBottle = game.store.descriptor.installsClientInBottle && Game.storeClientInstalled(game)
 
         items += gameFileItems(game)
         items += generatedItems(for: game, scope: scope)
@@ -101,7 +104,7 @@ public enum Uninstall {
             items += bottleItems(for: game, warnings: &warnings, blockers: &blockers)
         } else if FileManager.default.fileExists(atPath: game.prefix.path) {
             kept.append("The bottle '\(game.bottleName)'"
-                + (game.store.descriptor.installsClientInBottle
+                + (clientInBottle
                    ? " and the \(game.store.displayName) installed in it, so re-installing is just the download."
                    : ", so re-installing is just the download."))
         }
@@ -120,14 +123,14 @@ public enum Uninstall {
         // Only worth interrupting the player's client for something that is genuinely holding files
         // open: a stale icon is not worth closing Steam over.
         let touchesFiles = items.contains(where: \.isGameData) || scope == .bottle
-        let closesClient = touchesFiles && Game.storeClientRunning(game)
+        let closesClient = touchesFiles && clientInBottle && Game.storeClientRunning(game)
             && game.store.descriptor.requiresClientClosedToUninstall
         if closesClient {
             warnings.append("\(game.store.displayName) is running. Cellar closes it before deleting anything — that is expected, not a crash.")
         }
         // Only when the game's files are actually going: "Steam will show it as not installed" in
         // front of somebody who never installed it is noise dressed up as information.
-        if items.contains(where: \.isGameData), let note = game.store.descriptor.uninstallClientNote {
+        if clientInBottle, items.contains(where: \.isGameData), let note = game.store.descriptor.uninstallClientNote {
             warnings.append(note)
         }
 
@@ -160,12 +163,13 @@ public enum Uninstall {
         // exactly the files about to be deleted, and the plan would still say there was none.
         let touchesFiles = plan.removesGameFiles || plan.scope == .bottle
         if touchesFiles, game.store.descriptor.requiresClientClosedToUninstall,
+           game.store.descriptor.installsClientInBottle, Game.storeClientInstalled(game),
            Game.storeClientRunning(game), let wine = Game.wineRunner(game) {
             progress("Closing \(game.store.displayName)…")
             switch game.store {
             case .steam:      SteamBottle.shutdown(runner: wine)
             case .battlenet:  BattleNetBottle.shutdown(runner: wine)
-            case .gog, .standalone: break
+            case .gog: break
             }
         }
 
@@ -238,7 +242,7 @@ public enum Uninstall {
                 items.append(item("GOG installer download",
                                   Paths.cache.appendingPathComponent("gog/\(productID)", isDirectory: true)))
             }
-        case .battlenet, .standalone:
+        case .battlenet:
             break
         }
 

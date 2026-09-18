@@ -18,8 +18,6 @@ public enum GameStore: String, CaseIterable, Sendable {
     /// GOG.com. No client in the bottle: Cellar holds an OAuth token, reads the player's owned
     /// library over HTTP, and installs the DRM-free installer itself.
     case gog
-    /// No store at all — the game's files are on disk and its exe is launched directly.
-    case standalone
 
     public static let `default` = GameStore.steam
 
@@ -33,7 +31,6 @@ public enum GameStore: String, CaseIterable, Sendable {
         case "steam": self = .steam
         case "battlenet", "battle.net", "blizzard", "bnet": self = .battlenet
         case "gog", "gog.com", "gog-galaxy": self = .gog
-        case "standalone", "none", "direct", "drm-free": self = .standalone
         default: return nil
         }
     }
@@ -162,23 +159,6 @@ public extension GameStore {
                 uninstallKeepsNote: "Battle.net itself, your sign-in, and anything else installed in this bottle.",
                 uninstallClientNote: "Battle.net offers the game as an install again next time it starts. That is it noticing the files are gone, not a failed uninstall.",
                 requiresClientClosedToUninstall: true)
-        case .standalone:
-            return StoreDescriptor(
-                store: .standalone,
-                displayName: "Standalone",
-                sectionTitle: "No store",
-                symbolName: "shippingbox.fill",
-                accentHex: "#8A8A8E",
-                accountNoun: "no account",
-                canDetectSignIn: false,
-                hasSilentInstaller: true,
-                installLocation: "a direct download",
-                authStyle: .none,
-                installsClientInBottle: false,
-                clientProcessNames: [],   // no client, so nothing of Cellar's to hide
-                uninstallKeepsNote: "Nothing else to keep — a standalone game brings no client and no account.",
-                uninstallClientNote: nil,
-                requiresClientClosedToUninstall: false)
         case .gog:
             return StoreDescriptor(
                 store: .gog,
@@ -210,7 +190,6 @@ public extension GameStore {
         case .steam: return 0
         case .battlenet: return 1
         case .gog: return 2
-        case .standalone: return 3
         }
     }
 }

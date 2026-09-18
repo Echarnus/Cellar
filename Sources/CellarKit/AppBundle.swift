@@ -85,9 +85,6 @@ public enum AppBundle {
     @discardableResult
     public static func generateStoreClient(store: GameStore, bottle: String, slug: String,
                                            cellarBinary: String) throws -> Generated {
-        guard store != .standalone else {
-            throw CellarError.invalidArgument("A standalone game has no store client to wrap in an app.")
-        }
         let name = store.displayName
         return try generate(name: "\(name) (\(bottle))",
                             identifier: "it.clercq.cellar.\(store.rawValue).\(bottle)",

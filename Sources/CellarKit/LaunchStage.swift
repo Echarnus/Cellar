@@ -89,7 +89,7 @@ public enum LaunchStage: String, Sendable, CaseIterable {
                 return "Steam starts in the background with no window. \(game) will not start reliably until it is ready, so Cellar waits."
             case .battlenet:
                 return "Blizzard's app has to be running before it can be told to launch \(game). Its window may appear — leave it open."
-            case .gog, .standalone:
+            case .gog:
                 return "Opening \(context.store.displayName)."
             }
         case .starting:
