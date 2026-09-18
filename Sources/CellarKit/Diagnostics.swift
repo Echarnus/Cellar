@@ -252,7 +252,7 @@ public enum Diagnostics {
         for bottle in bottles where steamBottles.contains(bottle.name) {
             out.append("Steam  client session in \(bottle.name): \(SteamBottle.clientSessionReadiness(in: bottle.url).diagnosis)")
         }
-        out.append("GOG  signed in: \(GOGAuth.isSignedIn ? "yes" : "no")")
+        out.append("GOG    signed in: \(GOGAuth.isSignedIn ? "yes" : "no")")
         out.append("Battle.net  sign-in state is not observable — Cellar does not track it.")
         out.append("")
 
