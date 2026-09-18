@@ -117,6 +117,55 @@ struct SteamClientSessionTests {
         #expect(TextVDF.parse("\"a\"\t\"b\"\n}") == nil)
     }
 
+    @Test("A value Cellar didn't touch is written back exactly as Steam spelled it")
+    func untouchedValuesKeepTheirSpelling() throws {
+        // `config.vdf` is rewritten whole, so every escape in it has to survive — including ones
+        // Cellar's own writer would spell differently.
+        // As Steam wrote it: the three escapes spelled out — backslash-n, backslash-t, backslash-backslash.
+        let escapes = "\"Escapes\"\t\t" + #""a\nb\tc\\d""#
+        let raw = "\t\"Raw\"\t\t\"one\ntwo\""                     // …and a real newline inside a value
+        let text = "\"root\"\n{\n\t" + escapes + "\n" + raw + "\n\t\"Changed\"\t\t\"old\"\n}\n"
+        var file = try #require(TextVDF.parse(text))
+        #expect(file.text == text, "an untouched file round-trips byte for byte")
+
+        file.edit(["root"]) { $0.set("Changed", "new\nline") }
+        let written = file.text
+        #expect(written.contains(escapes), "a value Cellar didn't touch keeps its own spelling")
+        #expect(written.contains(raw))
+        // Cellar's own value gets Cellar's escaping, and reads back as what was set.
+        #expect(TextVDF.parse(written)?.block("root")?.string("Changed") == "new\nline")
+        #expect(!written.contains("\"Changed\"\t\t\"new\nline\""), "…escaped, not a raw newline")
+    }
+
+    @Test("Taking the session back removes the token and the account it named")
+    func forgetRemovesBoth() throws {
+        let key = SteamClientSession.connectCacheKey(account: "someaccount")
+        let home = TestHome.scratch("forget")
+        let prefix = home.appendingPathComponent("bottle")
+        let steam = home.appendingPathComponent("steam")
+        let local = SteamClientSession.localConfig(in: prefix, wineUser: "someone")
+        let users = SteamClientSession.loginUsersFile(steamDirectory: steam)
+        for (url, text) in [
+            (local, SteamClientSession.withConnectCache(TextVDF(), account: "someaccount", value: "0badc0de").text),
+            (users, SteamClientSession.withLoginUser(TextVDF(), steamID: "76561197960265728",
+                                                     account: "someaccount").text),
+        ] {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        }
+
+        SteamClientSession.forget(account: "someaccount", prefix: prefix, steamDirectory: steam,
+                                  wineUser: "someone")
+
+        let localAfter = TextVDF.parse(try String(contentsOf: local, encoding: .utf8))
+        #expect(localAfter?.block(at: SteamClientSession.connectCachePath)?.string(key) == nil,
+                "the token must not survive a sign-out")
+        let usersAfter = TextVDF.parse(try String(contentsOf: users, encoding: .utf8))
+        #expect(usersAfter.map { !SteamClientSession.remembers($0, account: "someaccount") } ?? false,
+                "and nothing may keep claiming that account is signed in")
+    }
+
     @Test("local.vdf gains the encrypted token under ConnectCache, and keeps what was there")
     func connectCacheWrite() throws {
         let existing = try #require(TextVDF.parse("\"MachineUserConfigStore\"\n{\n\t\"Software\"\n\t{\n\t\t\"Valve\"\n\t\t{\n\t\t\t\"Steam\"\n\t\t\t{\n\t\t\t\t\"Other\"\t\t\"kept\"\n\t\t\t}\n\t\t}\n\t}\n}\n"))
@@ -155,10 +204,9 @@ struct SteamClientSessionTests {
     // MARK: - The decision
 
     static func snapshot(account: String? = "someaccount", token: String? = jwt(),
-                         local: String? = nil, users: String? = nil, config: String? = nil,
-                         userFolder: Bool = true) -> SteamClientSession.Snapshot {
-        .init(cellarAccount: account, token: token, localConfig: local, loginUsers: users, config: config,
-              hasWineUserFolder: userFolder)
+                         local: String? = nil, users: String? = nil,
+                         config: String? = nil) -> SteamClientSession.Snapshot {
+        .init(cellarAccount: account, token: token, localConfig: local, loginUsers: users, config: config)
     }
 
     @Test("A fresh bottle with a signed-in Cellar is handed the session")
@@ -173,16 +221,29 @@ struct SteamClientSessionTests {
         #expect(SteamClientSession.readiness(Self.snapshot(token: nil)) == .unavailable(.tokenNotForClient))
         #expect(SteamClientSession.readiness(Self.snapshot(token: Self.jwt(aud: ["web"])))
             == .unavailable(.tokenNotForClient))
-        #expect(SteamClientSession.readiness(Self.snapshot(userFolder: false)) == .unavailable(.bottleNotReady))
         #expect(SteamClientSession.readiness(Self.snapshot(config: "\"broken\"\n{\n"))
             == .unavailable(.unreadableFiles), "a file Cellar can't read is a file it won't rewrite")
         #expect(!SteamClientSession.Readiness.unavailable(.notSignedIn).signsInByItself)
     }
 
-    @Test("A client signed in to another account by hand is left alone")
+    @Test("A client signed in to another account by hand is left alone — even after Cellar has run")
     func otherAccount() {
-        let users = "\"users\"\n{\n\t\"76561197960265729\"\n\t{\n\t\t\"AccountName\"\t\t\"somebodyelse\"\n\t}\n}\n"
-        #expect(SteamClientSession.readiness(Self.snapshot(users: users)) == .unavailable(.otherAccount))
+        func user(_ id: String, _ name: String, mostRecent: String) -> String {
+            "\t\"\(id)\"\n\t{\n\t\t\"AccountName\"\t\t\"\(name)\"\n\t\t\"AllowAutoLogin\"\t\t\"1\"\n\t\t\"MostRecent\"\t\t\"\(mostRecent)\"\n\t}\n"
+        }
+        let theirs = "\"users\"\n{\n" + user("76561197960265729", "somebodyelse", mostRecent: "1") + "}\n"
+        #expect(SteamClientSession.readiness(Self.snapshot(users: theirs)) == .unavailable(.otherAccount))
+
+        // The shared install keeps an entry for every account ever used, so "our name is in the file"
+        // must not be the test: after one hand-over, a second account signing in by hand still wins.
+        let both = "\"users\"\n{\n" + user("76561197960265728", "someaccount", mostRecent: "0")
+            + user("76561197960265729", "somebodyelse", mostRecent: "1") + "}\n"
+        #expect(SteamClientSession.readiness(Self.snapshot(users: both)) == .unavailable(.otherAccount),
+                "the account the client would actually use is the one that counts")
+
+        let ours = "\"users\"\n{\n" + user("76561197960265728", "someaccount", mostRecent: "1")
+            + user("76561197960265729", "somebodyelse", mostRecent: "0") + "}\n"
+        #expect(SteamClientSession.readiness(Self.snapshot(users: ours)) == .canHandOver)
     }
 
     @Test("A bottle whose client already remembers this account needs nothing, even without a token")

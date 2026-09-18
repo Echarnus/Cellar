@@ -248,10 +248,11 @@ public enum Diagnostics {
             + ", signed in: \(SteamBottle.sharedLoggedInAccount != nil ? "yes" : "no")")
         // Whether each Steam bottle's client signs in with Cellar's session — the decision, never
         // the session.
-        for bottle in bottles where Game.bottleNames(forStore: .steam).contains(bottle.name) {
+        let steamBottles = Game.bottleNames(forStore: .steam)      // reads the profile TOMLs: once, not per bottle
+        for bottle in bottles where steamBottles.contains(bottle.name) {
             out.append("Steam  client session in \(bottle.name): \(SteamBottle.clientSessionReadiness(in: bottle.url).diagnosis)")
         }
-        out.append("GOG   signed in: \(GOGAuth.isSignedIn ? "yes" : "no")")
+        out.append("GOG  signed in: \(GOGAuth.isSignedIn ? "yes" : "no")")
         out.append("Battle.net  sign-in state is not observable — Cellar does not track it.")
         out.append("")
 

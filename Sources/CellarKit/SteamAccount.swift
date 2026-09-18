@@ -275,6 +275,12 @@ public enum SteamAccount {
     /// an account nobody can use, and a token left behind would be a credential the player believes
     /// they removed.
     public static func signOut() throws {
+        // The bottles first, and by name: the same token also sits in every bottle's client
+        // (`SteamClientSession`), and a sign-out that left it there would keep signing the player in
+        // for the rest of the token's ~200 days — a credential they believe they removed.
+        if let account = record?.accountName {
+            SteamBottle.forgetClientSessions(account: account)
+        }
         try DepotTool.forgetSession()
         write(nil)
     }
@@ -293,6 +299,17 @@ public enum SteamAccount {
             record.rejectionReason = reason
             write(record)
         }
+    }
+
+    /// The same verdict, learned from the *client* instead of the downloader: Steam answering a logon
+    /// with something other than `OK` (`SteamClientSession.LogonResult.refused`) means that refresh
+    /// token is done — revoked in the mobile app, or expired. Recording it is what stops the next Play
+    /// handing over a dead session, and makes Settings say "Sign in again" rather than nothing.
+    static func noteClientRefusal(_ reason: String) {
+        guard var record, !record.isRejected else { return }
+        record.rejectedAt = Date()
+        record.rejectionReason = "Steam refused it (\(reason.lowercased()))"
+        write(record)
     }
 
     public static func rejection(in line: String) -> String? {

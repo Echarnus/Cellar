@@ -845,7 +845,10 @@ public enum Game {
                 // Handed over now, or already remembered from a previous launch: either way the
                 // client signs itself in, and the game has to wait for that to land.
                 let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
-                if !signsItself, SteamBottle.loggedInAccount(in: plan.prefix) == nil {
+                // The guard stays unconditional: a hand-over leaves `loginusers.vdf` naming the
+                // account, so it costs nothing here — and it is the only thing that catches a client
+                // that is up but signed out, where the cold-start logon wait never runs.
+                if SteamBottle.loggedInAccount(in: plan.prefix) == nil {
                     stage(.signIn)
                     try SteamBottle.waitForClientSignIn(runner: wine, game: plan.name, showHUD: showHUD,
                                                         gameEnv: plan.env, progress: progress)

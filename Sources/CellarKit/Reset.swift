@@ -154,6 +154,16 @@ public enum Reset {
     @discardableResult
     public static func perform(_ items: [Item], progress: (String) -> Void = { _ in }) -> [String] {
         var failures: [String] = []
+        // Cellar's Steam token also sits in every bottle's client (`SteamClientSession`). A reset
+        // that takes the sign-in away but keeps the bottles would otherwise leave that copy behind,
+        // still signing the player in — so it goes first, while the account name is still readable.
+        let removingSignIn = items.contains { $0.target == .path(DepotTool.root) }
+            || items.contains { $0.target == .path(SteamAccount.recordFile) }
+        if removingSignIn, let account = SteamAccount.record?.accountName,
+           !items.contains(where: { $0.target == .path(Paths.prefixes) }) {
+            progress("Taking the Steam sign-in back out of your bottles…")
+            SteamBottle.forgetClientSessions(account: account)
+        }
         for item in items where item.exists {
             progress("Removing \(item.title.lowercased())…")
             do {

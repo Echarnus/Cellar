@@ -12,6 +12,16 @@ struct TextVDF: Equatable {
     struct Entry: Equatable {
         var key: String
         var value: Value
+        /// The value exactly as the file spelled it, escapes and all. Re-emitted verbatim, so a value
+        /// Cellar did not touch cannot come back altered — `config.vdf` is rewritten whole, and Valve
+        /// writes escapes Cellar has no business reinterpreting.
+        var rawValue: String?
+
+        init(key: String, value: Value, rawValue: String? = nil) {
+            self.key = key
+            self.value = value
+            self.rawValue = rawValue
+        }
     }
 
     var entries: [Entry] = []
@@ -55,6 +65,7 @@ struct TextVDF: Equatable {
     mutating func set(_ key: String, _ value: Value) {
         if let i = entries.lastIndex(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame }) {
             entries[i].value = value
+            entries[i].rawValue = nil          // Cellar's value now, so Cellar's escaping applies.
         } else {
             entries.append(Entry(key: key, value: value))
         }
@@ -83,7 +94,7 @@ struct TextVDF: Equatable {
             let key = entry.key
             switch entry.value {
             case .string(let s):
-                out += "\(indent)\"\(Self.escape(key))\"\t\t\"\(Self.escape(s))\"\n"
+                out += "\(indent)\"\(Self.escape(key))\"\t\t\"\(entry.rawValue ?? Self.escape(s))\"\n"
             case .block(let b):
                 out += "\(indent)\"\(Self.escape(key))\"\n\(indent){\n"
                 b.write(into: &out, depth: depth + 1)
@@ -92,8 +103,30 @@ struct TextVDF: Equatable {
         }
     }
 
+    /// Valve's four escapes, in both directions. All four matter for a round-trip: decoding `\n` and
+    /// re-encoding it as a raw newline would rewrite a value Cellar never touched (`config.vdf` is
+    /// rewritten whole), and decoding only `\\` would turn `\n` into `\\n`.
     private static func escape(_ s: String) -> String {
-        s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        var out = ""
+        for c in s.unicodeScalars {
+            switch c {
+            case "\\":  out += "\\\\"
+            case "\"":  out += "\\\""
+            case "\n":  out += "\\n"
+            case "\t":  out += "\\t"
+            default:    out.unicodeScalars.append(c)
+            }
+        }
+        return out
+    }
+
+    static func unescaped(_ c: Unicode.Scalar) -> Unicode.Scalar? {
+        switch c {
+        case "\\", "\"": return c
+        case "n":        return "\n"
+        case "t":        return "\t"
+        default:         return nil
+        }
     }
 
     private struct Scanner {
@@ -126,10 +159,10 @@ struct TextVDF: Equatable {
             while i < chars.count {
                 let c = chars[i]; i += 1
                 if c == "\"" { return String(s) }
-                if c == "\\", i < chars.count, chars[i] == "\\" || chars[i] == "\"" {
-                    // Only the two escapes `escape` writes, so reading and rewriting a file never
-                    // changes a value it didn't touch.
-                    s.append(chars[i]); i += 1
+                if c == "\\", i < chars.count, let decoded = TextVDF.unescaped(chars[i]) {
+                    // Exactly the escapes `escape` writes, so reading and rewriting a file cannot
+                    // change a value it did not touch.
+                    s.append(decoded); i += 1
                 } else {
                     s.append(c)
                 }
@@ -156,8 +189,12 @@ struct TextVDF: Equatable {
                     guard let child = block(closed: true) else { return nil }
                     result.entries.append(Entry(key: key, value: .block(child)))
                 } else {
+                    let opening = i                     // the opening quote
                     guard let value = quoted() else { return nil }
-                    result.entries.append(Entry(key: key, value: .string(value)))
+                    // `i` is now past the closing quote: what lies between them is the value as
+                    // written.
+                    let raw = String(String.UnicodeScalarView(chars[(opening + 1)..<(i - 1)]))
+                    result.entries.append(Entry(key: key, value: .string(value), rawValue: raw))
                 }
             }
         }

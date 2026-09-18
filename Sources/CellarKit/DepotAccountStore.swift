@@ -1,7 +1,10 @@
 import Compression
 import Foundation
 
-/// Reads the **account names** out of DepotDownloader's `account.config` — never the tokens.
+/// Reads DepotDownloader's `account.config`: the **account names** for every caller, and a single
+/// account's refresh token for the one caller that needs it — `refreshToken(for:)`, which exists so
+/// the Windows client in a bottle can be handed the session the player already approved
+/// (`SteamClientSession`). `accountNames` still never copies a token out.
 ///
 /// A QR sign-in has only one place the account name reliably appears: the key the refresh token is
 /// stored under. DepotDownloader's `Success! … -username <name>` line is printed only when Steam

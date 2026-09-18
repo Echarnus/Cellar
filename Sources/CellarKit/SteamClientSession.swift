@@ -12,6 +12,16 @@ import Foundation
 ///
 /// A token is plaintext for exactly as long as it takes to encrypt it. Nothing here logs it, and no
 /// error or result carries it.
+///
+/// **What that blob does and does not protect.** It is exactly as strong as the client's own
+/// "Remember me" inside a bottle, and no stronger: Wine's key comes from the Wine user name, the
+/// blob's own salt and the account name, all of which sit in or beside the file, so anyone who can
+/// read the bottle can recover the token — `unprotect` here does precisely that. It is obfuscation
+/// plus a format the client understands, not a secret. Two consequences Cellar has to honour: a copy
+/// of a bottle (a backup, a synced folder, a `Steam.superseded-…` directory left by
+/// `linkIntoBottle`) carries a working credential, and signing out has to take the seeded session
+/// back out of every bottle — which is why `SteamAccount.signOut` calls
+/// `SteamBottle.forgetClientSessions` and `Reset` does the same.
 public enum SteamClientSession {
     /// What a refresh token says about itself — read from its JWT payload, never verified (Steam does
     /// that). Enough to refuse to seed a token the client could not use.
@@ -166,7 +176,6 @@ extension SteamClientSession {
         var localConfig: String?
         var loginUsers: String?
         var config: String?
-        var hasWineUserFolder: Bool
     }
 
     static func readiness(_ s: Snapshot, now: Date = Date()) -> Readiness {
@@ -178,20 +187,35 @@ extension SteamClientSession {
         }
         let local = s.localConfig.flatMap(TextVDF.parse)
         let users = s.loginUsers.flatMap(TextVDF.parse)
-        let knowsAccount = users.map { remembers($0, account: account) } ?? false
-        if knowsAccount,
-           local?.block(at: connectCachePath)?.string(connectCacheKey(account: account)) != nil {
-            return .remembered
-        }
-        // Someone signed the client in to another account by hand: that is theirs to change.
-        if let listed = users?.block("users"), !listed.entries.isEmpty, !knowsAccount {
+        // Someone else's sign-in is theirs to change. The test is who the client would *use* — the
+        // account it auto-logs in as — not merely who appears in the list: `loginusers.vdf` belongs
+        // to the shared install and keeps an entry for every account ever used there, so "our name is
+        // in it" would stop protecting a second account the moment Cellar had run once.
+        if let other = autoLoginAccount(users), other.caseInsensitiveCompare(account) != .orderedSame {
             return .unavailable(.otherAccount)
+        }
+        if local?.block(at: connectCachePath)?.string(connectCacheKey(account: account)) != nil,
+           users.map({ remembers($0, account: account) }) ?? false {
+            return .remembered
         }
         guard let token = s.token, let claims = claims(ofToken: token), claims.isUsable(at: now) else {
             return .unavailable(.tokenNotForClient)
         }
-        guard s.hasWineUserFolder else { return .unavailable(.bottleNotReady) }
         return .canHandOver
+    }
+
+    /// The account the client would sign in as by itself: the one marked most recent, or the only one
+    /// allowed to auto-log-in. `nil` when the file names nobody, which is a bottle nobody has used.
+    static func autoLoginAccount(_ loginUsers: TextVDF?) -> String? {
+        guard let users = loginUsers?.block("users") else { return nil }
+        let entries = users.entries.compactMap { entry -> TextVDF? in
+            if case .block(let user) = entry.value { return user }
+            return nil
+        }
+        let chosen = entries.first { $0.string("MostRecent") == "1" }
+            ?? entries.first { $0.string("AllowAutoLogin") == "1" }
+            ?? (entries.count == 1 ? entries.first : nil)
+        return chosen?.string("AccountName")
     }
 
     static let connectCachePath = ["MachineUserConfigStore", "Software", "Valve", "Steam", "ConnectCache"]
@@ -219,16 +243,12 @@ extension SteamClientSession {
         let state = SteamAccount.state
         let account = state.isUsable ? state.accountName : nil
         func read(_ url: URL) -> String? { try? String(contentsOf: url, encoding: .utf8) }
-        var isDirectory: ObjCBool = false
-        let userFolder = prefix.appendingPathComponent("drive_c/users/\(wineUser)").path
         return Snapshot(
             cellarAccount: account,
             token: account.flatMap(DepotTool.refreshToken(for:)),
             localConfig: read(localConfig(in: prefix, wineUser: wineUser)),
             loginUsers: read(loginUsersFile(steamDirectory: steamDirectory)),
-            config: read(configFile(steamDirectory: steamDirectory)),
-            hasWineUserFolder: FileManager.default.fileExists(atPath: userFolder, isDirectory: &isDirectory)
-                && isDirectory.boolValue)
+            config: read(configFile(steamDirectory: steamDirectory)))
     }
 
     /// Write the session into the bottle's `local.vdf` and the shared install's `loginusers.vdf` and
@@ -242,14 +262,26 @@ extension SteamClientSession {
               let protected = protectedToken(token, account: account, wineUser: wineUser)
         else { return decision }
 
+        // The bottle has to have been initialised before there is a Windows user folder to write into.
+        // Checked here rather than in `readiness`, because a bottle that Play is about to initialise
+        // must not make the game's page promise a sign-in window that never opens.
+        var isDirectory: ObjCBool = false
+        let userFolder = prefix.appendingPathComponent("drive_c/users/\(wineUser)").path
+        guard FileManager.default.fileExists(atPath: userFolder, isDirectory: &isDirectory), isDirectory.boolValue
+        else { return .unavailable(.bottleNotReady) }
+
         func load(_ text: String?) -> TextVDF { text.flatMap(TextVDF.parse) ?? TextVDF() }
+        // `loginusers.vdf` goes **last**, deliberately: it is what `SteamBottle.loggedInAccount` reads,
+        // so until it names the account nothing believes this bottle is signed in. Writing it first and
+        // then failing on `config.vdf` would report failure while the launch skipped the sign-in
+        // window — the exact bug this whole change exists to remove.
         let writes: [(URL, TextVDF)] = [
             (localConfig(in: prefix, wineUser: wineUser),
              withConnectCache(load(s.localConfig), account: account, value: protected)),
-            (loginUsersFile(steamDirectory: steamDirectory),
-             withLoginUser(load(s.loginUsers), steamID: claims.steamID, account: account, now: now)),
             (configFile(steamDirectory: steamDirectory),
              withAccount(load(s.config), steamID: claims.steamID, account: account)),
+            (loginUsersFile(steamDirectory: steamDirectory),
+             withLoginUser(load(s.loginUsers), steamID: claims.steamID, account: account, now: now)),
         ]
         do {
             for (url, file) in writes {
@@ -258,6 +290,9 @@ extension SteamClientSession {
                 try file.text.write(to: url, atomically: true, encoding: .utf8)
             }
         } catch {
+            // Take back whatever landed, so a half-written hand-over leaves no token behind and no
+            // claim of a sign-in.
+            forget(account: account, prefix: prefix, steamDirectory: steamDirectory, wineUser: wineUser)
             return .unavailable(.unreadableFiles)
         }
         return .canHandOver

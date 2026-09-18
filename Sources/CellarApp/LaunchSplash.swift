@@ -91,6 +91,8 @@ struct LaunchSplashView: View {
     let onDismiss: () -> Void
 
     @State private var elapsed = 0
+    /// Whether this launch ever asked for a sign-in — a step that has happened stays on the list.
+    @State private var sawSignIn = false
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -115,7 +117,10 @@ struct LaunchSplashView: View {
         .background(.background)
         // The window is borderless and transparent, so the rounded corner is the view's job.
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .onReceive(tick) { _ in if outcome == .working { elapsed += 1 } }
+        .onReceive(tick) { _ in
+            if outcome == .working { elapsed += 1 }
+            if runner.stage == .signIn { sawSignIn = true }
+        }
         .onChange(of: outcome) { newValue in
             switch newValue {
             // The game is on screen; the window has said what it came to say. A beat, so the ✓ is
@@ -256,8 +261,12 @@ struct LaunchSplashView: View {
     private var sequence: [LaunchStage] {
         let context = game.launchContext
         // Steam refused the session Cellar handed it, so its window opened after all: show the
-        // sign-in step rather than jumping back to the first one.
-        guard runner.stage == .signIn, !context.signsInFirst else { return LaunchStage.sequence(context) }
+        // sign-in step rather than jumping back to the first one — and keep showing it for the rest
+        // of the launch, because a checklist that drops a step the player just completed reads as a
+        // different launch.
+        guard sawSignIn || runner.stage == .signIn, !context.signsInFirst else {
+            return LaunchStage.sequence(context)
+        }
         return LaunchStage.sequence(LaunchContext(game: context.game, store: context.store,
                                                   throughClient: context.throughClient, signsInFirst: true))
     }

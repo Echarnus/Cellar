@@ -566,6 +566,21 @@ public extension SteamBottle {
         return .canHandOver
     }
 
+    /// Take the handed-over session back out of **every** bottle — what signing out of Cellar, and
+    /// resetting its Steam sign-in, have to do.
+    ///
+    /// The token lives in each bottle's own `local.vdf`, so removing DepotDownloader's copy alone
+    /// would leave a working credential behind in every bottle for the rest of its ~200 days.
+    /// `AutoLoginUser` in the registry is left as it is: it is a name, not a credential, and a client
+    /// with no remembered session simply asks for one.
+    static func forgetClientSessions(account: String) {
+        let bottles = ((try? PrefixManager.list()) ?? []).map(\.url)
+        for prefix in bottles {
+            SteamClientSession.forget(account: account, prefix: prefix,
+                                      steamDirectory: steamDirectory(in: prefix), wineUser: wineUser)
+        }
+    }
+
     /// `HKCU\Software\Valve\Steam` `AutoLoginUser` + `RememberPassword`, as Steam's "Remember me"
     /// leaves them. Skipped when already set, because asking Wine costs a few seconds.
     internal static func setAutoLogin(account: String, runner: WineRunner) {
@@ -609,7 +624,7 @@ public extension SteamBottle {
     /// game never starts against a client nobody is signed in to.
     internal static func waitForClientLogon(runner: WineRunner, since mark: UInt64, game: String,
                                             showHUD: Bool, gameEnv: [String: String],
-                                            timeout: TimeInterval = 120,
+                                            timeout: TimeInterval = 180,
                                             progress: (String) -> Void,
                                             stage: (LaunchStage) -> Void) throws {
         let deadline = Date().addingTimeInterval(timeout)
@@ -620,11 +635,12 @@ public extension SteamBottle {
                 return
             case .refused(let reason)?:
                 progress("Steam didn't accept the sign-in Cellar gave it (\(reason)), so its own window opens instead.")
-                if let account = SteamAccount.state.accountName {
-                    SteamClientSession.forget(account: account, prefix: runner.prefix,
-                                              steamDirectory: steamDirectory(in: runner.prefix), wineUser: wineUser)
-                }
-                stage(.signIn)
+                // Steam refusing a refresh token means that token is done, so the session is marked
+                // as refused too: the next launch asks rather than handing over a dead one again, and
+                // Settings offers "Sign in again".
+                SteamAccount.noteClientRefusal(reason)
+                fallBackToClientWindow(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
+                                       progress: progress, stage: stage)
                 try waitForClientSignIn(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
                                         progress: progress)
                 return
@@ -636,9 +652,29 @@ public extension SteamBottle {
                 Thread.sleep(forTimeInterval: 2)
             }
         }
-        // Cellar cannot tell a slow Steam from a stuck one, so it says what it knows and goes on
-        // rather than refusing a launch that may well work.
-        progress("Steam hasn't reported a sign-in in \(Int(timeout)) s. Starting \(game) anyway — if it says SteamAPI isn't ready, press Play again.")
+        // No answer at all is the third outcome, and it is not "fine": Steam can decide to ask for a
+        // Steam Guard confirmation, or sit on a login window with no network, and neither writes a
+        // logon line. Starting the game into that gives "Unable to initialize SteamAPI", so this ends
+        // in the same place a refusal does — the client's own window, which is the one thing that can
+        // still fix it.
+        progress("Steam hasn't signed in within \(Int(timeout / 60)) minutes, so its own window opens — sign in there and \(game) starts.")
+        fallBackToClientWindow(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
+                               progress: progress, stage: stage)
+        try waitForClientSignIn(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
+                                progress: progress)
+    }
+
+    /// Take the handed-over session back and put the sign-in step on screen, so `waitForClientSignIn`
+    /// really waits instead of returning at once on a `loginusers.vdf` Cellar wrote itself.
+    private static func fallBackToClientWindow(runner: WineRunner, game: String, showHUD: Bool,
+                                               gameEnv: [String: String],
+                                               progress: (String) -> Void,
+                                               stage: (LaunchStage) -> Void) {
+        if let account = SteamAccount.state.accountName ?? SteamAccount.record?.accountName {
+            SteamClientSession.forget(account: account, prefix: runner.prefix,
+                                      steamDirectory: steamDirectory(in: runner.prefix), wineUser: wineUser)
+        }
+        stage(.signIn)
     }
 
     /// Open the client's own window and wait until the player has signed in to it.
