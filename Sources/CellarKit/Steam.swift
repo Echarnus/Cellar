@@ -517,39 +517,18 @@ public extension SteamBottle {
         env["SteamGameId"] = "\(appID)"
         let log = Paths.logs.appendingPathComponent("game-\(exe.deletingPathExtension().lastPathComponent).log")
 
-        // The same supervision `runGameSupervised` gives the client's own route: D3DMetal 3.0 drops a
-        // game a few seconds in, and without a retry a single Play ended with a dead game and a
-        // crash reporter. Reported as attempts, because a launch that took three tries is not a
-        // launch that took one.
-        stage(.starting)
-        for attempt in 1...attempts {
-            if attempt > 1 {
-                ProcessWatch.kill([exe.lastPathComponent, "crash_reporter.exe"])
-                Thread.sleep(forTimeInterval: 8)
-                progress("Attempt \(attempt): starting \(exe.lastPathComponent) again…")
-            } else {
-                progress("Launching \(exe.lastPathComponent)…")
-            }
-            try runner.spawn([exe.path], extraEnv: env, log: log)
-            stage(.waiting)
-            guard ProcessWatch.waitToAppear([exe.lastPathComponent], seconds: 40) else {
-                progress("Attempt \(attempt): \(exe.lastPathComponent) didn't start; retrying…")
-                continue
-            }
-            // Did it survive the startup race? ~16 s is where D3DMetal drops it.
-            var survived = true
-            for _ in 0..<8 {
-                Thread.sleep(forTimeInterval: 2)
-                if !ProcessWatch.isRunning(exe.lastPathComponent) { survived = false; break }
-            }
-            if survived {
-                if attempt > 1 { progress("Up after \(attempt) attempts.") }
-                return
-            }
-            progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
-        }
-        throw CellarError.ioFailure(
-            "\(game) kept stopping within seconds of starting, \(attempts) times — the D3DMetal startup race. Press Play again, and see the activity log for the game's own output.")
+        // The same supervision the client's own route gets, through the loop Battle.net already uses:
+        // D3DMetal 3.0 drops a game a few seconds in, and with no retry here a single Play ended with
+        // a dead game and a crash reporter.
+        progress("Launching \(exe.lastPathComponent)…")
+        try ProcessWatch.superviseStart(
+            attempts: attempts,
+            appearSeconds: 40,
+            cleanup: { ProcessWatch.kill([exe.lastPathComponent, "crash_reporter.exe"]) },
+            start: { try runner.spawn([exe.path], extraEnv: env, log: log) },
+            isUp: { ProcessWatch.isRunning(exe.lastPathComponent) },
+            progress: progress,
+            stage: stage)
     }
 }
 
