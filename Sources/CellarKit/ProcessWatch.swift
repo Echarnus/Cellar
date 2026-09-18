@@ -7,9 +7,18 @@ import Foundation
 /// an exe name, an install directory — and is bottle-blind by construction. Callers that need
 /// per-bottle certainty must pick a needle that only one bottle could produce.
 public enum ProcessWatch {
-    /// Whether any process's command line contains `needle` (case-insensitive, literal).
+    /// Processes that *mention* a game without being it. A crash reporter is started with the game's
+    /// own path on its command line (`crash_reporter.exe … -parentpath C:\…\PlanetCoaster2.exe`), so
+    /// a plain name match sees it and reports the game alive **after** it has died — which is exactly
+    /// when a supervised launch needs to know otherwise. Measured on a real Planet Coaster 2 crash.
+    static let impostors = ["crash_reporter.exe", "steamerrorreporter", "winedbg", "wineboot"]
+
+    /// Whether any process's command line contains `needle` (case-insensitive, literal), ignoring
+    /// the impostors above.
     public static func isRunning(_ needle: String) -> Bool {
-        Shell.run("/bin/sh", ["-c", "ps -axo command | grep -vi grep | grep -qiF \"\(needle)\""]).succeeded
+        let excluded = impostors.map { "| grep -viF \"\($0)\" " }.joined()
+        return Shell.run("/bin/sh", ["-c",
+            "ps -axo command | grep -vi grep | grep -iF \"\(needle)\" \(excluded)| grep -q ."]).succeeded
     }
 
     /// Whether any of `needles` matches. Used where one thing has several possible spellings
