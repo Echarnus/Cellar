@@ -20,6 +20,8 @@ struct InstallProgressBarTests {
         ("Planet Coaster 2", .steam, InstallProgress(.clientUpdate, fraction: 0.16)),
         ("Planet Coaster 2", .steam, InstallProgress(.downloading, fraction: 0.42)),
         ("The Witcher 3", .gog, InstallProgress(.installing)),
+        ("Planet Coaster 2", .steam, InstallProgress(.updateCheck)),
+        ("Planet Coaster 2", .steam, InstallProgress(.updating, fraction: 0.07)),
     ]
 
     @Test("A measured phase shows its percentage; an unmeasured one shows none")

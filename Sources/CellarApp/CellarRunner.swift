@@ -168,6 +168,33 @@ final class CellarRunner: ObservableObject {
         installingSlug = slug
     }
 
+    /// Run a CLI command beside the runner rather than on it — no activity log, no busy state — and
+    /// wait for it. For the background update check only: it must not take the one runner (and every
+    /// Play button with it) away from the player, yet it talks to Steam, so it still goes through
+    /// the CLI like every other networked action instead of running inside the app.
+    func runBeside(_ args: [String]) async -> Int32 {
+        let path = binary
+        return await Task.detached(priority: .utility) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: path)
+            process.arguments = args
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            process.standardInput = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return -1 }
+            process.waitUntilExit()
+            return process.terminationStatus
+        }.value
+    }
+
+    /// Bring a game Cellar downloaded up to Steam's current build, with the same bar as Install —
+    /// a patch can be gigabytes, and a spinner is no answer to "how long".
+    func update(slug: String, name: String, then: (@MainActor () -> Void)? = nil) {
+        guard !busy else { return }
+        run(["update", slug, "--machine-progress"], title: "Updating \(name)", stages: true, then: then)
+        installingSlug = slug
+    }
+
     /// The game currently being launched, if the running command is a launch.
     @Published private(set) var launchingSlug: String?
 

@@ -105,11 +105,23 @@ issued, and what the app says to the player.
 | Games addressed by | numeric AppID | product code (`Fen` = Diablo IV) | `gog_product_id` |
 | Authentication | in the client's own window | in the client's own window | **OAuth 2.0 token Cellar holds** (keychain) |
 | "Signed in?" | readable — `config/loginusers.vdf` | **not observable**; folded into "open the client" | readable — Cellar owns the token |
-| "Installed?" | `appmanifest_<id>.acf`, `StateFlags 4` | the profile's `install_dir` + `exe` on disk | the exe on disk |
+| "Installed?" | `appmanifest_<id>.acf` says `StateFlags 4` **and** its `installdir` holds files; or Cellar's own depot download | the profile's `install_dir` + `exe` on disk | the exe on disk |
 | Install a game | `steam://install/<id>` | no drivable URL — open the client | Cellar downloads + runs the installer |
 | Launch | `steam://rungameid/<id>` into a `-silent` client | `Battle.net.exe --exec="launch <product>"`, client warmed first | run the exe — nothing beside it |
+| Updates | Steam patches its own library; a copy Cellar downloaded is checked against Steam and patched before Play (`GameUpdates`) | the client | not handled yet — reinstall |
 | Uninstall | delete the install dir **inside the shared library**, plus its manifests; close the client first | delete the install dir; the client re-offers it as an install | run the game's own Inno uninstaller, then delete |
 | Public artwork | yes, per AppID | none a launcher may hotlink | yes, from the product API |
+
+**Two kinds of Steam install, and who updates each.** A game in Steam's own library has an
+appmanifest and Steam patches it. One Cellar fetched with DepotDownloader has no appmanifest, so Steam
+never sees it — `GameUpdates` compares the manifest ids DepotDownloader recorded in
+`.DepotDownloader/depot.config` with the ones Steam serves today (a `-manifest-only` run, no game files
+moved), and `DepotTool.fetch` into the same folder downloads only the changed chunks. Play does this
+before it starts the game (a check that can't reach Steam, or an update that can't begin, starts the
+intact build; only an update that stopped mid-write blocks Play); `cellar update` does it by hand; the
+app re-asks Steam every six hours so the game page says which it is. An appmanifest alone never counts
+as installed: one that outlived its `steamapps/common` folder (or whose folder holds only hidden files)
+used to send Play down `rungameid`, and Steam answered with its own Install dialog.
 
 Three consequences worth stating plainly, because they shape the UI as much as the code:
 

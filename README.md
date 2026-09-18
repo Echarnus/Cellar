@@ -214,6 +214,7 @@ Your games, and starting over:
 cellar library                      # the games you own that Cellar can run
 cellar library --refresh            # ask your stores again
 cellar install planet-coaster-2     # download it with the sign-in you already gave
+cellar update                       # catch the games Cellar downloaded up to Steam's current build
 cellar reset                        # show everything Cellar put on this Mac (--yes to remove it)
 ```
 

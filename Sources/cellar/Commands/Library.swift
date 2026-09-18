@@ -92,6 +92,7 @@ struct LibraryCommand: ParsableCommand {
         case .notOwned: return "not in your library"
         case .unknown(let why): return why
         case .owned:
+            if game.updatePending { return "installed, update available — cellar update \(game.slug)" }
             if game.gameInstalled { return "installed — cellar launch \(game.slug)" }
             return "owned, not installed — cellar install \(game.slug)"
         }

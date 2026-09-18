@@ -136,12 +136,38 @@ struct ContentView: View {
         }
         .frame(minWidth: 880, minHeight: 580)
         .onAppear { lib.refresh() }
+        .task { await keepGamesCurrent() }
         .onReceive(NotificationCenter.default.publisher(for: .cellarAccountsChanged)) { _ in
             lib.checking = nil
             lib.refresh()
         }
         .onReceive(NotificationCenter.default.publisher(for: .cellarLibraryChecking)) { note in
             lib.checking = note.object as? String
+        }
+    }
+
+    /// How old an answer from Steam may get before the app asks again.
+    private static let updateCheckInterval = GameUpdates.recheckInterval
+
+    /// Keeps each downloaded game's "up to date / update available" honest while the app is open, by
+    /// asking Steam about any game whose last answer is stale. It only asks: the download itself
+    /// happens on Play (which catches the game up before starting it) or on "Update now", where the
+    /// player sees it coming. A patch started on its own would hold the app's one runner — and with
+    /// it every Play button — for as long as it took, with nothing on screen to stop it.
+    ///
+    /// Skipped while Cellar is running anything, so a check never competes with a download or a game.
+    private func keepGamesCurrent() async {
+        while !Task.isCancelled {
+            let due = lib.games
+                .filter { $0.update != nil && !GameUpdates.isFresh($0.update, within: Self.updateCheckInterval) }
+                .map(\.slug)
+            if !due.isEmpty, !runner.busy {
+                for slug in due {
+                    _ = await runner.runBeside(["update", slug, "--check"])
+                }
+                lib.refresh()
+            }
+            try? await Task.sleep(for: .seconds(30 * 60))
         }
     }
 

@@ -144,6 +144,15 @@ struct GameDetailView: View {
                 Button("Download and install from GOG") { act(["gog", "install", game.slug], "Installing") }
                 Button("GOG accounts…") { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
             }
+            // Any game whose files Cellar fetched from a Steam depot — with or without a live session.
+            if game.update != nil {
+                if game.updatePending {
+                    Button("Update now") { runner.update(slug: game.slug, name: game.name) { onChange() } }
+                }
+                Button("Check for updates") {
+                    act(["update", game.slug, "--check"], "Checking \(game.name) for updates")
+                }
+            }
             // The game's own app — its name, its icon — whatever store it came from. A wrapper for
             // the store client is not offered on a game's page: there it read as the game's app.
             Button("Add \(game.name) to Applications") { act(["app", game.slug], "Adding to Applications") }
@@ -215,8 +224,36 @@ struct GameDetailView: View {
                 && game.store.descriptor.installsClientInBottle
             Chip(needsClient ? "Needs \(game.store.displayName) running" : "Runs on its own",
                  system: needsClient ? "link" : "bolt.fill")
+            if let update = game.update { updateChip(update) }
             Spacer()
         }
+    }
+
+    /// Whether this copy is Steam's current build. Only for a game Cellar downloaded: Steam keeps
+    /// its own library current, and a chip claiming Cellar checked that would be a claim about
+    /// nothing. "Up to date" is only ever said with the time Steam said it.
+    @ViewBuilder private func updateChip(_ update: GameUpdates.State) -> some View {
+        switch update {
+        case .upToDate(let checked) where GameUpdates.isFresh(update, within: GameUpdates.recheckInterval):
+            Chip("Up to date", system: "checkmark.seal")
+                .help("Steam confirmed this is the current build \(Self.relative(checked)).")
+        case .upToDate(let checked):
+            // An old "up to date" is only a fact about the past; say when, not what.
+            Chip("Checked \(Self.relative(checked))", system: "clock")
+                .help("Steam said this was the current build then. Play checks again before it starts the game.")
+        case .available(let checked):
+            Chip("Update available", system: "arrow.down.circle.fill", tint: .blue)
+                .help("Steam has a newer build than the one on disk (checked \(Self.relative(checked))). Play downloads only what changed, first.")
+        case .unknown:
+            Chip("Not checked for updates", system: "questionmark.circle")
+                .help("Cellar hasn't been able to ask Steam yet. Play checks before it starts the game.")
+        }
+    }
+
+    private static func relative(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     // MARK: - Information

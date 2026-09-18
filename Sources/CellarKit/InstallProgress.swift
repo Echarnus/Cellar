@@ -22,6 +22,10 @@ public enum InstallPhase: String, Sendable, CaseIterable {
     case downloading
     /// Running the game's own installer (GOG).
     case installing
+    /// Asking Steam whether a game Cellar downloaded has a newer build. No denominator.
+    case updateCheck
+    /// Fetching what changed since the copy on disk — a patch, not the whole game.
+    case updating
 
     public func title(game: String, store: GameStore) -> String {
         switch self {
@@ -31,6 +35,8 @@ public enum InstallPhase: String, Sendable, CaseIterable {
         case .clientUpdate: return "Updating \(store.displayName)"
         case .downloading: return "Downloading \(game)"
         case .installing:  return "Installing \(game)"
+        case .updateCheck: return "Checking for a newer version"
+        case .updating:    return "Updating \(game)"
         }
     }
 
@@ -51,6 +57,10 @@ public enum InstallPhase: String, Sendable, CaseIterable {
             return "Straight from your library. You can keep using your Mac."
         case .installing:
             return "The installer runs with no window, so this bar is the progress."
+        case .updateCheck:
+            return "Asking \(store.displayName) which build is current. Nothing is downloaded yet."
+        case .updating:
+            return "Only what changed since your last download."
         }
     }
 }

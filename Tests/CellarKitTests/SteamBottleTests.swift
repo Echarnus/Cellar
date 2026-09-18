@@ -140,6 +140,11 @@ struct SteamBottleTests {
             at: SteamBottle.steamDirectory(in: claimed).appendingPathComponent("steamapps/common/A Game"),
             withIntermediateDirectories: true)
         #expect(SteamBottle.isGameInstalled(in: claimed, appID: 42) == false)
+
+        // Opening that folder in Finder leaves a `.DS_Store`, which is not a game either.
+        try "".write(to: SteamBottle.steamDirectory(in: claimed)
+            .appendingPathComponent("steamapps/common/A Game/.DS_Store"), atomically: true, encoding: .utf8)
+        #expect(SteamBottle.isGameInstalled(in: claimed, appID: 42) == false)
     }
 
     @Test("A missing manifest is 'not installed', not a crash")

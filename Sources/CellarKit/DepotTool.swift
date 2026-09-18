@@ -228,6 +228,65 @@ public enum DepotTool {
     /// Serialises the read-modify-write of the sign-in record when checks run side by side.
     private static let sessionRecordLock = NSLock()
 
+    // MARK: - Current build
+
+    /// What Steam says is the current build of an app, depot by depot.
+    public enum LatestManifests: Sendable, Equatable {
+        case manifests([UInt32: UInt64])
+        /// No answer — not signed in, no network, the tool failed. Not "up to date".
+        case unknown(String)
+    }
+
+    /// Ask Steam which manifest each of an app's Windows depots is on today, without downloading
+    /// the game. Same `-manifest-only` question as `access`, and like it, the run is stopped the
+    /// moment every depot has named its manifest.
+    ///
+    /// Into a scratch directory, never the game's: a manifest-only run writes its own
+    /// `depot.config`, and in the game's folder that would overwrite the record of what is installed.
+    /// One directory per run, because the app's background check and a launch can ask about the
+    /// same game at once — and a logon id of its own, so a check never signs out a download.
+    public static func latestManifests(appID: Int, credentials: Credentials,
+                                       timeout: TimeInterval = 90) -> LatestManifests {
+        guard (try? install()) != nil else { return .unknown("DepotDownloader isn't installed") }
+        let scratch = Paths.cache.appendingPathComponent("update-check/\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var args = ["-app", "\(appID)", "-os", "windows", "-osarch", "64",
+                    "-manifest-only", "-dir", scratch.path]
+        args += credentials.arguments
+        args += ["-loginid", "\(updateCheckLoginIDBase + UInt32.random(in: 0..<256))"]
+
+        var listing = DepotManifests.Listing()
+        do {
+            try runStreaming(args: args, timeout: timeout) { line in
+                SteamAccount.note(line)
+                listing.read(line)
+            } stopWhen: { listing.isComplete }
+        } catch {
+            if let failure = listing.failure { return .unknown(failure) }
+            return .unknown("DepotDownloader failed: \(CellarLog.describe(error))")
+        }
+        if let failure = listing.failure { return .unknown(failure) }
+        guard listing.isComplete else { return .unknown("Steam didn't answer in time") }
+        SteamAccount.noteSuccess()
+        return .manifests(listing.manifests)
+    }
+
+    /// Logon ids for update checks ("CEU" + a random byte) — apart from DepotDownloader's default,
+    /// which downloads use, and from the ownership checks' range.
+    static let updateCheckLoginIDBase: UInt32 = 0x4345_5500
+
+    /// Whether a DepotDownloader run is writing into `directory` right now — including one left
+    /// behind by a `cellar` that was stopped: the tool is its own process and outlives its parent.
+    /// Two runs in one game folder is two writers on the same files, so anything about to start one
+    /// asks this first.
+    public static func isDownloading(into directory: URL) -> Bool {
+        // The `sh -c` line itself carries both words; excluding `ps -axo` rules it out.
+        Shell.run("/bin/sh", ["-c",
+            "ps -axo command | grep -v 'ps -axo' | grep -F DepotDownloader | grep -qF -- \"$0\"",
+            directory.path]).succeeded
+    }
+
     // MARK: - The stored session
 
     /// Whether DepotDownloader holds a token, so a download needs no sign-in.

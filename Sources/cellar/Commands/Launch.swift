@@ -17,6 +17,10 @@ struct Launch: ParsableCommand {
     @Flag(name: .customLong("store"), help: "Force the store-client launch path even if a direct launch is possible.")
     var forceStore = false
 
+    @Flag(name: .customLong("no-update"),
+          help: "Start the version on disk without asking Steam for a newer one first (games Cellar downloaded itself).")
+    var noUpdate = false
+
     @Flag(name: .customLong("no-wait"), help: "Return immediately after launch instead of waiting for the game to exit and closing the layer.")
     var noWait = false
 
@@ -87,7 +91,8 @@ struct Launch: ParsableCommand {
             }
         }
 
-        let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore, stage: report,
+        let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore,
+                                    checkUpdates: !noUpdate, stage: report,
                                     update: updateReporter()) {
             print("  " + Term.dim($0))
         }

@@ -300,6 +300,9 @@ public struct GameSummary: Identifiable, Sendable {
             case .gog:        return "Cellar downloads it from your GOG library and installs it. No client, and nothing runs alongside the game." + first
             }
         case .play:
+            if updatePending {
+                return "A newer version is out. Play downloads only what changed, then starts the game."
+            }
             if clientSignInPending {
                 return "Installed. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game."
             }
@@ -311,6 +314,17 @@ public struct GameSummary: Identifiable, Sendable {
 
     /// Whether playing this game will bring a store client up alongside it.
     public let needsClientAtRuntime: Bool
+
+    /// Whether this copy is on Steam's current build — only for a game Cellar downloaded itself,
+    /// since Steam updates the ones in its own library. Nil means Cellar doesn't manage it. Read
+    /// from the last check, never by asking Steam: this is built on every library refresh.
+    public let update: GameUpdates.State?
+
+    /// A newer build is known to be out, so Play fetches it first.
+    public var updatePending: Bool {
+        if case .available = update { return true }
+        return false
+    }
 
     /// Who is being launched and by which route — what the launch window words its steps from.
     public var launchContext: LaunchContext {
@@ -332,7 +346,8 @@ public struct GameSummary: Identifiable, Sendable {
                 clientSignsInByItself: Bool = false,
                 artworkAppID: Int?,
                 artPortraitURL: String?, artHeroURL: String?,
-                needsClientAtRuntime: Bool, facts: GameFacts, runnerID: String, backend: String,
+                needsClientAtRuntime: Bool, update: GameUpdates.State? = nil,
+                facts: GameFacts, runnerID: String, backend: String,
                 bottleName: String) {
         self.slug = slug
         self.name = name
@@ -353,6 +368,7 @@ public struct GameSummary: Identifiable, Sendable {
         self.artPortraitURL = artPortraitURL
         self.artHeroURL = artHeroURL
         self.needsClientAtRuntime = needsClientAtRuntime
+        self.update = update
         self.facts = facts
         self.runnerID = runnerID
         self.backend = backend
@@ -393,6 +409,7 @@ public enum Game {
                 artPortraitURL: plan.artPortraitURL,
                 artHeroURL: plan.artHeroURL,
                 needsClientAtRuntime: !plan.canLaunchStoreFree,
+                update: GameUpdates.cachedState(plan),
                 facts: plan.facts,
                 runnerID: plan.runnerID,
                 backend: plan.backend,
@@ -756,6 +773,7 @@ public enum Game {
     /// `forceStore` skips the store-free shortcut, for debugging a title that normally runs bare.
     @discardableResult
     public static func launch(_ plan: GamePlan, showHUD: Bool = false, forceStore: Bool = false,
+                              checkUpdates: Bool = true,
                               stage: (LaunchStage) -> Void = { _ in },
                               update: (InstallProgress) -> Void = { _ in },
                               progress: (String) -> Void = { _ in }) throws -> LaunchRoute {
@@ -771,6 +789,7 @@ public enum Game {
             subject: plan.slug)
         do {
             let route = try route(plan, showHUD: showHUD, forceStore: forceStore,
+                                  checkUpdates: checkUpdates,
                                   progress: step, stage: stage, update: update)
             Diagnostics.playSessionBegan(slug: plan.slug, name: plan.name, route: route.logDescription)
             return route
@@ -782,6 +801,7 @@ public enum Game {
 
     /// Pick the route and take it. Split out of `launch` so the logging above wraps every path.
     private static func route(_ plan: GamePlan, showHUD: Bool, forceStore: Bool,
+                              checkUpdates: Bool,
                               progress: (String) -> Void,
                               stage: (LaunchStage) -> Void,
                               update: (InstallProgress) -> Void) throws -> LaunchRoute {
@@ -792,6 +812,12 @@ public enum Game {
         // After a runner update Wine would rebuild the prefix inside this launch, with its own
         // "Please wait" box on screen. Do it first, where nothing is drawn.
         wine.updatePrefixIfStale()
+
+        // A copy Cellar downloaded has nobody else to keep it current: Steam doesn't know it exists.
+        // So Cellar does what Steam does before it starts anything — catch it up first.
+        if checkUpdates, GameUpdates.managesUpdates(plan) {
+            try updateBeforeLaunch(plan, progress: progress, update: update)
+        }
 
         // No live-session DRM and the exe is on disk → run it directly, no client at all.
         if plan.canLaunchStoreFree && !forceStore {
@@ -897,6 +923,53 @@ public enum Game {
             // Reaching here means the exe isn't on disk: a DRM-free game never needs the store route.
             throw CellarError.invalidArgument(
                 "\(plan.name) isn't installed yet. Run: cellar gog install \(plan.slug)")
+        }
+    }
+
+    /// How long an "up to date" answer is trusted before Play asks Steam again. Long enough that a
+    /// relaunch straight after a crash doesn't pay for the check twice, short enough that a patch
+    /// released this afternoon is picked up this evening.
+    static let updateCheckReuse: TimeInterval = 15 * 60
+
+    /// Bring a Cellar-downloaded game up to Steam's current build before it starts.
+    ///
+    /// Only one thing stands between the player and the build they have: files that are mid-change.
+    /// A check that can't reach Steam, or an update that can't begin (offline, sign-in expired),
+    /// says so and starts the intact build on disk. An update that stopped after it began replacing
+    /// files does not, because half a patch is a game in no known state; the next Play resumes it.
+    ///
+    /// Steam is asked afresh unless it said "up to date" in the last few minutes — never on the
+    /// strength of an older "update available", which an update since then would have made stale.
+    static func updateBeforeLaunch(_ plan: GamePlan, progress: (String) -> Void,
+                                   update: (InstallProgress) -> Void) throws {
+        if DepotTool.isDownloading(into: plan.depotGameDir) {
+            throw CellarError.ioFailure(
+                "An update for \(plan.name) is still downloading into its folder. Wait for it to finish, then press Play — starting the game now would run it on files that are being replaced.")
+        }
+        let cached = GameUpdates.cachedState(plan)
+        if case .upToDate = cached, GameUpdates.isFresh(cached, within: updateCheckReuse) { return }
+
+        progress("Checking with Steam for a newer version of \(plan.name)…")
+        update(InstallProgress(.updateCheck))
+        switch GameUpdates.check(plan, timeout: 60) {
+        case .available:
+            progress("A newer version of \(plan.name) is out — downloading only what changed…")
+            do {
+                try GameUpdates.apply(plan, progress: progress, phase: update)
+            } catch GameUpdates.UpdateFailure.notStarted(let why) {
+                progress("Couldn't download the update (\(why)) — starting the version you have.")
+            } catch GameUpdates.UpdateFailure.alreadyDownloading {
+                throw CellarError.ioFailure(
+                    "An update for \(plan.name) is already downloading into its folder. Wait for it to finish, then press Play.")
+            } catch {
+                CellarLog.failure(.launch, "\(plan.name)'s update stopped partway", error, subject: plan.slug)
+                throw CellarError.ioFailure(
+                    "\(plan.name)'s update stopped partway (\(CellarLog.describe(error))). Press Play again to pick it up where it left off, or run: cellar update \(plan.slug)")
+            }
+        case .unknown(let why):
+            progress("Couldn't check for updates (\(why)) — starting the version you have.")
+        case .upToDate:
+            break
         }
     }
 
