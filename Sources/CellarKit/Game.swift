@@ -77,7 +77,9 @@ public struct GamePlan {
     public var launchContext: LaunchContext {
         LaunchContext(game: name, store: store, throughClient: !canLaunchStoreFree,
                       signsInFirst: needsLiveSession && store.descriptor.installsClientInBottle
-                          && store.descriptor.canDetectSignIn && Game.signedInAccount(self) == nil)
+                          && store.descriptor.canDetectSignIn && Game.signedInAccount(self) == nil
+                          // Not a step when Cellar signs the client in itself.
+                          && !(store == .steam && SteamBottle.clientSessionReadiness(in: prefix).signsInByItself))
     }
 
     /// Command-line fragments that identify the *game's own* process, so a supervised launch never
@@ -211,10 +213,11 @@ public struct GameSummary: Identifiable, Sendable {
     /// Signing in is never a step of its own on a game's page. Cellar's sign-in is account-level,
     /// done once in Settings, and a game whose store hasn't been signed in is not in the library.
     ///
-    /// The store **client inside the bottle** is the one sign-in left, and it is folded into Play
-    /// (`clientSignInPending`): a Steamworks or Denuvo game talks to a running Steam, whose session
-    /// Cellar cannot supply from a token. A separate "Sign in to Steam" button beside a Settings
-    /// row already saying "Signed in" read as Cellar asking twice.
+    /// The store **client inside the bottle** keeps a session of its own: a Steamworks or Denuvo game
+    /// talks to a running Steam. Cellar hands that client the player's session when it can
+    /// (`SteamClientSession`); when it can't, the sign-in is folded into Play (`clientSignInPending`)
+    /// — a separate "Sign in to Steam" button beside a Settings row already saying "Signed in" read
+    /// as Cellar asking twice.
     public var nextStep: NextStep {
         // Install sets up whatever is missing before it fetches the game, so a game that isn't on
         // disk yet is one button away, never two. A separate "Set up" step asked the player for
@@ -229,11 +232,17 @@ public struct GameSummary: Identifiable, Sendable {
     /// Whether Play first opens the store client's window for the player to sign in to it.
     ///
     /// Only where Cellar can actually *read* that nobody is signed in. Battle.net publishes nothing
-    /// comparable, so it is never promised a sign-in — signing in stays folded into its client.
+    /// comparable, so it is never promised a sign-in — signing in stays folded into its client. And
+    /// not where Cellar hands the client the session the player already gave it
+    /// (`clientSignsInByItself`), which is the ordinary case for Steam.
     public var clientSignInPending: Bool {
         needsLiveSession && store.descriptor.installsClientInBottle
-            && store.descriptor.canDetectSignIn && account == nil
+            && store.descriptor.canDetectSignIn && account == nil && !clientSignsInByItself
     }
+
+    /// Whether the store client in the bottle signs in with Cellar's own session — already remembered
+    /// there, or handed over when Play starts it (`SteamBottle.clientSessionReadiness`).
+    public let clientSignsInByItself: Bool
 
     /// Whether install has to set things up before the game itself — the runtime, or a store
     /// client. The client only has to exist for a game that talks to it while it runs, and for
@@ -320,6 +329,7 @@ public struct GameSummary: Identifiable, Sendable {
                 bottleExists: Bool, running: Bool, productCode: String?,
                 ownership: Ownership = .unknown("not checked"),
                 needsLiveSession: Bool = true,
+                clientSignsInByItself: Bool = false,
                 artworkAppID: Int?,
                 artPortraitURL: String?, artHeroURL: String?,
                 needsClientAtRuntime: Bool, facts: GameFacts, runnerID: String, backend: String,
@@ -338,6 +348,7 @@ public struct GameSummary: Identifiable, Sendable {
         self.productCode = productCode
         self.ownership = ownership
         self.needsLiveSession = needsLiveSession
+        self.clientSignsInByItself = clientSignsInByItself
         self.artworkAppID = artworkAppID
         self.artPortraitURL = artPortraitURL
         self.artHeroURL = artHeroURL
@@ -374,6 +385,8 @@ public enum Game {
                 // store anything. `StoreLibrary.refreshAll` is what does the asking.
                 ownership: StoreLibrary.ownership(of: plan),
                 needsLiveSession: plan.needsLiveSession,
+                clientSignsInByItself: plan.store == .steam && plan.needsLiveSession && clientInstalled
+                    && SteamBottle.clientSessionReadiness(in: plan.prefix).signsInByItself,
                 // Only Steam publishes free cover art keyed on an app id; everything else has to
                 // bring its own URLs or fall back to Cellar's generated cover.
                 artworkAppID: plan.store == .steam ? plan.appID : nil,
@@ -826,26 +839,33 @@ public enum Game {
                         "\(plan.name) needs a running Steam client for its DRM, and this bottle has none. Run: cellar setup --profile \(plan.slug)")
                 }
                 // A client nobody is signed in to would move the failure to the game's own licence
-                // check, where it looks like the game is broken. So Play opens the client's window
-                // and waits for the sign-in — the one step Cellar cannot take for the player.
-                if SteamBottle.loggedInAccount(in: plan.prefix) == nil {
+                // check, where it looks like the game is broken. So the client is handed the session
+                // the player gave Cellar; only when that can't be done does Play open the client's
+                // window and wait for the player to sign in to it.
+                // Handed over now, or already remembered from a previous launch: either way the
+                // client signs itself in, and the game has to wait for that to land.
+                let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
+                if !signsItself, SteamBottle.loggedInAccount(in: plan.prefix) == nil {
                     stage(.signIn)
                     try SteamBottle.waitForClientSignIn(runner: wine, game: plan.name, showHUD: showHUD,
                                                         gameEnv: plan.env, progress: progress)
                 }
                 progress("Starting Steam quietly for \(plan.name)'s DRM, then launching the game…")
                 try SteamBottle.launchAlongside(runner: wine, exe: exe, appID: appID,
-                                                showHUD: showHUD, gameEnv: plan.env, progress: progress,
-                                                stage: stage)
+                                                showHUD: showHUD, gameEnv: plan.env,
+                                                game: plan.name, expectsSignIn: signsItself,
+                                                progress: progress, stage: stage)
                 return .direct(exeName: exe.lastPathComponent)
             }
             guard SteamBottle.isInstalled(in: plan.prefix) else {
                 throw CellarError.invalidArgument(
                     "Windows Steam isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
             }
+            let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
             progress("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…")
             try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: showHUD,
-                                              gameEnv: plan.env, progress: progress, stage: stage)
+                                              gameEnv: plan.env, game: plan.name, expectsSignIn: signsItself,
+                                              progress: progress, stage: stage)
             stage(.running)
             return .steam(appID: appID)
 

@@ -77,7 +77,10 @@ struct Launch: ParsableCommand {
                         + " Run: cellar \(plan.store.rawValue) login  and sign in first.")
                 }
             case .inClientWindow, .none:
-                if plan.needsLiveSession {
+                // Only when Cellar can't sign that client in with the session it already holds —
+                // otherwise this promised a window that never opens.
+                if plan.needsLiveSession,
+                   !SteamBottle.clientSessionReadiness(in: plan.prefix).signsInByItself {
                     print(Term.yellow("\(plan.store.displayName)'s window opens first so you can sign in to it.")
                         + " \(plan.name) starts once you're in — once, for every \(plan.store.displayName) game.")
                 }

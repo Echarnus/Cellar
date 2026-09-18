@@ -19,12 +19,14 @@ struct GameSummaryTests {
                          bottleExists: Bool = true,
                          running: Bool = false,
                          needsLiveSession: Bool = true,
-                         needsClientAtRuntime: Bool = true) -> GameSummary {
+                         needsClientAtRuntime: Bool = true,
+                         clientSignsInByItself: Bool = false) -> GameSummary {
         GameSummary(slug: "fixture", name: "Fixture", store: store, appID: 1, iconPath: nil,
                     runnerInstalled: runnerInstalled, clientInstalled: clientInstalled,
                     account: account, gameInstalled: gameInstalled, bottleExists: bottleExists,
                     running: running,
-                    productCode: nil, needsLiveSession: needsLiveSession, artworkAppID: nil, artPortraitURL: nil, artHeroURL: nil,
+                    productCode: nil, needsLiveSession: needsLiveSession,
+                    clientSignsInByItself: clientSignsInByItself, artworkAppID: nil, artPortraitURL: nil, artHeroURL: nil,
                     needsClientAtRuntime: needsClientAtRuntime,
                     facts: GameFacts(developer: nil, released: nil, engine: nil, graphicsAPI: nil,
                                      anticheat: nil, drm: nil, online: nil, requiresAccount: nil,
@@ -90,13 +92,17 @@ struct GameSummaryTests {
 
     @Test("Only the in-bottle client's sign-in is still asked for, and only as part of Play")
     func onlyTheInBottleClientAsksForSignIn() {
-        // Steam's client lives in the bottle and keeps its own session, which Cellar cannot supply
-        // from a token — so a Steamworks game must still say so, or it fails its licence check with
-        // nothing on screen having warned anyone.
+        // Steam's client lives in the bottle and keeps its own session. When Cellar can't hand it the
+        // player's, a Steamworks game must say so, or it fails its licence check with nothing on
+        // screen having warned anyone.
         let steam = summary(store: .steam, account: nil)
         #expect(steam.clientSignInPending)
         #expect(steam.launchContext.signsInFirst)
         #expect(!summary(store: .steam).clientSignInPending, "a signed-in client is not asked again")
+        let handedOver = summary(store: .steam, account: nil, clientSignsInByItself: true)
+        #expect(!handedOver.clientSignInPending, "a client Cellar signs in itself never asks the player")
+        #expect(!handedOver.launchContext.signsInFirst)
+        #expect(!handedOver.actionHint.contains("sign in"))
         #expect(!summary(store: .steam, account: nil, needsLiveSession: false).clientSignInPending,
                 "a game that never talks to the client never waits on its sign-in")
 

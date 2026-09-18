@@ -246,7 +246,12 @@ public enum Diagnostics {
         out.append(section("Store accounts"))
         out.append("Steam  shared install: \(SteamBottle.isSharedInstallPresent ? "present" : "none")"
             + ", signed in: \(SteamBottle.sharedLoggedInAccount != nil ? "yes" : "no")")
-        out.append("GOG    signed in: \(GOGAuth.isSignedIn ? "yes" : "no")")
+        // Whether each Steam bottle's client signs in with Cellar's session — the decision, never
+        // the session.
+        for bottle in bottles where Game.bottleNames(forStore: .steam).contains(bottle.name) {
+            out.append("Steam  client session in \(bottle.name): \(SteamBottle.clientSessionReadiness(in: bottle.url).diagnosis)")
+        }
+        out.append("GOG   signed in: \(GOGAuth.isSignedIn ? "yes" : "no")")
         out.append("Battle.net  sign-in state is not observable — Cellar does not track it.")
         out.append("")
 

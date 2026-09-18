@@ -1,0 +1,165 @@
+import Foundation
+
+/// Steam's text key-values format (`config.vdf`, `loginusers.vdf`, `local.vdf`): quoted keys, each
+/// followed by either a quoted string or a `{ … }` block. Order and duplicates are kept, so a file
+/// Cellar edits reads back exactly as Steam wrote it apart from the keys that were changed.
+struct TextVDF: Equatable {
+    indirect enum Value: Equatable {
+        case string(String)
+        case block(TextVDF)
+    }
+
+    struct Entry: Equatable {
+        var key: String
+        var value: Value
+    }
+
+    var entries: [Entry] = []
+
+    // MARK: - Reading
+
+    /// `nil` for anything that isn't well-formed — a file Cellar can't read is a file it must not
+    /// rewrite.
+    static func parse(_ text: String) -> TextVDF? {
+        var scanner = Scanner(Array(text.unicodeScalars))
+        guard let root = scanner.block(closed: false), scanner.atEnd else { return nil }
+        return root
+    }
+
+    subscript(key: String) -> Value? {
+        entries.last { $0.key.caseInsensitiveCompare(key) == .orderedSame }?.value
+    }
+
+    func string(_ key: String) -> String? {
+        if case .string(let s) = self[key] { return s }
+        return nil
+    }
+
+    func block(_ key: String) -> TextVDF? {
+        if case .block(let b) = self[key] { return b }
+        return nil
+    }
+
+    /// The block at a path of keys, matched the way Steam matches them (case-insensitively).
+    func block(at path: [String]) -> TextVDF? {
+        path.reduce(Optional(self)) { $0?.block($1) }
+    }
+
+    // MARK: - Editing
+
+    /// Set a string, replacing an existing key in place or appending a new one.
+    mutating func set(_ key: String, _ value: String) {
+        set(key, .string(value))
+    }
+
+    mutating func set(_ key: String, _ value: Value) {
+        if let i = entries.lastIndex(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame }) {
+            entries[i].value = value
+        } else {
+            entries.append(Entry(key: key, value: value))
+        }
+    }
+
+    /// Edit the block at `path`, creating any missing block along the way.
+    mutating func edit(_ path: [String], _ change: (inout TextVDF) -> Void) {
+        guard let first = path.first else { return change(&self) }
+        var child = block(first) ?? TextVDF()
+        child.edit(Array(path.dropFirst()), change)
+        set(first, .block(child))
+    }
+
+    // MARK: - Writing
+
+    /// Serialised with tabs, the way the client writes these files.
+    var text: String {
+        var out = ""
+        write(into: &out, depth: 0)
+        return out
+    }
+
+    private func write(into out: inout String, depth: Int) {
+        let indent = String(repeating: "\t", count: depth)
+        for entry in entries {
+            let key = entry.key
+            switch entry.value {
+            case .string(let s):
+                out += "\(indent)\"\(Self.escape(key))\"\t\t\"\(Self.escape(s))\"\n"
+            case .block(let b):
+                out += "\(indent)\"\(Self.escape(key))\"\n\(indent){\n"
+                b.write(into: &out, depth: depth + 1)
+                out += "\(indent)}\n"
+            }
+        }
+    }
+
+    private static func escape(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    private struct Scanner {
+        let chars: [Unicode.Scalar]
+        var i = 0
+
+        init(_ chars: [Unicode.Scalar]) { self.chars = chars }
+
+        var atEnd: Bool {
+            mutating get { skipSpace(); return i >= chars.count }
+        }
+
+        mutating func skipSpace() {
+            while i < chars.count {
+                if chars[i].properties.isWhitespace {
+                    i += 1
+                } else if chars[i] == "/", i + 1 < chars.count, chars[i + 1] == "/" {
+                    while i < chars.count, chars[i] != "\n" { i += 1 }
+                } else {
+                    return
+                }
+            }
+        }
+
+        mutating func quoted() -> String? {
+            skipSpace()
+            guard i < chars.count, chars[i] == "\"" else { return nil }
+            i += 1
+            var s = String.UnicodeScalarView()
+            while i < chars.count {
+                let c = chars[i]; i += 1
+                if c == "\"" { return String(s) }
+                if c == "\\", i < chars.count, chars[i] == "\\" || chars[i] == "\"" {
+                    // Only the two escapes `escape` writes, so reading and rewriting a file never
+                    // changes a value it didn't touch.
+                    s.append(chars[i]); i += 1
+                } else {
+                    s.append(c)
+                }
+            }
+            return nil
+        }
+
+        /// A sequence of entries, up to a `}` when `closed`, or to the end of the file otherwise.
+        mutating func block(closed: Bool) -> TextVDF? {
+            var result = TextVDF()
+            while true {
+                skipSpace()
+                if i >= chars.count { return closed ? nil : result }
+                if chars[i] == "}" {
+                    guard closed else { return nil }
+                    i += 1
+                    return result
+                }
+                guard let key = quoted() else { return nil }
+                skipSpace()
+                guard i < chars.count else { return nil }
+                if chars[i] == "{" {
+                    i += 1
+                    guard let child = block(closed: true) else { return nil }
+                    result.entries.append(Entry(key: key, value: .block(child)))
+                } else {
+                    guard let value = quoted() else { return nil }
+                    result.entries.append(Entry(key: key, value: .string(value)))
+                }
+            }
+        }
+    }
+}

@@ -345,6 +345,7 @@ public enum SteamBottle {
     /// once, silently), so retries are cheap.
     public static func runGameSupervised(runner: WineRunner, appID: Int, showHUD: Bool = false,
                                          gameEnv: [String: String] = [:], attempts: Int = 8,
+                                         game: String = "the game", expectsSignIn: Bool = false,
                                          progress: (String) -> Void = { _ in },
                                          stage: (LaunchStage) -> Void = { _ in }) throws {
         // Warm the client first: launching the game into a not-yet-ready Steam makes the D3DMetal
@@ -353,11 +354,16 @@ public enum SteamBottle {
         if !isRunning {
             stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
+            let mark = connectionLogMark(in: runner.prefix)
             try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv,
                              dock: .hidden)
             for _ in 0..<20 {
                 Thread.sleep(forTimeInterval: 2)
                 if isRunning && isClientUpdated(in: runner.prefix) { break }
+            }
+            if expectsSignIn {
+                try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
+                                       gameEnv: gameEnv, progress: progress, stage: stage)
             }
             Thread.sleep(forTimeInterval: 6) // let login settle
         }
@@ -436,13 +442,28 @@ public enum SteamBottle {
         }
     }
 
-    /// Whether a given app id reports as fully installed (StateFlags=4) in its appmanifest.
+    /// Whether the **client's own copy** of an app is really installed in this bottle.
+    ///
+    /// An appmanifest is Steam's claim, not proof, and a claim Cellar must not take at face value:
+    /// a client that has just signed in writes a manifest saying `StateFlags "4"` for a game whose
+    /// files it does not have, and believing it sent the launch down `steam://rungameid`, where
+    /// Steam answered with its 33 GB install dialog for a game already on the disk. So the files
+    /// are checked too — `steamapps/common/<installdir>` has to exist and hold something.
     public static func isGameInstalled(in prefix: URL, appID: Int) -> Bool {
         let manifest = steamDirectory(in: prefix)
             .appendingPathComponent("steamapps/appmanifest_\(appID).acf")
-        guard let text = try? String(contentsOf: manifest, encoding: .utf8) else { return false }
-        // StateFlags 4 == fully installed.
-        return text.range(of: #""StateFlags"\s*"4""#, options: .regularExpression) != nil
+        guard let text = try? String(contentsOf: manifest, encoding: .utf8),
+              text.range(of: #""StateFlags"\s*"4""#, options: .regularExpression) != nil,
+              let directory = installDirectory(in: prefix, appID: appID)
+        else { return false }
+        return hasFiles(steamDirectory(in: prefix).appendingPathComponent("steamapps/common/\(directory)"))
+    }
+
+    /// Whether a directory exists and is not empty. A manifest for an empty folder is a claim about
+    /// nothing.
+    static func hasFiles(_ directory: URL) -> Bool {
+        let contents = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return contents.contains { $0 != ".DS_Store" }
     }
 }
 
@@ -469,16 +490,23 @@ public extension SteamBottle {
     /// keeping the download path free of the client's install dialog.
     static func launchAlongside(runner: WineRunner, exe: URL, appID: Int, showHUD: Bool = false,
                                 gameEnv: [String: String] = [:],
+                                game: String = "the game", expectsSignIn: Bool = false,
+                                attempts: Int = 8,
                                 progress: (String) -> Void = { _ in },
                                 stage: (LaunchStage) -> Void = { _ in }) throws {
         SteamDRM.markAppDirectory(exe.deletingLastPathComponent(), appID: appID)
         if !isRunning {
             stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
+            let mark = connectionLogMark(in: runner.prefix)
             try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv)
             for _ in 0..<20 {
                 Thread.sleep(forTimeInterval: 2)
                 if isRunning && isClientUpdated(in: runner.prefix) { break }
+            }
+            if expectsSignIn {
+                try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
+                                       gameEnv: gameEnv, progress: progress, stage: stage)
             }
             Thread.sleep(forTimeInterval: 6)   // let the sign-in settle before the game asks
         }
@@ -487,18 +515,157 @@ public extension SteamBottle {
         // What steam_api looks at when a game was not started by the client.
         env["SteamAppId"] = "\(appID)"
         env["SteamGameId"] = "\(appID)"
+        let log = Paths.logs.appendingPathComponent("game-\(exe.deletingPathExtension().lastPathComponent).log")
+
+        // The same supervision `runGameSupervised` gives the client's own route: D3DMetal 3.0 drops a
+        // game a few seconds in, and without a retry a single Play ended with a dead game and a
+        // crash reporter. Reported as attempts, because a launch that took three tries is not a
+        // launch that took one.
         stage(.starting)
-        progress("Launching \(exe.lastPathComponent)…")
-        try runner.spawn([exe.path], extraEnv: env,
-                         log: Paths.logs.appendingPathComponent("game-\(exe.deletingPathExtension().lastPathComponent).log"))
+        for attempt in 1...attempts {
+            if attempt > 1 {
+                ProcessWatch.kill([exe.lastPathComponent, "crash_reporter.exe"])
+                Thread.sleep(forTimeInterval: 8)
+                progress("Attempt \(attempt): starting \(exe.lastPathComponent) again…")
+            } else {
+                progress("Launching \(exe.lastPathComponent)…")
+            }
+            try runner.spawn([exe.path], extraEnv: env, log: log)
+            stage(.waiting)
+            guard ProcessWatch.waitToAppear([exe.lastPathComponent], seconds: 40) else {
+                progress("Attempt \(attempt): \(exe.lastPathComponent) didn't start; retrying…")
+                continue
+            }
+            // Did it survive the startup race? ~16 s is where D3DMetal drops it.
+            var survived = true
+            for _ in 0..<8 {
+                Thread.sleep(forTimeInterval: 2)
+                if !ProcessWatch.isRunning(exe.lastPathComponent) { survived = false; break }
+            }
+            if survived {
+                if attempt > 1 { progress("Up after \(attempt) attempts.") }
+                return
+            }
+            progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
+        }
+        throw CellarError.ioFailure(
+            "\(game) kept stopping within seconds of starting, \(attempts) times — the D3DMetal startup race. Press Play again, and see the activity log for the game's own output.")
     }
 }
 
 public extension SteamBottle {
+    // MARK: - The client signs in with Cellar's session
+
+    /// Whether this bottle's Steam will sign in by itself — see `SteamClientSession`.
+    static func clientSessionReadiness(in prefix: URL) -> SteamClientSession.Readiness {
+        SteamClientSession.readiness(SteamClientSession.snapshot(
+            prefix: prefix, steamDirectory: steamDirectory(in: prefix), wineUser: wineUser))
+    }
+
+    /// The Wine user the bottle runs as. `WineRunner.environment` inherits `USER` from Cellar's own
+    /// process, so this is the name the client's `CryptProtectData` will be keyed with.
+    internal static var wineUser: String {
+        SteamClientSession.wineUser(environment: ProcessInfo.processInfo.environment)
+    }
+
+    /// Hand the bottle's client the session the player approved in Cellar, so it starts signed in
+    /// instead of opening its login window. Only before the client starts — a running client
+    /// rewrites these files — and never over an account somebody signed in to by hand.
+    ///
+    /// `.canHandOver` means it was handed over this time; `.remembered` that nothing was needed.
+    @discardableResult
+    static func handOverSession(runner: WineRunner, progress: (String) -> Void = { _ in }) -> SteamClientSession.Readiness {
+        let prefix = runner.prefix
+        let readiness = clientSessionReadiness(in: prefix)
+        guard readiness == .canHandOver else { return readiness }
+        guard !isRunning else { return .unavailable(.clientRunning) }
+        let result = SteamClientSession.handOver(prefix: prefix, steamDirectory: steamDirectory(in: prefix),
+                                                 wineUser: wineUser)
+        guard result == .canHandOver, let account = SteamAccount.state.accountName else { return result }
+        setAutoLogin(account: account, runner: runner)
+        progress("Signing Steam in with the account you gave Cellar…")
+        return .canHandOver
+    }
+
+    /// `HKCU\Software\Valve\Steam` `AutoLoginUser` + `RememberPassword`, as Steam's "Remember me"
+    /// leaves them. Skipped when already set, because asking Wine costs a few seconds.
+    internal static func setAutoLogin(account: String, runner: WineRunner) {
+        let name = account.lowercased()
+        let userReg = (try? String(contentsOf: runner.prefix.appendingPathComponent("user.reg"), encoding: .utf8)) ?? ""
+        if userReg.contains("\"AutoLoginUser\"=\"\(name)\""), userReg.contains("\"RememberPassword\"=dword:00000001") {
+            return
+        }
+        let key = #"HKCU\Software\Valve\Steam"#
+        runner.run(["reg", "add", key, "/v", "AutoLoginUser", "/t", "REG_SZ", "/d", name, "/f"])
+        runner.run(["reg", "add", key, "/v", "RememberPassword", "/t", "REG_DWORD", "/d", "1", "/f"])
+    }
+
+    /// How far `connection_log.txt` has got, so a logon can be read from what Steam writes after it.
+    static func connectionLogMark(in prefix: URL) -> UInt64 {
+        let log = logsDirectory(in: prefix).appendingPathComponent("connection_log.txt")
+        return ((try? FileManager.default.attributesOfItem(atPath: log.path)[.size]) as? NSNumber)?.uint64Value ?? 0
+    }
+
+    /// Steam's answer to the most recent logon since `mark`, if it has given one.
+    internal static func logonResult(in prefix: URL, since mark: UInt64) -> SteamClientSession.LogonResult? {
+        let log = logsDirectory(in: prefix).appendingPathComponent("connection_log.txt")
+        guard let handle = try? FileHandle(forReadingFrom: log) else { return nil }
+        defer { try? handle.close() }
+        let size = (try? handle.seekToEnd()) ?? 0
+        // Steam starts a fresh file when the old one grows too large; then all of it is new.
+        try? handle.seek(toOffset: size >= mark ? mark : 0)
+        guard let data = try? handle.readToEnd() else { return nil }
+        return SteamClientSession.logonResult(inConnectionLog: String(decoding: data, as: UTF8.self))
+    }
+
+    /// Wait until the client Cellar expects to sign in by itself actually **has**, before the game is
+    /// started beside it.
+    ///
+    /// Running is not signed in: Steam's logon lands twenty to forty seconds after its process does,
+    /// and starting a Steamworks game into that gap gave "Unable to initialize SteamAPI. Please make
+    /// sure Steam is running and you are logged in" — a dialog that looks like a broken game and is
+    /// really a launch that went too early.
+    ///
+    /// A refusal takes the session back and falls back to the client's own sign-in window, so the
+    /// game never starts against a client nobody is signed in to.
+    internal static func waitForClientLogon(runner: WineRunner, since mark: UInt64, game: String,
+                                            showHUD: Bool, gameEnv: [String: String],
+                                            timeout: TimeInterval = 120,
+                                            progress: (String) -> Void,
+                                            stage: (LaunchStage) -> Void) throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        var announced = false
+        while Date() < deadline {
+            switch logonResult(in: runner.prefix, since: mark) {
+            case .loggedOn?:
+                return
+            case .refused(let reason)?:
+                progress("Steam didn't accept the sign-in Cellar gave it (\(reason)), so its own window opens instead.")
+                if let account = SteamAccount.state.accountName {
+                    SteamClientSession.forget(account: account, prefix: runner.prefix,
+                                              steamDirectory: steamDirectory(in: runner.prefix), wineUser: wineUser)
+                }
+                stage(.signIn)
+                try waitForClientSignIn(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
+                                        progress: progress)
+                return
+            case nil:
+                if !announced {
+                    progress("Waiting for Steam to finish signing in — \(game)'s DRM needs it signed in, not just running.")
+                    announced = true
+                }
+                Thread.sleep(forTimeInterval: 2)
+            }
+        }
+        // Cellar cannot tell a slow Steam from a stuck one, so it says what it knows and goes on
+        // rather than refusing a launch that may well work.
+        progress("Steam hasn't reported a sign-in in \(Int(timeout)) s. Starting \(game) anyway — if it says SteamAPI isn't ready, press Play again.")
+    }
+
     /// Open the client's own window and wait until the player has signed in to it.
     ///
-    /// The client in the bottle keeps its own session, and the token the player gave Cellar cannot
-    /// be handed to it. Asking for that as a separate step on the game's page read as Cellar asking
+    /// The fallback for when Cellar can't hand the client its session (`handOverSession`) or Steam
+    /// refused it. Asking for that as a separate step on the game's page read as Cellar asking
     /// twice, so it is folded into Play instead: the window opens, and the game starts once
     /// `loginusers.vdf` names an account — a file Steam writes, rather than a hope that Steam
     /// queues a launch behind its login screen.

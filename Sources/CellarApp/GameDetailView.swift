@@ -181,11 +181,12 @@ struct GameDetailView: View {
                    title: "The install runs with no window",
                    detail: "GOG ships a normal Windows installer and Cellar runs it silently, so there is nothing to watch for a few minutes. The activity log below is the progress.")
         } else if game.nextStep == .play && game.clientSignInPending {
-            // The player already signed in to Cellar, so a second sign-in needs its reason on the
-            // page — or it reads as Cellar forgetting the first one.
+            // Cellar normally hands the client the player's session, so this only shows when it
+            // can't — and a second sign-in needs its reason on the page, or it reads as Cellar
+            // forgetting the first one.
             Notice(symbol: "person.crop.circle.badge.questionmark", tint: game.store.tint,
                    title: "\(game.store.displayName) asks you to sign in once more",
-                   detail: "Your sign-in in Settings lists and downloads your games. \(game.name)'s DRM checks the \(game.store.displayName) app instead, which keeps a sign-in of its own. The first time you press Play, its window opens — the QR code with the mobile app is quickest. Every \(game.store.displayName) game shares it.")
+                   detail: "\(game.name)'s DRM checks the \(game.store.displayName) app, which keeps a sign-in of its own. Cellar usually signs it in with your sign-in from Settings, but can't right now. The first time you press Play, its window opens — the QR code with the mobile app is quickest. Every \(game.store.displayName) game shares it.")
         } else if game.nextStep == .play && game.store == .battlenet {
             Notice(symbol: "bolt.horizontal.circle.fill", tint: game.store.tint,
                    title: "Battle.net stays open while you play",

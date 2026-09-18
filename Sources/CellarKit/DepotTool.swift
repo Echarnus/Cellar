@@ -244,7 +244,7 @@ public enum DepotTool {
     }
 
     /// The accounts DepotDownloader holds a token for, with when each store was last written —
-    /// newest store first. Names only; the tokens are never read into Cellar.
+    /// newest store first. Names only; the one reader of a token is `refreshToken(for:)`.
     static var storedAccounts: [(names: [String], modified: Date)] {
         storedSessionFiles.map { file in
             let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
@@ -252,6 +252,16 @@ public enum DepotTool {
             return (DepotAccountStore.accountNames(in: file), modified)
         }
         .sorted { $0.modified > $1.modified }
+    }
+
+    /// The stored refresh token for `account`, newest store first. Read for one purpose only —
+    /// handing the Windows client in a bottle the same session (`SteamClientSession`) — and never
+    /// written anywhere but that client's encrypted `local.vdf` entry.
+    static func refreshToken(for account: String) -> String? {
+        storedSessionFiles
+            .map { ($0, (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast) }
+            .sorted { $0.1 > $1.1 }
+            .lazy.compactMap { DepotAccountStore.refreshToken(for: account, in: $0.0) }.first
     }
 
     /// Where `storedSessionFiles` looks, in order.

@@ -42,6 +42,42 @@ enum DepotAccountStore {
         return names
     }
 
+    /// The refresh token stored for one account — the only reader that copies a token out, and only
+    /// so the Windows client in a bottle can be handed the session the player already approved
+    /// (`SteamClientSession`). The result must never reach a log, a report or an error message.
+    static func refreshToken(for account: String, in file: URL) -> String? {
+        guard let data = try? Data(contentsOf: file) else { return nil }
+        return refreshToken(for: account, inCompressed: data)
+    }
+
+    static func refreshToken(for account: String, inCompressed data: Data) -> String? {
+        guard let raw = inflate(data) else { return nil }
+        var found: String?
+        var reader = ProtoReader(raw)
+        while let (field, wire) = reader.tag() {
+            guard wire == 2, let entry = reader.lengthDelimited() else {
+                guard reader.skip(wire) else { return found }
+                continue
+            }
+            guard field == 4 else { continue }
+            var inner = ProtoReader(entry)
+            var name: String?, token: String?
+            while let (key, kwire) = inner.tag() {
+                if kwire == 2, key == 1 || key == 2, let bytes = inner.lengthDelimited() {
+                    let text = String(bytes: bytes, encoding: .utf8)
+                    if key == 1 { name = text } else { token = text }
+                } else if !inner.skip(kwire) {
+                    break
+                }
+            }
+            // Steam account names are case-insensitive; the last entry wins, as it does in .NET's map.
+            if let name, name.caseInsensitiveCompare(account) == .orderedSame, let token, !token.isEmpty {
+                found = token
+            }
+        }
+        return found
+    }
+
     /// Raw deflate (no zlib header), which is what .NET's `DeflateStream` writes and what Apple's
     /// `COMPRESSION_ZLIB` means.
     private static func inflate(_ data: Data) -> Data? {

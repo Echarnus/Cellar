@@ -253,7 +253,14 @@ struct LaunchSplashView: View {
         return (runner.exitCode ?? 0) == 0 ? .running : .failed
     }
 
-    private var sequence: [LaunchStage] { LaunchStage.sequence(game.launchContext) }
+    private var sequence: [LaunchStage] {
+        let context = game.launchContext
+        // Steam refused the session Cellar handed it, so its window opened after all: show the
+        // sign-in step rather than jumping back to the first one.
+        guard runner.stage == .signIn, !context.signsInFirst else { return LaunchStage.sequence(context) }
+        return LaunchStage.sequence(LaunchContext(game: context.game, store: context.store,
+                                                  throughClient: context.throughClient, signsInFirst: true))
+    }
 
     private func state(of index: Int) -> LaunchStepRow.State {
         // Before the first marker arrives Cellar is, truthfully, on the first step.

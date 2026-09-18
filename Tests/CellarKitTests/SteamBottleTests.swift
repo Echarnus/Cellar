@@ -107,15 +107,39 @@ struct SteamBottleTests {
     func stateFlagsGateInstalled() throws {
         // 1026 = update required / partially downloaded. Calling that "installed" puts a Play
         // button in front of a game that will not start.
-        let partial = try bottle(steamFiles: ["steamapps/appmanifest_42.acf": """
-        "AppState" { "appid" "42" "StateFlags" "1026" "installdir" "Half A Game" }
-        """])
+        let partial = try bottle(steamFiles: [
+            "steamapps/appmanifest_42.acf": """
+            "AppState" { "appid" "42" "StateFlags" "1026" "installdir" "Half A Game" }
+            """,
+            "steamapps/common/Half A Game/game.exe": "MZ",
+        ])
         #expect(SteamBottle.isGameInstalled(in: partial, appID: 42) == false)
 
-        let complete = try bottle(steamFiles: ["steamapps/appmanifest_42.acf": """
+        let complete = try bottle(steamFiles: [
+            "steamapps/appmanifest_42.acf": """
+            "AppState" { "appid" "42" "StateFlags" "4" "installdir" "A Game" }
+            """,
+            "steamapps/common/A Game/game.exe": "MZ",
+        ])
+        #expect(SteamBottle.isGameInstalled(in: complete, appID: 42))
+    }
+
+    @Test("A manifest with no files behind it is not an install")
+    func manifestWithoutFiles() throws {
+        // What a freshly signed-in client writes for a game it does not have. Believing it sent the
+        // launch to `steam://rungameid`, and Steam answered with its install dialog for a game that
+        // was already on the disk — while Cellar's own page still said "Installed".
+        let claimed = try bottle(steamFiles: ["steamapps/appmanifest_42.acf": """
         "AppState" { "appid" "42" "StateFlags" "4" "installdir" "A Game" }
         """])
-        #expect(SteamBottle.isGameInstalled(in: complete, appID: 42))
+        #expect(SteamBottle.isGameInstalled(in: claimed, appID: 42) == false,
+                "a claim with nothing behind it is not an install")
+
+        // An empty directory is the same claim about nothing.
+        try FileManager.default.createDirectory(
+            at: SteamBottle.steamDirectory(in: claimed).appendingPathComponent("steamapps/common/A Game"),
+            withIntermediateDirectories: true)
+        #expect(SteamBottle.isGameInstalled(in: claimed, appID: 42) == false)
     }
 
     @Test("A missing manifest is 'not installed', not a crash")
