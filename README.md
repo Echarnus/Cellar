@@ -132,7 +132,10 @@ Detailed rules: [docs/LEGAL.md](docs/LEGAL.md).
 - **Apple Silicon** Mac (M1 or newer; developed/tested on **M5**)
 - **macOS 14 (Sonoma)** or later — recommended **macOS 26 (Tahoe)**
 - **Rosetta 2** (`softwareupdate --install-rosetta --agree-to-license`)
-- **Swift 6** toolchain (Xcode or Command Line Tools) to build from source
+- **Swift 6** to build from source. The Command Line Tools build the `cellar` CLI; the **app needs
+  Xcode** (the Command Line Tools have no SwiftUI macros). `Scripts/install-app.sh` picks an
+  installed Xcode by itself; for a by-hand `swift build`, point `xcode-select` at Xcode or set
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 
 On first launch the app asks for your **Documents, Desktop and Downloads** folders — that is where
 Windows games keep their saves. It asks for all three at once, up front, so macOS doesn't interrupt

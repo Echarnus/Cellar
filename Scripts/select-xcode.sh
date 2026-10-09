@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # Sourced (not run) by install-app.sh and package.sh to pick the toolchain that builds the app.
 #
 # A Nix/devenv shell may export DEVELOPER_DIR/SDKROOT pointing at a non-macOS SDK, so both are
@@ -9,7 +10,8 @@
 unset DEVELOPER_DIR SDKROOT
 case "$(xcode-select -p 2>/dev/null)" in
   */CommandLineTools*)
-    for candidate in /Applications/Xcode.app /Applications/Xcode-beta.app /Applications/Xcode-*.app; do
+    # Xcode-beta.app also matches Xcode-*.app; the glob covers it (and versioned names from `xcodes`).
+    for candidate in /Applications/Xcode.app /Applications/Xcode-*.app; do
       dir="$candidate/Contents/Developer"
       [ -d "$dir" ] || continue
       if DEVELOPER_DIR="$dir" swift --version >/dev/null 2>&1; then

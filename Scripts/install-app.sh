@@ -6,14 +6,40 @@ cd "$(dirname "$0")/.."
 # Clears a Nix/devenv DEVELOPER_DIR/SDKROOT and picks a toolchain that can build the SwiftUI app.
 . Scripts/select-xcode.sh
 
-# Build both products before touching anything installed: a failure in either leaves the previous
-# app and CLI in place as a matching pair, never a new app driving an old CLI.
+# Build everything — both products, the Dock shim and the icon — before touching anything installed:
+# a failure leaves the previous app and CLI in place as a matching pair, never a new app driving an
+# old CLI.
 echo "Building CellarApp and the cellar CLI (release)…"
 swift build -c release --product CellarApp
 swift build -c release --product cellar
 BIN=".build/release/CellarApp"
 [ -x "$BIN" ] || { echo "Build produced no CellarApp binary at $BIN"; exit 1; }
 [ -x ".build/release/cellar" ] || { echo "Build produced no cellar binary at .build/release/cellar"; exit 1; }
+# The Dock shim, which keeps a bottle's Steam/Battle.net out of the Dock while a game starts.
+SHIM=".build/cellar-dock-shim.dylib"
+sh Scripts/build-dock-shim.sh "$SHIM"
+
+# App icon: build a multi-resolution .icns from Resources/AppIcon.png (regenerate it if missing).
+ICON_SRC="Resources/AppIcon.png"
+ICNS=""
+[ -f "$ICON_SRC" ] || swift Scripts/make-icon.swift "$ICON_SRC"
+if [ -f "$ICON_SRC" ]; then
+  ISET="$(mktemp -d)/Cellar.iconset"; mkdir -p "$ISET"
+  for s in 16 32 128 256 512; do
+    sips -z "$s" "$s"       "$ICON_SRC" --out "$ISET/icon_${s}x${s}.png"    >/dev/null
+    sips -z "$((s*2))" "$((s*2))" "$ICON_SRC" --out "$ISET/icon_${s}x${s}@2x.png" >/dev/null
+  done
+  ICNS=".build/AppIcon.icns"
+  iconutil -c icns "$ISET" -o "$ICNS"
+fi
+
+# Copy then rename, for files outside the app bundle: a `cellar launch` — and the Steam or Battle.net
+# client it injected the shim into — may be running for a whole play session, and rewriting a signed
+# binary in place can get it killed.
+install_file() {
+  cp "$1" "$2.new"
+  mv -f "$2.new" "$2"
+}
 
 # One version, from CellarKit. A diagnostics report that names a version nobody shipped is worse
 # than no version at all, and a dev install used to claim 0.1 forever.
@@ -24,17 +50,8 @@ APP="$HOME/Applications/Cellar.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/CellarApp"
-
-# App icon: build a multi-resolution .icns from Resources/AppIcon.png (regenerate it if missing).
-ICON_SRC="Resources/AppIcon.png"
-[ -f "$ICON_SRC" ] || swift Scripts/make-icon.swift "$ICON_SRC"
-if [ -f "$ICON_SRC" ]; then
-  ISET="$(mktemp -d)/Cellar.iconset"; mkdir -p "$ISET"
-  for s in 16 32 128 256 512; do
-    sips -z "$s" "$s"       "$ICON_SRC" --out "$ISET/icon_${s}x${s}.png"    >/dev/null
-    sips -z "$((s*2))" "$((s*2))" "$ICON_SRC" --out "$ISET/icon_${s}x${s}@2x.png" >/dev/null
-  done
-  iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns"
+if [ -n "$ICNS" ]; then
+  cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
   ICON_KEY='  <key>CFBundleIconFile</key><string>AppIcon</string>'
 fi
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -66,12 +83,11 @@ mkdir -p "$APP/Contents/Resources/profiles"
 cp profiles/*.toml "$APP/Contents/Resources/profiles/"
 echo "Bundled $(ls profiles/*.toml | wc -l | tr -d ' ') game profiles."
 
-# The Dock shim, which keeps a bottle's Steam/Battle.net out of the Dock while a game starts.
-# Also dropped beside the CLI's own state, because it is the `cellar` binary — not the app — that
-# spawns Wine, and the CLI may live anywhere on PATH.
-sh Scripts/build-dock-shim.sh "$APP/Contents/Resources/cellar-dock-shim.dylib"
+# The Dock shim goes in the bundle, and beside the CLI's own state, because it is the `cellar`
+# binary — not the app — that spawns Wine, and the CLI may live anywhere on PATH.
+cp "$SHIM" "$APP/Contents/Resources/cellar-dock-shim.dylib"
 mkdir -p "$HOME/Library/Application Support/Cellar"
-cp "$APP/Contents/Resources/cellar-dock-shim.dylib" "$HOME/Library/Application Support/Cellar/"
+install_file "$SHIM" "$HOME/Library/Application Support/Cellar/cellar-dock-shim.dylib"
 
 # The app does every action through the `cellar` CLI (~/.local/bin is where it looks when PATH has
 # none), so installing the app alone leaves it driving whatever older CLI is there. Same layout as
@@ -79,13 +95,10 @@ cp "$APP/Contents/Resources/cellar-dock-shim.dylib" "$HOME/Library/Application S
 # is where the CLI looks for both — an old share/ is an old game list, not just an old binary.
 PREFIX="$HOME/.local"
 mkdir -p "$PREFIX/bin" "$PREFIX/share/cellar/profiles"
-# Copy then rename: a `cellar launch` may be running for a whole play session, and rewriting a signed
-# binary in place can get it killed.
-cp .build/release/cellar "$PREFIX/bin/.cellar.new"
-mv -f "$PREFIX/bin/.cellar.new" "$PREFIX/bin/cellar"
+install_file .build/release/cellar "$PREFIX/bin/cellar"
 rm -f "$PREFIX/share/cellar/profiles/"*.toml
 cp profiles/*.toml "$PREFIX/share/cellar/profiles/"
-cp "$APP/Contents/Resources/cellar-dock-shim.dylib" "$PREFIX/share/cellar/"
+install_file "$SHIM" "$PREFIX/share/cellar/cellar-dock-shim.dylib"
 echo "Installed the cellar CLI at $PREFIX/bin/cellar (profiles in $PREFIX/share/cellar)."
 
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true

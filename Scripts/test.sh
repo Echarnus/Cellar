@@ -9,7 +9,7 @@
 # Three environment problems this exists to solve:
 #
 #  1. A Nix/devenv shell exports DEVELOPER_DIR/SDKROOT pointing at a non-macOS SDK. The rest of the
-#     repo just unsets them (see Scripts/install-app.sh), but unsetting is not enough for tests:
+#     repo unsets them and picks an Xcode for the app (Scripts/select-xcode.sh), but tests need more:
 #     swift-testing lives in Testing.framework, inside a developer directory, and with DEVELOPER_DIR
 #     unset the toolchain falls back to `xcode-select -p` — the Nix SDK, which has none. So this
 #     picks a developer directory that actually carries the framework rather than merely unsetting.
