@@ -69,7 +69,13 @@ Battle.net simply keeps its Dock icon, which is what Cellar did before the shim 
 > env -u DEVELOPER_DIR -u SDKROOT swift build -c release
 > ```
 >
-> `Scripts/install-app.sh` and `Scripts/package.sh` already `unset` them internally.
+> `Scripts/install-app.sh` and `Scripts/package.sh` already `unset` them internally (via
+> `Scripts/select-xcode.sh`). When `xcode-select -p` is the Command Line Tools, they can build the
+> CLI but **not the SwiftUI app** (no SwiftUI macro plugins: "SwiftUIMacros.StateMacro could not be
+> found"), so the scripts switch to an installed Xcode. For a by-hand build of the app on such a Mac:
+> `env -u SDKROOT DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build -c release`.
+> `install-app.sh` installs the app **and** the CLI it drives (`~/.local/bin/cellar` +
+> `~/.local/share/cellar/`), so the two never drift apart.
 
 ### Verification ladder — the "appropriate demands"
 

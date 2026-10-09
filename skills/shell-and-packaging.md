@@ -57,7 +57,12 @@ unset DEVELOPER_DIR SDKROOT
 ```
 
 A Nix/devenv shell exports these pointing at a non-macOS SDK; without unsetting, the build fails or
-links the wrong SDK. `install-app.sh` and `package.sh` already do this — keep it.
+links the wrong SDK. `install-app.sh` and `package.sh` do it by sourcing `Scripts/select-xcode.sh` —
+keep it. That helper also handles the second half: once unset, `xcode-select -p` decides, and the
+Command Line Tools alone cannot build the SwiftUI app (no SwiftUI macro plugins), so it switches to an
+installed Xcode whose toolchain runs, says which, and fails with the fix when there is none. It changes
+nothing where xcode-select already points at an Xcode (CI). One copy of that rule — don't paste it
+into another script, source it.
 
 ## App bundle & Info.plist
 

@@ -42,8 +42,10 @@ launching the app. Details in `AGENTS.md` → *Testing*.
 ### Build reminder
 
 Build with `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` — a Nix/devenv shell exports an
-SDK that breaks a plain `swift build`. GUI changes are verified by `sh Scripts/install-app.sh` and
-launching the app, never by reading the diff.
+SDK that breaks a plain `swift build`. If xcode-select points at the Command Line Tools, that builds
+the CLI but not the app — add `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (the install
+scripts do this themselves). GUI changes are verified by `sh Scripts/install-app.sh` and launching the
+app, never by reading the diff.
 
 ### Second brain
 

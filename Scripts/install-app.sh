@@ -3,21 +3,17 @@
 # Also installs the matching `cellar` CLI into ~/.local/bin, which the app drives for every action.
 set -e
 cd "$(dirname "$0")/.."
-# A Nix/devenv shell may export DEVELOPER_DIR/SDKROOT pointing at a non-macOS SDK; use Xcode's.
-unset DEVELOPER_DIR SDKROOT
-# The Command Line Tools on their own have no SwiftUI macro plugins (`@State` fails to expand), so
-# when xcode-select points there, build with a full Xcode if one is installed and its toolchain runs.
-case "$(xcode-select -p 2>/dev/null)" in
-  */CommandLineTools*)
-    XCODE="/Applications/Xcode.app/Contents/Developer"
-    if [ -d "$XCODE" ] && DEVELOPER_DIR="$XCODE" swift --version >/dev/null 2>&1; then
-      export DEVELOPER_DIR="$XCODE"
-    fi ;;
-esac
-echo "Building CellarApp (release)…"
+# Clears a Nix/devenv DEVELOPER_DIR/SDKROOT and picks a toolchain that can build the SwiftUI app.
+. Scripts/select-xcode.sh
+
+# Build both products before touching anything installed: a failure in either leaves the previous
+# app and CLI in place as a matching pair, never a new app driving an old CLI.
+echo "Building CellarApp and the cellar CLI (release)…"
 swift build -c release --product CellarApp
+swift build -c release --product cellar
 BIN=".build/release/CellarApp"
 [ -x "$BIN" ] || { echo "Build produced no CellarApp binary at $BIN"; exit 1; }
+[ -x ".build/release/cellar" ] || { echo "Build produced no cellar binary at .build/release/cellar"; exit 1; }
 
 # One version, from CellarKit. A diagnostics report that names a version nobody shipped is worse
 # than no version at all, and a dev install used to claim 0.1 forever.
@@ -78,11 +74,19 @@ mkdir -p "$HOME/Library/Application Support/Cellar"
 cp "$APP/Contents/Resources/cellar-dock-shim.dylib" "$HOME/Library/Application Support/Cellar/"
 
 # The app does every action through the `cellar` CLI (~/.local/bin is where it looks when PATH has
-# none), so installing the app alone leaves it driving whatever older CLI is there.
-swift build -c release --product cellar
-mkdir -p "$HOME/.local/bin"
-cp .build/release/cellar "$HOME/.local/bin/cellar"
-echo "Installed the cellar CLI at $HOME/.local/bin/cellar."
+# none), so installing the app alone leaves it driving whatever older CLI is there. Same layout as
+# package.sh's CLI zip: <prefix>/bin/cellar beside <prefix>/share/cellar/{profiles,dock shim}, which
+# is where the CLI looks for both — an old share/ is an old game list, not just an old binary.
+PREFIX="$HOME/.local"
+mkdir -p "$PREFIX/bin" "$PREFIX/share/cellar/profiles"
+# Copy then rename: a `cellar launch` may be running for a whole play session, and rewriting a signed
+# binary in place can get it killed.
+cp .build/release/cellar "$PREFIX/bin/.cellar.new"
+mv -f "$PREFIX/bin/.cellar.new" "$PREFIX/bin/cellar"
+rm -f "$PREFIX/share/cellar/profiles/"*.toml
+cp profiles/*.toml "$PREFIX/share/cellar/profiles/"
+cp "$APP/Contents/Resources/cellar-dock-shim.dylib" "$PREFIX/share/cellar/"
+echo "Installed the cellar CLI at $PREFIX/bin/cellar (profiles in $PREFIX/share/cellar)."
 
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true

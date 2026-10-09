@@ -21,7 +21,11 @@ Key rules:
   ID. Prefer `ditto` over `cp -R` when assembling the bundle. If real signing ever lands, the release
   notes must stop telling people to right-click → Open.
 - **Any script that runs `swift build` must `unset DEVELOPER_DIR SDKROOT` first** (Nix/devenv SDK
-  breaks the build). `install-app.sh` / `package.sh` already do.
+  breaks the build). `install-app.sh` / `package.sh` do it by sourcing `Scripts/select-xcode.sh`,
+  which also switches to an installed Xcode when xcode-select points at the Command Line Tools (they
+  cannot build the SwiftUI app). Source it; don't copy it.
+- **`install-app.sh` installs the CLI too** (`~/.local/bin/cellar` + `~/.local/share/cellar/`): the
+  app drives that CLI for every action, so an app installed alone runs against a stale CLI.
 - **Info.plist** (kept in sync across `install-app.sh` and `package.sh`): `CFBundleName=Cellar`,
   `CFBundleGetInfoString` + `NSHumanReadableCopyright` (the description — don't drop them),
   `CFBundleIconFile=AppIcon`, stable identifier, min-system + hi-res keys.
