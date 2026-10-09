@@ -8,6 +8,14 @@
 set -e
 cd "$(dirname "$0")/.."
 unset DEVELOPER_DIR SDKROOT
+# Same toolchain choice as install-app.sh: the Command Line Tools alone cannot build the SwiftUI app.
+case "$(xcode-select -p 2>/dev/null)" in
+  */CommandLineTools*)
+    XCODE="/Applications/Xcode.app/Contents/Developer"
+    if [ -d "$XCODE" ] && DEVELOPER_DIR="$XCODE" swift --version >/dev/null 2>&1; then
+      export DEVELOPER_DIR="$XCODE"
+    fi ;;
+esac
 VERSION="${1:-0.0.0-dev}"
 DIST="dist"; rm -rf "$DIST"; mkdir -p "$DIST"
 

@@ -1,10 +1,19 @@
 #!/bin/sh
 # Build CellarApp and install it as ~/Applications/Cellar.app (the native "Steam-like" front-end).
-# Requires the `cellar` CLI on PATH or ~/.local/bin for actions.
+# Also installs the matching `cellar` CLI into ~/.local/bin, which the app drives for every action.
 set -e
 cd "$(dirname "$0")/.."
 # A Nix/devenv shell may export DEVELOPER_DIR/SDKROOT pointing at a non-macOS SDK; use Xcode's.
 unset DEVELOPER_DIR SDKROOT
+# The Command Line Tools on their own have no SwiftUI macro plugins (`@State` fails to expand), so
+# when xcode-select points there, build with a full Xcode if one is installed and its toolchain runs.
+case "$(xcode-select -p 2>/dev/null)" in
+  */CommandLineTools*)
+    XCODE="/Applications/Xcode.app/Contents/Developer"
+    if [ -d "$XCODE" ] && DEVELOPER_DIR="$XCODE" swift --version >/dev/null 2>&1; then
+      export DEVELOPER_DIR="$XCODE"
+    fi ;;
+esac
 echo "Building CellarApp (release)…"
 swift build -c release --product CellarApp
 BIN=".build/release/CellarApp"
@@ -67,6 +76,13 @@ echo "Bundled $(ls profiles/*.toml | wc -l | tr -d ' ') game profiles."
 sh Scripts/build-dock-shim.sh "$APP/Contents/Resources/cellar-dock-shim.dylib"
 mkdir -p "$HOME/Library/Application Support/Cellar"
 cp "$APP/Contents/Resources/cellar-dock-shim.dylib" "$HOME/Library/Application Support/Cellar/"
+
+# The app does every action through the `cellar` CLI (~/.local/bin is where it looks when PATH has
+# none), so installing the app alone leaves it driving whatever older CLI is there.
+swift build -c release --product cellar
+mkdir -p "$HOME/.local/bin"
+cp .build/release/cellar "$HOME/.local/bin/cellar"
+echo "Installed the cellar CLI at $HOME/.local/bin/cellar."
 
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
