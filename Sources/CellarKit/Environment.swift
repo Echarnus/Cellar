@@ -254,7 +254,7 @@ public enum SystemEnvironment {
         // Low Power Mode throttles the CPU, and a translated game is CPU-heavy before it draws anything.
         if ProcessInfo.processInfo.isLowPowerModeEnabled {
             checks.append(.init("Low Power Mode", .warn, "on — games run slower",
-                hint: "Turn it off in System Settings → Battery while you play."))
+                hint: "Turn it off in System Settings → Battery (Energy on a desktop Mac) while you play."))
         } else {
             checks.append(.init("Low Power Mode", .ok, "off"))
         }

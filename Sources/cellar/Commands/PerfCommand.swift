@@ -34,6 +34,48 @@ struct PerfCommand: ParsableCommand {
          Game.slugs(sharingBottle: plan.bottleName).filter { $0 != plan.slug })
     }
 
+    static func describe(_ source: PerformanceSettings.Source) -> String {
+        switch source {
+        case .cellarDefault: return "Cellar's default"
+        case .profile:       return "the game's profile"
+        case .bottle:        return "your choice"
+        }
+    }
+
+    /// The value that will actually take effect, re-read after a change rather than echoed back.
+    static func printEffective(_ settings: [PerformanceSetting], slug: String) throws {
+        let plan = try Game.plan(slug: slug)
+        let (url, _) = bottle(for: plan)
+        let bottleEnv = BottleConfig.env(url)
+        for entry in plan.performance.entries where settings.contains(entry.setting) {
+            print("\(entry.setting.key) = \(Term.bold(entry.value))" + Term.dim("  (\(describe(entry.source)))"))
+            if let variable = entry.setting.environmentVariable, bottleEnv[variable] != nil {
+                print(Term.yellow("  \(variable) in this bottle's [env] decides this one, and wins over the switch.")
+                    + " Remove that line from \(url.path) to use the switch.")
+            }
+        }
+        printCaveats(plan)
+    }
+
+    /// What would make a switch do less than it says, checked rather than assumed.
+    static func printCaveats(_ plan: GamePlan) {
+        if plan.performance.metalFXUpscaling {
+            if plan.graphicsBackend != .d3dmetal {
+                print(Term.yellow("MetalFX only works on D3DMetal; this game runs on \(plan.backend), so it does nothing."))
+            } else if let install = RunnerManager.find(id: plan.runnerID), !install.hasMetalFXShim {
+                print(Term.yellow("MetalFX is on, but this game's runtime has no MetalFX support, so it does nothing."))
+            }
+        }
+        if Game.storeClientRunning(plan) {
+            print(Term.yellow("\(plan.store.displayName) is open.") + " A game it starts gets the settings it was "
+                + "opened with — quit \(plan.store.displayName) first for a change to apply.")
+        }
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            print(Term.yellow("Low Power Mode is on.") + " macOS slows the CPU and GPU — turn it off in "
+                + "System Settings → Battery (Energy on a desktop Mac) for the best frame rate.")
+        }
+    }
+
     struct Show: ParsableCommand {
         static let configuration = CommandConfiguration(abstract: "Show a game's performance switches.")
 
@@ -47,22 +89,10 @@ struct PerfCommand: ParsableCommand {
                 let key = entry.setting.key.padding(toLength: 18, withPad: " ", startingAt: 0)
                 // Pad, never truncate: a Wine channel list is longer than the column.
                 let value = entry.value + String(repeating: " ", count: max(1, 8 - entry.value.count))
-                let from: String
-                switch entry.source {
-                case .cellarDefault: from = "Cellar's default"
-                case .profile:       from = "the game's profile"
-                case .bottle:        from = "your choice"
-                }
-                print("  \(key) \(Term.bold(value))\(Term.dim(from))")
+                print("  \(key) \(Term.bold(value))\(Term.dim(PerfCommand.describe(entry.source)))")
                 print("    " + Term.dim(entry.setting.summary))
             }
-            if plan.performance.metalFXUpscaling, let wine = Game.wineRunner(plan), !wine.usesMetalFX {
-                print(Term.yellow("MetalFX is on, but this runner has no MetalFX support, so it does nothing."))
-            }
-            if ProcessInfo.processInfo.isLowPowerModeEnabled {
-                print(Term.yellow("Low Power Mode is on.") + " macOS slows the CPU and GPU — turn it off in "
-                    + "System Settings → Battery for the best frame rate.")
-            }
+            PerfCommand.printCaveats(plan)
             print(Term.dim("Change one: cellar perf set \(slug) <switch> <value>"))
         }
     }
@@ -82,10 +112,16 @@ struct PerfCommand: ParsableCommand {
         func run() throws {
             let plan = try Game.plan(slug: slug)
             let setting = try PerfCommand.setting(key)
+            // The choice lives in the bottle. Creating a bare one here would make setup think the
+            // bottle already exists and skip writing its real configuration.
+            guard FileManager.default.fileExists(atPath: plan.prefix.path) else {
+                throw CellarError.invalidArgument(
+                    "\(plan.name) has no bottle yet to keep this in. Run: cellar setup --profile \(slug)  first.")
+            }
             let (url, sharedWith) = PerfCommand.bottle(for: plan)
             try BottleConfig.set(setting, to: value, in: url)
-            let saved = try setting.normalise(value)
-            print(Term.green("\(setting.key) = \(saved)") + " for \(plan.name), from the next launch.")
+            print(Term.green("Saved for \(plan.name), from the next launch:"))
+            try PerfCommand.printEffective([setting], slug: slug)
             if !sharedWith.isEmpty {
                 print(Term.dim("Shared bottle: \(sharedWith.joined(separator: ", ")) get this too."))
             }
@@ -106,10 +142,7 @@ struct PerfCommand: ParsableCommand {
             let settings = key == "all" ? PerformanceSetting.allCases : [try PerfCommand.setting(key)]
             let (url, _) = PerfCommand.bottle(for: plan)
             for setting in settings { try BottleConfig.unset(setting, in: url) }
-            for entry in try Game.plan(slug: slug).performance.entries where settings.contains(entry.setting) {
-                let from = entry.source == .profile ? "the game's profile" : "Cellar's default"
-                print("\(entry.setting.key) = \(entry.value)" + Term.dim("  (\(from))"))
-            }
+            try PerfCommand.printEffective(settings, slug: slug)
         }
     }
 }

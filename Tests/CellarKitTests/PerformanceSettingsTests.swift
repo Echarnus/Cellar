@@ -593,4 +593,55 @@ struct PerformanceSettingsTests {
         #expect(try entry(.metalHUD, in: resolved).source == .bottle)
         #expect(try entry(.wineDebug, in: resolved).source == .profile)
     }
+
+    @Test("A bottle's WINEDLLOVERRIDES is merged with the profile's, never replaces it")
+    func dllOverridesMerge() {
+        let resolved = PerformanceSettings.resolve(
+            profileFields: [:], profileEnv: ["WINEDLLOVERRIDES": "locationapi=d"],
+            bottleFields: [:], bottleEnv: ["WINEDLLOVERRIDES": "dinput8=n,b"])
+        #expect(resolved.env["WINEDLLOVERRIDES"] == "locationapi=d;dinput8=n,b")
+    }
+
+    @Test("The shipped Planet Coaster 2 profile keeps validation on, and its bottle can turn it off")
+    func shippedPlanetCoaster2ThroughGamePlan() throws {
+        TestHome.ensure()
+        let shipped = try #require(try Repo.profileFiles().first { $0.lastPathComponent == "planet-coaster-2.toml" })
+        let slug = TestHome.writeProfile(try String(contentsOf: shipped, encoding: .utf8), slug: "pc2")
+
+        let plan = try Game.plan(slug: slug)
+        #expect(plan.env["MTL_DEBUG_LAYER"] == "1")
+        #expect(plan.env["WINEDEBUG"] == "-all")
+        #expect(plan.metalFXUpscaling)
+        #expect(try entry(.metalValidation, in: plan.performance).source == .profile)
+
+        try BottleConfig.set(.metalValidation, to: "off", in: BottleConfig.url(forBottle: plan.bottleName))
+        let tuned = try Game.plan(slug: slug)
+        #expect(tuned.env["MTL_DEBUG_LAYER"] == nil)
+        #expect(try entry(.metalValidation, in: tuned.performance).source == .bottle)
+    }
+
+    @Test("A hand-written switch with a trailing comment still counts")
+    func handEditedSwitchWithComment() throws {
+        let url = try bottleFile("""
+        [performance]
+        metal_validation = "false" # trying the newer D3DMetal
+        """)
+        #expect(BottleConfig.fields(url)["metal_validation"] == "false")
+    }
+
+    @Test("A switch's name inside [env] or [dll_overrides] is not the switch")
+    func rawSectionsAreNotSwitches() throws {
+        let url = try bottleFile("""
+        [env]
+        metal_hud = "true"
+
+        [dll_overrides]
+        wine_debug = "native"
+        """)
+        #expect(BottleConfig.fields(url)["metal_hud"] == nil)
+        #expect(BottleConfig.fields(url)["wine_debug"] == nil)
+        try BottleConfig.set(.metalHUD, to: "off", in: url)
+        #expect(BottleConfig.env(url)["metal_hud"] == "true", "the [env] line is left alone")
+        #expect(BottleConfig.fields(url)["metal_hud"] == "false")
+    }
 }

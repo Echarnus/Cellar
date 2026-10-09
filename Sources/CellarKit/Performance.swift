@@ -21,6 +21,16 @@ public enum PerformanceSetting: String, CaseIterable {
 
     var isBool: Bool { self != .wineDebug }
 
+    /// The variable a raw `[env]` block would use for the same switch, if it has one.
+    public var environmentVariable: String? {
+        switch self {
+        case .wineDebug:        return "WINEDEBUG"
+        case .metalValidation:  return "MTL_DEBUG_LAYER"
+        case .metalHUD:         return "MTL_HUD_ENABLED"
+        case .metalFXUpscaling: return nil
+        }
+    }
+
     /// The switch's value as a raw `[env]` block states it, if that block sets its variable.
     func value(fromEnv env: [String: String]) -> String? {
         switch self {
@@ -101,7 +111,14 @@ public enum PerformanceSettings {
                 values[setting] = (value, source)
                 apply(setting, value, to: &env)
             }
-            for (key, value) in raw { env[key] = value }
+            for (key, value) in raw {
+                // Merged, never replaced: a bottle's DLL override must not drop the profile's.
+                if key == "WINEDLLOVERRIDES", let earlier = env[key], !earlier.isEmpty {
+                    env[key] = earlier + ";" + value
+                } else {
+                    env[key] = value
+                }
+            }
             // A raw variable is the same switch spelled differently: report what the game will get,
             // not what the typed key said — a hand-edited profile's `WINEDEBUG` must show up here.
             for setting in PerformanceSetting.allCases {
@@ -137,7 +154,14 @@ public enum BottleConfig {
         Paths.prefixes.appendingPathComponent(name, isDirectory: true).appendingPathComponent("bottle.toml")
     }
 
-    public static func fields(_ url: URL) -> [String: String] { PrefixManager.readBottleConfig(url) }
+    /// The bottle's scalar keys outside `[env]` and `[dll_overrides]`, whose keys are variable and
+    /// DLL names, not settings. Inline ` #` comments are cut, as the profile scanner does — a
+    /// hand-written `metal_validation = "false" # crash fixed?` must still count.
+    public static func fields(_ url: URL) -> [String: String] {
+        var dict: [String: String] = [:]
+        for line in settingLines(readLines(url)) { dict[line.key] = line.value }
+        return dict
+    }
 
     public static func env(_ url: URL) -> [String: String] { ProfileStore.env(at: url) }
 
@@ -147,7 +171,7 @@ public enum BottleConfig {
         let normalised = try setting.normalise(value)
         let line = "\(setting.key) = \"\(normalised)\""
         var lines = readLines(url)
-        if let index = lines.firstIndex(where: { isLine($0, for: setting) }) {
+        if let index = settingLines(lines).first(where: { $0.key == setting.key })?.index {
             lines[index] = line
         } else if let header = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "[performance]" }) {
             lines.insert(line, at: header + 1)
@@ -161,15 +185,27 @@ public enum BottleConfig {
     public static func unset(_ setting: PerformanceSetting, in url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         let lines = readLines(url)
-        let kept = lines.filter { !isLine($0, for: setting) }
+        let drop = Set(settingLines(lines).filter { $0.key == setting.key }.map(\.index))
+        let kept = lines.indices.filter { !drop.contains($0) }.map { lines[$0] }
         guard kept.count != lines.count else { return }
         try write(kept, to: url)
     }
 
-    private static func isLine(_ line: String, for setting: PerformanceSetting) -> Bool {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.hasPrefix("#"), let eq = trimmed.firstIndex(of: "=") else { return false }
-        return trimmed[..<eq].trimmingCharacters(in: .whitespaces) == setting.key
+    /// `key = value` lines that can hold a setting, with their position: every section except
+    /// `[env]` and `[dll_overrides]`. Quotes and a trailing ` #` comment are stripped from the value.
+    private static func settingLines(_ lines: [String]) -> [(index: Int, key: String, value: String)] {
+        var result: [(index: Int, key: String, value: String)] = []
+        var inRawSection = false
+        for (index, raw) in lines.enumerated() {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") { inRawSection = ["[env]", "[dll_overrides]"].contains(line); continue }
+            guard !inRawSection, !line.hasPrefix("#"), let eq = line.firstIndex(of: "=") else { continue }
+            var value = String(line[line.index(after: eq)...])
+            if let hash = value.range(of: " #") { value = String(value[..<hash.lowerBound]) }
+            value = value.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            result.append((index, line[..<eq].trimmingCharacters(in: .whitespaces), value))
+        }
+        return result
     }
 
     private static func readLines(_ url: URL) -> [String] {
