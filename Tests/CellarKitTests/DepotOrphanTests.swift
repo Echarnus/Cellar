@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import CellarKit
 
-/// A download left running after its parent died keeps the Steam login, and Steam allows one
-/// session per account — so every later install failed with "Lost connection to Steam". Only the
+/// A download left running after its parent died keeps taking back the default logon id that every
+/// download shares — so every later install failed with "Lost connection to Steam". Only the
 /// orphan may be reaped: a run another Cellar process still drives is not ours to stop.
 struct DepotOrphanTests {
     private let binary = "/Users/me/Library/Application Support/Cellar/tools/depotdownloader/DepotDownloader"

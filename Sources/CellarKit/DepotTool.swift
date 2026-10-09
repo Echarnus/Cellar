@@ -392,10 +392,12 @@ public enum DepotTool {
 
     /// Stop copies of the tool whose parent has gone.
     ///
-    /// Steam allows one live session per account, so a download left running after its `cellar`
-    /// (or the app) was quit or killed keeps the login and knocks every later run off with
-    /// "Lost connection to Steam" — a retry then fails the same way, for as long as the orphan lives.
+    /// Steam ends a session when another signs in with the same logon id, and a download uses the
+    /// tool's default one. A download left running after its `cellar` (or the app) was quit or
+    /// killed therefore keeps taking the id back from every later run: each fails with
+    /// "Lost connection to Steam", and a retry fails the same way for as long as the orphan lives.
     /// Only orphans are touched: a run some other Cellar process is still driving has a parent.
+    /// Two live downloads that share the default id still collide — this does not cover that.
     static func reapOrphans() {
         let listing = Shell.run("/bin/ps", ["-axo", "pid=,ppid=,command="]).stdout
         for pid in orphanedPIDs(in: listing, binary: binary.path) { kill(pid, SIGTERM) }
