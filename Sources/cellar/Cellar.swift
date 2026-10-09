@@ -20,6 +20,7 @@ struct Cellar: ParsableCommand {
           cellar library                         the games you own that Cellar can run
           cellar install planet-coaster-2        downloaded with that sign-in, no Steam window
           cellar launch  planet-coaster-2        play
+          cellar perf    planet-coaster-2        performance switches (logging, validation, MetalFX, HUD)
 
         Quick start — GOG (DRM-free, no client in the bottle):
           cellar gog login                       sign in once, for your whole library
@@ -51,6 +52,7 @@ struct Cellar: ParsableCommand {
             AppCommand.self,
             Accounts.self,
             Launch.self,
+            PerfCommand.self,
             UpdateCommand.self,
             UninstallCommand.self,
             RunnerCommand.self,

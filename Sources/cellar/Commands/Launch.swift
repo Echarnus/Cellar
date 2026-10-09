@@ -11,7 +11,7 @@ struct Launch: ParsableCommand {
     @Argument(help: "Profile slug to launch, e.g. 'diablo-4'.")
     var slug: String
 
-    @Flag(help: "Show the Metal performance HUD (FPS / frametime).")
+    @Flag(help: "Show the Metal performance HUD (FPS / frametime) this once. To keep it on: cellar perf set <slug> metal_hud on")
     var hud = false
 
     @Flag(name: .customLong("store"), help: "Force the store-client launch path even if a direct launch is possible.")

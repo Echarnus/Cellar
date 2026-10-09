@@ -23,6 +23,9 @@ receipts there. Key rules:
 - **One game, one bottle.** Prefixes are not forward compatible — changing a bottle's runner is a
   migration, not a config edit. `bottle.toml` is read by a scalar scanner, same constraints as a
   profile ([`cellar-profiles`](../cellar-profiles/SKILL.md)).
+- **Performance switches** (`wine_debug`, `metal_validation`, `metalfx_upscaling`, `metal_hud`) are
+  set by the profile and overridden per bottle (`cellar perf`); `PerformanceSettings.resolve` is the
+  only place they are layered. Add a new one there, not as an `[env]` convention.
 - **Tear the layer down with the game:** client, `Agent.exe`, helpers, then `wineserver -k`. A
   surviving `Agent.exe` greys out Install next session.
 - **Wine's stderr is exactly the volume that deadlocks `Shell.run`** — use `inheritIO` (see

@@ -11,7 +11,8 @@ public struct GamePlan {
     public let store: GameStore
     public let appID: Int?
     public let backend: String
-    /// `[env]` from the profile — applied to the game and to the store client that spawns it.
+    /// The game's environment — the profile's `[env]` and switches, then the bottle's
+    /// (`PerformanceSettings.resolve`) — applied to the game and to the store client that spawns it.
     public let env: [String: String]
     /// Install method: `windows-steam-in-bottle` (default), `battlenet-in-bottle`, or `depot`.
     public let installMethod: String
@@ -36,6 +37,9 @@ public struct GamePlan {
     /// `metalfx_upscaling = true`: present the NVIDIA identity so the game's DLSS option becomes
     /// MetalFX. Only takes effect on D3DMetal with a runtime that ships the shims (`WineRunner.usesMetalFX`).
     public var metalFXUpscaling: Bool = false
+    /// Every performance switch with the layer it came from, for `cellar perf`.
+    public var performance = PerformanceSettings.resolve(profileFields: [:], profileEnv: [:],
+                                                          bottleFields: [:], bottleEnv: [:])
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
@@ -449,17 +453,22 @@ public enum Game {
         }
         let fields = ProfileStore.fields(ref)
         let store = GameStore(profileValue: fields["store"]) ?? .default
+        // Several games can share one bottle (one sign-in, one download cache); a profile
+        // opts in with `bottle = "<name>"`. Default: one bottle per game.
+        let bottleName = fields["bottle"] ?? slug
+        let bottleFile = BottleConfig.url(forBottle: bottleName)
+        let performance = PerformanceSettings.resolve(
+            profileFields: fields, profileEnv: ProfileStore.env(ref),
+            bottleFields: BottleConfig.fields(bottleFile), bottleEnv: BottleConfig.env(bottleFile))
         return GamePlan(
             slug: slug,
             name: fields["name"] ?? slug,
-            // Several games can share one bottle (one sign-in, one download cache); a profile
-            // opts in with `bottle = "<name>"`. Default: one bottle per game.
-            bottleName: fields["bottle"] ?? slug,
+            bottleName: bottleName,
             runnerID: fields["id"] ?? RunnerCatalog.defaultID,
             store: store,
             appID: fields["steam_appid"].flatMap { Int($0) },
             backend: fields["backend"] ?? "d3dmetal",
-            env: ProfileStore.env(ref),
+            env: performance.env,
             installMethod: fields["method"] ?? defaultInstallMethod(for: store),
             launchExe: fields["exe"],
             installDir: fields["install_dir"],
@@ -482,7 +491,8 @@ public enum Game {
                 requiresAccount: fields["requires_account"],
                 status: fields["status"],
                 notes: fields["notes"]),
-            metalFXUpscaling: fields["metalfx_upscaling"]?.lowercased() == "true"
+            metalFXUpscaling: performance.metalFXUpscaling,
+            performance: performance
         )
     }
 

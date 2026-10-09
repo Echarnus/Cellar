@@ -21,7 +21,7 @@ changing a profile. Key rules:
   `notes` names the hardware and OS; DRM and anti-cheat are stated precisely and separately (Denuvo
   is anti-tamper DRM, not anti-cheat). Untested means untested.
 - **Comment the *why* in the file** — existing profiles explain why `Fen` is Diablo IV's product
-  code and why `MTL_DEBUG_LAYER=1` is on. A profile is executable documentation.
+  code and why `metal_validation = true` is on. A profile is executable documentation.
 - **Don't add a fourth spelling** of "needs a live client": `needs_live_session` is canonical,
   `needs_live_steam` is legacy-but-read, `requires_live_steam_session` is read by nothing.
 - **Artwork:** Steam art is derived from the AppID; non-Steam profiles supply `art_portrait`

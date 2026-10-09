@@ -83,7 +83,7 @@ evening on a download. Cellar's whole proposition is that it does not overpromis
   Kernel-level anti-cheat and user-space protection are different worlds for a translation layer.
   Never write a profile that implies a circumvention.
 - **Comment the *why* in the file.** The existing profiles explain, inline, why `Fen` is Diablo IV's
-  product code and why `MTL_DEBUG_LAYER=1` is on. A profile is documentation that happens to be
+  product code and why `metal_validation = true` is on. A profile is documentation that happens to be
   executable; a bare key-value dump loses the reasoning that makes it maintainable.
 
 ## Known schema drift — don't add a fourth spelling

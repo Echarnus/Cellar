@@ -37,8 +37,11 @@ public enum ProfileStore {
 
     /// The `[env]` section of a profile: environment variables applied to the game (and to the
     /// Steam client that spawns it). Values are strings; keys are used verbatim.
-    public static func env(_ ref: ProfileRef) -> [String: String] {
-        guard let text = try? String(contentsOf: ref.url, encoding: .utf8) else { return [:] }
+    public static func env(_ ref: ProfileRef) -> [String: String] { env(at: ref.url) }
+
+    /// The `[env]` section of any Cellar TOML file — a profile, or a bottle's `bottle.toml`.
+    public static func env(at url: URL) -> [String: String] {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [:] }
         var dict: [String: String] = [:]
         var inEnv = false
         for rawLine in text.split(separator: "\n") {

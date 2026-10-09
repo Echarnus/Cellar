@@ -137,6 +137,16 @@ Two Wine-adjacent specifics worth keeping in mind here:
   no login form. The client rewrites its own config on exit, so re-applying it is a command
   (`cellar battlenet configure`), not a one-time setup step.
 
+## Performance switches — profile default, bottle override
+
+`wine_debug`, `metal_validation`, `metalfx_upscaling` and `metal_hud` are scalar keys a profile sets
+as the game's default and a bottle's `bottle.toml` overrides for the player (`cellar perf <slug>`
+reads and writes them; `PerformanceSettings.resolve` is the one place they are layered). Order, later
+wins: Cellar's default → profile switches → profile `[env]` → bottle switches → bottle `[env]`. A
+raw `[env]` variable (`WINEDEBUG`, `MTL_DEBUG_LAYER`, `MTL_HUD_ENABLED`) counts as setting its
+switch, so `cellar perf` shows what the game really gets. Add a new switch there, not as another
+`[env]` convention.
+
 ## Diagnosing a game that won't start
 
 Work down the layer, not across the internet:
@@ -147,8 +157,10 @@ Work down the layer, not across the internet:
    above was violated.
 3. **Is it the known D3DMetal race?** A fast `0xC0000409` at startup is the D3DMetal 3.0
    ray-tracing `D3D12AccelerationStructure` builder. `MTL_DEBUG_LAYER=1` shifts the timing enough to
-   get past it — a documented workaround, recorded in the profile's `[env]`, not a fix.
-4. **Only then** turn `WINEDEBUG` up — and remember that Wine's stderr is exactly the volume that
+   get past it — a documented workaround, recorded in the profile as `metal_validation = true`,
+   not a fix.
+4. **Only then** turn Wine's logging up — `cellar perf set <slug> wine_debug err+all`, and back to
+   `off` afterwards: tracing costs CPU on every call it logs — and remember that Wine's stderr is exactly the volume that
    deadlocks `Shell.run`; use `inheritIO` (see [`swift.md`](swift.md)).
 
 Launch-flag folklore (`-allosarches`, `-cef-force-32bit`) has been tested and is a **no-op**. Don't

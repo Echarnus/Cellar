@@ -52,8 +52,14 @@ public enum PrefixManager {
         runner = "\(runner)"
         windows_version = "win10"
 
+        [performance]
+        # Your own switches for this bottle; they win over the game's profile. Set them with
+        # `cellar perf set <game> <key> <value>`, e.g.:
+        # wine_debug = "off"
+        # metal_validation = "false"
+
         [env]
-        # Per-bottle environment overrides, e.g.:
+        # Per-bottle environment overrides, applied last, e.g.:
         # MTL_HUD_ENABLED = "1"
 
         [dll_overrides]

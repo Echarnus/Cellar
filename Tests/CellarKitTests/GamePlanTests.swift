@@ -52,7 +52,8 @@ struct GamePlanTests {
         #expect(plan.graphicsBackend == .dxvk)
         #expect(plan.launchExe == "AoE2DE_s.exe")
         #expect(plan.installDir == "AoE2DE")
-        #expect(plan.env == ["MTL_HUD_ENABLED": "1"])
+        // The profile's [env], plus Wine's logging off — what every plan carries unless told otherwise.
+        #expect(plan.env == ["MTL_HUD_ENABLED": "1", "WINEDEBUG": "-all"])
         #expect(plan.facts.status == "playable")
         #expect(plan.facts.engine == "Genie")
         #expect(plan.facts.notes == "Tested on an M5.")

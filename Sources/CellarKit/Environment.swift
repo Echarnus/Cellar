@@ -251,6 +251,14 @@ public enum SystemEnvironment {
                 hint: status == .warn ? "A game plus a Windows Steam bottle can need 30–100 GB." : nil))
         }
 
+        // Low Power Mode throttles the CPU, and a translated game is CPU-heavy before it draws anything.
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            checks.append(.init("Low Power Mode", .warn, "on — games run slower",
+                hint: "Turn it off in System Settings → Battery while you play."))
+        } else {
+            checks.append(.init("Low Power Mode", .ok, "off"))
+        }
+
         return checks
     }
 }
