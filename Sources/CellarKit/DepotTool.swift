@@ -379,6 +379,7 @@ public enum DepotTool {
     /// call site — which is exactly how the session went missing before.
     private static func process(_ args: [String]) throws -> Process {
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        reapOrphans()
         let p = Process()
         p.executableURL = binary
         p.arguments = args
@@ -387,6 +388,29 @@ public enum DepotTool {
         env["HOME"] = home.path
         p.environment = env
         return p
+    }
+
+    /// Stop copies of the tool whose parent has gone.
+    ///
+    /// Steam allows one live session per account, so a download left running after its `cellar`
+    /// (or the app) was quit or killed keeps the login and knocks every later run off with
+    /// "Lost connection to Steam" — a retry then fails the same way, for as long as the orphan lives.
+    /// Only orphans are touched: a run some other Cellar process is still driving has a parent.
+    static func reapOrphans() {
+        let listing = Shell.run("/bin/ps", ["-axo", "pid=,ppid=,command="]).stdout
+        for pid in orphanedPIDs(in: listing, binary: binary.path) { kill(pid, SIGTERM) }
+    }
+
+    /// The pids in `ps -axo pid=,ppid=,command=` output that run `binary` with launchd as their
+    /// parent.
+    static func orphanedPIDs(in listing: String, binary: String) -> [pid_t] {
+        listing.split(separator: "\n").compactMap { line in
+            let fields = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
+            guard fields.count == 3, fields[1] == "1",
+                  fields[2] == Substring(binary) || fields[2].hasPrefix(binary + " "),
+                  let pid = pid_t(fields[0]) else { return nil }
+            return pid
+        }
     }
 
     private static func runInheritingIO(args: [String]) throws {
