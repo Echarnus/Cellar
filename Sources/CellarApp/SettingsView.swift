@@ -48,7 +48,7 @@ struct SettingsView: View {
                 }
                 Section("Gameplay") {
                     Toggle("Show Metal performance overlay (FPS)", isOn: $showHUD)
-                    Text("Shows FPS and frame time in every game you launch. For one game only, leave this off and run: cellar perf set <game> metal_hud on")
+                    Text("Shows FPS and frame time in every game you launch.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Folder access") {

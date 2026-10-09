@@ -49,7 +49,7 @@ public enum PerformanceSetting: String, CaseIterable {
         case .wineDebug:        return "Wine debug logging: off, or channels such as err+all (slows the game)"
         case .metalValidation:  return "Metal validation layer: a crash workaround for some games, costs FPS"
         case .metalFXUpscaling: return "MetalFX upscaling through the game's DLSS option (D3DMetal only)"
-        case .metalHUD:         return "Metal performance HUD: FPS and frame time on screen"
+        case .metalHUD:         return "Metal performance HUD for this game (the app's overlay setting adds it to every game)"
         }
     }
 

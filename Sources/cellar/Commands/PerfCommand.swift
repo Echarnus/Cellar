@@ -46,15 +46,18 @@ struct PerfCommand: ParsableCommand {
     static func printEffective(_ settings: [PerformanceSetting], slug: String) throws {
         let plan = try Game.plan(slug: slug)
         let (url, _) = bottle(for: plan)
-        let bottleEnv = BottleConfig.env(url)
         for entry in plan.performance.entries where settings.contains(entry.setting) {
             print("\(entry.setting.key) = \(Term.bold(entry.value))" + Term.dim("  (\(describe(entry.source)))"))
-            if let variable = entry.setting.environmentVariable, bottleEnv[variable] != nil {
-                print(Term.yellow("  \(variable) in this bottle's [env] decides this one, and wins over the switch.")
-                    + " Remove that line from \(url.path) to use the switch.")
-            }
+            printEnvOverride(entry.setting, url: url)
         }
         printCaveats(plan)
+    }
+
+    /// A bottle `[env]` line spelling the same switch wins over it — say so, and where it is.
+    static func printEnvOverride(_ setting: PerformanceSetting, url: URL) {
+        guard let variable = setting.environmentVariable, BottleConfig.env(url)[variable] != nil else { return }
+        print(Term.yellow("    \(variable) in this bottle's [env] decides this one, and wins over the switch.")
+            + " Remove that line from \(url.path) to use the switch.")
     }
 
     /// What would make a switch do less than it says, checked rather than assumed.
@@ -65,10 +68,6 @@ struct PerfCommand: ParsableCommand {
             } else if let install = RunnerManager.find(id: plan.runnerID), !install.hasMetalFXShim {
                 print(Term.yellow("MetalFX is on, but this game's runtime has no MetalFX support, so it does nothing."))
             }
-        }
-        if Game.storeClientRunning(plan) {
-            print(Term.yellow("\(plan.store.displayName) is open.") + " A game it starts gets the settings it was "
-                + "opened with — quit \(plan.store.displayName) first for a change to apply.")
         }
         if ProcessInfo.processInfo.isLowPowerModeEnabled {
             print(Term.yellow("Low Power Mode is on.") + " macOS slows the CPU and GPU — turn it off in "
@@ -91,6 +90,7 @@ struct PerfCommand: ParsableCommand {
                 let value = entry.value + String(repeating: " ", count: max(1, 8 - entry.value.count))
                 print("  \(key) \(Term.bold(value))\(Term.dim(PerfCommand.describe(entry.source)))")
                 print("    " + Term.dim(entry.setting.summary))
+                PerfCommand.printEnvOverride(entry.setting, url: PerfCommand.bottle(for: plan).url)
             }
             PerfCommand.printCaveats(plan)
             print(Term.dim("Change one: cellar perf set \(slug) <switch> <value>"))
