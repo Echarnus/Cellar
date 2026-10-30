@@ -290,10 +290,17 @@ struct GameDetailView: View {
 
             FactList(title: "Runtime", rows: [
                 ("Runner", game.runnerID),
-                ("Graphics", game.backend.uppercased()),
+                ("Graphics", graphicsValue),
                 ("Store", game.store.displayName),
                 ("Bottle", game.bottleName),
             ])
+
+            if game.backendIsPlayerChoice, let profiles = game.profileBackend.flatMap(GraphicsBackend.init(rawValue:)) {
+                Button("Go back to \(profiles.displayName), the profile's backend") { resetBackend() }
+                    .buttonStyle(.link).font(.callout)
+                    .disabled(runner.busy)
+                    .help("\(game.name) starts on \(profiles.displayName) again from its next launch. \(profiles.summary)")
+            }
 
             if let notes = facts.notes, !notes.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
@@ -308,6 +315,19 @@ struct GameDetailView: View {
             }
         }
         .padding(.top, 2)
+    }
+
+    /// The backend, and whose choice it is — a switch the player made is never shown as the profile's.
+    private var graphicsValue: String {
+        let name = GraphicsBackend(rawValue: game.backend)?.displayName ?? game.backend
+        return game.backendIsPlayerChoice ? "\(name) — your choice" : name
+    }
+
+    private func resetBackend() {
+        // A link has nowhere to show an error; a write that failed leaves the row as it was, which
+        // is the truth.
+        guard (try? BackendChoice.set(nil, in: BottleConfig.url(forBottle: game.bottleName))) != nil else { return }
+        onChange()
     }
 
     @ViewBuilder private func factColumns(_ facts: GameFacts) -> some View {
@@ -338,7 +358,7 @@ struct GameDetailView: View {
             // The launch gets a window of its own: it is a minute or two of work with several
             // steps, and a spinner beside the button reads as a hang.
             runner.launch(slug: game.slug, showHUD: showHUD) { onChange() }
-            LaunchSplashWindow.present(game: game, runner: runner)
+            LaunchSplashWindow.present(game: game, runner: runner, onFinished: { onChange() })
         case .setup:
             act(["setup", "--profile", game.slug], "Setting up")
         case .install:
