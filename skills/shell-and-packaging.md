@@ -98,15 +98,24 @@ touch this:
   keep that the last step that touches the bundle.
 - Copying files with `ditto` preserves extended attributes and signatures; a naive `cp -R` of a
   signed bundle can invalidate it. Prefer `ditto` when assembling the bundle.
-- If Developer-ID signing and notarisation ever land, they need a hardened runtime, `codesign
-  --deep --options runtime`, `notarytool submit --wait` and `stapler staple` — **and the release
-  notes must stop telling people to use Open Anyway.** Don't ship one without the other.
+- **Signing goes through `Scripts/sign-app.sh`**, inside-out (Sparkle's XPC services and helpers,
+  the bundled CLI, the Dock shim, then the app) rather than `--deep`. Ad-hoc by default; with
+  `CELLAR_SIGN_IDENTITY` set to a Developer ID it adds the hardened runtime and a timestamp — only
+  then, because ad-hoc code has no Team ID and library validation would refuse Sparkle.framework.
+  `Scripts/notarize.sh` submits and staples, and is a no-op without the notary key. The steps to
+  switch it on are in `docs/RELEASING.md` — **and the release notes and the DMG's read-me must stop
+  telling people to use Open Anyway in the same change.** Don't ship one without the other.
 
 ## Packaging traps (already solved — don't reintroduce)
 
 - **Case-insensitive filesystem collision.** The zips are named `Cellar-App-<v>.zip` and
   `Cellar-CLI-<v>.zip` deliberately — a naive `Cellar-<v>.zip` / `cellar-<v>.zip` pair collides on
   macOS's case-insensitive FS and one silently overwrites the other.
+- **The DMG window is laid out by Finder.** `make-dmg.sh` mounts a writable image, has Finder
+  position the icons over the background (AppleScript), then converts it. The icon positions there
+  and the drawing in `make-dmg-background.swift` are one layout — move one, move the other. Finder
+  label colour follows light/dark mode and cannot be set, so the background stays a mid-tone with
+  ≥ 4.5:1 contrast against both black and white text.
 - **Versionless DMG.** `make-dmg.sh` emits `dist/Cellar.dmg` (no version in the name) so the site's
   `releases/latest/download/Cellar.dmg` link always resolves. Don't add a version back.
 

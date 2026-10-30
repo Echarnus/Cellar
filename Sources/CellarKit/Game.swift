@@ -571,9 +571,19 @@ public enum Game {
 
     /// Minimal-setup pipeline: ensure runner → bottle → initialised prefix → the store's client.
     /// Idempotent: safe to re-run; skips steps already done.
+    ///
+    /// Holds `SetupLock`, so it waits for a background `cellar prepare` rather than racing it for
+    /// the same runner directory — and says that it is waiting.
     @discardableResult
     public static func setUp(_ plan: GamePlan, progress: (String) -> Void,
                              phase: (InstallProgress) -> Void = { _ in }) throws -> WineRunner {
+        try SetupLock.withLock(waiting: progress) {
+            try setUpHoldingLock(plan, progress: progress, phase: phase)
+        }
+    }
+
+    private static func setUpHoldingLock(_ plan: GamePlan, progress: (String) -> Void,
+                                         phase: (InstallProgress) -> Void) throws -> WineRunner {
         func step(_ message: String) {
             CellarLog.debug(.setup, message, subject: plan.slug)
             progress(message)

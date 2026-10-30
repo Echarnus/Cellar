@@ -169,6 +169,13 @@ struct WelcomeTourView: View {
                 FactRow(symbol: "gearshape", tint: .gray,
                         title: "Settings — ⌘,",
                         detail: "The Wine runner, your logs and the Cellar folder. It also replays this tour whenever you want it.")
+                // Only while it is actually happening: a tour replayed later must not claim a
+                // download that finished weeks ago, or one the player switched off.
+                if RuntimePreparation.shared.isWorking {
+                    FactRow(symbol: "arrow.down.circle", tint: .pink,
+                            title: "Getting ready in the background",
+                            detail: "Cellar is already downloading the Windows runtime and Steam client every game shares — a few gigabytes — so your first game only has to download itself. The library's footer shows how it's going.")
+                }
                 FactRow(symbol: "questionmark.circle", tint: .purple,
                         title: "Questions",
                         detail: "The supported-games list and the FAQ live on the Cellar site, linked from Settings.")

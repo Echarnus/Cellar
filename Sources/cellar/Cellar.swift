@@ -44,6 +44,7 @@ struct Cellar: ParsableCommand {
         subcommands: [
             Doctor.self,
             Setup.self,
+            PrepareCommand.self,
             LibraryCommand.self,
             Install.self,
             SteamCommand.self,
@@ -62,6 +63,7 @@ struct Cellar: ParsableCommand {
             SelfTest.self,
             LogsCommand.self,
             ResetCommand.self,
+            UninstallCellarCommand.self,
         ],
         defaultSubcommand: Doctor.self
     )
@@ -111,7 +113,7 @@ struct Cellar: ParsableCommand {
     private static func category(for subcommand: String?) -> LogCategory {
         switch subcommand {
         case "launch":                      return .launch
-        case "setup":                       return .setup
+        case "setup", "prepare":            return .setup
         case "fetch-depot":                 return .install
         case "steam", "battlenet", "gog":   return .store
         case "accounts":                    return .account

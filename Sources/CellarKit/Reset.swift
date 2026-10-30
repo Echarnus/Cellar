@@ -107,16 +107,96 @@ public enum Reset {
         }
 
         if includingCellarItself {
-            add(cellarApp, "Cellar.app", "download it again")
-            if let cli = cellarBinary { add(cli, "The cellar command-line tool", "download it again") }
+            let apps = cellarApps
+            for app in apps { add(app, "Cellar.app (\(app.deletingLastPathComponent().path))", "download it again") }
+            // A CLI inside an app being removed goes with it; listing it twice would overstate.
+            for cli in cellarCLIs where !apps.contains(where: { cli.path.hasPrefix($0.path + "/") }) {
+                var isDirectory: ObjCBool = false
+                FileManager.default.fileExists(atPath: cli.path, isDirectory: &isDirectory)
+                add(cli, isDirectory.boolValue ? "The cellar command's profiles and helpers"
+                                               : "The cellar command-line tool", "download it again")
+            }
+            for (url, title) in macOSRecords {
+                add(url, title, "nothing to restore — Cellar starts with its defaults")
+            }
         }
         return items
     }
 
-    /// Where the app and the CLI live, for `--everything`. The CLI is found from the running
-    /// process rather than assumed: it is installed by hand, so it can be anywhere on `PATH`.
+    /// The identifier every Cellar.app carries, whatever its file is called.
+    static let appIdentifier = "it.clercq.cellar.app"
+
+    /// Where a Cellar.app may be: next to the generated launchers (where `install-app.sh` puts it),
+    /// in /Applications (where the DMG puts it), or wherever this process is running from. Each one
+    /// is only counted if its Info.plist says it *is* Cellar — never by file name alone.
+    ///
+    /// A relocated Cellar (`CELLAR_HOME` / `CELLAR_APPLICATIONS_DIR`, which tests and throwaway
+    /// installs use) only ever looks inside its own applications folder, so it can never plan to
+    /// remove the player's real copy.
+    static var cellarApps: [URL] {
+        var candidates = [AppBundle.applicationsDirectory.appendingPathComponent("Cellar.app", isDirectory: true)]
+        if !isRelocated {
+            candidates.append(URL(fileURLWithPath: "/Applications/Cellar.app", isDirectory: true))
+            if Bundle.main.bundleURL.pathExtension == "app" { candidates.append(Bundle.main.bundleURL) }
+        }
+        var seen = Set<String>()
+        return candidates.filter { url in
+            seen.insert(url.standardizedFileURL.path).inserted && isCellarApp(url)
+        }
+    }
+
+    /// Whether a bundle is Cellar by what it says it is, not by what it is called.
+    static func isCellarApp(_ url: URL) -> Bool {
+        let plist = url.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: plist),
+              let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else { return false }
+        return info["CFBundleIdentifier"] as? String == appIdentifier
+    }
+
+    /// The first Cellar.app found, for the plan's "this stays" list.
     static var cellarApp: URL {
-        AppBundle.applicationsDirectory.appendingPathComponent("Cellar.app", isDirectory: true)
+        cellarApps.first ?? AppBundle.applicationsDirectory.appendingPathComponent("Cellar.app", isDirectory: true)
+    }
+
+    /// The CLI: the running binary, and the copy `install-app.sh` puts in ~/.local with its
+    /// profiles beside it. Only files that are really there, and really named `cellar`.
+    static var cellarCLIs: [URL] {
+        var found: [URL] = []
+        if let running = cellarBinary { found.append(running) }
+        if !isRelocated {
+            let local = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local")
+            let bin = local.appendingPathComponent("bin/cellar")
+            if FileManager.default.isExecutableFile(atPath: bin.path) {
+                found.append(bin)
+                found.append(local.appendingPathComponent("share/cellar", isDirectory: true))
+            }
+        }
+        var seen = Set<String>()
+        return found.map { $0.resolvingSymlinksInPath().standardizedFileURL }
+            .filter { seen.insert($0.path).inserted }
+    }
+
+    /// What macOS keeps on Cellar's behalf, outside its own folder: the app's preferences, the
+    /// updater's caches, the web view's storage from signing in to GOG, the saved window state.
+    /// Left out when relocated — those belong to the player's real installation.
+    static var macOSRecords: [(URL, String)] {
+        guard !isRelocated else { return [] }
+        let library = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library")
+        let id = appIdentifier
+        return [
+            (library.appendingPathComponent("Preferences/\(id).plist"), "Cellar's settings"),
+            (library.appendingPathComponent("Caches/\(id)", isDirectory: true), "Cellar's caches"),
+            (library.appendingPathComponent("HTTPStorages/\(id)", isDirectory: true), "Cellar's web storage"),
+            (library.appendingPathComponent("WebKit/\(id)", isDirectory: true), "The GOG sign-in page's storage"),
+            (library.appendingPathComponent("Saved Application State/\(id).savedState", isDirectory: true),
+             "Cellar's saved window positions"),
+        ]
+    }
+
+    static var isRelocated: Bool {
+        let env = ProcessInfo.processInfo.environment
+        return !(env["CELLAR_HOME"] ?? "").isEmpty || !(env["CELLAR_APPLICATIONS_DIR"] ?? "").isEmpty
     }
 
     static var cellarBinary: URL? {
@@ -132,10 +212,11 @@ public enum Reset {
     public static func leftBehind(after items: [Item]) -> [URL] {
         let removing = Set(items.compactMap(\.url))
         var rest: [URL] = []
-        if FileManager.default.fileExists(atPath: cellarApp.path), !removing.contains(cellarApp) {
-            rest.append(cellarApp)
+        for app in cellarApps where !removing.contains(app) { rest.append(app) }
+        if let cli = cellarBinary, !removing.contains(cli),
+           !removing.contains(where: { cli.path.hasPrefix($0.path + "/") }) {
+            rest.append(cli)
         }
-        if let cli = cellarBinary, !removing.contains(cli) { rest.append(cli) }
         return rest
     }
 

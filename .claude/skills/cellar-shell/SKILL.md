@@ -17,8 +17,11 @@ Key rules:
 - **Temp files:** `tmp=$(mktemp -d)` + `trap 'rm -rf "$tmp"' EXIT`, so a `set -e` abort still cleans
   up.
 - **Signing:** artifacts are ad-hoc signed and unnotarised. What blocks a download is the
-  `com.apple.quarantine` xattr, not the missing Developer ID. The bundle is sealed with
-  `codesign --force --deep --sign -` as the last step, or macOS 15+ calls it "damaged". Prefer
+  `com.apple.quarantine` xattr, not the missing Developer ID. `package.sh` seals the bundle with
+  `Scripts/sign-app.sh` (inside-out; Developer ID + hardened runtime when `CELLAR_SIGN_IDENTITY` is
+  set) as the last step, or macOS 15+ calls it "damaged"; `Scripts/notarize.sh` is a no-op until the
+  notary key exists. The DMG window is laid out by Finder over `make-dmg-background.swift`'s drawing —
+  keep the two layouts in step. Prefer
   `ditto` over `cp -R` when assembling the bundle. Users get past Gatekeeper via System Settings →
   Privacy & Security → Open Anyway (right-click → Open stopped working in macOS 15).
 - **Any script that runs `swift build` must `unset DEVELOPER_DIR SDKROOT` first** (Nix/devenv SDK

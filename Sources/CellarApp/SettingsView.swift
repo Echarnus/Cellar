@@ -26,11 +26,25 @@ struct SettingsView: View {
     @State private var export: Export = .idle
     @StateObject private var runner = CellarRunner()
     @ObservedObject private var updater = AppUpdater.shared
+    @ObservedObject private var preparation = RuntimePreparation.shared
     /// Read once per refresh, never from a view body — see `StoreAccountState`.
     @State private var accounts = StoreAccountState.unknown
 
     private var runnerName: String { RunnerManager.installed().first?.spec.displayName ?? "not installed" }
     private var depot: String { DepotTool.isInstalled ? "installed" : "installs on first download" }
+
+    /// Every state of the background download, said plainly — including "off".
+    private var preparationNote: String {
+        switch preparation.state {
+        case .working(let line): return "Downloading now: \(line)"
+        case .ready:             return "Everything every game shares is on this Mac."
+        case .incomplete:        return "Stopped before it finished. Whatever is missing downloads when a game first needs it, or when Cellar next opens."
+        case .idle:
+            return preparation.isEnabled
+                ? "The Windows runtime and Steam client download when Cellar opens, so a first game doesn't wait for them."
+                : "Off: the Windows runtime and Steam client download when you set up your first game."
+        }
+    }
 
     /// The panes, in the order a player needs them: the sign-in first, then what changes how games
     /// run, then the machinery, then who made it.
@@ -90,9 +104,22 @@ struct SettingsView: View {
                     Section("Runtime") {
                         LabeledContent("Wine runner", value: runnerName)
                         LabeledContent("DepotDownloader", value: depot)
+                        Toggle("Download what every game needs ahead of time", isOn: Binding(
+                            get: { preparation.isEnabled },
+                            set: { preparation.isEnabled = $0 }))
+                        Text(preparationNote)
+                            .font(.caption).foregroundStyle(.secondary)
                         Button("Open Cellar folder") { NSWorkspace.shared.open(Paths.appSupport) }
                     }
                     diagnostics
+                    Section("Uninstall") {
+                        Button("Uninstall Cellar…") {
+                            onClose()
+                            CellarUninstaller.begin()
+                        }
+                        Text("Removes Cellar and everything it downloaded. You choose whether to keep your save games first.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 .formStyle(.grouped)
                 .tabItem { Label(Pane.advanced.rawValue, systemImage: "wrench.and.screwdriver") }

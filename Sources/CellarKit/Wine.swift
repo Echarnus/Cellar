@@ -219,14 +219,19 @@ public struct WineRunner {
     /// Cellar access to them — empty on the normal path. `wineboot` points the Windows user's
     /// Documents/Desktop/Downloads at the real ones, so a folder the player declined would leave a
     /// game writing saves into a symlink it cannot follow (see `HomeFolderAccess`).
+    ///
+    /// `checkingHomeFolders: false` skips that check, which reads the folders and so can make macOS
+    /// ask for them — right for a bottle no game will run in (`Preparation`'s scaffold), which must
+    /// not put a permission dialog in front of a player who is still reading the welcome tour.
     @discardableResult
-    public func initializePrefix() throws -> [HomeFolder] {
+    public func initializePrefix(checkingHomeFolders: Bool = true) throws -> [HomeFolder] {
         try FileManager.default.createDirectory(at: prefix, withIntermediateDirectories: true)
         let result = run(["wineboot", "--init"], extraEnv: ["WINEDLLOVERRIDES": Self.headlessBootOverrides])
         guard result.succeeded else {
             throw CellarError.ioFailure("wineboot --init failed: \(result.stderr)")
         }
         waitForServer()
+        guard checkingHomeFolders else { return [] }
         return HomeFolderAccess.redirectDeniedUserShellFolders(in: prefix)
     }
 
