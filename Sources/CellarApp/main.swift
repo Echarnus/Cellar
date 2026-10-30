@@ -120,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func uninstallCellar() { CellarUninstaller.begin() }
+    @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin() }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
