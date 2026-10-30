@@ -63,12 +63,13 @@ private struct Track: View {
     let fraction: Double?
     let tint: Color
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.12))
+                Capsule().fill(Color.primary.opacity(contrast == .increased ? 0.28 : 0.12))
                 Capsule().fill(tint)
                     .frame(width: max(width * (fraction ?? 0), fraction == nil || fraction == 0 ? 0 : 6))
                     .opacity(fraction == nil ? 0 : 1)

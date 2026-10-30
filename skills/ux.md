@@ -133,6 +133,9 @@ are the external standard here; this is what it means for Cellar specifically.
   this mostly means: don't add motion to work around that constraint. Where motion does exist, read
   `@Environment(\.accessibilityReduceMotion)` and drop it: the sidebar's hover fade, the cover
   art's fade-in, and the indeterminate progress sweep (which holds still mid-track instead).
+- **Increase Contrast** (`@Environment(\.colorSchemeContrast) == .increased`) gets stronger
+  fills wherever a state is carried by a faint tint: the sidebar's selection and hover, the progress
+  track. Any new `opacity(0.0x)` fill that means something needs the same.
 - **Store marks and covers are hidden from VoiceOver on purpose.** `StoreMark` and `GameCover`
   hide themselves, because the rule is that a mark or a cover never appears without the store's or
   the game's name in words beside it — reading both says everything twice. If you ever place a mark
