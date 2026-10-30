@@ -27,6 +27,12 @@ struct GameDetailView: View {
                         .font(.callout).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    if let drive = game.missingDrive {
+                        Label("\(game.name) is on the drive “\(drive)”, which isn't connected. Connect it to play.",
+                              systemImage: "externaldrive.badge.xmark")
+                            .font(.callout).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     notice
                     chips
                     information
@@ -173,6 +179,12 @@ struct GameDetailView: View {
             if game.isDraft {
                 // A guess that works is worth handing in: the file is an ordinary profile.
                 Button("Save Profile As…") { exportProfile() }
+            }
+            if game.isOnOtherDrive {
+                Button("Move Back to This Mac") { act(["storage", "move-back", game.slug], "Moving \(game.name) back") }
+                    .disabled(game.missingDrive != nil)
+            } else if game.gameInstalled, game.store != .battlenet {
+                Button("Move to Another Drive…") { chooseDrive() }
             }
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
             // Removal is last and on its own, where destructive actions belong. Each entry states
@@ -444,6 +456,19 @@ struct GameDetailView: View {
         guard panel.runModal() == .OK, let target = panel.url else { return }
         try? FileManager.default.removeItem(at: target)
         try? FileManager.default.copyItem(at: source, to: target)
+    }
+
+    /// Pick a folder on another drive, then move the game there through the CLI.
+    private func chooseDrive() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Move Here"
+        panel.message = "Choose a folder on the drive to move \(game.name) to. Cellar puts it in a “Cellar Games” folder there, and the game plays and updates from it while the drive is connected."
+        panel.directoryURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        act(["storage", "move", game.slug, "--to", folder.path], "Moving \(game.name)")
     }
 
     private func act(_ args: [String], _ title: String) {
