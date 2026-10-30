@@ -195,3 +195,31 @@ same retry loop the Steam path uses (`ProcessWatch.superviseStart`).
 - ProtonDB / ValveSoftware/Proton #7199 — Diablo IV anti-cheat and Linux status
 - MichaelLod/D4Mac — Battle.net on Apple Silicon, prior art
 
+
+## Update 2026-10-30 — measuring frame rate, and where the next FPS is
+
+Planet Coaster 2's heavy parks are **CPU-bound** (above: GPU 26 ms of a 45 ms frame), so graphics
+switches cannot move them, and every other FPS claim so far was read off the HUD by eye. Cellar now
+measures instead: whenever the Metal HUD is on, `MTL_HUD_LOG_ENABLED=1` makes Metal log one line a
+second (`metal-HUD: <first frame>,<a>,<b>,<interval ms>,<gpu ms>,…` — Apple's
+[HUD documentation](https://developer.apple.com/documentation/xcode/monitoring-your-metal-apps-graphics-performance)),
+and `cellar perf measure <slug>` turns the last minute into average FPS, the slowest 1%, GPU time,
+and a verdict: GPU-bound (≥ 85% of the frame), CPU-bound (≤ 60%), capped at a refresh rate, or
+balanced. Apple documents the format but not the destination, so Cellar reads both the unified log
+and the launch logs in `Paths.logs`. Not yet run on a Mac: which of the two the lines land in is the
+first thing to confirm.
+
+Levers looked at, and why they are or are not in:
+
+- **Already in:** fast sync per build (`FastSync`), `WINEDEBUG=-all`, `ROSETTA_ADVERTISE_AVX`,
+  MetalFX through the DLSS path, Low Power Mode warning. Now also a thermal-throttling warning.
+- **Metal validation on PC2 (~7%)** stays: it is a crash workaround for D3DMetal 3.0. The way to get
+  it back is a newer D3DMetal, then `cellar perf set planet-coaster-2 metal_validation off` and
+  `cellar perf measure` before and after.
+- **macOS Game Mode** (top CPU/GPU priority, fewer background tasks) is decided by the frontmost
+  app's bundle declaring `LSApplicationCategoryType = public.app-category.games`; Apple says it
+  cannot be triggered programmatically. A game under Wine runs as the bare `wine` binary, which has
+  no such bundle — the same root cause as the Dock showing "Wine". The HUD's header says whether
+  Game Mode is on; check it before and after any change to the game's process identity.
+- **MoltenVK knobs** (`MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS`, `MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS`)
+  only matter on the DXVK fallback; not changed without a game that uses it to measure on.

@@ -14,8 +14,9 @@ struct PerfCommand: ParsableCommand {
           cellar perf set planet-coaster-2 wine_debug off       stop Wine's debug logging
           cellar perf set planet-coaster-2 metal_validation off try without the validation layer
           cellar perf reset planet-coaster-2 metal_validation   back to the profile's choice
+          cellar perf measure planet-coaster-2                  frame rate of the last minute, and what limits it
         """,
-        subcommands: [Show.self, Set.self, Reset.self],
+        subcommands: [Show.self, Set.self, Reset.self, Measure.self],
         defaultSubcommand: Show.self
     )
 
@@ -72,6 +73,13 @@ struct PerfCommand: ParsableCommand {
         if ProcessInfo.processInfo.isLowPowerModeEnabled {
             print(Term.yellow("Low Power Mode is on.") + " macOS slows the CPU and GPU — turn it off in "
                 + "System Settings → Battery (Energy on a desktop Mac) for the best frame rate.")
+        }
+        switch ProcessInfo.processInfo.thermalState {
+        case .serious, .critical:
+            print(Term.yellow("Your Mac is running hot.") + " macOS is slowing the CPU and GPU to cool it down, "
+                + "so the frame rate will drop until it does.")
+        default:
+            break
         }
     }
 
@@ -143,6 +151,95 @@ struct PerfCommand: ParsableCommand {
             let (url, _) = PerfCommand.bottle(for: plan)
             for setting in settings { try BottleConfig.unset(setting, in: url) }
             try PerfCommand.printEffective(settings, slug: slug)
+        }
+    }
+
+    struct Measure: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Measure a game's frame rate from the last minute of play, and say what limits it.",
+            discussion: """
+            Reads the Metal performance HUD's own numbers, so the HUD has to be on while you play:
+
+              cellar perf set planet-coaster-2 metal_hud on    (or: cellar launch planet-coaster-2 --hud)
+              … play the scene you care about for a minute …
+              cellar perf measure planet-coaster-2
+
+            Run it while the game is still open, or right after. Keep the HUD visible: hidden with
+            Shift-F9 it stops updating the frame times.
+            """)
+
+        @Argument(help: "Profile slug, e.g. 'planet-coaster-2'.")
+        var slug: String
+
+        @Option(help: "How many seconds of play to measure, counting back from now.")
+        var seconds: Int = 60
+
+        @Option(help: "Read the HUD's lines from this file instead (a saved log).")
+        var from: String?
+
+        func run() throws {
+            let plan = try Game.plan(slug: slug)
+            guard seconds > 0 else { throw CellarError.invalidArgument("--seconds has to be more than 0.") }
+            let measured: FrameStats?
+            if let from {
+                let text = try String(contentsOf: URL(fileURLWithPath: (from as NSString).expandingTildeInPath),
+                                      encoding: .utf8)
+                measured = FrameStats.measure(text)
+            } else {
+                measured = FrameStats.measure(FrameStats.Source.unifiedLog(seconds: seconds))
+                    ?? FrameStats.measure(FrameStats.Source.launchLogs(bottle: plan.bottleName, slug: slug,
+                                                                       seconds: seconds))
+            }
+            guard let stats = measured else {
+                let window = from == nil ? " from the last \(seconds) seconds" : ""
+                print(Term.yellow("No frame timing found\(window)."))
+                print("Measuring reads the Metal performance HUD, so it needs the HUD on while you play:")
+                print("  cellar perf set \(slug) metal_hud on")
+                print("then start \(plan.name), play for a minute, and run this again.")
+                print(Term.dim("If Steam was already open without the HUD, quit it first: the game takes its settings from Steam."))
+                throw ExitCode.failure
+            }
+            print(Term.bold(plan.name) + Term.dim("  \(stats.frames) frames measured"))
+            print("  Frame rate      " + Term.bold(String(format: "%.0f FPS", stats.averageFPS))
+                + Term.dim(String(format: "  (%.1f ms a frame)", stats.averageFrameMs)))
+            print("  Slowest 1%      " + Term.bold(String(format: "%.0f FPS", stats.onePercentLowFPS)))
+            print("  GPU busy        " + Term.bold(String(format: "%.1f ms", stats.averageGPUMs))
+                + Term.dim(String(format: "  (%.0f%% of each frame)", stats.gpuShare * 100)))
+            print("")
+            for line in Measure.advice(stats, plan: plan) { print(line) }
+            PerfCommand.printCaveats(plan)
+        }
+
+        /// What the numbers mean for this game, and the one thing worth trying next.
+        static func advice(_ stats: FrameStats, plan: GamePlan) -> [String] {
+            switch stats.limit {
+            case .gpu:
+                var lines = [Term.bold("The graphics card is the limit.") + " It is busy for the whole frame."]
+                if plan.graphicsBackend == .d3dmetal && !plan.performance.metalFXUpscaling {
+                    lines.append("Try MetalFX upscaling: cellar perf set \(plan.slug) metalfx_upscaling on, "
+                        + "then choose DLSS in the game's graphics settings.")
+                } else {
+                    lines.append("Lower the resolution or the heaviest graphics settings in the game.")
+                }
+                return lines
+            case .cpu:
+                var lines = [Term.bold("The processor is the limit.")
+                    + String(format: " The graphics card waits about %.0f ms of every frame for it.",
+                             stats.averageFrameMs - stats.averageGPUMs),
+                    "Graphics settings will barely change this; less going on in the scene will."]
+                if plan.performance.value(.metalValidation) == "true" {
+                    lines.append(Term.dim("Metal validation is on for this game (a crash workaround) and adds to the "
+                        + "processor's work. See: cellar perf \(plan.slug)"))
+                }
+                return lines
+            case .capped:
+                return [Term.bold("The frame rate is capped") + " at your display's refresh rate, by vsync or the game's "
+                    + "frame limit — the Mac has power to spare.",
+                        "Turn vsync or the frame limit off in the game to see how fast it can go."]
+            case .balanced:
+                return ["Neither the processor nor the graphics card clearly limits the frame rate, so lower graphics "
+                    + "settings and a quieter scene will each help a little."]
+            }
         }
     }
 }
