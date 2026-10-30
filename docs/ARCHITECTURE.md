@@ -299,6 +299,28 @@ prefix and the client inside it). The rules that keep it safe:
 - Store-specific behaviour — what survives, what the client does afterwards, whether it must be
   closed — is in `StoreDescriptor`, like every other per-store difference.
 
+## Online features: whose problem is a "network error"?
+
+A game's online features — Planet Coaster 2's Frontier Workshop, a store's news feed — do not use
+the store client's networking. They go through Windows' own stack: WinHTTP, then Schannel for TLS,
+then crypt32 for the certificate chain. Under Wine those are `winhttp.dll`, `secur32` over the
+runner's bundled GnuTLS, and macOS's trust store. Steam signing in proves none of it: Steam's
+Chromium brings its own TLS.
+
+When the game only says "network error", `cellar network <slug>` (`NetworkCheck.swift`) answers
+whose problem it is. It runs a JScript probe inside the bottle with Wine's `cscript`, using
+`WinHttp.WinHttpRequest` — the same `winhttp.dll` the game calls — and makes the same request from
+the Mac with `URLSession`. Each address is checked twice and compared:
+
+| Bottle | Mac | Verdict |
+|---|---|---|
+| fails | reached | Cellar's layer is in the way; the WinHTTP error names the part (DNS, connect, TLS, certificate) and Wine's `err:` lines go to the log |
+| fails | fails | the connection, a firewall, or the service itself |
+| reached | reached | the path is open: look at the service or the account (the Workshop needs a linked Frontier account) |
+
+Any HTTP status counts as reached — a 404 still proves lookup, connection and TLS all worked. The
+addresses are the store's own services plus the profile's optional `network_check`.
+
 ## On-disk layout
 
 ```
