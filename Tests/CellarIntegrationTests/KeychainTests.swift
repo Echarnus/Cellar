@@ -12,21 +12,9 @@ import Testing
 ///
 /// Skipped — visibly, never as a pass — where the process has no usable keychain (a locked one, or
 /// a CI host without a login keychain).
-@Suite(.serialized, .enabled(if: KeychainTests.keychainAvailable, "no usable login keychain here"))
+@Suite(.serialized, .enabled(if: KeychainProbe.available, "no usable login keychain here"))
 struct KeychainTests {
-    static let service = "it.clercq.cellar.tests.\(ProcessInfo.processInfo.processIdentifier)"
-
-    /// Probe once: add and remove an item under the test service.
-    static let keychainAvailable: Bool = {
-        let probe = "\(service).probe"
-        do {
-            try Keychain.set("probe", account: "probe", service: probe, label: "Cellar test probe")
-            try Keychain.remove(account: nil, service: probe)
-            return true
-        } catch {
-            return false
-        }
-    }()
+    static var service: String { KeychainProbe.service }
 
     @Test("A token round-trips, is found without being read, and is replaced rather than duplicated")
     func roundTrip() throws {
@@ -87,4 +75,22 @@ struct KeychainTests {
         guard SecItemCopyMatching(query as CFDictionary, &items) == errSecSuccess else { return 0 }
         return (items as? [[String: Any]])?.count ?? 0
     }
+}
+
+/// Outside the suite: a suite's trait cannot refer to the suite's own members (the `@Suite` macro
+/// would have to resolve itself first).
+enum KeychainProbe {
+    static let service = "it.clercq.cellar.tests.\(ProcessInfo.processInfo.processIdentifier)"
+
+    /// Probe once: add and remove an item under a throwaway service.
+    static let available: Bool = {
+        let probe = "\(service).probe"
+        do {
+            try Keychain.set("probe", account: "probe", service: probe, label: "Cellar test probe")
+            try Keychain.remove(account: nil, service: probe)
+            return true
+        } catch {
+            return false
+        }
+    }()
 }
