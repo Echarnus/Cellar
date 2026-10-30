@@ -13,11 +13,11 @@ The full guide is [`skills/python.md`](../../../skills/python.md); read it. This
 - **Python 3.9 is the floor and it is live:** this machine's `python3` is 3.9.6, so the hand-rolled
   TOML fallback is the local path while CI (3.12+) uses `tomllib`. No `match`, no `X | Y`
   annotations. The same profile can parse differently in the two ([`cellar-profiles`](../cellar-profiles/SKILL.md)).
-- **Escape every interpolation.** `card()` aliases `n = html.escape` for visible text but skips
-  several attributes (`src`, `data-status`, `data-store`, the store CSS class) — and `data-status`
-  falls back to the *raw* profile string for an unknown status. Wrap them.
-- **Pass `encoding="utf-8"` to `open()`** (`main()` currently doesn't when writing `index.html`),
-  and close what you open — the fallback parser iterates a bare `open()`.
+- **Escape every interpolation**, attributes included (`n = html.escape`). An unknown store or
+  status fails the build with the filename.
+- **Pass `encoding="utf-8"` to `open()`** and close what you open. `CELLAR_TOML_FALLBACK=1` forces
+  the fallback parser; CI diffs the site built both ways.
+- `Scripts/check-site.py` (the site's checker) follows the same rules.
 - **Stay deterministic:** `sorted(glob(...))` and the explicit sort are why the page has a stable
   diff. Never iterate a set into output.
 - **Match the file's idiom** (`os.path`, f-strings, small functions). Converting to `pathlib` is
