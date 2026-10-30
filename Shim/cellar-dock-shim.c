@@ -22,10 +22,20 @@
  * CELLAR_WINDOW_HIDE gets that treatment; Cellar reads the update's progress from Steam's log and
  * shows it in its own window, and ends that session once the update is done.
  *
+ * Third, the same library gives the game its own name. Wine is one binary for every Windows program,
+ * so a game started through it is called "wine" in the Dock's tooltip, in ⌘-Tab, in the menu bar
+ * and in Force Quit, even while it wears its own icon. A process whose Windows executable is named
+ * in CELLAR_APP_EXE (or, when Cellar does not know the exe, any process *not* named in
+ * CELLAR_APP_SKIP — the store clients) takes CELLAR_APP_NAME instead, as Wine turns it into a Dock
+ * app: both LaunchServices' display name and the CFBundleName Wine reads to title its "Hide …" and
+ * "Quit …" menu items. The kernel's process name — what `ps` shows, and what Activity Monitor shows
+ * for Wine's windowless helpers — is fixed at exec and cannot be changed from inside.
+ *
  * Built by Scripts/build-dock-shim.sh for both architectures, because a runner may be x86_64
  * (running under Rosetta) or arm64.
  */
 
+#include <CoreFoundation/CoreFoundation.h>
 #include <crt_externs.h>
 #include <dlfcn.h>
 #include <objc/message.h>
@@ -41,6 +51,11 @@
 static bool transformed = false;
 static BOOL (*original_set_policy)(id, SEL, long) = NULL;
 static long (*original_policy)(id, SEL) = NULL;
+static id (*original_info_value)(id, SEL, id) = NULL;
+
+/* The game's name, when this process is the game (CELLAR_APP_NAME); NULL otherwise. */
+static CFStringRef app_name = NULL;
+static bool named = false;
 
 /* Wine asks for Regular; give it Accessory. Reporting success keeps the driver on its normal
  * path — it goes on to build the menu bar and activate the app, which is what makes the client's
@@ -61,6 +76,54 @@ static BOOL cellar_set_activation_policy(id self, SEL cmd, long policy)
 static long cellar_activation_policy(id self, SEL cmd)
 {
     return transformed ? POLICY_REGULAR : original_policy(self, cmd);
+}
+
+/* LaunchServices' own name for an app — what the Dock tooltip, ⌘-Tab, the menu bar and Force Quit
+ * show. A bundled app gets it from its Info.plist; Wine is a bare binary, so it gets "wine". The
+ * setter is private (the same one WebKit's plugin host and Chromium's helpers use), so it is looked
+ * up by name and simply skipped if a future macOS removes it: a wrong name, never a crash. */
+static bool set_launch_services_name(CFStringRef name)
+{
+    CFBundleRef services = CFBundleGetBundleWithIdentifier(CFSTR("com.apple.LaunchServices"));
+    if (!services) return false;
+    CFTypeRef (*current_asn)(void) =
+        (CFTypeRef (*)(void))CFBundleGetFunctionPointerForName(services, CFSTR("_LSGetCurrentApplicationASN"));
+    OSStatus (*set_item)(int, CFTypeRef, CFStringRef, CFTypeRef, CFDictionaryRef *) =
+        (OSStatus (*)(int, CFTypeRef, CFStringRef, CFTypeRef, CFDictionaryRef *))
+        CFBundleGetFunctionPointerForName(services, CFSTR("_LSSetApplicationInformationItem"));
+    const CFStringRef *display_name_key =
+        (const CFStringRef *)CFBundleGetDataPointerForName(services, CFSTR("_kLSDisplayNameKey"));
+    if (!current_asn || !set_item || !display_name_key || !*display_name_key) return false;
+
+    CFTypeRef asn = current_asn();
+    if (!asn) return false;
+    return set_item(-2 /* kLSDefaultSessionID */, asn, *display_name_key, name, NULL) == 0;
+}
+
+/* The name goes on as Wine asks for a Dock icon: before the request, so the tile the Dock creates
+ * is labelled from the start (NSApplication has checked in with LaunchServices long before), and
+ * once more after it if that was too early. Wine builds its menu bar after this returns. */
+static BOOL cellar_set_activation_policy_named(id self, SEL cmd, long policy)
+{
+    if (policy != POLICY_REGULAR || named) return original_set_policy(self, cmd, policy);
+    named = set_launch_services_name(app_name);
+    BOOL ok = original_set_policy(self, cmd, policy);
+    if (!named) named = set_launch_services_name(app_name);
+    return ok;
+}
+
+/* Wine titles "Hide …" and "Quit …" from the main bundle's CFBundleName, which for a bare binary is
+ * whatever Wine embedded, or nothing. Every other bundle, and every other key, is left alone. */
+static id cellar_info_value(id self, SEL cmd, id key)
+{
+    if (app_name && key) {
+        id main = ((id (*)(id, SEL))objc_msgSend)((id)objc_getClass("NSBundle"), sel_registerName("mainBundle"));
+        if (self == main && (CFEqual((CFTypeRef)key, kCFBundleNameKey)
+                             || CFEqual((CFTypeRef)key, CFSTR("CFBundleDisplayName")))) {
+            return (id)app_name;
+        }
+    }
+    return original_info_value(self, cmd, key);
 }
 
 /* The last path component of a Windows ("C:\...\steam.exe") or unix argument. */
@@ -110,12 +173,26 @@ static bool this_process_is_listed(const char *variable)
     return name_is_listed(executable_name((*_NSGetArgv())[1]), list);
 }
 
+/* Whether this process is the game: named in CELLAR_APP_EXE when Cellar knows the exe, otherwise
+ * anything but a store client. Without CELLAR_APP_NAME nothing is ever renamed. */
+static bool this_process_is_the_game(void)
+{
+    const char *name = getenv("CELLAR_APP_NAME");
+    if (!name || !*name) return false;
+    const char *exe = getenv("CELLAR_APP_EXE");
+    if (exe && *exe) return this_process_is_listed("CELLAR_APP_EXE");
+    if (*_NSGetArgc() < 2) return false;
+    return !this_process_is_listed("CELLAR_APP_SKIP");
+}
+
 __attribute__((constructor))
 static void cellar_dock_shim_init(void)
 {
     bool hide_dock = this_process_is_listed("CELLAR_DOCK_HIDE");
     bool hide_windows = this_process_is_listed("CELLAR_WINDOW_HIDE");
-    if (!hide_dock && !hide_windows) return;
+    /* A process kept out of the Dock has no name on show, so hiding wins. */
+    bool name_app = !hide_dock && !hide_windows && this_process_is_the_game();
+    if (!hide_dock && !hide_windows && !name_app) return;
 
     /* AppKit is not linked: a process that never draws should not pay for it. */
     if (!dlopen("/System/Library/Frameworks/AppKit.framework/AppKit", RTLD_LAZY)) return;
@@ -127,6 +204,18 @@ static void cellar_dock_shim_init(void)
                  (IMP)cellar_set_activation_policy, &original_set_policy);
             swap(application, sel_registerName("activationPolicy"),
                  (IMP)cellar_activation_policy, &original_policy);
+        }
+    }
+
+    if (name_app) {
+        app_name = CFStringCreateWithCString(NULL, getenv("CELLAR_APP_NAME"), kCFStringEncodingUTF8);
+        Class application = objc_getClass("NSApplication");
+        Class bundle = objc_getClass("NSBundle");
+        if (app_name && application && bundle) {
+            swap(application, sel_registerName("setActivationPolicy:"),
+                 (IMP)cellar_set_activation_policy_named, &original_set_policy);
+            swap(bundle, sel_registerName("objectForInfoDictionaryKey:"),
+                 (IMP)cellar_info_value, &original_info_value);
         }
     }
 

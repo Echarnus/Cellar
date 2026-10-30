@@ -1,6 +1,6 @@
 import Foundation
 
-/// Keeps a bottle's storefront client out of the Dock.
+/// Keeps a bottle's storefront client out of the Dock, and gives the game its own name in it.
 ///
 /// Wine gives a Dock icon to every Windows process that shows a window. For a game that is right —
 /// it is the thing the player started. For Steam or Battle.net it is not: Cellar stands those up on
@@ -64,6 +64,32 @@ public enum DockShim {
         var env = environment(hiding: processNames)
         guard !env.isEmpty else { return [:] }
         env["CELLAR_WINDOW_HIDE"] = processNames.joined(separator: ",")
+        return env
+    }
+
+    /// Environment that makes the game call itself by its own name — in the Dock's tooltip, ⌘-Tab,
+    /// the menu bar and Force Quit — rather than "wine", which is what every Windows program run
+    /// through Wine is otherwise called. Only the game's process is renamed: the one whose exe is in
+    /// `executables`, or, when the profile does not say which exe that is, any process that is not
+    /// a store client — so the Steam window a launch may have to show is never labelled as the game.
+    ///
+    /// Empty when the shim is not installed, in which case the game is called "wine" as before.
+    public static func environment(naming game: String, executables: [String]) -> [String: String] {
+        environment(naming: game, executables: executables, library: libraryURL)
+    }
+
+    static func environment(naming game: String, executables: [String], library: URL?) -> [String: String] {
+        guard !game.isEmpty, let library else { return [:] }
+        var env = [
+            "DYLD_INSERT_LIBRARIES": library.path,
+            "CELLAR_APP_NAME": game,
+        ]
+        if executables.isEmpty {
+            env["CELLAR_APP_SKIP"] = GameStore.allCases
+                .flatMap { $0.descriptor.clientProcessNames }.joined(separator: ",")
+        } else {
+            env["CELLAR_APP_EXE"] = executables.joined(separator: ",")
+        }
         return env
     }
 

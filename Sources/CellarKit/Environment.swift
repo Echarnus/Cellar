@@ -186,7 +186,8 @@ public enum SystemEnvironment {
             checks.append(.init("Dock shim", .ok, shim.path))
         } else {
             checks.append(.init("Dock shim", .info, "not built",
-                hint: "A bottle's Steam/Battle.net will show its own Dock icon while you play. "
+                hint: "A bottle's Steam/Battle.net will show its own Dock icon while you play, and the "
+                    + "game will be called “wine” in the Dock and ⌘-Tab. "
                     + "Build it with: sh Scripts/build-dock-shim.sh"))
         }
 
