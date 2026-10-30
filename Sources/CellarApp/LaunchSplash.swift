@@ -210,6 +210,13 @@ struct LaunchSplashView: View {
                 Text("Nothing is broken by this — try again, or open the logs to see how far it got.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                // Only once the game itself was started, and once the fallback has had its turn:
+                // "didn't start" about a runner that isn't installed sends the profile's
+                // maintainers after the wrong problem.
+                if runner.attempt > 0 {
+                    Button("Report that it didn't start…") { CompatibilityPrompt.preview(game, outcome: .didNotStart) }
+                        .buttonStyle(.link).font(.caption)
+                }
             }
         }
     }

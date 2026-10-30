@@ -412,7 +412,12 @@ struct GameDetailView: View {
         case .play:
             // The launch gets a window of its own: it is a minute or two of work with several
             // steps, and a spinner beside the button reads as a hang.
-            runner.launch(slug: game.slug, showHUD: showHUD) { onChange() }
+            let launched = game
+            runner.launch(slug: game.slug, showHUD: showHUD) {
+                onChange()
+                // Played and quit: the one moment "how did it run?" has an answer.
+                if runner.stage == .closed { CompatibilityPrompt.offerAfterSession(launched) }
+            }
             LaunchSplashWindow.present(game: game, runner: runner, onFinished: { onChange() })
         case .setup:
             act(["setup", "--profile", game.slug], "Setting up")
