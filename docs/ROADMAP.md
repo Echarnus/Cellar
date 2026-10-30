@@ -59,7 +59,7 @@ generalized into a per-game profile system, then given a native GUI.
 - ✅ The profile database ships inside the app bundle and beside an installed CLI, so a new game
   reaches players without them copying TOML files — user profiles still win.
 - ⏳ Verify Diablo IV end-to-end on the M5 (install + play). The profile is `untested` until then.
-- ⏳ Further stores when a game needs one: Epic.
+- ⏳ Further stores when a game needs one: Epic — decided in [LEGAL.md](LEGAL.md#epic-games-store-decided-not-yet-built): through Epic's own launcher in the bottle, never with the launcher's credentials.
 
 ## Phase 5 — Sign in once ✅ (GOG + shared Steam)
 
@@ -85,8 +85,9 @@ Next in this direction, not yet done:
 
 - Browse the full owned library rather than curated profiles — possible for GOG today (one API call),
   and for Steam via a Web API key. Steam and Battle.net still need a profile to *run* a game.
-- Epic Games Store: a genuine OAuth flow (as Legendary/Heroic use), but reverse-engineered against the
-  launcher's own client credentials — a bigger surface and a bigger judgement call than GOG's.
+- Epic Games Store: **decided** (see [LEGAL.md](LEGAL.md#epic-games-store-decided-not-yet-built)). The
+  Legendary/Heroic OAuth flow is ruled out because it authenticates with the launcher's own client
+  secret; Epic arrives the Battle.net way, its own launcher in the bottle, when a game needs it.
 - Generate a profile from a store's metadata, so adding a game is not hand-writing TOML.
 
 ## Phase 6 — Native ARM64EC runner (the Rosetta exit)
