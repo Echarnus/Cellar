@@ -132,7 +132,7 @@ These are settings, not files, so the maintainer applies them once:
    [`.github/rulesets/tags.json`](../.github/rulesets/tags.json) (release tags can't be moved or
    deleted).
 3. **Settings → Environments → release**: add a deployment rule allowing only tags matching `v*`,
-   and put `SPARKLE_ED_PRIVATE_KEY` there.
+   `sh Scripts/sparkle-keys.sh` creates the environment and stores `SPARKLE_ED_PRIVATE_KEY` in it.
 4. **Settings → Code security**: turn on Dependabot alerts and security updates, secret scanning
    and push protection, and private vulnerability reporting.
 5. **Settings → Actions → General**: workflow permissions *Read repository contents*, and untick
