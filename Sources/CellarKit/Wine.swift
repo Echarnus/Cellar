@@ -144,6 +144,11 @@ public struct WineRunner {
                 env[key] = value
             }
         }
+        // Wherever the HUD is on, have it log its numbers too (one line a second), so
+        // `cellar perf measure` can report what the player just saw instead of asking them to read it.
+        if env["MTL_HUD_ENABLED"] == "1", env["MTL_HUD_LOG_ENABLED"] == nil {
+            env["MTL_HUD_LOG_ENABLED"] = "1"
+        }
         return env
     }
 
