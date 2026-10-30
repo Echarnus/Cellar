@@ -38,6 +38,9 @@ struct GameDetailView: View {
                             .font(.callout).foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    if let played = playedLine {
+                        Label(played, systemImage: "clock").font(.callout).foregroundStyle(.secondary)
+                    }
                     notice
                     chips
                     information
@@ -58,6 +61,13 @@ struct GameDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidConnect)) { _ in pads = Controllers.connected() }
         .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in pads = Controllers.connected() }
+    }
+
+    /// "Played 12 h · last played yesterday" — kept on this Mac only.
+    private var playedLine: String? {
+        guard let record = game.playtime, record.sessions > 0, let last = record.lastPlayed else { return nil }
+        let when = RelativeDateTimeFormatter().localizedString(for: last, relativeTo: Date())
+        return "Played \(Playtime.describe(seconds: record.totalSeconds)) · last played \(when)"
     }
 
     // MARK: - Hero

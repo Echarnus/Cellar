@@ -63,6 +63,7 @@ public enum Diagnostics {
         lock.lock()
         open[slug] = PlaySession(slug: slug, name: name, route: route, startedAt: Date())
         lock.unlock()
+        Playtime.began(slug: slug)
         CellarLog.info(.session, "\(name) is up (\(route)).", subject: slug)
     }
 
@@ -75,6 +76,7 @@ public enum Diagnostics {
         lock.lock()
         let session = open.removeValue(forKey: slug)
         lock.unlock()
+        Playtime.ended(slug: slug)
 
         guard let session else {
             CellarLog.info(.session, "\(name) exited.", subject: slug)
