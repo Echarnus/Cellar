@@ -48,6 +48,8 @@ public struct GamePlan {
     /// Every performance switch with the layer it came from, for `cellar perf`.
     public var performance = PerformanceSettings.resolve(profileFields: [:], profileEnv: [:],
                                                           bottleFields: [:], bottleEnv: [:])
+    /// A profile Cellar wrote itself from the game's files (`DraftProfile`): every value a guess.
+    public var isDraft = false
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
@@ -372,6 +374,8 @@ public struct GameSummary: Identifiable, Sendable {
     /// the launch window can offer the fallback. Nil profile backend means "same as `backend`".
     public var profileBackend: String? = nil
     public var fallbackBackend: String? = nil
+    /// Cellar guessed this game's settings (`DraftProfile`); the library shows it apart, saying so.
+    public var isDraft = false
 
     /// The player switched this game off the profile's backend.
     public var backendIsPlayerChoice: Bool { profileBackend.map { $0 != backend } ?? false }
@@ -459,6 +463,7 @@ public enum Game {
                 bottleName: plan.bottleName)
             summary.profileBackend = plan.profileBackend
             summary.fallbackBackend = plan.fallbackBackend
+            summary.isDraft = plan.isDraft
             return summary
         }
     }
@@ -538,7 +543,8 @@ public enum Game {
                 notes: fields["notes"]),
             metalFXUpscaling: performance.metalFXUpscaling,
             language: LanguageChoice.resolve(game: BottleConfig.language(bottleFile), global: CellarSettings.language),
-            performance: performance
+            performance: performance,
+            isDraft: fields["generated"]?.lowercased() == "true"
         )
     }
 

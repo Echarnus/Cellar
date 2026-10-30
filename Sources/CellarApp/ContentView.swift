@@ -75,13 +75,17 @@ final class Library: ObservableObject {
 
     /// The filtered library, grouped into store sections in a fixed order — never alphabetical,
     /// so a game doesn't move house when it is renamed.
-    var sections: [(store: GameStore, games: [GameSummary])] {
-        GameStore.allCases
-            .sorted { $0.sortIndex < $1.sortIndex }
-            .compactMap { store in
-                let inStore = filtered.filter { $0.store == store }.sorted { $0.name < $1.name }
-                return inStore.isEmpty ? nil : (store, inStore)
+    ///
+    /// Games whose profile Cellar guessed (`DraftProfile`) come after every hand-made one, in
+    /// sections of their own that say so — a guess never sits among the tested games.
+    var sections: [LibrarySection] {
+        let stores = GameStore.allCases.sorted { $0.sortIndex < $1.sortIndex }
+        return [false, true].flatMap { guessed in
+            stores.compactMap { store in
+                let inStore = filtered.filter { $0.store == store && $0.isDraft == guessed }.sorted { $0.name < $1.name }
+                return inStore.isEmpty ? nil : LibrarySection(store: store, guessed: guessed, games: inStore)
             }
+        }
     }
 
     /// Stores that actually have a game, so the filter never offers an empty result.
@@ -166,6 +170,11 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .cellarLibraryChecking)) { note in
             lib.checking = note.object as? String
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarDraftProfiles)) { _ in
+            guard !runner.busy else { return }
+            runner.run(["profiles", "draft", "--all"], title: "Finding games without a profile",
+                       then: { lib.refresh() })
         }
         .onReceive(NotificationCenter.default.publisher(for: .cellarRefreshLibrary)) { _ in
             lib.refresh()
@@ -294,7 +303,7 @@ struct ContentView: View {
     private var libraryList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 3, pinnedViews: [.sectionHeaders]) {
-                ForEach(lib.sections, id: \.store) { section in
+                ForEach(lib.sections, id: \.id) { section in
                     Section {
                         ForEach(section.games) { game in
                             SidebarRow(game: game, selected: lib.selected == game.slug)
@@ -302,7 +311,7 @@ struct ContentView: View {
                                 .onTapGesture { lib.selected = game.slug }
                         }
                     } header: {
-                        StoreSectionHeader(store: section.store, count: section.games.count)
+                        StoreSectionHeader(store: section.store, count: section.games.count, guessed: section.guessed)
                     }
                 }
                 if lib.filtered.isEmpty { emptyLibrary }
@@ -451,9 +460,18 @@ struct ContentView: View {
 
 /// A store's heading in the library. Carries the mark *and* the word, so the section — not each
 /// row — is what tells you where these games come from.
+struct LibrarySection {
+    let store: GameStore
+    /// Profiles Cellar wrote itself from the games' files.
+    let guessed: Bool
+    let games: [GameSummary]
+    var id: String { "\(store.rawValue)\(guessed ? "-guessed" : "")" }
+}
+
 struct StoreSectionHeader: View {
     let store: GameStore
     let count: Int
+    var guessed = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -462,6 +480,12 @@ struct StoreSectionHeader: View {
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(store.tint)
                 .kerning(0.6)
+            if guessed {
+                Text("· UNTESTED, CELLAR GUESSED")
+                    .font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                    .kerning(0.6).lineLimit(1)
+                    .help("Cellar wrote these games' settings itself from their files. Nobody has tested them yet.")
+            }
             Text("\(count)")
                 .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 .padding(.horizontal, 5).padding(.vertical, 1)
@@ -473,7 +497,7 @@ struct StoreSectionHeader: View {
         // sidebar rather than an opaque strip floating over it.
         .background(SidebarMaterial())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(store.displayName), \(count) \(count == 1 ? "game" : "games")")
+        .accessibilityLabel("\(store.displayName)\(guessed ? ", untested, settings guessed by Cellar" : ""), \(count) \(count == 1 ? "game" : "games")")
     }
 }
 

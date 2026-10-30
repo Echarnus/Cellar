@@ -170,6 +170,10 @@ struct GameDetailView: View {
                 GameLanguageMenu(game: game, state: $language)
             }
             Divider()
+            if game.isDraft {
+                // A guess that works is worth handing in: the file is an ordinary profile.
+                Button("Save Profile As…") { exportProfile() }
+            }
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
             // Removal is last and on its own, where destructive actions belong. Each entry states
             // what it takes, and neither does anything until the confirmation has been read.
@@ -429,6 +433,17 @@ struct GameDetailView: View {
                            title: game.store == .battlenet ? "Opening Battle.net" : "Downloading \(game.name)",
                            then: { onChange() })
         }
+    }
+
+    /// Copy a draft profile out, for contributing it once the game is known to run.
+    private func exportProfile() {
+        guard let source = ProfileStore.find(game.slug)?.url else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = source.lastPathComponent
+        panel.message = "Cellar guessed this profile's settings. If \(game.name) runs, set status and notes to what you saw, then contribute it to Cellar's profiles."
+        guard panel.runModal() == .OK, let target = panel.url else { return }
+        try? FileManager.default.removeItem(at: target)
+        try? FileManager.default.copyItem(at: source, to: target)
     }
 
     private func act(_ args: [String], _ title: String) {
