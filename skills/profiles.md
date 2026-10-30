@@ -56,8 +56,21 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   Steam game is still `steam`, with `needs_live_session = false` so Cellar downloads the depot and
   runs the exe without standing Windows Steam up in the bottle.
 - **`[compatibility]`** — `anticheat`, `drm`, `requires_account`, `online`, `status`, `notes`.
+  Optional `network_check` — space-separated `https://` addresses of the game's own online services
+  (a workshop, an account server) that `cellar network <slug>` probes on top of the store's. Only
+  addresses you have seen the game use or the publisher documents; a guessed host proves nothing.
 - **`[runner]`** — `id`, `windows_version`. **`[graphics]`** — `backend`, `fallback_backend`.
+  `fallback_backend` is live: when a launch starts the game but it never comes up, the launch window
+  (and `cellar launch`) offers it once, and a switch that works is kept in the bottle as
+  `graphics_backend` (`BackendChoice`), so a profile update never undoes it. `cellar backend <slug>`
+  shows or changes it.
 - **`[install]`** — `method`, plus the id the method needs.
+- **`save_paths`** (optional) — where the game saves, relative to the Windows user folder, `;`-separated
+  (`"Documents/My Games/X; AppData/Local/X"`). `SaveBackups` copies only these; without it, every
+  folder `SaveGames` counts as a save in the bottle. Only record a path you have seen the game write.
+- **`generated = "true"`** — a draft Cellar wrote itself (`DraftProfile`, `cellar profiles draft`) from an
+  installed game's PE header. Drafts live in the player's own profiles, are always `untested`, and the app
+  lists them apart. Turning one into a shipped profile means testing it and deleting this line.
 - **`[legal]`** — `drm_circumvention = "never"`. It is never anything else.
 
 ## Vocabularies the tooling actually knows
@@ -65,6 +78,8 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
 `gen-site.py` maps these to labels and CSS classes; a value outside the set silently falls back:
 
 - `status`: **`playable` | `experimental` | `untested`**. An unknown value renders as *Untested*.
+  Players' reports arrive as `compatibility-report` issues (the app asks after a session; `cellar
+  report <slug>`): a report is evidence to test against, not a status to copy in unverified.
 - `store`: **`steam` | `battlenet` | `gog`**. An unknown value is treated as Steam — which
   would put a Battle.net game down the Steam pipeline. Spell it exactly.
 

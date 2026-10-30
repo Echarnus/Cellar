@@ -14,6 +14,8 @@ struct GameDetailView: View {
     @State private var measuringRemoval = false
     /// The game's language submenu, read when the page appears rather than from the body.
     @State private var language = GameLanguageMenu.Selection()
+    /// The newest copy of this game's saves, read when the page appears and after a backup or restore.
+    @State private var latestBackup: SaveBackups.Backup?
 
     var body: some View {
         ScrollView {
@@ -28,13 +30,17 @@ struct GameDetailView: View {
                     notice
                     chips
                     information
+                    if game.bottleExists { saves }
                     activityLog
                 }
                 .padding(24)
             }
         }
         .background(.background)
-        .task(id: game.slug) { language = .load(game) }
+        .task(id: game.slug) {
+            language = .load(game)
+            latestBackup = SaveBackups.list(bottle: game.bottleName).first
+        }
     }
 
     // MARK: - Hero
@@ -164,6 +170,10 @@ struct GameDetailView: View {
                 GameLanguageMenu(game: game, state: $language)
             }
             Divider()
+            if game.isDraft {
+                // A guess that works is worth handing in: the file is an ordinary profile.
+                Button("Save Profile As…") { exportProfile() }
+            }
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
             // Removal is last and on its own, where destructive actions belong. Each entry states
             // what it takes, and neither does anything until the confirmation has been read.
@@ -290,10 +300,17 @@ struct GameDetailView: View {
 
             FactList(title: "Runtime", rows: [
                 ("Runner", game.runnerID),
-                ("Graphics", game.backend.uppercased()),
+                ("Graphics", graphicsValue),
                 ("Store", game.store.displayName),
                 ("Bottle", game.bottleName),
             ])
+
+            if game.backendIsPlayerChoice, let profiles = game.profileBackend.flatMap(GraphicsBackend.init(rawValue:)) {
+                Button("Go back to \(profiles.displayName), the profile's backend") { resetBackend() }
+                    .buttonStyle(.link).font(.callout)
+                    .disabled(runner.busy)
+                    .help("\(game.name) starts on \(profiles.displayName) again from its next launch. \(profiles.summary)")
+            }
 
             if let notes = facts.notes, !notes.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
@@ -310,9 +327,71 @@ struct GameDetailView: View {
         .padding(.top, 2)
     }
 
+    /// The backend, and whose choice it is — a switch the player made is never shown as the profile's.
+    private var graphicsValue: String {
+        let name = GraphicsBackend(rawValue: game.backend)?.displayName ?? game.backend
+        return game.backendIsPlayerChoice ? "\(name) — your choice" : name
+    }
+
+    private func resetBackend() {
+        // A link has nowhere to show an error; a write that failed leaves the row as it was, which
+        // is the truth.
+        guard (try? BackendChoice.set(nil, in: BottleConfig.url(forBottle: game.bottleName))) != nil else { return }
+        onChange()
+    }
+
     @ViewBuilder private func factColumns(_ facts: GameFacts) -> some View {
         if !facts.about.isEmpty { FactList(title: "About", rows: facts.about) }
         if !facts.compatibility.isEmpty { FactList(title: "Compatibility", rows: facts.compatibility) }
+    }
+
+    /// Saves live in the bottle; Cellar copies them out before anything that could lose them. This
+    /// says when it last did, and offers the two things a player wants from that: another copy now,
+    /// and the last one back.
+    private var saves: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Save games").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                .kerning(0.5).textCase(.uppercase)
+            Text(backupSummary).font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("Back up now") {
+                    runner.run(["saves", "backup", game.slug], title: "Backing up saves", then: { refreshBackups() })
+                }
+                Button("Restore last backup…") { confirmRestore() }
+                    .disabled(latestBackup == nil)
+                Button("Show in Finder") {
+                    NSWorkspace.shared.open(SaveBackups.directory(forBottle: game.bottleName))
+                }
+                .disabled(latestBackup == nil)
+            }
+            .disabled(runner.busy)
+        }
+    }
+
+    private var backupSummary: String {
+        guard let backup = latestBackup else {
+            return "No backup yet. Cellar takes one by itself before a reset, an update or removing the bottle."
+        }
+        let when = RelativeDateTimeFormatter().localizedString(for: backup.manifest.created, relativeTo: Date())
+        return "Last backed up \(when) — \(backup.manifest.reason.description.lowercased()), \(ByteSize.describe(backup.manifest.bytes)). Cellar keeps the last \(SaveBackups.keep)."
+    }
+
+    private func refreshBackups() {
+        latestBackup = SaveBackups.list(bottle: game.bottleName).first
+    }
+
+    /// A restore replaces the saves the game has now, so it is asked first — with the one fact that
+    /// makes it safe to say yes: the current saves are kept too.
+    private func confirmRestore() {
+        guard let backup = latestBackup else { return }
+        let alert = NSAlert()
+        alert.messageText = "Restore \(game.name)'s saves from \(backup.id)?"
+        alert.informativeText = "The saves the game has now are replaced by that backup (\(backup.manifest.reason.description.lowercased())). Cellar keeps a copy of the current ones first, so you can go back."
+        alert.addButton(withTitle: "Restore")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        runner.run(["saves", "restore", game.slug, "--backup", backup.id], title: "Restoring saves", then: { refreshBackups() })
     }
 
     private var activityLog: some View {
@@ -337,8 +416,13 @@ struct GameDetailView: View {
         case .play:
             // The launch gets a window of its own: it is a minute or two of work with several
             // steps, and a spinner beside the button reads as a hang.
-            runner.launch(slug: game.slug, showHUD: showHUD) { onChange() }
-            LaunchSplashWindow.present(game: game, runner: runner)
+            let launched = game
+            runner.launch(slug: game.slug, showHUD: showHUD) {
+                onChange()
+                // Played and quit: the one moment "how did it run?" has an answer.
+                if runner.stage == .closed { CompatibilityPrompt.offerAfterSession(launched) }
+            }
+            LaunchSplashWindow.present(game: game, runner: runner, onFinished: { onChange() })
         case .setup:
             act(["setup", "--profile", game.slug], "Setting up")
         case .install:
@@ -349,6 +433,17 @@ struct GameDetailView: View {
                            title: game.store == .battlenet ? "Opening Battle.net" : "Downloading \(game.name)",
                            then: { onChange() })
         }
+    }
+
+    /// Copy a draft profile out, for contributing it once the game is known to run.
+    private func exportProfile() {
+        guard let source = ProfileStore.find(game.slug)?.url else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = source.lastPathComponent
+        panel.message = "Cellar guessed this profile's settings. If \(game.name) runs, set status and notes to what you saw, then contribute it to Cellar's profiles."
+        guard panel.runModal() == .OK, let target = panel.url else { return }
+        try? FileManager.default.removeItem(at: target)
+        try? FileManager.default.copyItem(at: source, to: target)
     }
 
     private func act(_ args: [String], _ title: String) {

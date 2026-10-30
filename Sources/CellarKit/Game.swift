@@ -10,7 +10,12 @@ public struct GamePlan {
     /// how it is set up, installed and launched. See `GameStore`.
     public let store: GameStore
     public let appID: Int?
-    public let backend: String
+    /// The backend this launch uses: the player's choice for the bottle when there is one, else the
+    /// profile's. A `var` so `cellar launch --backend` can try another for one launch.
+    public var backend: String
+    /// What the profile names: the backend it was tested on, and the one to try when that fails.
+    public let profileBackend: String
+    public let fallbackBackend: String?
     /// The game's environment — the profile's `[env]` and switches, then the bottle's
     /// (`PerformanceSettings.resolve`) — applied to the game and to the store client that spawns it.
     public let env: [String: String]
@@ -43,9 +48,15 @@ public struct GamePlan {
     /// Every performance switch with the layer it came from, for `cellar perf`.
     public var performance = PerformanceSettings.resolve(profileFields: [:], profileEnv: [:],
                                                           bottleFields: [:], bottleEnv: [:])
+    /// A profile Cellar wrote itself from the game's files (`DraftProfile`): every value a guess.
+    public var isDraft = false
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
+    /// The backend to offer when this one didn't bring the game up — see `BackendChoice.retry`.
+    public var retryBackend: GraphicsBackend? {
+        BackendChoice.retry(current: backend, primary: profileBackend, fallback: fallbackBackend)
+    }
 
     /// Where DepotDownloader places this game's files inside the bottle.
     public var depotGameDir: URL { prefix.appendingPathComponent("drive_c/Games/\(slug)", isDirectory: true) }
@@ -359,6 +370,20 @@ public struct GameSummary: Identifiable, Sendable {
     public let runnerID: String
     public let backend: String
     public let bottleName: String
+    /// The profile's backend and its fallback, so the page can say whose choice `backend` is and
+    /// the launch window can offer the fallback. Nil profile backend means "same as `backend`".
+    public var profileBackend: String? = nil
+    public var fallbackBackend: String? = nil
+    /// Cellar guessed this game's settings (`DraftProfile`); the library shows it apart, saying so.
+    public var isDraft = false
+
+    /// The player switched this game off the profile's backend.
+    public var backendIsPlayerChoice: Bool { profileBackend.map { $0 != backend } ?? false }
+
+    /// The backend to offer when a launch didn't bring the game up — see `BackendChoice.retry`.
+    public var retryBackend: GraphicsBackend? {
+        BackendChoice.retry(current: backend, primary: profileBackend ?? backend, fallback: fallbackBackend)
+    }
 
     public init(slug: String, name: String, store: GameStore, appID: Int?, iconPath: String?,
                 runnerInstalled: Bool, clientInstalled: Bool, account: String?, gameInstalled: Bool,
@@ -405,7 +430,7 @@ public enum Game {
         ProfileStore.all().compactMap { ref in
             guard let plan = try? plan(slug: ref.slug) else { return nil }
             let clientInstalled = storeClientInstalled(plan)
-            return GameSummary(
+            var summary = GameSummary(
                 slug: plan.slug,
                 name: plan.name,
                 store: plan.store,
@@ -436,6 +461,10 @@ public enum Game {
                 runnerID: plan.runnerID,
                 backend: plan.backend,
                 bottleName: plan.bottleName)
+            summary.profileBackend = plan.profileBackend
+            summary.fallbackBackend = plan.fallbackBackend
+            summary.isDraft = plan.isDraft
+            return summary
         }
     }
 
@@ -475,6 +504,7 @@ public enum Game {
         // opts in with `bottle = "<name>"`. Default: one bottle per game.
         let bottleName = fields["bottle"] ?? slug
         let bottleFile = BottleConfig.url(forBottle: bottleName)
+        let profileBackend = fields["backend"] ?? "d3dmetal"
         let performance = PerformanceSettings.resolve(
             profileFields: fields, profileEnv: ProfileStore.env(ref),
             bottleFields: BottleConfig.fields(bottleFile), bottleEnv: BottleConfig.env(bottleFile))
@@ -485,7 +515,9 @@ public enum Game {
             runnerID: fields["id"] ?? RunnerCatalog.defaultID,
             store: store,
             appID: fields["steam_appid"].flatMap { Int($0) },
-            backend: fields["backend"] ?? "d3dmetal",
+            backend: BackendChoice.chosen(in: bottleFile)?.rawValue ?? profileBackend,
+            profileBackend: profileBackend,
+            fallbackBackend: fields["fallback_backend"],
             env: performance.env,
             installMethod: fields["method"] ?? defaultInstallMethod(for: store),
             launchExe: fields["exe"],
@@ -511,7 +543,8 @@ public enum Game {
                 notes: fields["notes"]),
             metalFXUpscaling: performance.metalFXUpscaling,
             language: LanguageChoice.resolve(game: BottleConfig.language(bottleFile), global: CellarSettings.language),
-            performance: performance
+            performance: performance,
+            isDraft: fields["generated"]?.lowercased() == "true"
         )
     }
 
@@ -927,6 +960,7 @@ public enum Game {
                 progress("Starting Steam quietly for \(plan.name)'s DRM, then launching the game…")
                 try SteamBottle.launchAlongside(runner: wine, exe: exe, appID: appID,
                                                 showHUD: showHUD, gameEnv: plan.launchEnv,
+                                                bundledLoader: GameApp.prepare(for: plan, runner: wine),
                                                 game: plan.name, expectsSignIn: signsItself,
                                                 progress: progress, stage: stage)
                 return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
@@ -1032,7 +1066,8 @@ public enum Game {
         let wineLog = Paths.logs.appendingPathComponent("game-\(plan.slug).log")
         CellarLog.debug(.launch, "Starting \(exe.lastPathComponent) directly; Wine output → "
             + wineLog.lastPathComponent, subject: plan.slug)
-        try wine.spawn([exe.path], extraEnv: env, log: wineLog)
+        try wine.spawn([exe.path], extraEnv: env, log: wineLog,
+                       bundledLoader: GameApp.prepare(for: plan, runner: wine))
     }
 
     /// Block until the player quits, then take the whole layer down — the behaviour that makes

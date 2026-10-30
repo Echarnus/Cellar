@@ -25,6 +25,8 @@ extension Notification.Name {
     static let cellarRefreshLibrary = Notification.Name("cellar.refreshLibrary")
     /// Posted by Edit › Find… (⌘F), so the keyboard reaches the library search like any Mac app's.
     static let cellarFocusSearch = Notification.Name("cellar.focusSearch")
+    /// View › Add Installed Games Without a Profile: write draft profiles for them (`DraftProfile`).
+    static let cellarDraftProfiles = Notification.Name("cellar.draftProfiles")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -202,6 +204,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let viewMenu = submenu("View")
         viewMenu.addItem(withTitle: "Refresh Library", action: #selector(refreshLibrary), keyEquivalent: "r")
             .target = self
+        viewMenu.addItem(withTitle: "Add Installed Games Without a Profile", action: #selector(draftProfiles), keyEquivalent: "")
+            .target = self
         viewMenu.addItem(.separator())
         let fullScreen = viewMenu.addItem(withTitle: "Enter Full Screen",
                                           action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
@@ -233,6 +237,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func refreshLibrary() {
         NotificationCenter.default.post(name: .cellarRefreshLibrary, object: nil)
+    }
+
+    @objc private func draftProfiles() {
+        NotificationCenter.default.post(name: .cellarDraftProfiles, object: nil)
     }
 
     @objc private func focusSearch() {

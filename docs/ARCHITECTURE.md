@@ -270,6 +270,30 @@ a launch may have to show is never labelled as the game. Opening the client on i
 exec: `ps`, and Activity Monitor's rows for Wine's windowless helpers (`wineserver`, `services.exe`,
 `explorer.exe`), still say wine — which is what they are.
 
+### The game as a game: Game Mode
+
+macOS gives Game Mode (CPU/GPU priority, halved Bluetooth latency) to the frontmost full-screen app
+whose bundle declares `LSApplicationCategoryType = public.app-category.games`, and it reads that from
+the bundle the process's executable sits in. The player's launcher in `~/Applications` does not
+count — it is a shell script that hands off to `cellar`; the process on screen is bare `wine`.
+
+So `GameApp` keeps `Paths.gameApps/<slug>.app` (Application Support, not `~/Applications`: it is
+plumbing, and double-clicking it would run Wine with no program). Its executable is a byte-for-byte
+**copy** of the runner's loader — re-copied whenever the runner's changes — and its Info.plist carries
+the game's name, icon, the games category, `LSSupportsGameMode`, plus what Wine embeds in its own
+loader (`LSUIElement`, `NSPrincipalClass = WineApplication`) so the Mac driver behaves as before.
+`WineRunner.spawn(bundledLoader:)` starts that copy through `posix_spawn` with `argv[0]` naming the
+runner's own binary: Wine's loader looks for `ntdll.so` beside its executable, then beside `argv[0]`
+(`loader/main.c`), so it finds the runner, and everything after — ntdll, `wineserver`, child
+processes — resolves from the runner's real path as before. A symlink would not do: macOS
+identifies the app by the resolved executable path.
+
+Limits: only processes Cellar starts itself get it — the direct route, and Steam games Cellar
+downloaded (`launchAlongside`). A game Steam's `rungameid` or Battle.net starts is the client's
+child, created from the runner's loader. Runners whose loader has no `ntdll.so` beside it (the GPTK
+`wine64` + preloader layout) are started the usual way. `CELLAR_NO_GAME_APP=1` turns it off for a
+launch, to tell whether a problem is this.
+
 The shim is a universal dylib (a runner may be x86_64 under Rosetta or arm64), built by
 `Scripts/build-dock-shim.sh` and installed beside the CLI. If it is missing, `DockShim.environment`
 returns nothing and launches behave exactly as they did before — a cosmetic feature must never be
@@ -298,6 +322,28 @@ prefix and the client inside it). The rules that keep it safe:
 - **A running game blocks removal; a running client is closed first**, announced before it happens.
 - Store-specific behaviour — what survives, what the client does afterwards, whether it must be
   closed — is in `StoreDescriptor`, like every other per-store difference.
+
+## Online features: whose problem is a "network error"?
+
+A game's online features — Planet Coaster 2's Frontier Workshop, a store's news feed — do not use
+the store client's networking. They go through Windows' own stack: WinHTTP, then Schannel for TLS,
+then crypt32 for the certificate chain. Under Wine those are `winhttp.dll`, `secur32` over the
+runner's bundled GnuTLS, and macOS's trust store. Steam signing in proves none of it: Steam's
+Chromium brings its own TLS.
+
+When the game only says "network error", `cellar network <slug>` (`NetworkCheck.swift`) answers
+whose problem it is. It runs a JScript probe inside the bottle with Wine's `cscript`, using
+`WinHttp.WinHttpRequest` — the same `winhttp.dll` the game calls — and makes the same request from
+the Mac with `URLSession`. Each address is checked twice and compared:
+
+| Bottle | Mac | Verdict |
+|---|---|---|
+| fails | reached | Cellar's layer is in the way; the WinHTTP error names the part (DNS, connect, TLS, certificate) and Wine's `err:` lines go to the log |
+| fails | fails | the connection, a firewall, or the service itself |
+| reached | reached | the path is open: look at the service or the account (the Workshop needs a linked Frontier account) |
+
+Any HTTP status counts as reached — a 404 still proves lookup, connection and TLS all worked. The
+addresses are the store's own services plus the profile's optional `network_check`.
 
 ## On-disk layout
 
