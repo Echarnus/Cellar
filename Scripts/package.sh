@@ -1,9 +1,9 @@
 #!/bin/sh
 # Build release binaries and assemble distributable artifacts into ./dist:
-#   dist/Cellar.app        the GUI app (with icon)
-#   dist/Cellar-<v>.zip    zipped app
-#   dist/cellar            the CLI
-#   dist/cellar-<v>.zip    zipped CLI
+#   dist/Cellar.app             the GUI app (with icon, its own copy of the CLI, and the updater)
+#   dist/Cellar-App-<v>.zip     zipped app — also what the update feed points at
+#   dist/cellar                 the CLI
+#   dist/Cellar-CLI-<v>.zip     zipped CLI
 # Used by the release workflow and for local packaging. Usage: Scripts/package.sh [version]
 set -e
 cd "$(dirname "$0")/.."
@@ -43,6 +43,20 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns"
 
+# Self-update (Sparkle), only once the release signing key exists: Resources/sparkle-public-key holds
+# its public half (Scripts/sparkle-keys.sh writes it), the private half is a repository secret. Without
+# it the app is built with updates switched off rather than with a feed it could never verify.
+# SUAllowsAutomaticUpdates is off: an update is always shown and installed on the player's say-so,
+# never swapped in on quit — Cellar may be the parent of a game that is still running.
+UPDATE_KEYS=""
+if [ -s Resources/sparkle-public-key ]; then
+  UPDATE_KEYS="  <key>SUFeedURL</key><string>https://github.com/Echarnus/Cellar/releases/latest/download/appcast.xml</string>
+  <key>SUPublicEDKey</key><string>$(tr -d '[:space:]' < Resources/sparkle-public-key)</string>
+  <key>SUAllowsAutomaticUpdates</key><false/>"
+else
+  echo "warning: Resources/sparkle-public-key missing — this build will not update itself"
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -54,6 +68,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0; not affiliated with the Wine project, Valve, Blizzard, GOG, Apple or any game publisher.</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <!-- What Sparkle compares against the appcast's sparkle:version. -->
+  <key>CFBundleVersion</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- Shown inside macOS's own permission dialog. Cellar asks for all three on first launch
@@ -63,8 +79,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSDesktopFolderUsageDescription</key><string>Windows installers put game shortcuts on your Desktop, and some games save screenshots there.</string>
   <key>NSDownloadsFolderUsageDescription</key><string>Game installers and patches you download land in your Downloads folder.</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+$UPDATE_KEYS
 </dict></plist>
 PLIST
+sh Scripts/bundle-app.sh "$APP" "$BINDIR"
 
 ( cd "$DIST" && ditto -c -k --keepParent Cellar.app "Cellar-App-$VERSION.zip" )
 rm -rf "$DIST/cli"

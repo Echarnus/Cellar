@@ -13,6 +13,7 @@ component's license and how Cellar treats it. Verified against upstream `LICENSE
 | **FAudio** | XAudio2 reimplementation | **zlib** | ✅ Yes | zlib attribution |
 | **DXMT** (`3Shain/dxmt`) | DirectX 11 → Metal | per its repo (verify per release) | ✅ Optional | Per its LICENSE |
 | **swift-argument-parser** | CLI parsing | **Apache-2.0** | ✅ Yes (build dep) | Include license; retain NOTICE |
+| **Sparkle** (2.x, `sparkle-project/Sparkle`) | The app's self-updater | **MIT** (bundled `ed25519` and `bsdiff` code under their own permissive terms, listed in its LICENSE) | ✅ Yes — `Sparkle.framework` inside `Cellar.app` | Ship its LICENSE text with the app; keep its copyright notice |
 | **Apple D3DMetal / `libd3dshared`** (inside the GPTK runner, or Apple's `.dmg`) | DirectX 11/12 → Metal | **Proprietary — Apple license** (grants personal/dev use **and non-commercial distribution**) | ❌ **Never in Cellar's repo/releases.** Fetched at runtime via the Gcenx GPTK runner (non-commercial redistribution under Apple's grant) or the user's own `.dmg` | Not redistributed *by Cellar*. Cellar downloads the Gcenx runner at runtime like Heroic does |
 | **Apple Metal Shader Converter** | DXIL → Metal shaders | Apple (more permissive — redistribution allowed) | Conditionally | Fetched alongside GPTK; cleanest to keep user-supplied too |
 | **CrossOver** app/GUI/installer | Commercial Wine front-end | **Proprietary (CodeWeavers)** | ❌ Never | Only CodeWeavers' **public LGPL `winecx` Wine modifications** may be reused — never the GUI/installer/product code |

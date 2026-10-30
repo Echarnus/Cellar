@@ -73,6 +73,10 @@ public enum Credits {
                role: "Parses the cellar command line.",
                license: "Apache-2.0",
                url: "https://github.com/apple/swift-argument-parser"),
+        Credit(name: "Sparkle",
+               role: "Keeps Cellar itself up to date: checks for a new release, shows what changed, and installs it when you say so.",
+               license: "MIT",
+               url: "https://sparkle-project.org"),
     ]
 
     /// The non-affiliation line, in one place.

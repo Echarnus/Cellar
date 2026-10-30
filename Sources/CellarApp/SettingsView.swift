@@ -24,6 +24,7 @@ struct SettingsView: View {
     }
     @State private var export: Export = .idle
     @StateObject private var runner = CellarRunner()
+    @ObservedObject private var updater = AppUpdater.shared
     /// Read once per refresh, never from a view body — see `StoreAccountState`.
     @State private var accounts = StoreAccountState.unknown
 
@@ -72,6 +73,7 @@ struct SettingsView: View {
                     Link("Questions & answers", destination: URL(string: "https://echarnus.github.io/Cellar/faq.html")!)
                 }
                 diagnostics
+                updates
                 Section("About") {
                     LabeledContent("Version", value: appVersion)
                     Link("Cellar on GitHub", destination: URL(string: "https://github.com/Echarnus/Cellar")!)
@@ -191,6 +193,37 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Updates
+
+    /// Every word here is true of this build: a release says when it last looked, a build from
+    /// source says it does not look at all rather than showing a switch that does nothing.
+    @ViewBuilder private var updates: some View {
+        Section("Updates") {
+            if updater.isAvailable {
+                Toggle("Check for updates automatically", isOn: $updater.checksAutomatically)
+                HStack {
+                    Button("Check Now") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheck)
+                    Spacer()
+                    Text(lastChecked).font(.caption).foregroundStyle(.secondary)
+                }
+                Text("Cellar looks for a new version once a day and shows you what changed. "
+                    + "Nothing is installed until you choose Install, and your games and bottles stay as they are.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("This copy of Cellar was built from source, so it doesn't update itself. "
+                    + "Pull the latest code and run Scripts/install-app.sh, or install a release from GitHub.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Link("Cellar releases", destination: URL(string: "https://github.com/Echarnus/Cellar/releases")!)
+            }
+        }
+    }
+
+    private var lastChecked: String {
+        guard let date = updater.lastChecked else { return "Not checked yet" }
+        return "Last checked " + date.formatted(.relative(presentation: .named))
     }
 
     private var logSize: String {

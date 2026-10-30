@@ -111,6 +111,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appItem.submenu = appMenu
         appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
             .target = self
+        // Left out of a build from source: it has no feed to check, and a disabled item would only
+        // raise a question it cannot answer. Settings › Updates says why.
+        if let updates = AppUpdater.shared.makeMenuItem() { appMenu.addItem(updates) }
         appMenu.addItem(withTitle: "Welcome to \(appName)…", action: #selector(showWelcomeTour), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())

@@ -65,6 +65,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0; not affiliated with the Wine project, Valve, Blizzard, GOG, Apple or any game publisher.</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- Shown inside macOS's own permission dialog. Cellar asks for all three on first launch
@@ -100,6 +101,11 @@ rm -f "$PREFIX/share/cellar/profiles/"*.toml
 cp profiles/*.toml "$PREFIX/share/cellar/profiles/"
 install_file "$SHIM" "$PREFIX/share/cellar/cellar-dock-shim.dylib"
 echo "Installed the cellar CLI at $PREFIX/bin/cellar (profiles in $PREFIX/share/cellar)."
+
+# The bundled CLI and the updater framework, then an ad-hoc signature over the whole bundle. No
+# SUFeedURL/SUPublicEDKey above, on purpose: a build from source must never replace itself with a
+# release, so its updater stays off and Settings says so.
+sh Scripts/bundle-app.sh "$APP" .build/release
 
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
