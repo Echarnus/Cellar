@@ -376,6 +376,10 @@ public struct GameSummary: Identifiable, Sendable {
     public var fallbackBackend: String? = nil
     /// Cellar guessed this game's settings (`DraftProfile`); the library shows it apart, saying so.
     public var isDraft = false
+    /// The drive this game was moved to, when it isn't connected (`GameStorage`).
+    public var missingDrive: String? = nil
+    /// Whether the game's files live on another drive.
+    public var isOnOtherDrive = false
 
     /// The player switched this game off the profile's backend.
     public var backendIsPlayerChoice: Bool { profileBackend.map { $0 != backend } ?? false }
@@ -464,6 +468,8 @@ public enum Game {
             summary.profileBackend = plan.profileBackend
             summary.fallbackBackend = plan.fallbackBackend
             summary.isDraft = plan.isDraft
+            summary.missingDrive = GameStorage.missingDrive(plan)
+            summary.isOnOtherDrive = GameStorage.movedLocation(slug: plan.slug) != nil
             return summary
         }
     }
@@ -763,6 +769,7 @@ public enum Game {
             progress(message)
         }
         CellarLog.info(.install, "Installing \(plan.name) via \(plan.store.displayName).", subject: plan.slug)
+        if let error = GameStorage.missingDriveError(plan) { throw error }
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
@@ -891,6 +898,9 @@ public enum Game {
                               progress: (String) -> Void,
                               stage: (LaunchStage) -> Void,
                               update: (InstallProgress) -> Void) throws -> LaunchRoute {
+        // A game moved to a drive that isn't plugged in: said by name, before anything reads as
+        // "not installed" and offers to download it onto the disk the player was keeping free.
+        if let error = GameStorage.missingDriveError(plan) { throw error }
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
