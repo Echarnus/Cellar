@@ -101,6 +101,9 @@ cp profiles/*.toml "$PREFIX/share/cellar/profiles/"
 install_file "$SHIM" "$PREFIX/share/cellar/cellar-dock-shim.dylib"
 echo "Installed the cellar CLI at $PREFIX/bin/cellar (profiles in $PREFIX/share/cellar)."
 
+# Same ad-hoc seal as package.sh: the Info.plist and resources were added after the linker signed
+# the binary, and an unsealed bundle is one macOS may refuse to open.
+codesign --force --deep --sign - "$APP"
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
 echo "Installed $APP  —  open it with:  open \"$APP\""

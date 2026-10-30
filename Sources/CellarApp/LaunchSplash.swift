@@ -26,7 +26,7 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
     static func present(game: GameSummary, runner: CellarRunner) {
         if let current {
             current.window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.bringToFront()
             return
         }
         let controller = LaunchSplashWindow()
@@ -60,7 +60,7 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
         window.delegate = self
         self.window = window
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     private func close() {

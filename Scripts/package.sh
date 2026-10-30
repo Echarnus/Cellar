@@ -66,6 +66,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 
+# Seal the bundle with an ad-hoc signature. The linker signs the bare binary, but the Info.plist,
+# icon and resources added above are not covered by it, and macOS 15+ Gatekeeper calls a quarantined
+# bundle with an unsealed signature "damaged" — with no Open Anyway button. Ad-hoc is not notarised;
+# it only makes the bundle consistent, so the player's System Settings override works.
+codesign --force --deep --sign - "$APP"
+codesign --verify --deep --strict "$APP"
+
 ( cd "$DIST" && ditto -c -k --keepParent Cellar.app "Cellar-App-$VERSION.zip" )
 rm -rf "$DIST/cli"
 echo "Packaged into $DIST:"; ls -1 "$DIST"
