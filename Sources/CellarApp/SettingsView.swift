@@ -81,6 +81,7 @@ struct SettingsView: View {
                         Text("Shows FPS and frame time in every game you launch.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                    GameLanguageSection()
                     Section("Folder access") {
                         Button("Review folder access…") {
                             onClose()

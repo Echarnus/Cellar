@@ -37,6 +37,9 @@ public struct GamePlan {
     /// `metalfx_upscaling = true`: present the NVIDIA identity so the game's DLSS option becomes
     /// MetalFX. Only takes effect on D3DMetal with a runtime that ships the shims (`WineRunner.usesMetalFX`).
     public var metalFXUpscaling: Bool = false
+    /// The language the game and its store client run in, and whether that is the Mac's or the
+    /// player's choice. See `GameLanguage`.
+    public var language = LanguageChoice.global()
     /// Every performance switch with the layer it came from, for `cellar perf`.
     public var performance = PerformanceSettings.resolve(profileFields: [:], profileEnv: [:],
                                                           bottleFields: [:], bottleEnv: [:])
@@ -507,6 +510,7 @@ public enum Game {
                 status: fields["status"],
                 notes: fields["notes"]),
             metalFXUpscaling: performance.metalFXUpscaling,
+            language: LanguageChoice.resolve(game: BottleConfig.language(bottleFile), global: CellarSettings.language),
             performance: performance
         )
     }
@@ -522,7 +526,8 @@ public enum Game {
     /// The bottle's Wine runner, if the runner is installed.
     public static func wineRunner(_ plan: GamePlan) -> WineRunner? {
         guard let install = RunnerManager.find(id: plan.runnerID) else { return nil }
-        return WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling)
+        return WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling,
+                          language: plan.language.language)
     }
 
     // MARK: - Store-aware state
@@ -608,7 +613,8 @@ public enum Game {
 
         if RunnerManager.find(id: spec.id) == nil { phase(InstallProgress(.runtime)) }
         let install = try RunnerManager.install(spec, progress: step)
-        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling)
+        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling,
+                              language: plan.language.language)
 
         if !FileManager.default.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path) {
             phase(InstallProgress(.bottle))
@@ -694,7 +700,8 @@ public enum Game {
             throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
         }
         let install = try RunnerManager.install(spec, progress: step)
-        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling)
+        let wine = WineRunner(install: install, prefix: plan.prefix, backend: plan.graphicsBackend, metalFX: plan.metalFXUpscaling,
+                              language: plan.language.language)
         if !FileManager.default.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path) {
             step("Initialising the Wine prefix…")
             try wine.initializePrefix(); try wine.setWindowsVersion("win10")
@@ -892,6 +899,7 @@ public enum Game {
             try SteamBottle.updateClient(runner: wine, progress: progress) {
                 update(InstallProgress(.clientUpdate, fraction: $0))
             }
+            SteamBottle.alignGameLanguage(plan.language.language, in: plan.prefix, appID: appID)
             // Cellar downloaded this copy, so Steam has no appmanifest for it and `rungameid` would
             // find nothing. The game's own DRM still wants a live session, so the client is brought
             // up quietly first and the exe is launched beside it — Steamworks finds the running,

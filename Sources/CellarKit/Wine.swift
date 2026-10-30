@@ -16,6 +16,9 @@ public struct WineRunner {
     /// The profile asked for MetalFX (`metalfx_upscaling = true`). Honoured only where the runtime
     /// can deliver it — see `environment()`.
     public let metalFX: Bool
+    /// The language Wine — and so the store client and the game — runs in. Nil leaves the locale
+    /// to the caller's environment, which is only right for a call that shows nothing (`--version`).
+    public let language: GameLanguage?
 
     public init(binary: URL, prefix: URL) {
         self.binary = binary
@@ -23,14 +26,17 @@ public struct WineRunner {
         self.install = nil
         self.backend = .d3dmetal
         self.metalFX = false
+        self.language = nil
     }
 
-    public init(install: RunnerInstall, prefix: URL, backend: GraphicsBackend = .d3dmetal, metalFX: Bool = false) {
+    public init(install: RunnerInstall, prefix: URL, backend: GraphicsBackend = .d3dmetal, metalFX: Bool = false,
+                language: GameLanguage? = nil) {
         self.binary = install.wineBinary
         self.prefix = prefix
         self.install = install
         self.backend = backend
         self.metalFX = metalFX
+        self.language = language
     }
 
     /// Whether this launch will actually present the NVIDIA identity and so get MetalFX: asked
@@ -62,6 +68,11 @@ public struct WineRunner {
             "HOME": home,
         ] { env[k] = v }
         for variable in (install?.fastSync ?? .unknown).variables { env[variable] = "1" }
+        if let language {
+            // The inherited locale is whatever shell started Cellar — see `GameLanguage`.
+            env.removeValue(forKey: "LANGUAGE")
+            for (k, v) in language.environment { env[k] = v }
+        }
 
         if let install, install.isWineForgeStyle {
             // WineForge: backend selected by GRAPHICS_BACKEND + *_RUNTIME_DIR, DLLs forced native.
