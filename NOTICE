@@ -27,7 +27,46 @@ carries no modifications to Wine. With thanks also to:
   WineForge    — the default runner build      https://github.com/Alien4042x/WineForge
   Sikarugir    — the Wine 10 runner + template https://github.com/Sikarugir-App
   Gcenx        — the Game Porting Toolkit build https://github.com/Gcenx
-  SteamRE      — DepotDownloader (GPL-2.0)      https://github.com/SteamRE/DepotDownloader
+  marzent      — msync fast sync (LGPL-2.1+)    https://github.com/marzent/wine-msync
+
+The runners in turn carry these graphics and media components, which Cellar
+selects between but does not ship or modify:
+
+  DXVK         — Direct3D 9/10/11 to Vulkan (zlib)   https://github.com/doitsujin/dxvk
+  DXMT         — Direct3D 11 to Metal (zlib)         https://github.com/3Shain/dxmt
+  MoltenVK     — Vulkan to Metal (Apache-2.0)        https://github.com/KhronosGroup/MoltenVK
+  GStreamer    — media playback (LGPL-2.1+)          https://gstreamer.freedesktop.org/
+  D3DMetal     — Apple, proprietary; see "Important" below
+
+Cellar also downloads, at run time and from their publishers:
+
+  DepotDownloader  SteamRE, GPL-2.0, run as a separate program
+                   https://github.com/SteamRE/DepotDownloader
+
+------------------------------------------------------------------------------
+Compiled into Cellar
+------------------------------------------------------------------------------
+
+  swift-argument-parser  Copyright (c) 2020 Apple Inc. and the Swift project
+                         authors. Apache-2.0 with Runtime Library Exception.
+                         https://github.com/apple/swift-argument-parser
+                         Full text: licenses/swift-argument-parser.txt
+
+  Sparkle 2              Copyright (c) 2006-2013 Andy Matuschak and the Sparkle
+                         contributors. MIT, plus the bsdiff, sais-lite and
+                         ed25519 notices in the same file. Cellar.app's self-updater,
+                         shipped as Contents/Frameworks/Sparkle.framework.
+                         https://sparkle-project.org
+                         Full text: licenses/Sparkle.txt
+
+------------------------------------------------------------------------------
+Source code
+------------------------------------------------------------------------------
+
+Cellar's complete source for any release is at the tag of the same version:
+https://github.com/Echarnus/Cellar/releases (each release links its tag and
+source archive). Licence texts ship with every release, in Cellar.app at
+Contents/Resources/Legal/ and in the CLI zip at share/cellar/legal/.
 
 ------------------------------------------------------------------------------
 Trademarks & non-affiliation
@@ -40,6 +79,7 @@ property of their respective owners:
   - Apple Inc.  (macOS, Metal, Game Porting Toolkit, D3DMetal, Rosetta)
   - Valve Corporation  (Steam, Steam Play, Proton)
   - Blizzard Entertainment, Inc.  (Battle.net, Diablo)
+  - CD PROJEKT S.A.  (GOG, GOG Galaxy)
   - CodeWeavers Inc.  (CrossOver)
   - Frontier Developments plc  (Planet Coaster, COBRA engine)
   - The Wine Project, the Khronos Group, and other upstream projects
@@ -52,7 +92,7 @@ it came from. Cellar bundles, redistributes and downloads no third-party logo
 file. Where the storefront is already installed on the machine, Cellar displays
 that installation's own icon, read from the user's own copy; where it is not,
 Cellar draws a simplified shape in its own code
-(Sources/CellarApp/StoreMark.swift). Either way the mark is used nominatively --
+(Sources/CellarUI/StoreMark.swift). Either way the mark is used nominatively --
 to label where a game came from -- not to suggest endorsement or affiliation.
 
 ------------------------------------------------------------------------------
@@ -60,7 +100,9 @@ Important
 ------------------------------------------------------------------------------
 
 Cellar does not bundle or redistribute Apple's proprietary D3DMetal / Game
-Porting Toolkit. Users obtain it themselves from Apple under Apple's license.
+Porting Toolkit. It reaches the user's Mac inside a community Wine runner that
+Cellar downloads at run time, or from Apple's own Game Porting Toolkit, under
+Apple's license, which permits only non-commercial use and distribution.
 
 Cellar never circumvents DRM or anti-cheat, and is intended only for use with
 games you legally own.

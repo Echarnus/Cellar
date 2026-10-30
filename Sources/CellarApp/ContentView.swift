@@ -93,6 +93,27 @@ final class Library: ObservableObject {
 
     var current: GameSummary? { games.first { $0.slug == selected } }
 
+    /// Whether anything narrows the list, so "No games match" can offer the one way back.
+    var isFiltered: Bool { !query.isEmpty || filter != .all || storeFilter != nil }
+
+    func clearFilters() {
+        query = ""
+        filter = .all
+        storeFilter = nil
+    }
+
+    /// The ↑/↓ keys in the sidebar: the next game in the order the player sees them — store
+    /// sections first, then name — stopping at either end rather than wrapping, as Finder does.
+    func moveSelection(by offset: Int) {
+        let order = sections.flatMap { $0.games.map(\.slug) }
+        guard !order.isEmpty else { return }
+        guard let selected, let index = order.firstIndex(of: selected) else {
+            self.selected = offset > 0 ? order.first : order.last
+            return
+        }
+        self.selected = order[min(max(index + offset, 0), order.count - 1)]
+    }
+
     /// Why the library is empty, named per store rather than assumed to be Steam's fault. Cellar
     /// speaks to three stores; only one of them signs in with a QR code.
     var signInReason: String {
@@ -124,6 +145,7 @@ final class Library: ObservableObject {
 struct ContentView: View {
     @StateObject private var lib = Library()
     @StateObject private var runner = CellarRunner()
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         HSplitView {
@@ -143,6 +165,12 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .cellarLibraryChecking)) { note in
             lib.checking = note.object as? String
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarRefreshLibrary)) { _ in
+            lib.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarFocusSearch)) { _ in
+            searchFocused = true
         }
     }
 
@@ -183,7 +211,9 @@ struct ContentView: View {
             Divider()
             footer
         }
-        .background(.background)
+        // The system's sidebar material, not a flat fill: it is translucent to the desktop behind
+        // the window and follows light, dark and Increase Contrast by itself, as Finder's does.
+        .background(SidebarMaterial().ignoresSafeArea())
     }
 
     private var header: some View {
@@ -192,17 +222,17 @@ struct ContentView: View {
             Text("Cellar").font(.system(.title3, design: .rounded).weight(.bold))
             Spacer()
             Button { lib.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                .buttonStyle(.borderless).help("Refresh the library")
+                .buttonStyle(.borderless).help("Refresh the library (⌘R)")
                 .accessibilityLabel("Refresh the library")
             // Accounts sits beside Settings because signing in is a thing you do once, for the
             // whole library — not something to rediscover on each game's screen.
             Button { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
                 label: { Image(systemName: "person.crop.circle") }
-                .buttonStyle(.borderless).help("Accounts — sign in to Steam, GOG and Battle.net")
+                .buttonStyle(.borderless).help("Accounts — sign in to Steam, GOG and Battle.net (⌘⇧A)")
                 .accessibilityLabel("Accounts")
             Button { NotificationCenter.default.post(name: .cellarOpenSettings, object: nil) }
                 label: { Image(systemName: "gearshape") }
-                .buttonStyle(.borderless).help("Settings")
+                .buttonStyle(.borderless).help("Settings (⌘,)")
                 .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
@@ -212,10 +242,15 @@ struct ContentView: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.caption)
             TextField("Search games", text: $lib.query).textFieldStyle(.plain)
+                .focused($searchFocused)
+                // Escape clears and leaves the field, as Finder's search does.
+                .onExitCommand { lib.query = ""; searchFocused = false }
+                .accessibilityLabel("Search games")
             if !lib.query.isEmpty {
                 Button { lib.query = "" } label: { Image(systemName: "xmark.circle.fill") }
                     .buttonStyle(.borderless).foregroundStyle(.secondary)
                     .accessibilityLabel("Clear search")
+                    .help("Clear search")
             }
         }
         .padding(7)
@@ -231,7 +266,7 @@ struct ContentView: View {
                 FilterChip(title: "All stores", tint: .secondary,
                            selected: lib.storeFilter == nil,
                            action: { lib.storeFilter = nil }) {
-                    Image(systemName: "square.grid.2x2.fill").font(.system(size: 9, weight: .semibold))
+                    Image(systemName: "square.grid.2x2.fill").font(.caption2.weight(.semibold))
                 }
                 ForEach(lib.presentStores, id: \.self) { store in
                     FilterChip(title: store.displayName, tint: store.tint,
@@ -274,6 +309,17 @@ struct ContentView: View {
             }
             .padding(8)
         }
+        // The keyboard reaches the list: click in it (or Tab to it) and ↑/↓ walk the games, the
+        // way every Mac sidebar works. Return then presses Play — it is the default button.
+        .focusable()
+        .noFocusRing()
+        .onMoveCommand { direction in
+            switch direction {
+            case .up: lib.moveSelection(by: -1)
+            case .down: lib.moveSelection(by: 1)
+            default: break
+            }
+        }
     }
 
     /// Games are being withheld because a store hasn't been asked yet — say so, in the library,
@@ -311,7 +357,15 @@ struct ContentView: View {
         VStack(spacing: 8) {
             switch emptyState {
             case .noMatches:
-                Text("No games match.").font(.caption).foregroundStyle(.secondary)
+                Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+                Text("No games match").font(.callout.weight(.semibold))
+                if lib.isFiltered {
+                    Text("Nothing in your library fits this search and these filters.")
+                        .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Button("Clear filters") { lib.clearFilters() }
+                        .buttonStyle(.bordered).controlSize(.small)
+                }
             case .checking(let sentence):
                 // Signed in, answers still coming: the one state that must never read as "sign in".
                 ProgressView().controlSize(.small)
@@ -409,7 +463,9 @@ struct StoreSectionHeader: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8).padding(.top, 10).padding(.bottom, 4)
-        .background(.background)
+        // The same material as the sidebar under it, so a pinned heading reads as part of the
+        // sidebar rather than an opaque strip floating over it.
+        .background(SidebarMaterial())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(store.displayName), \(count) \(count == 1 ? "game" : "games")")
     }
@@ -463,6 +519,7 @@ struct SidebarRow: View {
         .onHover { hover in withAnimation(.easeOut(duration: 0.12)) { hovering = hover } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(game.name), \(game.store.displayName), \(game.statusText)")
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
     }
 }
 
@@ -504,6 +561,33 @@ struct StatusPill: View {
             Text(game.statusText).font(.caption.weight(.semibold)).foregroundStyle(.white)
                 .padding(.horizontal, 9).padding(.vertical, 3)
                 .background(game.statusTint, in: Capsule())
+        }
+    }
+}
+
+/// The sidebar's translucent material. `NSVisualEffectView` rather than a SwiftUI `Material`,
+/// because only AppKit's `.sidebar` material is the exact one Finder and Mail use — and it adapts
+/// to Reduce Transparency on its own.
+struct SidebarMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
+extension View {
+    /// A list the keyboard can reach shouldn't draw a blue ring round the whole sidebar: the
+    /// selected row is the focus indicator, as in Finder. The modifier only exists from macOS 14.
+    @ViewBuilder func noFocusRing() -> some View {
+        if #available(macOS 14.0, *) {
+            focusEffectDisabled()
+        } else {
+            self
         }
     }
 }

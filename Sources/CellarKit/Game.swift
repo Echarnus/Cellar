@@ -89,6 +89,16 @@ public struct GamePlan {
     /// Command-line fragments that identify the *game's own* process, so a supervised launch never
     /// mistakes the store client for the game. Wine reports Windows command lines, hence both
     /// separators.
+    /// `env`, plus what makes the running game show up as itself rather than as "wine" (`DockShim`).
+    /// Every launch route starts its processes with this; opening the store client on its own
+    /// uses `env`, because a client the player opened is not this game.
+    public var launchEnv: [String: String] {
+        let exe = launchExe.map { [($0 as NSString).lastPathComponent] } ?? []
+        var env = DockShim.environment(naming: name, executables: exe)
+        for (key, value) in self.env { env[key] = value }
+        return env
+    }
+
     public var gameProcessNeedles: [String] {
         var needles: [String] = []
         if let launchExe { needles.append((launchExe as NSString).lastPathComponent) }
@@ -151,6 +161,9 @@ public struct GameFacts: Sendable {
 /// and to know what to wait on.
 public enum LaunchRoute {
     case direct(exeName: String)
+    /// The exe started by Cellar with the bottle's Steam client up beside it for the game's DRM —
+    /// a Steam game Cellar downloaded itself. Started like `direct`, but there is a client to close.
+    case steamAlongside(exeName: String, appID: Int)
     case steam(appID: Int)
     case battlenet(product: String)
 
@@ -158,6 +171,8 @@ public enum LaunchRoute {
     public var logDescription: String {
         switch self {
         case .direct(let exeName):    return "direct: \(exeName)"
+        case .steamAlongside(let exeName, let appID):
+            return "beside Steam: \(exeName), AppID \(appID)"
         case .steam(let appID):       return "via Steam, AppID \(appID)"
         case .battlenet(let product): return "via Battle.net, product \(product)"
         }
@@ -568,12 +583,14 @@ public enum Game {
         guard SystemEnvironment.isAppleSilicon else {
             throw CellarError.invalidArgument("Cellar requires an Apple Silicon Mac.")
         }
-        guard SystemEnvironment.rosettaWorks else {
-            throw CellarError.invalidArgument(
-                "Rosetta 2 is required. Install it: softwareupdate --install-rosetta --agree-to-license")
-        }
         guard let spec = RunnerCatalog.spec(forID: plan.runnerID) else {
             throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
+        }
+        // Only an x86_64 runner needs Rosetta. Asking it of every runner would lock a native
+        // ARM64EC runner out of exactly the Macs it exists for: macOS 28 and later.
+        let needsRosetta = RunnerManager.find(id: spec.id)?.needsRosetta ?? spec.architecture.needsRosetta
+        if needsRosetta, !SystemEnvironment.rosettaWorks {
+            throw CellarError.invalidArgument(SystemEnvironment.rosettaMissingMessage())
         }
         if let why = spec.deprecated {
             step("Warning: runner '\(spec.id)' is deprecated — \(why)")
@@ -887,14 +904,14 @@ public enum Game {
                 if SteamBottle.loggedInAccount(in: plan.prefix) == nil {
                     stage(.signIn)
                     try SteamBottle.waitForClientSignIn(runner: wine, game: plan.name, showHUD: showHUD,
-                                                        gameEnv: plan.env, progress: progress)
+                                                        gameEnv: plan.launchEnv, progress: progress)
                 }
                 progress("Starting Steam quietly for \(plan.name)'s DRM, then launching the game…")
                 try SteamBottle.launchAlongside(runner: wine, exe: exe, appID: appID,
-                                                showHUD: showHUD, gameEnv: plan.env,
+                                                showHUD: showHUD, gameEnv: plan.launchEnv,
                                                 game: plan.name, expectsSignIn: signsItself,
                                                 progress: progress, stage: stage)
-                return .direct(exeName: exe.lastPathComponent)
+                return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
             }
             guard SteamBottle.isInstalled(in: plan.prefix) else {
                 throw CellarError.invalidArgument(
@@ -903,7 +920,7 @@ public enum Game {
             let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
             progress("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…")
             try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: showHUD,
-                                              gameEnv: plan.env, game: plan.name, expectsSignIn: signsItself,
+                                              gameEnv: plan.launchEnv, game: plan.name, expectsSignIn: signsItself,
                                               progress: progress, stage: stage)
             stage(.running)
             return .steam(appID: appID)
@@ -924,7 +941,7 @@ public enum Game {
             }
             progress("Launching \(plan.name) via Battle.net (product \(product)) — runner \(plan.runnerID), backend \(plan.backend)…")
             try BattleNetBottle.runGameSupervised(runner: wine, product: product, gameNeedles: needles,
-                                                  showHUD: showHUD, gameEnv: plan.env,
+                                                  showHUD: showHUD, gameEnv: plan.launchEnv,
                                                   progress: progress, stage: stage)
             stage(.running)
             return .battlenet(product: product)
@@ -993,7 +1010,7 @@ public enum Game {
                 "No launchable exe found for '\(plan.slug)'. Run: cellar install \(plan.slug)")
         }
         var env = WineRunner.d3dMetalEnv(showHUD: showHUD)
-        for (key, value) in plan.env { env[key] = value }
+        for (key, value) in plan.launchEnv { env[key] = value }
         let wineLog = Paths.logs.appendingPathComponent("game-\(plan.slug).log")
         CellarLog.debug(.launch, "Starting \(exe.lastPathComponent) directly; Wine output → "
             + wineLog.lastPathComponent, subject: plan.slug)
@@ -1012,7 +1029,12 @@ public enum Game {
         switch route {
         case .direct(let exeName):
             ProcessWatch.waitToExit([exeName])
-            wine?.killServer()
+            wine?.shutDown()
+        case .steamAlongside(let exeName, _):
+            // Steam was started for the game's DRM, so it goes when the game does — asked to quit
+            // first, the same as on the client route, rather than only losing its wineserver.
+            ProcessWatch.waitToExit([exeName])
+            if let wine { SteamBottle.shutdown(runner: wine) }
         case .steam(let appID):
             SteamBottle.waitForGameExit(in: plan.prefix, appID: appID)
             if let wine { SteamBottle.shutdown(runner: wine) }

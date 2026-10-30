@@ -81,20 +81,26 @@ in **both**, and verify with `/usr/libexec/PlistBuddy -c "Print" dist/Cellar.app
 
 ## Signing, quarantine and Gatekeeper
 
-Releases are **unsigned and unnotarised**, and the release notes tell users to right-click → Open.
-Know the mechanics before you touch this:
+Releases are **ad-hoc signed and unnotarised**, and the release notes tell users to allow Cellar
+once under System Settings → Privacy & Security → **Open Anyway**. Know the mechanics before you
+touch this:
 
 - On Apple Silicon every Mach-O must carry **at least an ad-hoc signature** to execute at all; the
   toolchain applies one during the build. "Unsigned" here means *not Developer-ID signed*, which is a
   different thing from *no signature*.
 - What actually blocks a downloaded app is the **`com.apple.quarantine`** extended attribute applied
   by the browser, not the missing signature per se. `xattr -dr com.apple.quarantine
-  /Applications/Cellar.app` clears it; right-click → Open is the same escape hatch through the UI.
+  /Applications/Cellar.app` clears it; **Open Anyway** is the same escape hatch through the UI.
+  Right-click → Open stopped bypassing Gatekeeper in macOS 15 — don't tell anyone to use it.
+- The linker's signature covers the binary, not the bundle. Writing the Info.plist and resources
+  afterwards leaves the bundle unsealed, which macOS 15+ reports as **"damaged"** with no Open
+  Anyway. So `package.sh` and `install-app.sh` finish with `codesign --force --deep --sign -` —
+  keep that the last step that touches the bundle.
 - Copying files with `ditto` preserves extended attributes and signatures; a naive `cp -R` of a
   signed bundle can invalidate it. Prefer `ditto` when assembling the bundle.
 - If Developer-ID signing and notarisation ever land, they need a hardened runtime, `codesign
   --deep --options runtime`, `notarytool submit --wait` and `stapler staple` — **and the release
-  notes must stop telling people to right-click.** Don't ship one without the other.
+  notes must stop telling people to use Open Anyway.** Don't ship one without the other.
 
 ## Packaging traps (already solved — don't reintroduce)
 

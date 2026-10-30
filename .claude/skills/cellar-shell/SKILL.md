@@ -16,10 +16,11 @@ Key rules:
   decision; run it if you have it.
 - **Temp files:** `tmp=$(mktemp -d)` + `trap 'rm -rf "$tmp"' EXIT`, so a `set -e` abort still cleans
   up.
-- **Signing:** artifacts are unsigned/unnotarised, but every arm64 Mach-O still carries an **ad-hoc**
-  signature. What blocks a download is the `com.apple.quarantine` xattr, not the missing Developer
-  ID. Prefer `ditto` over `cp -R` when assembling the bundle. If real signing ever lands, the release
-  notes must stop telling people to right-click → Open.
+- **Signing:** artifacts are ad-hoc signed and unnotarised. What blocks a download is the
+  `com.apple.quarantine` xattr, not the missing Developer ID. The bundle is sealed with
+  `codesign --force --deep --sign -` as the last step, or macOS 15+ calls it "damaged". Prefer
+  `ditto` over `cp -R` when assembling the bundle. Users get past Gatekeeper via System Settings →
+  Privacy & Security → Open Anyway (right-click → Open stopped working in macOS 15).
 - **Any script that runs `swift build` must `unset DEVELOPER_DIR SDKROOT` first** (Nix/devenv SDK
   breaks the build). `install-app.sh` / `package.sh` do it by sourcing `Scripts/select-xcode.sh`,
   which also switches to an installed Xcode when xcode-select points at the Command Line Tools (they

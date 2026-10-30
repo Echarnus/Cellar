@@ -91,6 +91,12 @@ struct Launch: ParsableCommand {
             }
         }
 
+        // The app reads this command's output through a pipe, and the app can go away mid-session:
+        // closing its last window quits it. The next line printed would then end this process on
+        // SIGPIPE — and with it the only thing waiting to close the layer, so every Wine process of
+        // the game outlived it. Losing the reader costs the output, never the shutdown.
+        signal(SIGPIPE, SIG_IGN)
+
         let route = try Game.launch(plan, showHUD: hud, forceStore: forceStore,
                                     checkUpdates: !noUpdate, stage: report,
                                     update: updateReporter()) {
@@ -102,7 +108,7 @@ struct Launch: ParsableCommand {
         switch route {
         case .direct:
             print(Term.dim("Playing… (Cellar will close the layer when you quit the game)"))
-        case .steam, .battlenet:
+        case .steam, .steamAlongside, .battlenet:
             print(Term.dim("Playing… (Cellar will close \(plan.store.displayName) when you quit the game)"))
         }
         report(.playing)

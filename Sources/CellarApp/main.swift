@@ -1,7 +1,6 @@
 import AppKit
 import CellarKit
 import SwiftUI
-import CellarKit
 
 extension Notification.Name {
     /// Posted by the "Settings…" menu item; ContentView opens its settings sheet on receipt.
@@ -22,6 +21,10 @@ extension Notification.Name {
     /// Named for the *tour* specifically, because the folder-access screen above is the other
     /// first-run window and the two coexist rather than fight for the name.
     static let cellarOpenWelcomeTour = Notification.Name("cellar.openWelcomeTour")
+    /// Posted by View › Refresh Library (⌘R) — the same reload as the sidebar's button.
+    static let cellarRefreshLibrary = Notification.Name("cellar.refreshLibrary")
+    /// Posted by Edit › Find… (⌘F), so the keyboard reaches the library search like any Mac app's.
+    static let cellarFocusSearch = Notification.Name("cellar.focusSearch")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -60,17 +63,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Comfortably above ContentView's minimum: at the minimum the detail pane's two
             // information columns collapse into one, which is a fallback, not the intended look.
             contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            // A full-size content view under a transparent title bar: the sidebar's material runs
+            // up behind the traffic lights, the way Music, Notes and the App Store look. SwiftUI
+            // still lays content out below the title bar (it is a safe-area inset); only the
+            // backgrounds reach into it.
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false)
         window.title = "Cellar"
+        // The sidebar already carries the name and the mark; a second "Cellar" centred above the
+        // game's banner is noise. The title stays set for the Window menu and Mission Control.
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        // A library is one window. Without this macOS adds "Show Tab Bar" and friends to the menus,
+        // offering tabs of a window that has nothing to put in a second one.
+        window.tabbingMode = .disallowed
+        window.collectionBehavior.insert(.fullScreenPrimary)
+        // AppKit enforces the floor itself, rather than letting SwiftUI clip a window the player
+        // dragged smaller than the layout can take.
+        window.contentMinSize = NSSize(width: 880, height: 580)
         window.center()
+        // Reopen where the player left it — size and position — as every document-less Mac app does.
+        window.setFrameAutosaveName("CellarLibraryWindow")
         let useDiagnostic = ProcessInfo.processInfo.environment["CELLAR_DIAG"] != nil
         window.contentView = useDiagnostic
             ? NSHostingView(rootView: AnyView(Text("Cellar GUI works").padding()))
             : NSHostingView(rootView: ContentView())
         window.makeKeyAndOrderFront(nil)
         self.window = window
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
 
         // Two things want the first launch, so they take it in turn — stacking two windows on a
         // player who has not seen the app yet is worse than either on its own.
@@ -100,15 +120,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu
 
+    /// The menu bar, built to the Human Interface Guidelines' standard order — App, File, Edit,
+    /// View, Window, Help — because a hand-rolled app gets none of it for free, and a missing menu
+    /// is a missing keyboard path (skills/ux.md › Accessibility). Menu items are title case, as
+    /// macOS's own are; everything inside the window stays sentence case.
     private func buildMainMenu() -> NSMenu {
         let appName = "Cellar"
         let mainMenu = NSMenu()
 
+        func submenu(_ title: String) -> NSMenu {
+            let item = NSMenuItem()
+            mainMenu.addItem(item)
+            let menu = NSMenu(title: title)
+            item.submenu = menu
+            return menu
+        }
+
         // App menu (its bold title comes from CFBundleName once wrapped as Cellar.app).
-        let appItem = NSMenuItem()
-        mainMenu.addItem(appItem)
-        let appMenu = NSMenu()
-        appItem.submenu = appMenu
+        let appMenu = submenu(appName)
         appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
             .target = self
         // Left out of a build from source: it has no feed to check, and a disabled item would only
@@ -117,10 +146,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "Welcome to \(appName)…", action: #selector(showWelcomeTour), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Account…", action: #selector(showAccounts), keyEquivalent: "A")
-            .target = self
         appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
             .target = self
+        // ⌘⇧A: an upper-case key equivalent is the shifted one.
+        appMenu.addItem(withTitle: "Accounts…", action: #selector(showAccounts), keyEquivalent: "A")
+            .target = self
+        appMenu.addItem(.separator())
+        let services = appMenu.addItem(withTitle: "Services", action: nil, keyEquivalent: "")
+        let servicesMenu = NSMenu(title: "Services")
+        services.submenu = servicesMenu
+        NSApp.servicesMenu = servicesMenu
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide \(appName)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = appMenu.addItem(withTitle: "Hide Others",
@@ -130,32 +165,70 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit \(appName)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
+        // File menu — Close belongs here, not in Window, on every Mac.
+        let fileMenu = submenu("File")
+        fileMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+
         // Edit menu — text fields (the library search box) need these for cut/copy/paste/select-all.
-        let editItem = NSMenuItem()
-        mainMenu.addItem(editItem)
-        let editMenu = NSMenu(title: "Edit")
-        editItem.submenu = editMenu
+        let editMenu = submenu("Edit")
         editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
         editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
         editMenu.addItem(.separator())
         editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Delete", action: #selector(NSText.delete(_:)), keyEquivalent: "")
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Find…", action: #selector(focusSearch), keyEquivalent: "f")
+            .target = self
+
+        // View menu.
+        let viewMenu = submenu("View")
+        viewMenu.addItem(withTitle: "Refresh Library", action: #selector(refreshLibrary), keyEquivalent: "r")
+            .target = self
+        viewMenu.addItem(.separator())
+        let fullScreen = viewMenu.addItem(withTitle: "Enter Full Screen",
+                                          action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
+        fullScreen.keyEquivalentModifierMask = [.command, .control]
 
         // Window menu.
-        let windowItem = NSMenuItem()
-        mainMenu.addItem(windowItem)
-        let windowMenu = NSMenu(title: "Window")
-        windowItem.submenu = windowMenu
+        let windowMenu = submenu("Window")
         windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
         windowMenu.addItem(.separator())
-        windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
         NSApp.windowsMenu = windowMenu
+
+        // Help menu. Registering it is what gives macOS's menu search field, for free.
+        let helpMenu = submenu("Help")
+        helpMenu.addItem(withTitle: "\(appName) Help", action: #selector(openHelp), keyEquivalent: "?")
+            .target = self
+        helpMenu.addItem(withTitle: "Supported Games", action: #selector(openSupportedGames), keyEquivalent: "")
+            .target = self
+        helpMenu.addItem(.separator())
+        helpMenu.addItem(withTitle: "Show Logs in Finder", action: #selector(showLogs), keyEquivalent: "")
+            .target = self
+        helpMenu.addItem(withTitle: "Report an Issue…", action: #selector(reportIssue), keyEquivalent: "")
+            .target = self
+        NSApp.helpMenu = helpMenu
 
         return mainMenu
     }
+
+    @objc private func refreshLibrary() {
+        NotificationCenter.default.post(name: .cellarRefreshLibrary, object: nil)
+    }
+
+    @objc private func focusSearch() {
+        window?.makeKeyAndOrderFront(nil)
+        NotificationCenter.default.post(name: .cellarFocusSearch, object: nil)
+    }
+
+    @objc private func openHelp() { NSWorkspace.shared.open(Links.help) }
+    @objc private func openSupportedGames() { NSWorkspace.shared.open(Links.supportedGames) }
+    @objc private func showLogs() { NSWorkspace.shared.open(Paths.logs) }
+    @objc private func reportIssue() { NSWorkspace.shared.open(Links.newIssue) }
 
     @objc private func showSettings() {
         if settingsWindow == nil {
@@ -174,7 +247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settingsWindow = w
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     /// There is one place to sign in, and it is Settings. "Accounts…" and every "Sign in" button
@@ -205,7 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         })
         folderAccessWindow = w
         w.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     /// The first-run tour. Its own window for the usual reason — a sheet under `NSHostingView` is a
@@ -228,7 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         WelcomeTour.markSeen()
         welcomeTourWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     @objc private func showAbout() {
@@ -238,7 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .applicationVersion: version,
             .credits: Self.aboutCredits(),
         ])
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     /// The About panel's credits: the tagline, then the thank-you to Wine — the project Cellar is a
@@ -272,10 +345,33 @@ app.delegate = delegate
 app.setActivationPolicy(.regular)
 app.run()
 
+/// Where the app sends a player for help. One table, so Settings and the Help menu never point at
+/// two different pages.
+enum Links {
+    static let help = URL(string: "https://echarnus.github.io/Cellar/faq.html")!
+    static let supportedGames = URL(string: "https://echarnus.github.io/Cellar/")!
+    static let repository = URL(string: "https://github.com/Echarnus/Cellar")!
+    static let releases = URL(string: "https://github.com/Echarnus/Cellar/releases")!
+    static let newIssue = URL(string: "https://github.com/Echarnus/Cellar/issues/new")!
+}
+
 extension Bundle {
     /// The version shown in About and written into the log; falls back to the library's own
     /// version when the app runs unwrapped during development.
     var shortVersion: String {
         (infoDictionary?["CFBundleShortVersionString"] as? String) ?? CellarVersion.current
+    }
+}
+
+extension NSApplication {
+    /// Brings Cellar forward. `activate(ignoringOtherApps:)` is deprecated from macOS 14, where
+    /// activation became cooperative and the flag is ignored anyway; the plain `activate()` is the
+    /// call that stays.
+    func bringToFront() {
+        if #available(macOS 14, *) {
+            activate()
+        } else {
+            activate(ignoringOtherApps: true)
+        }
     }
 }

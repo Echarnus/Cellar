@@ -12,7 +12,8 @@ import CellarUI
 struct SettingsView: View {
     @AppStorage("showHUD") private var showHUD = false
     /// Settings is shown in a standalone NSWindow (not a SwiftUI sheet — that crashes under
-    /// NSHostingView), so Done closes the window through this callback rather than `dismiss`.
+    /// NSHostingView), so anything that hands off to another window closes this one through this
+    /// callback rather than `dismiss`.
     var onClose: () -> Void = {}
 
     /// Where the diagnostics export has got to. Every one of these states is drawn: a button that
@@ -31,75 +32,104 @@ struct SettingsView: View {
     private var runnerName: String { RunnerManager.installed().first?.spec.displayName ?? "not installed" }
     private var depot: String { DepotTool.isInstalled ? "installed" : "installs on first download" }
 
+    /// The panes, in the order a player needs them: the sign-in first, then what changes how games
+    /// run, then the machinery, then who made it.
+    private enum Pane: String, CaseIterable {
+        case accounts = "Accounts", general = "General", advanced = "Advanced", about = "About"
+    }
+    @State private var pane: Pane = .accounts
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Settings").font(.title2.weight(.bold))
-                Spacer()
-                Button("Done") { onClose() }.keyboardShortcut(.defaultAction)
-            }.padding(20)
-            Divider()
-            Form {
-                // Signing in is account-level, so it belongs here as well as behind ⌘⇧A — the
-                // welcome tour promises "you can do this later in Settings", and this is that. The
-                // rows are shown inline rather than behind a button: this *is* the accounts screen.
-                Section("Accounts") {
-                    AccountsSection(runner: runner, state: accounts, refresh: refresh)
-                        .padding(.vertical, 4)
-                }
-                Section("Gameplay") {
-                    Toggle("Show Metal performance overlay (FPS)", isOn: $showHUD)
-                    Text("Shows FPS and frame time in every game you launch.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Section("Folder access") {
-                    Button("Review folder access…") {
-                        onClose()
-                        NotificationCenter.default.post(name: .cellarOpenFolderAccess, object: nil)
+            // Tabs, as every Mac app's Settings has them, rather than one long scrolling form that
+            // put the credits above the fold and the diagnostics below it. No "Done" button and no
+            // in-window heading: settings apply as you change them, the title bar already says
+            // "Settings", and the window closes like any other (⌘W or the red button).
+            TabView(selection: $pane) {
+                Form {
+                    // Signing in is account-level, so it belongs here as well as behind ⌘⇧A — the
+                    // welcome tour promises "you can do this later in Settings", and this is that.
+                    Section {
+                        AccountsSection(runner: runner, state: accounts, refresh: refresh)
+                            .padding(.vertical, 4)
+                    } footer: {
+                        Text("One sign-in per store covers your whole library.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                    Text("Which of your Documents, Desktop and Downloads folders Windows games may use. A folder that is off isn't a failure — those games keep their saves inside their bottle instead.")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
-                Section("Runtime") {
-                    LabeledContent("Wine runner", value: runnerName)
-                    LabeledContent("DepotDownloader", value: depot)
-                    Button("Open Cellar folder") { NSWorkspace.shared.open(Paths.appSupport) }
-                    Button("Open logs") { NSWorkspace.shared.open(Paths.logs) }
-                }
-                Section("Help") {
-                    Button("Show the welcome tour again") {
-                        NotificationCenter.default.post(name: .cellarOpenWelcomeTour, object: nil)
+                .formStyle(.grouped)
+                .tabItem { Label(Pane.accounts.rawValue, systemImage: "person.crop.circle") }
+                .tag(Pane.accounts)
+
+                Form {
+                    Section("Gameplay") {
+                        Toggle("Show Metal performance overlay (FPS)", isOn: $showHUD)
+                        Text("Shows FPS and frame time in every game you launch.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                    Link("Questions & answers", destination: URL(string: "https://echarnus.github.io/Cellar/faq.html")!)
+                    Section("Folder access") {
+                        Button("Review folder access…") {
+                            onClose()
+                            NotificationCenter.default.post(name: .cellarOpenFolderAccess, object: nil)
+                        }
+                        Text("Which of your Documents, Desktop and Downloads folders Windows games may use. A folder that is off isn't a failure — those games keep their saves inside their bottle instead.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Section("Help") {
+                        Button("Show the welcome tour again") {
+                            NotificationCenter.default.post(name: .cellarOpenWelcomeTour, object: nil)
+                        }
+                        Link("Questions & answers", destination: Links.help)
+                    }
                 }
-                diagnostics
-                updates
-                Section("About") {
-                    LabeledContent("Version", value: appVersion)
-                    Link("Cellar on GitHub", destination: URL(string: "https://github.com/Echarnus/Cellar")!)
-                    Link("Supported games", destination: URL(string: "https://echarnus.github.io/Cellar/")!)
-                    Text(Credits.nonAffiliation)
-                        .font(.caption).foregroundStyle(.secondary)
+                .formStyle(.grouped)
+                .tabItem { Label(Pane.general.rawValue, systemImage: "gearshape") }
+                .tag(Pane.general)
+
+                Form {
+                    Section("Runtime") {
+                        LabeledContent("Wine runner", value: runnerName)
+                        LabeledContent("DepotDownloader", value: depot)
+                        Button("Open Cellar folder") { NSWorkspace.shared.open(Paths.appSupport) }
+                    }
+                    diagnostics
                 }
-                // Wine gets its own group rather than a line among the links: Cellar is a launcher
-                // over it, and a player reading "About" should leave knowing that.
-                Section("Built on Wine") {
-                    Text(Credits.wine.role)
-                        .font(.caption).foregroundStyle(.secondary)
-                    Link("Wine — winehq.org", destination: Credits.wine.url)
-                    Link("Wine source — gitlab.winehq.org", destination: Credits.wine.sourceURL!)
-                    LabeledContent("License", value: Credits.wine.license)
-                }
-                Section("With thanks to") {
-                    ForEach(Credits.all.dropFirst(), id: \.name) { credit in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Link(credit.name, destination: credit.url)
-                            Text(credit.role).font(.caption).foregroundStyle(.secondary)
+                .formStyle(.grouped)
+                .tabItem { Label(Pane.advanced.rawValue, systemImage: "wrench.and.screwdriver") }
+                .tag(Pane.advanced)
+
+                Form {
+                    Section("About") {
+                        LabeledContent("Version", value: appVersion)
+                        Link("Cellar on GitHub", destination: Links.repository)
+                        Link("Supported games", destination: Links.supportedGames)
+                        Text(Credits.nonAffiliation)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    updates
+                    // Wine gets its own group rather than a line among the links: Cellar is a
+                    // launcher over it, and a player reading "About" should leave knowing that.
+                    Section("Built on Wine") {
+                        Text(Credits.wine.role)
+                            .font(.caption).foregroundStyle(.secondary)
+                        Link("Wine — winehq.org", destination: Credits.wine.url)
+                        Link("Wine source — gitlab.winehq.org", destination: Credits.wine.sourceURL!)
+                        LabeledContent("License", value: Credits.wine.license)
+                    }
+                    Section("With thanks to") {
+                        ForEach(Credits.all.dropFirst(), id: \.name) { credit in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Link(credit.name, destination: credit.url)
+                                Text(credit.role).font(.caption).foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
+                .formStyle(.grouped)
+                .tabItem { Label(Pane.about.rawValue, systemImage: "info.circle") }
+                .tag(Pane.about)
             }
-            .formStyle(.grouped)
+            .padding(.top, 8)
             Divider()
             activity
         }
@@ -152,6 +182,37 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Updates
+
+    /// Every word here is true of this build: a release says when it last looked, a build from
+    /// source says it does not look at all rather than showing a switch that does nothing.
+    @ViewBuilder private var updates: some View {
+        Section("Updates") {
+            if updater.isAvailable {
+                Toggle("Check for updates automatically", isOn: $updater.checksAutomatically)
+                HStack {
+                    Button("Check Now") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheck)
+                    Spacer()
+                    Text(lastChecked).font(.caption).foregroundStyle(.secondary)
+                }
+                Text("Cellar looks for a new version once a day and shows you what changed. "
+                    + "Nothing is installed until you choose Install, and your games and bottles stay as they are.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("This copy of Cellar was built from source, so it doesn't update itself. "
+                    + "Pull the latest code and run Scripts/install-app.sh, or install a release from GitHub.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Link("Cellar releases", destination: Links.releases)
+            }
+        }
+    }
+
+    private var lastChecked: String {
+        guard let date = updater.lastChecked else { return "Not checked yet" }
+        return "Last checked " + date.formatted(.relative(presentation: .named))
+    }
+
     // MARK: - Diagnostics
 
     /// Cellar keeps a rolling record of set-ups, launches and failures. This is where a player
@@ -179,7 +240,8 @@ struct SettingsView: View {
                 }
             case .written(let url):
                 HStack(spacing: 8) {
-                    Text("✓").foregroundStyle(.green)
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        .accessibilityHidden(true)
                     Text("Saved \(url.lastPathComponent) to your Desktop.").font(.caption)
                     Spacer()
                     Button("Show in Finder") {
@@ -188,42 +250,12 @@ struct SettingsView: View {
                 }
             case .failed(let reason):
                 HStack(spacing: 8) {
-                    Text("✗").foregroundStyle(.red)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                        .accessibilityLabel("Export failed")
                     Text(reason).font(.caption).textSelection(.enabled)
                 }
             }
         }
-    }
-
-    // MARK: - Updates
-
-    /// Every word here is true of this build: a release says when it last looked, a build from
-    /// source says it does not look at all rather than showing a switch that does nothing.
-    @ViewBuilder private var updates: some View {
-        Section("Updates") {
-            if updater.isAvailable {
-                Toggle("Check for updates automatically", isOn: $updater.checksAutomatically)
-                HStack {
-                    Button("Check Now") { updater.checkForUpdates() }
-                        .disabled(!updater.canCheck)
-                    Spacer()
-                    Text(lastChecked).font(.caption).foregroundStyle(.secondary)
-                }
-                Text("Cellar looks for a new version once a day and shows you what changed. "
-                    + "Nothing is installed until you choose Install, and your games and bottles stay as they are.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } else {
-                Text("This copy of Cellar was built from source, so it doesn't update itself. "
-                    + "Pull the latest code and run Scripts/install-app.sh, or install a release from GitHub.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Link("Cellar releases", destination: URL(string: "https://github.com/Echarnus/Cellar/releases")!)
-            }
-        }
-    }
-
-    private var lastChecked: String {
-        guard let date = updater.lastChecked else { return "Not checked yet" }
-        return "Last checked " + date.formatted(.relative(presentation: .named))
     }
 
     private var logSize: String {

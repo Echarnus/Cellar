@@ -270,5 +270,9 @@ which no Wine patch touches. Fixes go upstream; see
 
 ## License
 
-[GPL-3.0](LICENSE) © Cellar contributors. Bundled third-party components retain their own licenses
-([THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)).
+[GPL-3.0](LICENSE) © Cellar contributors. Cellar is built on Wine and other people's work, credited in
+[NOTICE](NOTICE) and the app's About screen. Every component, whether it ships inside Cellar or is
+fetched from its publisher at run time, is listed with its licence in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md); the texts Cellar must ship are in
+[`licenses/`](licenses/) and travel inside every release. Cellar is free to download; see
+[docs/LEGAL.md](docs/LEGAL.md#distributing-cellar) before distributing it any other way.

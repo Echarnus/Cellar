@@ -113,7 +113,13 @@ actual `WINEPREFIX`) and a `bottle.toml` recording `backend`, `runner` and `wind
   see [`profiles.md`](profiles.md) before adding a field.
 - **Tear the whole layer down with the game.** On exit Cellar kills the store client, its helpers
   (`Agent.exe`, `Battle.net Helper.exe` — a surviving `Agent.exe` greys out Install next session),
-  then `wineserver -k`. A bottle that keeps a wineserver alive looks to the player like Cellar hung.
+  then `WineRunner.shutDown()` — `wineserver -k`, `-k9` if the server is still up after a few
+  seconds, then a sweep of anything still running the runner's binaries (`RunnerProcesses`, matched
+  by executable path, never touched while another wineserver of that runner is up). Never a bare
+  `killServer()` at the end of a session: on its own it left three `wine` processes behind Planet
+  Coaster 2. A bottle that keeps Wine alive looks to the player like Cellar hung.
+- **The waiter must outlive the app.** `cellar launch` ignores `SIGPIPE`: the app quitting closes
+  the pipe it reads, and dying on the next `print` would leave nobody to close the layer.
 
 ## Store clients live inside the bottle
 

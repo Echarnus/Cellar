@@ -1,7 +1,7 @@
 #!/bin/sh
-# Finish a Cellar.app that package.sh or install-app.sh has assembled: put the `cellar` CLI and
-# Sparkle.framework inside it, then ad-hoc sign the whole bundle. Run after Info.plist is written —
-# the signature seals it.
+# Put the `cellar` CLI and Sparkle.framework inside a Cellar.app that package.sh or install-app.sh
+# has assembled. Run before the bundle's ad-hoc seal (`codesign --deep` in both scripts), which then
+# covers both — Sparkle refuses an update whose bundle signature is present but broken.
 # Run from the repository root. Usage: Scripts/bundle-app.sh <Cellar.app> <swift build bin dir>
 set -eu
 APP="$1"
@@ -14,28 +14,11 @@ BINDIR="$2"
 cp "$BINDIR/cellar" "$APP/Contents/MacOS/cellar"
 
 # The updater. SwiftPM leaves the framework beside the binary it linked; inside a bundle it goes in
-# Contents/Frameworks, where CellarApp's rpath looks (Package.swift). ditto keeps its symlinks and
-# Sparkle's own signature intact.
+# Contents/Frameworks, where CellarApp's rpath looks (Package.swift). ditto keeps the framework's
+# symlinks, which codesign needs to seal it.
 [ -d "$BINDIR/Sparkle.framework" ] || { echo "No Sparkle.framework in $BINDIR — build CellarApp first"; exit 1; }
 mkdir -p "$APP/Contents/Frameworks"
 rm -rf "$APP/Contents/Frameworks/Sparkle.framework"
 ditto "$BINDIR/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 
-# Sparkle is MIT: its licence text travels with the copy of it we ship.
-# SwiftPM clones the package into .build/checkouts; the unpacked release under .build/artifacts has
-# it too.
-LICENSE_FILE="$(find .build/checkouts/Sparkle .build/artifacts -maxdepth 3 -name LICENSE -path '*parkle*' \
-  -type f 2>/dev/null | head -n 1)"
-[ -n "$LICENSE_FILE" ] || { echo "Sparkle's LICENSE not found under .build — resolve packages first"; exit 1; }
-mkdir -p "$APP/Contents/Resources/licenses"
-cp "$LICENSE_FILE" "$APP/Contents/Resources/licenses/Sparkle-LICENSE.txt"
-
-# Ad-hoc, because there is no Developer ID yet. Still load-bearing: Sparkle rejects an update whose
-# bundle signature is present but broken, and a bundle that only carries the linker's signature on
-# its main binary (resources unsealed, a second executable unsigned) does not verify. Inner code
-# first, then the bundle; Sparkle.framework keeps the signature it shipped with.
-codesign --force --sign - "$APP/Contents/MacOS/cellar"
-codesign --force --sign - "$APP/Contents/Resources/cellar-dock-shim.dylib"
-codesign --force --sign - "$APP"
-codesign --verify --strict "$APP"
-echo "Bundled the cellar CLI and Sparkle into $APP, ad-hoc signed."
+echo "Bundled the cellar CLI and Sparkle into $APP."

@@ -13,5 +13,5 @@ mkdir -p "$(dirname "$OUT")"
 # Absolute path: a devenv shell puts a Nix clang first on PATH, and that one cannot see the macOS SDK.
 /usr/bin/xcrun clang -arch x86_64 -arch arm64 -mmacosx-version-min=13.0 \
   -O2 -Wall -Wextra -dynamiclib -install_name @rpath/cellar-dock-shim.dylib \
-  -lobjc -o "$OUT" Shim/cellar-dock-shim.c
+  -lobjc -framework CoreFoundation -o "$OUT" Shim/cellar-dock-shim.c
 echo "Built $OUT ($(lipo -archs "$OUT"))"
