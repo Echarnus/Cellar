@@ -46,9 +46,16 @@ Build and check before opening a PR:
 
 ```sh
 swift build
-swift run cellar doctor
-swift test            # once the test target lands (Phase 1)
+sh Scripts/test.sh --coverage   # unit + hermetic integration tests, coverage held to the baseline
+sh Scripts/test.sh --integration  # for runners, prefixes, launching: a real Windows exe under Wine
+swift run cellar selftest
 ```
+
+**Every PR that changes Swift under `Sources/` adds or updates a test** that would fail without the
+change; a bug fix starts with a test that reproduces the bug. The PR template asks how you verified
+the change: tick only what you actually ran and paste the evidence. The *PR checklist* check holds
+every PR to this — whether a person or an AI agent wrote it. See [`docs/TESTING.md`](docs/TESTING.md)
+for where each kind of test goes and the test doubles that make launches testable without Wine.
 
 Match the surrounding style: small types, clear names, comments only where intent isn't obvious.
 

@@ -34,8 +34,10 @@ jobs:
         run: swift --version
       - name: Build (release)
         run: swift build -c release
-      - name: Test suite
-        run: sh Scripts/test.sh
+      # Unit + hermetic integration tiers, with line coverage held to Tests/coverage-baseline.json:
+      # a change that lowers it fails here and says which files are least covered.
+      - name: Test suite + coverage ratchet
+        run: sh Scripts/test.sh --coverage
       # SwiftPM does not build the Dock shim (it has to be universal), so nothing else here would
       # notice if it stopped compiling.
       - name: Build the Dock shim (universal)
@@ -88,3 +90,38 @@ jobs:
         run: shellcheck --severity=warning Scripts/*.sh
       - name: Python compiles (3.9 floor)
         run: python3 -m py_compile Scripts/*.py
+
+  wine:
+    name: Wine tiers (real runner, real Windows exe)
+    # Tiers B and C of docs/TESTING.md: a real runner installs, a real prefix initialises, and a
+    # Windows PE starts under Cellar's own launch path and is shut down again. The unit suite proves
+    # Cellar decides correctly; this proves a Windows program actually runs, before the merge rather
+    # than on the player's Mac. Not a required check yet — it downloads a runner from upstream on
+    # every run, and has to prove it is stable on hosted runners first (docs/TESTING.md).
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Every runner Cellar ships is x86_64 Wine. Hosted images may come without Rosetta; without it
+      # tier B fails on its own precondition rather than skipping, so it is installed first.
+      - name: Install Rosetta 2
+        run: softwareupdate --install-rosetta --agree-to-license
+      - name: Install the default runner
+        run: |
+          swift build -c release --product cellar
+          .build/release/cellar runner install
+          .build/release/cellar runner list
+      - name: Wine tiers
+        env:
+          # The sandbox lands somewhere the log upload below can find it; a failed run keeps it.
+          TMPDIR: ${{ runner.temp }}
+        run: sh Scripts/test.sh --integration --filter CellarIntegrationTests
+      - name: Upload Wine logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wine-tier-logs
+          path: ${{ runner.temp }}/cellar-tests.*/home/logs/
+          if-no-files-found: ignore

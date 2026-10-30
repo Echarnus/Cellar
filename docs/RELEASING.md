@@ -40,7 +40,9 @@ Every piece of work starts as an issue, because the issues are what a release's 
 2. Climb the verification ladder in [`AGENTS.md`](../AGENTS.md). CI is a floor, not a substitute: it
    cannot launch the app or a game.
 3. Open a PR from the template. Its body says **`Closes #N`**, which is what links it to the
-   issue and closes the issue when it merges.
+   issue and closes the issue when it merges, and says how the change was verified. A change to
+   `Sources/` carries its tests. The *PR checklist* check fails until all of that is true, and it
+   re-runs whenever the description is edited ([`docs/TESTING.md`](TESTING.md)).
 4. **Turn on auto-merge (squash).** The PR merges by itself once every required check is green.
 
 ### Why auto-merge and not auto-approve
@@ -48,8 +50,8 @@ Every piece of work starts as an issue, because the issues are what a release's 
 GitHub never lets the author of a pull request approve it, and Claude opens PRs as the maintainer.
 An approving review from a second bot account would be a rubber stamp: it would look like review
 without being one, and it is one more credential that can write to `main`. So the ruleset requires
-**zero** approvals and makes the checks the gate instead: build, tests, self-test, lint, CodeQL and
-dependency review must all pass on an up-to-date branch, and every review conversation must be
+**zero** approvals and makes the checks the gate instead: build, tests with the coverage ratchet,
+self-test, lint, the PR checklist, CodeQL and dependency review must all pass on an up-to-date branch, and every review conversation must be
 resolved. What this gives up is a second human pair of eyes; with one maintainer that was never
 there. If a contributor joins, raise `required_approving_review_count` to 1 and turn on
 `require_code_owner_review` — CODEOWNERS is already in place.

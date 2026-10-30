@@ -67,6 +67,10 @@
           {
             "context": "review",
             "integration_id": 15368
+          },
+          {
+            "context": "PR checklist",
+            "integration_id": 15368
           }
         ]
       }
