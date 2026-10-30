@@ -233,12 +233,14 @@ Force feedback comes from Cellar's own SDL (`Scripts/build-sdl.sh`, see ARCHITEC
 none yet.
 
 Tier A loads the real built SDL the way winebus does and starts its joystick and haptic subsystems
-(`CellarSDLIntegrationTests`), and `build-sdl.sh` starts both architecture slices. Neither can show
-a motor turning: that is this table.
+(`CellarSDLIntegrationTests`), and `build-sdl.sh` starts both architecture slices. Cellar's Fanatec
+driver is tested by `build-sdl.sh` too (`Shim/sdl/tests/test_fanatec.c`): the init sequence, every
+slot's encoding, the strength cap, gain, durations, pause and stop-on-close, against a fake base that
+records every command. None of it can show a motor turning: that is this table.
 
 | Wheel | Mode / firmware | Listed by `cellar controllers` | Steering + pedals in game | Force feedback |
 |---|---|---|---|---|
-| Fanatec (CSL DD / GT DD Pro / ClubSport) | PC mode, current firmware | not yet tested | — | — |
+| Fanatec (CSL DD / GT DD Pro / ClubSport DD / CSL Elite) | PC mode, current firmware | not yet tested | — | — (expected: yes, Cellar's Fanatec driver, half strength) |
 | Logitech G29 / G27 / G25 | PS3 or PS4 position | not yet tested | — | — (expected: yes, via Cellar's SDL) |
 | Logitech G920 / G923 | — | not yet tested | — | — (expected: none yet) |
 | Thrustmaster (T300 / T248 / TX) | PC mode | not yet tested | — | — |
@@ -254,6 +256,8 @@ To test a wheel:
    or crash shake it, and does all force stop the moment the game quits?
 5. If force feedback misbehaves, start the game once with the runner's own SDL —
    `CELLAR_RUNNER_SDL=1 cellar launch <game>` — to tell Cellar's SDL apart from the rest of the path.
+   For a Fanatec base, also try `CELLAR_FFB_MAX_PERCENT=100` (is it only weak?) and
+   `CELLAR_FFB_DISABLE=1` (steering without Cellar's driver).
 6. Note the game, runner and backend, and record the result in the game's profile notes.
 
 ## Where this sits in the verification ladder

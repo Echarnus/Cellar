@@ -3,7 +3,8 @@
 # the runner's Wine loads by name. Wine's input layer (winebus) hands a game's force-feedback
 # effects to SDL; the runner's own SDL can only send them through macOS's ForceFeedback plug-ins,
 # which no wheel maker ships for Apple Silicon. SDL 3.4 talks to the wheel over USB itself instead
-# (HIDAPI). See docs/ARCHITECTURE.md → Controllers and racing wheels.
+# (HIDAPI), and Cellar's own patches add the wheels SDL has no driver for (Shim/sdl/). See
+# docs/ARCHITECTURE.md → Controllers and racing wheels.
 #
 # Universal, like the Dock shim: the runner may be x86_64 (Rosetta) or arm64. Sources are pinned by
 # version and SHA-256 and fetched from libsdl.org's GitHub releases; patches in Shim/sdl/*.patch are
@@ -38,7 +39,7 @@ copy_out() {
 }
 
 # Everything the output depends on, so an unchanged input is not rebuilt (it takes minutes).
-STAMP="sdl3=$SDL3_VERSION:$SDL3_SHA256 compat=$COMPAT_VERSION:$COMPAT_SHA256 patches=$(cat Shim/sdl/*.patch 2>/dev/null | shasum -a 256 | cut -c1-16)"
+STAMP="sdl3=$SDL3_VERSION:$SDL3_SHA256 compat=$COMPAT_VERSION:$COMPAT_SHA256 patches=$(cat Shim/sdl/*.patch Shim/sdl/tests/*.c 2>/dev/null | shasum -a 256 | cut -c1-16)"
 if [ -f "$CACHE/libSDL2-2.0.0.dylib" ] && [ -f "$CACHE/libSDL3.dylib" ] && [ "$(cat "$WORK/stamp" 2>/dev/null)" = "$STAMP" ]; then
   copy_out
   echo "Cellar's SDL is up to date ($OUT)"
@@ -115,6 +116,9 @@ for symbol in SDL_Init SDL_JoystickOpen SDL_HapticOpenFromJoystick SDL_HapticNew
 done
 nm -gU "$CACHE/libSDL3.dylib" | grep -q " _SDL_OpenHapticFromJoystick\$" \
   || { echo "error: libSDL3.dylib has no haptic support" >&2; exit 1; }
+# Cellar's Fanatec driver is inside it (a private symbol, so not -g).
+nm "$CACHE/libSDL3.dylib" | grep -q " _CellarFanatec_Create\$" \
+  || { echo "error: libSDL3.dylib was built without Cellar's Fanatec driver" >&2; exit 1; }
 
 # And that it starts: load it the way winebus does (dlopen by path), bring up the joystick and
 # haptic subsystems, and check sdl2-compat found the SDL 3 beside it. Both slices, where the Mac can
@@ -146,6 +150,18 @@ if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
   /usr/bin/arch -x86_64 "$WORK/smoke" "$CACHE/libSDL2-2.0.0.dylib"
 else
   echo "Rosetta not available: x86_64 slice built and checked, not started"
+fi
+
+# Cellar's drivers, tested against this exact SDL on a fake wheel base that records every command:
+# the init sequence, the encoding, the strength cap and stopping on close. Both slices.
+FANATEC="$SDL3_SRC/src/haptic/darwin"
+/usr/bin/clang -arch x86_64 -arch arm64 -mmacosx-version-min=13.0 -std=c99 -Wall -Wextra -Werror \
+  -Wno-unused-parameter -DCELLAR_FFB_STANDALONE -I"$FANATEC" -I"$WORK/prefix/include" \
+  "$FANATEC/SDL_cellar_fanatec.c" Shim/sdl/tests/test_fanatec.c \
+  -L"$WORK/prefix/lib" -lSDL3 -Wl,-rpath,"$PWD/$WORK/prefix/lib" -o "$WORK/test_fanatec"
+"$WORK/test_fanatec"
+if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+  /usr/bin/arch -x86_64 "$WORK/test_fanatec"
 fi
 
 echo "$STAMP" > "$WORK/stamp"
