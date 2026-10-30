@@ -6,7 +6,7 @@ struct ProfileCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "profiles",
         abstract: "Browse the per-game profile database.",
-        subcommands: [List.self, Show.self, Draft.self, Update.self]
+        subcommands: [List.self, Show.self, Draft.self, Update.self, Version.self]
     )
 
     struct List: ParsableCommand {
@@ -105,11 +105,41 @@ struct ProfileCommand: ParsableCommand {
     }
 
     struct Update: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Update the community profile database. [Phase 2]")
+        static let configuration = CommandConfiguration(
+            abstract: "Fetch the latest game database from Cellar's releases, signature checked.",
+            discussion: """
+            New and fixed game profiles are published with every release as one signed file. This
+            fetches it, refuses it unless Cellar's key signed it, and keeps it beside your own
+            profiles, which still win. Offline, or on any failure, the database you have stays.
+            """)
+
+        @Flag(name: .long, help: "Print only failures — for the app's quiet daily check.")
+        var quiet = false
 
         func run() throws {
-            print(Term.yellow("Not yet implemented (Phase 2).")
-                + " Will sync profiles from the Cellar community registry.")
+            do {
+                let installed = try ProfileUpdates.update()
+                guard !quiet else { return }
+                print(Term.green("Game database updated: ") + "\(installed.count) profiles, published with Cellar \(installed.cellarVersion) "
+                    + Term.dim("(\(installed.published.formatted(date: .abbreviated, time: .omitted)))"))
+            } catch let failure as ProfileUpdates.Failure {
+                if quiet, failure == .noKey { return }
+                throw CellarError.ioFailure(failure.description)
+            }
+        }
+    }
+
+    struct Version: ParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Show which game database is in use.")
+
+        func run() throws {
+            if let installed = ProfileUpdates.installed {
+                print("Downloaded: \(installed.count) profiles, published with Cellar \(installed.cellarVersion), "
+                    + "fetched \(installed.fetched.formatted(date: .abbreviated, time: .shortened))")
+            } else {
+                print("The one that shipped with Cellar \(CellarVersion.current).")
+            }
+            print(Term.dim("\(ProfileStore.all().count) profiles in use, your own included. Update: cellar profiles update"))
         }
     }
 }

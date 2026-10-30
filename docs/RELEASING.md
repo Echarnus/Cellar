@@ -168,3 +168,15 @@ The generator writes two pages: `index.html` (the games grid) and `faq.html` (th
 [questions &amp; answers](https://echarnus.github.io/Cellar/faq.html) page, which the app links to
 from **Settings → Help**). The FAQ's prose lives in `FAQ_SECTIONS` in `Scripts/gen-site.py` — it
 makes factual claims about how Cellar behaves, so it changes when the behaviour does.
+
+## The game database between releases
+
+Every release should also publish the `profiles/` set as `profiles.json` + `profiles.json.sig`
+(`swift Scripts/profiles-bundle.swift <version> dist/` with `PROFILES_SIGNING_KEY` set), so
+`cellar profiles update` and the app's daily check can fetch new and fixed games without a new
+build. Cellar refuses a bundle its compiled-in key (`ProfileUpdates.publicKey`) didn't sign, and
+ignores one made for an older Cellar than itself.
+
+One-time setup: `swift Scripts/profiles-bundle.swift --generate-key`, put the private key in the
+`release` environment as `PROFILES_SIGNING_KEY`, and commit the public key into
+`ProfileUpdates.publicKey`. Until then every build says it uses the database it shipped with.

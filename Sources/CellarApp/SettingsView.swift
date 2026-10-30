@@ -25,6 +25,8 @@ struct SettingsView: View {
     }
     @State private var export: Export = .idle
     @StateObject private var runner = CellarRunner()
+    /// Read after the first layout, never from the body (skills/swift.md).
+    @State private var databaseVersion = ""
     @ObservedObject private var updater = AppUpdater.shared
     @ObservedObject private var preparation = RuntimePreparation.shared
     /// Read once per refresh, never from a view body — see `StoreAccountState`.
@@ -112,6 +114,7 @@ struct SettingsView: View {
                             .font(.caption).foregroundStyle(.secondary)
                         Button("Open Cellar folder") { NSWorkspace.shared.open(Paths.appSupport) }
                     }
+                    gameDatabase
                     diagnostics
                     Section("Uninstall") {
                         Button("Uninstall Cellar…") {
@@ -239,6 +242,35 @@ struct SettingsView: View {
     private var lastChecked: String {
         guard let date = updater.lastChecked else { return "Not checked yet" }
         return "Last checked " + date.formatted(.relative(presentation: .named))
+    }
+
+    // MARK: - Game database
+
+    /// Which set of game profiles is in use, and a way to fetch the newest — said honestly for a
+    /// build that has no key to check a download with.
+    @ViewBuilder private var gameDatabase: some View {
+        Section("Game database") {
+            LabeledContent("In use", value: databaseVersion)
+            if ProfileUpdates.publicKey.isEmpty {
+                Text("This copy of Cellar can't check a downloaded game database, so it uses the one it shipped with. Installing a newer Cellar brings newer games.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Button("Check for new games now") {
+                    runner.run(["profiles", "update"], title: "Updating the game database",
+                               then: { databaseVersion = Self.describeDatabase() })
+                }
+                .disabled(runner.busy)
+                Text("New and fixed game profiles are published with every Cellar release, signed. Cellar checks once a day and keeps the ones it has if anything doesn't check out. Profiles you add yourself always win.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .task { databaseVersion = Self.describeDatabase() }
+    }
+
+    static func describeDatabase() -> String {
+        guard let installed = ProfileUpdates.installed else { return "The one Cellar \(CellarVersion.current) shipped with" }
+        return "\(installed.count) profiles from Cellar \(installed.cellarVersion), fetched "
+            + installed.fetched.formatted(.relative(presentation: .named))
     }
 
     // MARK: - Diagnostics
