@@ -324,6 +324,6 @@ public enum BattleNetBottle {
     public static func shutdown(runner: WineRunner) {
         killClientProcesses()
         for _ in 0..<10 where isRunning { Thread.sleep(forTimeInterval: 1) }
-        runner.killServer()
+        runner.shutDown()
     }
 }

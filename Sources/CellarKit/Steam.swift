@@ -429,7 +429,7 @@ public enum SteamBottle {
             runner.runExecutable(steamExecutable(in: runner.prefix).path, args: ["-shutdown"], inheritIO: false)
             for _ in 0..<15 { if !isRunning { break }; Thread.sleep(forTimeInterval: 2) }
         }
-        runner.killServer()
+        runner.shutDown()
     }
 
     /// Kill the game's own process and its crash reporter in this bottle (not Steam itself), so a

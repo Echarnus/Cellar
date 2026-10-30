@@ -161,6 +161,9 @@ public struct GameFacts: Sendable {
 /// and to know what to wait on.
 public enum LaunchRoute {
     case direct(exeName: String)
+    /// The exe started by Cellar with the bottle's Steam client up beside it for the game's DRM —
+    /// a Steam game Cellar downloaded itself. Started like `direct`, but there is a client to close.
+    case steamAlongside(exeName: String, appID: Int)
     case steam(appID: Int)
     case battlenet(product: String)
 
@@ -168,6 +171,8 @@ public enum LaunchRoute {
     public var logDescription: String {
         switch self {
         case .direct(let exeName):    return "direct: \(exeName)"
+        case .steamAlongside(let exeName, let appID):
+            return "beside Steam: \(exeName), AppID \(appID)"
         case .steam(let appID):       return "via Steam, AppID \(appID)"
         case .battlenet(let product): return "via Battle.net, product \(product)"
         }
@@ -906,7 +911,7 @@ public enum Game {
                                                 showHUD: showHUD, gameEnv: plan.launchEnv,
                                                 game: plan.name, expectsSignIn: signsItself,
                                                 progress: progress, stage: stage)
-                return .direct(exeName: exe.lastPathComponent)
+                return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
             }
             guard SteamBottle.isInstalled(in: plan.prefix) else {
                 throw CellarError.invalidArgument(
@@ -1024,7 +1029,12 @@ public enum Game {
         switch route {
         case .direct(let exeName):
             ProcessWatch.waitToExit([exeName])
-            wine?.killServer()
+            wine?.shutDown()
+        case .steamAlongside(let exeName, _):
+            // Steam was started for the game's DRM, so it goes when the game does — asked to quit
+            // first, the same as on the client route, rather than only losing its wineserver.
+            ProcessWatch.waitToExit([exeName])
+            if let wine { SteamBottle.shutdown(runner: wine) }
         case .steam(let appID):
             SteamBottle.waitForGameExit(in: plan.prefix, appID: appID)
             if let wine { SteamBottle.shutdown(runner: wine) }
