@@ -163,16 +163,17 @@ struct GameDetailView: View {
             if game.gameInstalled || game.bottleExists {
                 Divider()
                 if game.gameInstalled {
-                    Button("Uninstall \(game.name)…") { confirmRemoval(scope: .game) }
+                    Button("Uninstall \(game.name)…", role: .destructive) { confirmRemoval(scope: .game) }
                 }
                 if game.bottleExists {
-                    Button("Remove the bottle '\(game.bottleName)'…") { confirmRemoval(scope: .bottle) }
+                    Button("Remove the bottle '\(game.bottleName)'…", role: .destructive) { confirmRemoval(scope: .bottle) }
                 }
             }
         } label: {
             Image(systemName: "ellipsis.circle").font(.title3)
         }
-        .menuStyle(.borderlessButton).fixedSize()
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .help("More actions for \(game.name)")
         .accessibilityLabel("More actions")
     }
 
