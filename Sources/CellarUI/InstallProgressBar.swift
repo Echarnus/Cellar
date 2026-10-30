@@ -62,6 +62,7 @@ public struct InstallProgressBar: View {
 private struct Track: View {
     let fraction: Double?
     let tint: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geometry in
@@ -71,9 +72,11 @@ private struct Track: View {
                 Capsule().fill(tint)
                     .frame(width: max(width * (fraction ?? 0), fraction == nil || fraction == 0 ? 0 : 6))
                     .opacity(fraction == nil ? 0 : 1)
-                TimelineView(.animation(minimumInterval: 1 / 30, paused: fraction != nil)) { context in
+                // With Reduce Motion on, the sweep holds still in the middle of the track: still
+                // visibly "working, size unknown", without a block sliding past forever.
+                TimelineView(.animation(minimumInterval: 1 / 30, paused: fraction != nil || reduceMotion)) { context in
                     let segment = width * 0.28
-                    let phase = context.date.timeIntervalSinceReferenceDate
+                    let phase = reduceMotion ? 0.5 : context.date.timeIntervalSinceReferenceDate
                         .truncatingRemainder(dividingBy: 1.4) / 1.4
                     Capsule().fill(tint)
                         .frame(width: segment)

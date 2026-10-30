@@ -298,7 +298,7 @@ struct ContentView: View {
                 .accessibilityLabel("Search games")
             if !lib.query.isEmpty {
                 Button { lib.query = "" } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .buttonStyle(.borderless).foregroundStyle(.secondary).help("Clear search")
                     .accessibilityLabel("Clear search")
                     .help("Clear search")
             }
@@ -584,6 +584,7 @@ struct SidebarRow: View {
     let game: GameSummary
     let selected: Bool
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 11) {
@@ -599,7 +600,7 @@ struct SidebarRow: View {
         .background(selected ? Color.accentColor.opacity(0.20)
                              : (hovering ? Color.primary.opacity(0.06) : Color.clear),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .onHover { hover in withAnimation(.easeOut(duration: 0.12)) { hovering = hover } }
+        .onHover { hover in withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { hovering = hover } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(game.name), \(game.store.displayName), \(game.statusText)")
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
