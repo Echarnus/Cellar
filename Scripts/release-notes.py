@@ -39,6 +39,26 @@ OTHER = "Other changes"
 SKIP = "skip-changelog"
 
 
+# The install section, the same in every release. User-facing copy (skills/ux.md).
+INSTALL = (
+    "Download **Cellar.dmg**, open it and drag Cellar into Applications. Cellar is not "
+    "notarised yet, so macOS blocks the first launch: open **System Settings → Privacy & "
+    "Security**, scroll to Cellar and click **Open Anyway** (right-click → Open no longer "
+    "bypasses this since macOS 15). Cellar then sets up its runtime, you sign in to your "
+    "store, and you pick a game to play."
+)
+REQUIREMENTS = (
+    "Requires an Apple Silicon Mac on macOS 14 or later. Today's runners are Intel builds that "
+    "run under Rosetta 2, which macOS 28 keeps only for games: `cellar doctor` says where your "
+    "Mac stands."
+)
+DOWNLOADS = (
+    "`Cellar-App-*.zip` is the same app without the installer, and `Cellar-CLI-*.zip` is the "
+    "`cellar` command. `SHA256SUMS.txt` lists every download's checksum, and each one carries "
+    "a [build provenance attestation](https://github.com/%s/attestations)."
+)
+
+
 def run(*args):
     return subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip()
 
@@ -160,26 +180,8 @@ def render(version, issues, prs, repo):
         lines += ["No tracked issues were closed in this release.", ""]
     if prs:
         lines += [prs.replace("## What's Changed", "## Pull requests"), ""]
-    lines += [
-        "## Install",
-        "",
-        "Download **Cellar.dmg**, open it and drag Cellar into Applications. Cellar is not "
-        "notarised yet, so macOS blocks the first launch: open **System Settings → Privacy & "
-        "Security**, scroll to Cellar and click **Open Anyway** (right-click → Open no longer "
-        "bypasses this since macOS 15). Cellar then sets up its runtime, you sign in to your "
-        "store, and you pick a game to play.",
-        "",
-        "Requires an Apple Silicon Mac on macOS 14 or later. Today's runners are Intel builds that "
-        "run under Rosetta 2, which macOS 28 keeps only for games: `cellar doctor` says where your "
-        "Mac stands.",
-        "",
-        "`Cellar-App-*.zip` is the same app without the installer, and `Cellar-CLI-*.zip` is the "
-        "`cellar` command. `SHA256SUMS.txt` lists every download's checksum, and each one carries "
-        "a [build provenance attestation](https://github.com/%s/attestations)." % repo,
-        "",
-        "Supported games: https://echarnus.github.io/Cellar/",
-        "",
-    ]
+    lines += ["## Install", "", INSTALL, "", REQUIREMENTS, "", DOWNLOADS % repo, "",
+              "Supported games: https://echarnus.github.io/Cellar/", ""]
     return "\n".join(lines)
 
 
