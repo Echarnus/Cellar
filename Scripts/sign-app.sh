@@ -53,7 +53,7 @@ for fw in "$APP"/Contents/Frameworks/*.framework; do
 done
 
 # 2. Loose code inside the bundle: the Dock shim and the CLI the app drives.
-for dylib in "$APP"/Contents/Resources/*.dylib; do
+for dylib in "$APP"/Contents/Resources/*.dylib "$APP"/Contents/Resources/sdl/*.dylib; do
   if [ -f "$dylib" ]; then sign "$dylib"; fi
 done
 for exe in "$APP"/Contents/MacOS/*; do

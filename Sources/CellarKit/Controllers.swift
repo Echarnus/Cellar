@@ -133,7 +133,15 @@ public enum Controllers {
 
     /// What `cellar doctor` says about the runner's controller path. Information either way: a
     /// runner can carry SDL and have been built without using it, so this is a pointer, not proof.
-    public static func sdlCheck(runnerID: String, library: URL?) -> CheckResult {
+    public static func sdlCheck(runnerID: String, library: URL?, cellarSDL: URL? = nil) -> CheckResult {
+        if cellarSDL != nil {
+            let wheels = Wheels.Vendor.allCases.compactMap { vendor in
+                CellarSDL.forceFeedbackWheels[vendor].map { "\(vendor.displayName) \($0)" }
+            }
+            return CheckResult("Controller layer", .info, "Cellar's SDL, loaded ahead of the \(runnerID) runner's",
+                hint: "Pads reach games as Xbox controllers. Wheel force feedback is driven over USB for: "
+                    + wheels.joined(separator: "; ") + ".")
+        }
         if let library {
             return CheckResult("Controller layer", .info, "SDL in the \(runnerID) runner (\(library.lastPathComponent))",
                 hint: "Wine can present PlayStation and Switch pads to games as Xbox controllers.")
@@ -149,7 +157,7 @@ public enum Controllers {
     /// tested without hardware. Pads and wheels are `.info` whatever is connected: a device macOS
     /// sees is not proof a game takes it.
     public static func doctorChecks(pads: [Pad], wheels: [Wheels.Device], inputMonitoring: InputMonitoring,
-                                    who: String, runnerLayer: CheckResult?) -> [CheckResult] {
+                                    who: String, runnerLayer: CheckResult?, cellarSDL: Bool = false) -> [CheckResult] {
         var checks: [CheckResult] = []
         checks.append(CheckResult("Controllers", .info,
             pads.isEmpty ? "none connected" : pads.map { "\($0.name) (\($0.kind.displayName))" }.joined(separator: ", "),
@@ -157,7 +165,7 @@ public enum Controllers {
         if !wheels.isEmpty {
             checks.append(CheckResult("Racing wheels", .info,
                 wheels.map { "\($0.name) (\($0.vendor.displayName) \($0.kind.displayName))" }.joined(separator: ", "),
-                hint: Wheels.forceFeedbackNote + " What to set up first: cellar controllers"))
+                hint: Wheels.forceFeedbackNote(for: wheels, cellarSDL: cellarSDL) + " What to set up first: cellar controllers"))
         }
         checks.append(inputMonitoringCheck(inputMonitoring, who: who))
         if let runnerLayer { checks.append(runnerLayer) }

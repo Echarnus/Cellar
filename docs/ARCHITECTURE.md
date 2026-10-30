@@ -417,11 +417,33 @@ check, and `cellar doctor` / `cellar controllers` / the game page show it, alway
 - **What the profile recorded** — `controller = "full" | "partial" | "none"`.
 - **Steam Input** — a Steam game started through the client gets its pad remapped by Steam first.
 
-Force feedback is the hard limit: macOS drives a wheel's motor only through a vendor
-ForceFeedback plug-in, and Fanatec, Logitech, Thrustmaster and MOZA ship none for Apple Silicon. So
-the honest baseline is steering and pedals without feel. Everything a player must do outside Cellar
-(PC mode, firmware updates that need Windows) is in `Wheels.Vendor.setup` and the FAQ's
-*Controllers and racing wheels* section, which say the same thing.
+### Force feedback: Cellar's own SDL
+
+macOS drives a wheel's motor only through a vendor ForceFeedback plug-in, and Fanatec, Logitech,
+Thrustmaster and MOZA ship none for Apple Silicon. But the motor is reachable without one: the
+wheel takes its force-feedback commands as ordinary USB HID output reports, which any process can
+send. So Cellar does not wait for the vendors.
+
+The path a game's effect takes, measured on the default runner (WineForge 0.6.0.4):
+
+1. The game creates a DirectInput effect. Wine's `dinput` turns it into HID PID reports.
+2. `winebus` built the device with a *virtual PID descriptor* because SDL said it was haptic
+   (`descriptor_add_haptic` in `bus_sdl.c`); it turns the PID reports into `SDL_HapticNewEffect` /
+   `SDL_HapticRunEffect` calls. WineForge's `winebus.so` binds to SDL 2 by name
+   (`libSDL2-2.0.0.dylib`, found on `DYLD_FALLBACK_LIBRARY_PATH`).
+3. **Cellar puts its own SDL first on that path** (`CellarSDL`, `Wine.environment`): SDL 3.4 behind
+   sdl2-compat, built by `Scripts/build-sdl.sh` from pinned, checksummed release tarballs, universal.
+   SDL 3.4's HIDAPI layer has wheel drivers that write the vendor's reports itself.
+
+What that covers is exactly `CellarSDL.forceFeedbackWheels` — today SDL 3.4's Logitech driver (G29,
+G27, G25, Driving Force GT/Pro). Other wheels get drivers as patches in `Shim/sdl/` (Fanatec first,
+porting the protocol of the Linux `hid-fanatecff` driver), each capping its output and stopping
+every effect when the device closes. Until a wheel is on that list the app, the CLI and the FAQ say
+"no force feedback yet" for it; a unit test keeps the FAQ and the list in step.
+`CELLAR_RUNNER_SDL=1` goes back to the runner's SDL, for comparing or when ours misbehaves.
+
+Everything a player must do outside Cellar (PC mode, firmware updates that need Windows) is in
+`Wheels.Vendor.setup` and the FAQ's *Controllers and racing wheels* section, which say the same thing.
 
 ## The rolling log
 

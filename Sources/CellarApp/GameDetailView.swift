@@ -377,7 +377,7 @@ struct GameDetailView: View {
                 if !wheels.isEmpty {
                     Label("Connected: " + wheels.map(\.name).joined(separator: ", "), systemImage: "steeringwheel")
                         .font(.callout)
-                    Text(Wheels.forceFeedbackNote)
+                    Text(Wheels.forceFeedbackNote(for: wheels, cellarSDL: CellarSDL.libraryDirectory != nil))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

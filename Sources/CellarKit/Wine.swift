@@ -86,7 +86,9 @@ public struct WineRunner {
             }
             if let dxmt = install.dxmtRuntime { env["DXMT_RUNTIME_DIR"] = dxmt.path }
             dyld += ["/usr/lib", "/usr/libexec", "/usr/lib/system"]
-            env["DYLD_FALLBACK_LIBRARY_PATH"] = dyld.joined(separator: ":")
+            // Cellar's SDL first: winebus loads libSDL2 by name, and this one drives wheel force feedback.
+            env["DYLD_FALLBACK_LIBRARY_PATH"] = CellarSDL.libraryPath(dyld, sdl: CellarSDL.libraryDirectory)
+                .joined(separator: ":")
 
             switch backend {
             case .d3dmetal:
@@ -137,7 +139,8 @@ public struct WineRunner {
                 }
             }
             dyld += ["/opt/wine/lib", "/usr/lib", "/usr/libexec", "/usr/lib/system"]
-            env["DYLD_FALLBACK_LIBRARY_PATH"] = dyld.joined(separator: ":")
+            env["DYLD_FALLBACK_LIBRARY_PATH"] = CellarSDL.libraryPath(dyld, sdl: CellarSDL.libraryDirectory)
+                .joined(separator: ":")
 
             // MoltenVK defaults the wrapper ships with.
             env["MVK_CONFIG_RESUME_LOST_DEVICE"] = "1"
