@@ -1,52 +1,137 @@
 # Branching & releasing
 
-Cellar uses **trunk-based development** with tagged releases. Small project, one maintainer, fast
-iteration — GitFlow's long-lived branches would be overhead with no payoff.
+Cellar uses **trunk-based development**: short-lived branches, one pull request per issue, merged into
+`main` as soon as the checks are green, and releases cut as tags on `main`. No `develop` branch, no
+release branches.
 
-## Branches
+## Issues
 
-- **`main`** is always releasable. CI (`.github/workflows/ci.yml`) builds, tests and self-tests every
-  push and PR on a macOS runner, so `main` stays green.
-- **Commit straight to `main`.** With one maintainer, a PR per change is review nobody performs plus
-  a branch to clean up afterwards. What keeps `main` releasable is the verification ladder in
-  [`AGENTS.md`](../AGENTS.md) — run it, then push. Agents included: they do not need to ask.
-- **Branch when it buys something**: work spanning several sessions, a change worth reading as a diff
-  first, or one you want CI to vet before it lands. Then PR → merge. That is the exception now, not
-  the default.
-- No `develop` branch. No release branches — a release is just a tag on `main`.
-- **Never force-push or rewrite published history.**
+Every piece of work starts as an issue, because the issues are what a release's notes are made of.
+
+- **Title it for a player.** "Frontier Workshop can't be reached from inside Planet Coaster" reads
+  well in release notes; "fix winhttp override" does not.
+- **Label it.** The label decides the section it appears under in the release notes. The set lives
+  in [`.github/labels.yml`](../.github/labels.yml) and is applied by the Labels workflow.
+
+  | Label | Release-notes section |
+  |---|---|
+  | `breaking-change` | Breaking changes |
+  | `security` | Security |
+  | `bug` | Fixes |
+  | `enhancement` | New and improved |
+  | `performance` | Performance |
+  | `ux` | Look and feel |
+  | `compatibility` | Compatibility |
+  | `networking` | Online play |
+  | `game-profile` | Games |
+  | `legal` | Licences and credits |
+  | `documentation` | Documentation |
+  | `ci` | Delivery |
+  | `dependencies` | Dependencies |
+  | `skip-changelog` | left out |
+
+  An issue with several labels lands in the first matching section in that order.
+- **Close it as "not planned" or "duplicate"** when it won't be done. Only issues closed as
+  completed appear in the notes.
+
+## Pull requests
+
+1. Branch from `main` (`fix/dock-name`, `feat/updater`, anything readable).
+2. Climb the verification ladder in [`AGENTS.md`](../AGENTS.md). CI is a floor, not a substitute: it
+   cannot launch the app or a game.
+3. Open a PR from the template. Its body says **`Closes #N`**, which is what links it to the
+   issue and closes the issue when it merges.
+4. **Turn on auto-merge (squash).** The PR merges by itself once every required check is green.
+
+### Why auto-merge and not auto-approve
+
+GitHub never lets the author of a pull request approve it, and Claude opens PRs as the maintainer.
+An approving review from a second bot account would be a rubber stamp: it would look like review
+without being one, and it is one more credential that can write to `main`. So the ruleset requires
+**zero** approvals and makes the checks the gate instead: build, tests, self-test, lint, CodeQL and
+dependency review must all pass on an up-to-date branch, and every review conversation must be
+resolved. What this gives up is a second human pair of eyes; with one maintainer that was never
+there. If a contributor joins, raise `required_approving_review_count` to 1 and turn on
+`require_code_owner_review` — CODEOWNERS is already in place.
+
+Dependabot's patch and minor updates auto-merge the same way (`dependabot-auto-merge.yml`); a major
+update waits for a person.
+
+## Checks
+
+| Workflow | Runs on | Does |
+|---|---|---|
+| `ci.yml` | every PR, `main`, merge queue | Release build, test suite, Dock shim, `cellar selftest`, site generation; actionlint, ShellCheck, Python compile. |
+| `codeql.yml` | every PR, `main`, weekly | CodeQL security-and-quality queries for Swift, Python and the workflows. |
+| `dependency-review.yml` | every PR | Blocks a new dependency with a known vulnerability or a licence that can't ship under GPL-3.0. |
+| `scorecard.yml` | `main`, weekly | OpenSSF Scorecard for the repository's supply-chain practices. |
+| `labels.yml` | `main` when the labels change | Applies `.github/labels.yml`. |
+| `pages.yml` | `main` when profiles change | Publishes the supported-games site. |
+| `release.yml` | a `v*` tag | Builds, writes the notes, publishes the release. |
+
+Every workflow declares least-privilege `permissions:`, pins every action to a commit SHA (Dependabot
+keeps them current) and passes `${{ }}` values through `env:`, never into a `run:` line. See
+[`skills/ci.md`](../skills/ci.md).
 
 ## Versioning
 
 [Semantic Versioning](https://semver.org): `vMAJOR.MINOR.PATCH`.
 
-- **PATCH** — fixes, profile tweaks, a new game profile.
-- **MINOR** — new user-facing capability (a command, the GUI, a runner, the depot path).
-- **MAJOR** — a breaking change to the CLI, profile schema, or on-disk layout.
+- **PATCH**: fixes, profile tweaks, a new game profile.
+- **MINOR**: new user-facing capability (a command, the GUI, a runner, the depot path).
+- **MAJOR**: a breaking change to the CLI, profile schema, or on-disk layout.
 
 Pre-1.0 (where we are): treat MINOR as "notable" and PATCH as "small"; breaking changes are allowed
-in MINOR and called out in the release notes.
+in MINOR and called out in the release notes (label the issue `breaking-change`).
+
+A suffix makes a pre-release: `v0.5.0-beta.1` is published as one, and the in-app updater and
+`releases/latest` ignore it.
 
 ## Cutting a release
 
 ```sh
 git switch main && git pull
-git tag v0.1.0            # annotate if you like: git tag -a v0.1.0 -m "…"
-git push origin v0.1.0
+git tag -a v0.4.0 -m "Cellar 0.4.0"
+git push origin v0.4.0
 ```
 
-The tag triggers `.github/workflows/release.yml`, which on a macOS runner:
+The tag runs [`release.yml`](../.github/workflows/release.yml):
 
-1. builds `cellar` + `CellarApp` in release,
-2. runs `Scripts/package.sh <version>` to assemble `Cellar.app` (with icon) and the CLI,
-3. publishes a **GitHub Release** with `Cellar-App-<v>.zip` and `Cellar-CLI-<v>.zip` plus
-   auto-generated notes.
+1. **Build** (macOS, read-only token): runs the test suite, `Scripts/package.sh` and
+   `Scripts/make-dmg.sh`, and writes `SHA256SUMS.txt`.
+2. **Publish** (the `release` environment, the only job with write access):
+   - writes the notes with `Scripts/release-notes.py`: every issue closed by a PR merged since the
+     previous tag, plus any issue closed as completed in that window, grouped by label, then
+     GitHub's list of merged PRs and the install instructions;
+   - signs the app zip and writes `appcast.xml` for the in-app updater, once
+     `Scripts/make-appcast.sh` and the `SPARKLE_ED_PRIVATE_KEY` secret exist;
+   - attests build provenance for every download;
+   - publishes the GitHub Release with the DMG, both zips, the checksums and the feed.
 
-`workflow_dispatch` builds the same artifacts on demand (uploaded as workflow artifacts, no Release).
+To preview the notes before tagging: `GH_TOKEN=… python3 Scripts/release-notes.py --repo
+Echarnus/Cellar --tag HEAD --out /tmp/notes.md`. `workflow_dispatch` builds the downloads for any
+version without publishing anything.
 
-Artifacts are **unsigned / unnotarised** — the release notes tell users to clear the quarantine flag
-(`xattr -dr com.apple.quarantine Cellar.app`) or right-click → Open. Signing/notarisation is a later
-step once there's a Developer ID.
+Artifacts are **unsigned and unnotarised**: the notes tell players to right-click → Open the first
+time. Signing and notarisation come once there's a Developer ID; the certificate then goes into the
+`release` environment's secrets, never into repository secrets a PR could reach.
+
+## One-time repository setup
+
+These are settings, not files, so the maintainer applies them once:
+
+1. **Settings → General → Pull Requests**: allow squash merging only, tick *Allow auto-merge* and
+   *Automatically delete head branches*.
+2. **Settings → Rules → Rulesets → New ruleset → Import**: import
+   [`.github/rulesets/main.json`](../.github/rulesets/main.json) (protects `main`) and
+   [`.github/rulesets/tags.json`](../.github/rulesets/tags.json) (release tags can't be moved or
+   deleted).
+3. **Settings → Environments → release**: add a deployment rule allowing only tags matching `v*`,
+   and put `SPARKLE_ED_PRIVATE_KEY` there.
+4. **Settings → Code security**: turn on Dependabot alerts and security updates, secret scanning
+   and push protection, and private vulnerability reporting.
+5. **Settings → Actions → General**: workflow permissions *Read repository contents*, and untick
+   *Allow GitHub Actions to create and approve pull requests*.
 
 ## Supported-games site
 

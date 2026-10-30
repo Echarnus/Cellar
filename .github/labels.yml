@@ -1,0 +1,18 @@
+# The repository's labels, kept as code. `.github/workflows/labels.yml` applies this file on every
+# push to main that changes it. Release notes group closed issues by these labels, in the order
+# given in Scripts/release-notes.py.
+- {name: breaking-change, color: b60205, description: "Changes the CLI, the profile schema or the on-disk layout"}
+- {name: security, color: d93f0b, description: "A vulnerability or a hardening change"}
+- {name: bug, color: d73a4a, description: "Something does not work as it should"}
+- {name: enhancement, color: a2eeef, description: "New capability or a better version of one"}
+- {name: performance, color: fbca04, description: "Frame rate, load time, memory"}
+- {name: ux, color: c5def5, description: "Anything a player sees: the app, CLI wording, errors"}
+- {name: compatibility, color: 0e8a16, description: "macOS versions, hardware, runners"}
+- {name: networking, color: 5319e7, description: "Online services, stores, in-game connectivity"}
+- {name: game-profile, color: 1d76db, description: "Adds or changes a profiles/*.toml"}
+- {name: legal, color: 000000, description: "Licences, attribution, trademarks"}
+- {name: documentation, color: 0075ca, description: "Docs, guides and project write-ups"}
+- {name: ci, color: ededed, description: "Workflows, releases, repository tooling"}
+- {name: dependencies, color: 0366d6, description: "A dependency update"}
+- {name: skip-changelog, color: ffffff, description: "Leave out of the release notes"}
+- {name: needs-triage, color: fef2c0, description: "Not yet looked at"}

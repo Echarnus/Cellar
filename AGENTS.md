@@ -34,9 +34,9 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
 | `Shim/` | `cellar-dock-shim.c` — the one piece of C in the repo. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts. Built by `Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
-| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `test.sh` (the test runner). |
+| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `release-notes.py` (a release's notes, from the issues it closed), `test.sh` (the test runner). |
 | `docs/` | `ARCHITECTURE.md`, `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
-| `.github/workflows/` | `ci.yml`, `release.yml`, `pages.yml`. |
+| `.github/` | Workflows (`ci`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
 
 ## Build, run, verify
@@ -217,20 +217,23 @@ the schema and its parser traps, and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Git & releases
 
-- **Trunk-based, and literally so: commit and push straight to `main`.** One person works on this
-  repo, so a PR per change buys review that nobody performs and costs a branch, a merge and a stale
-  copy of the work. **Push to `main` when the change is verified** — an agent does not need to ask.
-  Releases are SemVer tags (`vMAJOR.MINOR.PATCH`) on `main`. Full strategy:
-  [`docs/RELEASING.md`](docs/RELEASING.md).
-- **What makes it safe is the ladder, not the ceremony.** `main` must stay releasable, so the price
-  of pushing to it directly is that the verification ladder above is not optional. Climb it, then
-  push.
-- **Branches and PRs are still fine when they earn their keep** — work that will span sessions, a
-  change worth reading as a diff before it lands, or anything you want CI to check first. Use one
-  deliberately, not by default.
+Cellar is delivered through GitHub, end to end. Full strategy: [`docs/RELEASING.md`](docs/RELEASING.md).
+
+- **Every task has an issue.** Search before opening one, label it (`.github/labels.yml` is the set),
+  and keep it to one outcome. The issue is what the release notes are built from, so its title is
+  written for a player: "Dock says Wine while a game is playing", not "fix CFBundleName".
+- **Every change is a pull request that closes its issue.** Branch from `main`, push, open a PR whose
+  body says `Closes #N`, and turn on auto-merge (squash). It merges by itself once the required
+  checks are green: CI, lint, CodeQL and dependency review. Nobody pushes to `main` directly; the
+  ruleset in `.github/rulesets/main.json` enforces it.
+- **The checks are a floor, not the ladder.** CI cannot launch the app or a game. Climb the
+  verification ladder above before enabling auto-merge, and say in the PR which rung you reached.
+- **Releases are SemVer tags (`vMAJOR.MINOR.PATCH`) we push ourselves.** The tag runs
+  `release.yml`, which builds the downloads, writes the notes from the issues the release closed
+  (`Scripts/release-notes.py`) and publishes the GitHub Release.
 - **Commit messages:** state what was done, one subject line; a body only when the *why* isn't
   obvious. **No attribution trailers** (no `Co-Authored-By`, no "Generated with").
-- **Still never force-push or rewrite published history**, and never delete a branch someone else's
+- **Never force-push or rewrite published history**, and never delete a branch someone else's
   session is working in.
 
 ## Hard project rules (never violate)
