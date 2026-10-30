@@ -46,6 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Diagnostics.processDidStart(version: Bundle.main.shortVersion)
         NSApp.mainMenu = buildMainMenu()
 
+        // Started from inside the disk image: offer to move into Applications first. When the
+        // player accepts, the moved copy opens and this one quits — so nothing else is set up here.
+        if MoveToApplications.offerIfNeeded() { return }
+
         // The gear button in the SwiftUI sidebar asks for Settings via this notification (the menu
         // item calls showSettings directly). Settings is a separate NSWindow, not a SwiftUI .sheet:
         // a sheet presented inside the hosted view triggers a fatal AttributeGraph cycle under
@@ -108,7 +112,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else if !HomeFolderAccess.hasAsked {
             showWelcome()
         }
+
+        // The parts every game shares start downloading now, behind the tour, so the first
+        // Install press is a game download and nothing else. A no-op once they are here.
+        if !useDiagnostic {
+            DispatchQueue.main.async { RuntimePreparation.shared.startIfNeeded() }
+        }
     }
+
+    @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin() }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
@@ -163,6 +175,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
+        // Next to Quit, where a Mac app that removes itself puts it; it asks before doing anything.
+        appMenu.addItem(withTitle: "Uninstall \(appName)…", action: #selector(uninstallCellar), keyEquivalent: "")
+            .target = self
         appMenu.addItem(withTitle: "Quit \(appName)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         // File menu — Close belongs here, not in Window, on every Mac.

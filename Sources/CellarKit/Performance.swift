@@ -168,24 +168,33 @@ public enum BottleConfig {
     /// Writes `key = "value"` in place of an existing line, or under `[performance]` (created at the
     /// end of the file if missing). Every other line, comment included, is left as it was.
     public static func set(_ setting: PerformanceSetting, to value: String, in url: URL) throws {
-        let normalised = try setting.normalise(value)
-        let line = "\(setting.key) = \"\(normalised)\""
+        try set(key: setting.key, to: try setting.normalise(value), section: "performance", in: url)
+    }
+
+    public static func unset(_ setting: PerformanceSetting, in url: URL) throws {
+        try unset(key: setting.key, in: url)
+    }
+
+    /// Writes `key = "value"` in place of an existing line, or under `[section]` (created at the end
+    /// of the file if missing). Every other line, comment included, is left as it was.
+    static func set(key: String, to value: String, section: String, in url: URL) throws {
+        let line = "\(key) = \"\(value)\""
         var lines = readLines(url)
-        if let index = settingLines(lines).first(where: { $0.key == setting.key })?.index {
+        if let index = settingLines(lines).first(where: { $0.key == key })?.index {
             lines[index] = line
-        } else if let header = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "[performance]" }) {
+        } else if let header = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "[\(section)]" }) {
             lines.insert(line, at: header + 1)
         } else {
             while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true { lines.removeLast() }
-            lines += lines.isEmpty ? ["[performance]", line] : ["", "[performance]", line]
+            lines += lines.isEmpty ? ["[\(section)]", line] : ["", "[\(section)]", line]
         }
         try write(lines, to: url)
     }
 
-    public static func unset(_ setting: PerformanceSetting, in url: URL) throws {
+    static func unset(key: String, in url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         let lines = readLines(url)
-        let drop = Set(settingLines(lines).filter { $0.key == setting.key }.map(\.index))
+        let drop = Set(settingLines(lines).filter { $0.key == key }.map(\.index))
         let kept = lines.indices.filter { !drop.contains($0) }.map { lines[$0] }
         guard kept.count != lines.count else { return }
         try write(kept, to: url)

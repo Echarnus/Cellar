@@ -16,6 +16,9 @@ public struct WineRunner {
     /// The profile asked for MetalFX (`metalfx_upscaling = true`). Honoured only where the runtime
     /// can deliver it — see `environment()`.
     public let metalFX: Bool
+    /// The language Wine — and so the store client and the game — runs in. Nil leaves the locale
+    /// to the caller's environment, which is only right for a call that shows nothing (`--version`).
+    public let language: GameLanguage?
 
     public init(binary: URL, prefix: URL) {
         self.binary = binary
@@ -23,14 +26,17 @@ public struct WineRunner {
         self.install = nil
         self.backend = .d3dmetal
         self.metalFX = false
+        self.language = nil
     }
 
-    public init(install: RunnerInstall, prefix: URL, backend: GraphicsBackend = .d3dmetal, metalFX: Bool = false) {
+    public init(install: RunnerInstall, prefix: URL, backend: GraphicsBackend = .d3dmetal, metalFX: Bool = false,
+                language: GameLanguage? = nil) {
         self.binary = install.wineBinary
         self.prefix = prefix
         self.install = install
         self.backend = backend
         self.metalFX = metalFX
+        self.language = language
     }
 
     /// Whether this launch will actually present the NVIDIA identity and so get MetalFX: asked
@@ -62,6 +68,11 @@ public struct WineRunner {
             "HOME": home,
         ] { env[k] = v }
         for variable in (install?.fastSync ?? .unknown).variables { env[variable] = "1" }
+        if let language {
+            // The inherited locale is whatever shell started Cellar — see `GameLanguage`.
+            env.removeValue(forKey: "LANGUAGE")
+            for (k, v) in language.environment { env[k] = v }
+        }
 
         if let install, install.isWineForgeStyle {
             // WineForge: backend selected by GRAPHICS_BACKEND + *_RUNTIME_DIR, DLLs forced native.
@@ -219,14 +230,19 @@ public struct WineRunner {
     /// Cellar access to them — empty on the normal path. `wineboot` points the Windows user's
     /// Documents/Desktop/Downloads at the real ones, so a folder the player declined would leave a
     /// game writing saves into a symlink it cannot follow (see `HomeFolderAccess`).
+    ///
+    /// `checkingHomeFolders: false` skips that check, which reads the folders and so can make macOS
+    /// ask for them — right for a bottle no game will run in (`Preparation`'s scaffold), which must
+    /// not put a permission dialog in front of a player who is still reading the welcome tour.
     @discardableResult
-    public func initializePrefix() throws -> [HomeFolder] {
+    public func initializePrefix(checkingHomeFolders: Bool = true) throws -> [HomeFolder] {
         try FileManager.default.createDirectory(at: prefix, withIntermediateDirectories: true)
         let result = run(["wineboot", "--init"], extraEnv: ["WINEDLLOVERRIDES": Self.headlessBootOverrides])
         guard result.succeeded else {
             throw CellarError.ioFailure("wineboot --init failed: \(result.stderr)")
         }
         waitForServer()
+        guard checkingHomeFolders else { return [] }
         return HomeFolderAccess.redirectDeniedUserShellFolders(in: prefix)
     }
 

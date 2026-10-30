@@ -46,6 +46,13 @@ micro-optimisation until you remove it:
    `D3DM*`, `MTL_*`, `DXMT_*`, `GST_*` or `GRAPHICS_BACKEND` is another runner's settings leaking in.
    `environment()` deletes them before setting Cellar's own. If you add a new variable family, add it
    to that strip list too.
+   The locale is the one inherited value Cellar always overrides: a runner built from a plan carries
+   a `GameLanguage`, and `environment()` pins `LANG`/`LC_ALL` to it. Left inherited, a Terminal on a
+   Belgian Mac (`nl_BE.UTF-8`) put Steam and every game in Dutch on an English Mac. The language is
+   the game's choice (`bottle.toml`), else every game's (`settings.toml`), else the Mac's first
+   preferred language — never `Locale.current`, which is the region. Steam is told separately
+   (`-language`, `HKCU\Software\Valve\Steam\Language`, the appmanifest's `UserConfig`), because
+   a game with no appmanifest takes Steam's language, not Wine's. `cellar language` shows and sets it.
 4. **Merge `WINEDLLOVERRIDES`, never assign over it.** The backend sets its own overrides, the Steam
    overlay disable (`gameoverlayrenderer64=d`) is appended, and a profile's `[env]` override is
    merged with `;`. A plain assignment silently drops the backend's DLL selection and the game

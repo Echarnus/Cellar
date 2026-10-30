@@ -147,7 +147,8 @@ public enum BattleNetBottle {
         progress("Starting the Battle.net installer — a window will open. Click through it, then leave the app open.")
         progress("(Blizzard ships no silent installer, so this step needs you. Cellar waits here.)")
         runner.runExecutable(setup.path,
-                             args: ["--lang=enUS", "--installpath=\(windowsInstallPath)"],
+                             args: ["--lang=\(runner.language?.blizzardLocale ?? "enUS")",
+                                    "--installpath=\(windowsInstallPath)"],
                              inheritIO: true)
 
         // The installer hands off to the bootstrapper, which downloads the real client. Wait for

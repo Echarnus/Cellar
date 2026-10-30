@@ -12,6 +12,8 @@ struct GameDetailView: View {
     /// True while a removal is being measured. Walking a 36 GB Steam library takes a few seconds,
     /// and a menu item that appears to do nothing for that long reads as broken.
     @State private var measuringRemoval = false
+    /// The game's language submenu, read when the page appears rather than from the body.
+    @State private var language = GameLanguageMenu.Selection()
 
     var body: some View {
         ScrollView {
@@ -32,6 +34,7 @@ struct GameDetailView: View {
             }
         }
         .background(.background)
+        .task(id: game.slug) { language = .load(game) }
     }
 
     // MARK: - Hero
@@ -156,6 +159,10 @@ struct GameDetailView: View {
             // The game's own app — its name, its icon — whatever store it came from. A wrapper for
             // the store client is not offered on a game's page: there it read as the game's app.
             Button("Add \(game.name) to Applications") { act(["app", game.slug], "Adding to Applications") }
+            // The game's own language needs its bottle to live in; before set-up there is none.
+            if game.bottleExists {
+                GameLanguageMenu(game: game, state: $language)
+            }
             Divider()
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
             // Removal is last and on its own, where destructive actions belong. Each entry states

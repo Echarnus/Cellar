@@ -145,6 +145,7 @@ final class Library: ObservableObject {
 struct ContentView: View {
     @StateObject private var lib = Library()
     @StateObject private var runner = CellarRunner()
+    @ObservedObject private var preparation = RuntimePreparation.shared
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -423,7 +424,12 @@ struct ContentView: View {
 
     private var footer: some View {
         HStack {
-            Text(footerText).font(.caption).foregroundStyle(.secondary)
+            // While the shared parts download, that is the news; the game count can wait.
+            if preparation.isWorking {
+                PreparationStatus(preparation: preparation)
+            } else {
+                Text(footerText).font(.caption).foregroundStyle(.secondary)
+            }
             Spacer()
             if !runner.binaryExists {
                 Label("CLI missing", systemImage: "exclamationmark.triangle")
