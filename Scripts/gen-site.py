@@ -1006,6 +1006,63 @@ FAQ_SECTIONS = [
          "<code>cellar perf measure &lt;game&gt;</code>.</p>"),
     ]),
 
+    ("Controllers and racing wheels", "controllers",
+     "What reaches the game today, and the set-up that happens outside Cellar.", [
+        ("Can I play with a controller?",
+         "<p>Usually, yes. Xbox, PlayStation (DualSense, DualShock&nbsp;4) and Switch Pro "
+         "controllers connect to your Mac the normal way — pair them in <b>System Settings → "
+         "Bluetooth</b>, or plug them in over USB. There is nothing to install.</p>"
+         "<p>Wine then hands the pad to the game, as an Xbox controller where it can. Whether a "
+         "given game plays well with one is up to the game: its page shows what the pad is called "
+         "and what its profile records about controllers, and says so when nobody has recorded it "
+         "yet. <code>cellar controllers</code> lists what your Mac can see right now.</p>"),
+        ("macOS asks whether Cellar may “receive keystrokes from any application”.",
+         "<p>Allow it. That is how macOS names <b>Input Monitoring</b>, and Wine needs it to read "
+         "a controller or wheel at all: without it a pad your Mac sees never reaches the game.</p>"
+         "<p>If you said no, open <b>System Settings → Privacy &amp; Security → Input "
+         "Monitoring</b>, turn Cellar on (or your terminal, if you start games with the "
+         "<code>cellar</code> command), then quit and reopen the game. <code>cellar doctor</code> "
+         "shows where the setting stands.</p>"),
+        ("My controller's buttons are wrong, or the game doesn't see it.",
+         "<ul>"
+         "<li><b>A Steam game started through Steam</b> gets the pad through <i>Steam Input</i>, "
+         "which can remap it. Change that in Steam's controller settings for the game: on, to make "
+         "a PlayStation or Switch pad act as an Xbox one; off, to give the game the pad as it is.</li>"
+         "<li><b>Check Input Monitoring</b>, as above.</li>"
+         "<li><b>Run <code>cellar doctor</code></b>. Its <i>Controller layer</i> line says whether "
+         "the Wine runner can present PlayStation and Switch pads as Xbox ones; without that, an "
+         "Xbox pad is the safest choice.</li>"
+         "</ul>"),
+        ("Can I use a racing wheel, like a Fanatec, Logitech or Thrustmaster?",
+         "<p>Cellar recognises wheel bases, pedals and shifters from Fanatec, Logitech, Thrustmaster "
+         "and MOZA, lists them on the game's page and in <code>cellar controllers</code>, and Wine "
+         "passes them to the game as a Windows game controller. Steering, pedals and buttons can "
+         "reach a racing game that way.</p>"
+         "<p><b>Expect no force feedback.</b> macOS only drives a wheel's motor through a driver "
+         "from the wheel's maker, and none of them ships one for Apple Silicon Macs — so the wheel "
+         "steers, but you will not feel the road. Wheel support is new, and results per wheel and "
+         "per game are still being collected; what has been tested is recorded in the game's "
+         "profile.</p>"),
+        ("What do I have to set up on the wheel itself?",
+         "<p>Most of it happens outside Cellar, once, and some of it needs a Windows PC because the "
+         "makers only publish their tools for Windows:</p>"
+         "<ul>"
+         "<li><b>Fanatec</b> — put the base in <b>PC mode</b>, not Compatibility (PlayStation/Xbox) "
+         "mode; its manual shows how. Update the firmware first on a Windows PC with Fanatec's own "
+         "software: Fanatec offers no Mac app, and a base on old firmware may not show up.</li>"
+         "<li><b>Logitech</b> — macOS recognises the G29 and G920 by itself, with nothing to "
+         "install. Firmware updates go through Logitech G&nbsp;HUB; if it doesn't list your wheel "
+         "on the Mac, update it once on a Windows PC.</li>"
+         "<li><b>Thrustmaster</b> — set the base to its PC mode and connect it over USB. "
+         "Thrustmaster's drivers and firmware are Windows-only, and without the driver some bases "
+         "report the pedals as buttons, which most racing games cannot use.</li>"
+         "<li><b>MOZA</b> — update the firmware and set the steering angle in MOZA Pit House on a "
+         "Windows PC first; the base keeps those settings.</li>"
+         "</ul>"
+         "<p>Then plug the wheel into the Mac, allow Input Monitoring when macOS asks, and pick "
+         "the wheel in the game's own controls menu.</p>"),
+    ]),
+
     ("When something goes wrong", "trouble", "The usual causes, in the order worth checking.", [
         ("The first set-up is taking ages. Is it stuck?",
          "<p>Probably not. The first game downloads a Wine runner and builds a fresh bottle, which "

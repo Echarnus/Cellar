@@ -396,6 +396,33 @@ So Cellar owns the timing instead (`Sources/CellarKit/HomeFolders.swift`):
 
 There is no API for reading the privacy database, so *asking is the only way to find out*: reading
 the directory **is** the request. That is the whole reason the timing is Cellar's to choose.
+## Controllers and racing wheels
+
+A pad or wheel takes a different road into a Windows game than into a Mac one. Wine's `winebus`
+reads the device through macOS's HID layer (IOHID), or through SDL when the runner's Wine was built
+with it and can load it, and presents it to the game as XInput (Xbox-style pads) or DirectInput
+(everything else, wheels included). macOS's GameController framework is not on that road, so a pad
+the Mac sees is evidence, not proof. `Controllers` and `Wheels` (CellarKit) say what Cellar *can*
+check, and `cellar doctor` / `cellar controllers` / the game page show it, always as information:
+
+- **What is connected** — pads through GameController (family: Xbox, DualSense, DualShock, Switch
+  Pro), wheel bases, pedals and shifters through HID, sorted by vendor ID (Fanatec, Logitech,
+  Thrustmaster, MOZA). Logitech and Thrustmaster also make pads and flight sticks, so for them the
+  product name has to say "wheel" or name a wheel model.
+- **Input Monitoring** — `IOHIDManagerOpen` asks for every matching device, keyboards included,
+  and macOS refuses the lot until Input Monitoring is granted (Wine bug 50153). Cellar peeks at the
+  answer with `IOHIDCheckAccess` and never asks itself; Wine's first open is what puts the dialog up.
+- **The runner's SDL** — whether the runner carries an SDL dylib on the library path Cellar gives
+  Wine. A pointer, not proof: a Wine built without SDL support never tries to load it.
+- **What the profile recorded** — `controller = "full" | "partial" | "none"`.
+- **Steam Input** — a Steam game started through the client gets its pad remapped by Steam first.
+
+Force feedback is the hard limit: macOS drives a wheel's motor only through a vendor
+ForceFeedback plug-in, and Fanatec, Logitech, Thrustmaster and MOZA ship none for Apple Silicon. So
+the honest baseline is steering and pedals without feel. Everything a player must do outside Cellar
+(PC mode, firmware updates that need Windows) is in `Wheels.Vendor.setup` and the FAQ's
+*Controllers and racing wheels* section, which say the same thing.
+
 ## The rolling log
 
 Cellar drives Wine, a store client and a Windows game, and none of them report back. When a player

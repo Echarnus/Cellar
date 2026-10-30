@@ -280,6 +280,15 @@ public enum SystemEnvironment {
             checks.append(.init("Low Power Mode", .ok, "off"))
         }
 
+        // Controllers and wheels: information only — a device macOS sees still has to make it
+        // through Wine to the game. Input Monitoring is reported for *this* process, like folders.
+        let sdl = RunnerManager.find(id: defaultID).map {
+            Controllers.sdlCheck(runnerID: defaultID, library: Controllers.sdlLibrary(in: Controllers.libraryDirectories(of: $0)))
+        }
+        checks.append(contentsOf: Controllers.doctorChecks(
+            pads: Controllers.connected(settle: 0.5), wheels: Wheels.connected(),
+            inputMonitoring: Controllers.inputMonitoring(), who: who, runnerLayer: sdl))
+
         return checks
     }
 }

@@ -58,6 +58,7 @@ struct Cellar: ParsableCommand {
             LanguageCommand.self,
             StorageCommand.self,
             NetworkCommand.self,
+            ControllersCommand.self,
             ReportCommand.self,
             BackendCommand.self,
             SavesCommand.self,
