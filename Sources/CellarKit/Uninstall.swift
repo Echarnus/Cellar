@@ -302,6 +302,8 @@ public enum Uninstall {
             items.append(item("Launcher app", app))
         }
         items.append(item("Extracted icon", Paths.cache.appendingPathComponent("icons/\(game.slug).icns")))
+        let gameApp = GameApp.bundleURL(slug: game.slug)
+        if FileManager.default.fileExists(atPath: gameApp.path) { items.append(item("Game app", gameApp)) }
 
         // Only the shortcut Cellar wrote — identified by the launcher it points at, not by its name.
         // A player who added the same game to Steam by hand keeps their own entry.

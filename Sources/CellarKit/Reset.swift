@@ -77,6 +77,8 @@ public enum Reset {
             "re-read from the stores when you next refresh; Battle.net added again in Accounts")
         add(SteamAccount.recordFile, "Cellar's record of your Steam account", "one QR scan")
         add(Paths.cache, "Downloaded installers and other scratch files", "re-downloaded when needed")
+        add(Paths.gameApps, "The app each game runs as, so macOS treats it as a game",
+            "remade the next time you press Play")
         add(Paths.logs, "Logs", "nothing to restore")
         add(Paths.userProfiles, "Game profiles you added yourself",
             "re-added by hand — Cellar's own profiles ship with the app and come back on their own")

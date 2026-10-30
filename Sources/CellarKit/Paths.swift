@@ -25,6 +25,9 @@ public enum Paths {
     /// Per-game bottles (isolated WINEPREFIX + bottle.toml).
     public static var prefixes: URL { appSupport.appendingPathComponent("prefixes", isDirectory: true) }
 
+    /// The per-game `.app` bundles a game's Wine process runs from, so macOS sees a game (`GameApp`).
+    public static var gameApps: URL { appSupport.appendingPathComponent("apps", isDirectory: true) }
+
     /// Downloads and extracted artifacts.
     public static var cache: URL { appSupport.appendingPathComponent("cache", isDirectory: true) }
 
