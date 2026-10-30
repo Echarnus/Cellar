@@ -18,6 +18,9 @@ BIN=".build/release/CellarApp"
 # The Dock shim, which keeps a bottle's Steam/Battle.net out of the Dock while a game starts.
 SHIM=".build/cellar-dock-shim.dylib"
 sh Scripts/build-dock-shim.sh "$SHIM"
+# Cellar's SDL, loaded by Wine ahead of the runner's so wheel force feedback reaches the motor.
+SDL=".build/sdl"
+sh Scripts/build-sdl.sh "$SDL"
 
 # App icon: build a multi-resolution .icns from Resources/AppIcon.png (regenerate it if missing).
 ICON_SRC="Resources/AppIcon.png"
@@ -87,6 +90,8 @@ echo "Bundled $(ls profiles/*.toml | wc -l | tr -d ' ') game profiles."
 # The Dock shim goes in the bundle, and beside the CLI's own state, because it is the `cellar`
 # binary — not the app — that spawns Wine, and the CLI may live anywhere on PATH.
 cp "$SHIM" "$APP/Contents/Resources/cellar-dock-shim.dylib"
+rm -rf "$APP/Contents/Resources/sdl"
+cp -R "$SDL" "$APP/Contents/Resources/sdl"
 # The same Legal/ folder package.sh ships, so a local install matches a release.
 rm -rf "$APP/Contents/Resources/Legal"
 mkdir -p "$APP/Contents/Resources/Legal"
@@ -104,6 +109,8 @@ install_file .build/release/cellar "$PREFIX/bin/cellar"
 rm -f "$PREFIX/share/cellar/profiles/"*.toml
 cp profiles/*.toml "$PREFIX/share/cellar/profiles/"
 install_file "$SHIM" "$PREFIX/share/cellar/cellar-dock-shim.dylib"
+rm -rf "$PREFIX/share/cellar/sdl"
+cp -R "$SDL" "$PREFIX/share/cellar/sdl"
 echo "Installed the cellar CLI at $PREFIX/bin/cellar (profiles in $PREFIX/share/cellar)."
 
 # The bundled CLI and the updater framework. No SUFeedURL/SUPublicEDKey above, on purpose: a build

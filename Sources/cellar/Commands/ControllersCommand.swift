@@ -42,7 +42,7 @@ struct ControllersCommand: ParsableCommand {
             for step in vendor.setup { print(Term.dim("    – \(step)")) }
         }
         if !wheels.isEmpty {
-            print(Term.dim("  " + Wheels.forceFeedbackNote))
+            print(Term.dim("  " + Wheels.forceFeedbackNote(for: wheels, cellarSDL: CellarSDL.libraryDirectory != nil)))
         }
         print("")
 
