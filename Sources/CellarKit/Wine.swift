@@ -188,7 +188,16 @@ public struct WineRunner {
     }
 
     /// Start wine detached: returns immediately, the Windows process keeps running.
-    public func spawn(_ args: [String], extraEnv: [String: String] = [:], log: URL? = nil) throws {
+    ///
+    /// `bundledLoader` is a copy of this runner's loader inside the game's `.app` (`GameApp`). When
+    /// given, that copy is what runs — so macOS sees the game's bundle — with `argv[0]` still naming
+    /// the runner's own binary, which is where Wine's loader looks for the rest of itself.
+    public func spawn(_ args: [String], extraEnv: [String: String] = [:], log: URL? = nil,
+                      bundledLoader: URL? = nil) throws {
+        if let bundledLoader {
+            try spawnBundled(bundledLoader, args, environment: environment(extra: extraEnv), log: log)
+            return
+        }
         let process = Process()
         process.executableURL = binary
         process.arguments = args
@@ -204,6 +213,55 @@ public struct WineRunner {
             process.standardError = FileHandle.nullDevice
         }
         try process.run()
+    }
+
+    /// `Process` always passes the executable's own path as `argv[0]`, so the bundled start goes
+    /// through `posix_spawn` directly — set up the way `Process` does it (signals reset, no stray
+    /// descriptors inherited) — and is reaped in the background so it never lingers as a zombie.
+    private func spawnBundled(_ executable: URL, _ args: [String], environment: [String: String],
+                              log: URL?) throws {
+        let output = log?.path ?? "/dev/null"
+        if let log {
+            try FileManager.default.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: log.path, contents: nil)
+        }
+
+        var actions: posix_spawn_file_actions_t? = nil
+        posix_spawn_file_actions_init(&actions)
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
+        posix_spawn_file_actions_addopen(&actions, 1, output, O_WRONLY | O_APPEND, 0)
+        posix_spawn_file_actions_adddup2(&actions, 1, 2)
+
+        var attributes: posix_spawnattr_t? = nil
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        posix_spawnattr_setflags(&attributes,
+                                 Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
+        var every = sigset_t()
+        sigfillset(&every)
+        posix_spawnattr_setsigdefault(&attributes, &every)
+        var none = sigset_t()
+        sigemptyset(&none)
+        posix_spawnattr_setsigmask(&attributes, &none)
+
+        let argv: [UnsafeMutablePointer<CChar>?] = ([binary.path] + args).map { strdup($0) } + [nil]
+        let envp: [UnsafeMutablePointer<CChar>?] = environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
+        defer {
+            argv.forEach { free($0) }
+            envp.forEach { free($0) }
+        }
+
+        var pid: pid_t = 0
+        let status = posix_spawn(&pid, executable.path, &actions, &attributes, argv, envp)
+        guard status == 0 else {
+            throw CellarError.ioFailure("Couldn't start Wine from \(executable.path): \(String(cString: strerror(status)))")
+        }
+        let child = pid
+        DispatchQueue.global(qos: .utility).async {
+            var exitStatus: Int32 = 0
+            _ = waitpid(child, &exitStatus, 0)
+        }
     }
 
     public func wineVersion() -> String {
