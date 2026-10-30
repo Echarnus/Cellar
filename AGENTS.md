@@ -35,7 +35,7 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
 | `Shim/` | `cellar-dock-shim.c` — the one piece of C in the repo. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts. Built by `Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
 | `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `test.sh` (the test runner). |
-| `docs/` | `ARCHITECTURE.md`, `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
+| `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
 | `.github/workflows/` | `ci.yml`, `release.yml`, `pages.yml`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
 

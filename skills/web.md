@@ -30,6 +30,10 @@ required check that never runs would block every PR that doesn't touch the site.
 
 ## Rules
 
+- **Every game comes through a store.** Cellar has no store-less or manual-download path, so the
+  site never offers or implies one: no "No store" filter, label or copy. A profile without a known
+  `store` fails the build, and `check-site.py` fails on copy like "no store" or "manual download".
+  Whether the store's *app* must run while playing is a different fact ("While playing").
 - **Data-driven, never hand-authored.** The games grid is generated from `profiles/*.toml`, so the
   page can't drift from what Cellar actually supports. To change what a card shows, change the
   generator, not the HTML. Adding a profile updates the site on the next push to `main`.
