@@ -55,7 +55,8 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   locations in a binary database Cellar does not parse). Every game comes from a store: a DRM-free
   Steam game is still `steam`, with `needs_live_session = false` so Cellar downloads the depot and
   runs the exe without standing Windows Steam up in the bottle.
-- **`[compatibility]`** — `anticheat`, `drm`, `requires_account`, `online`, `status`, `notes`.
+- **`[compatibility]`** — `anticheat`, `drm`, `requires_account`, `online`, `status`, `notes`, and optionally
+  `controller = "full" | "partial" | "none"` — only what you saw a pad do in this game under Cellar.
   Optional `network_check` — space-separated `https://` addresses of the game's own online services
   (a workshop, an account server) that `cellar network <slug>` probes on top of the store's. Only
   addresses you have seen the game use or the publisher documents; a guessed host proves nothing.

@@ -202,6 +202,23 @@ same way.
 
 ---
 
+## Game controllers
+
+Wine passes a pad to a Windows game through SDL and its winebus, not through macOS's
+GameController framework, so a pad `cellar doctor` lists is not proof a game will take it. This is a
+manual check on a Mac with the default runner, recorded per profile as `controller = "full" |
+"partial" | "none"` once seen:
+
+| Pad | Connection | Default runner | Result |
+|---|---|---|---|
+| Xbox Wireless Controller | Bluetooth | not yet tested | — |
+| DualSense | Bluetooth / USB | not yet tested | — |
+| Switch Pro Controller | Bluetooth | not yet tested | — |
+
+To test: connect the pad, check `cellar doctor` lists it, start a game whose profile has no
+`controller` yet, and note whether menus and gameplay respond. For a Steam game started through the
+client, say whether Steam Input was on, since it remaps the pad before the game sees it.
+
 ## Where this sits in the verification ladder
 
 `AGENTS.md` asks for the highest rung available before calling a change done. The suite maps onto it:

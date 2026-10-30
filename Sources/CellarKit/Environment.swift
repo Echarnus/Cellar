@@ -280,6 +280,12 @@ public enum SystemEnvironment {
             checks.append(.init("Low Power Mode", .ok, "off"))
         }
 
+        // Information only: a pad macOS sees still has to make it through Wine to the game.
+        let pads = Controllers.connected(settle: 0.5)
+        checks.append(.init("Controllers", .info,
+            pads.isEmpty ? "none connected" : pads.map { "\($0.name) (\($0.kind.displayName))" }.joined(separator: ", "),
+            hint: pads.isEmpty ? nil : "Whether a game takes it depends on the game: its page says what its profile recorded."))
+
         return checks
     }
 }
