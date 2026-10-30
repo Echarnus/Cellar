@@ -62,6 +62,9 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   `graphics_backend` (`BackendChoice`), so a profile update never undoes it. `cellar backend <slug>`
   shows or changes it.
 - **`[install]`** — `method`, plus the id the method needs.
+- **`save_paths`** (optional) — where the game saves, relative to the Windows user folder, `;`-separated
+  (`"Documents/My Games/X; AppData/Local/X"`). `SaveBackups` copies only these; without it, every
+  folder `SaveGames` counts as a save in the bottle. Only record a path you have seen the game write.
 - **`[legal]`** — `drm_circumvention = "never"`. It is never anything else.
 
 ## Vocabularies the tooling actually knows

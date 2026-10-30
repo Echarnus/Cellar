@@ -255,6 +255,7 @@ public struct WineRunner {
               !serverRunning else { return }
         CellarLog.info(.runner, "Updating bottle '\(prefix.lastPathComponent)' for the new runner.",
                        subject: prefix.lastPathComponent)
+        SaveBackups.backUpQuietly(bottle: prefix, reason: .beforeRunnerUpdate)
         run(["wineboot", "--update"], extraEnv: ["WINEDLLOVERRIDES": Self.headlessBootOverrides])
         waitForServer()
     }

@@ -111,6 +111,7 @@ public enum GameUpdates {
             throw UpdateFailure.notStarted("not signed in to Steam — cellar steam login")
         }
         CellarLog.info(.install, "Updating \(plan.name) (AppID \(appID)).", subject: plan.slug)
+        SaveBackups.backUpQuietly(bottle: plan.prefix, reason: .beforeGameUpdate)
         phase(InstallProgress(.updating))
         // DepotDownloader prints a percentage per file it writes, so the first one is the moment the
         // copy on disk stops being the old build.

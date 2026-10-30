@@ -14,6 +14,8 @@ struct GameDetailView: View {
     @State private var measuringRemoval = false
     /// The game's language submenu, read when the page appears rather than from the body.
     @State private var language = GameLanguageMenu.Selection()
+    /// The newest copy of this game's saves, read when the page appears and after a backup or restore.
+    @State private var latestBackup: SaveBackups.Backup?
 
     var body: some View {
         ScrollView {
@@ -28,13 +30,17 @@ struct GameDetailView: View {
                     notice
                     chips
                     information
+                    if game.bottleExists { saves }
                     activityLog
                 }
                 .padding(24)
             }
         }
         .background(.background)
-        .task(id: game.slug) { language = .load(game) }
+        .task(id: game.slug) {
+            language = .load(game)
+            latestBackup = SaveBackups.list(bottle: game.bottleName).first
+        }
     }
 
     // MARK: - Hero
@@ -333,6 +339,55 @@ struct GameDetailView: View {
     @ViewBuilder private func factColumns(_ facts: GameFacts) -> some View {
         if !facts.about.isEmpty { FactList(title: "About", rows: facts.about) }
         if !facts.compatibility.isEmpty { FactList(title: "Compatibility", rows: facts.compatibility) }
+    }
+
+    /// Saves live in the bottle; Cellar copies them out before anything that could lose them. This
+    /// says when it last did, and offers the two things a player wants from that: another copy now,
+    /// and the last one back.
+    private var saves: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Save games").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                .kerning(0.5).textCase(.uppercase)
+            Text(backupSummary).font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("Back up now") {
+                    runner.run(["saves", "backup", game.slug], title: "Backing up saves", then: { refreshBackups() })
+                }
+                Button("Restore last backup…") { confirmRestore() }
+                    .disabled(latestBackup == nil)
+                Button("Show in Finder") {
+                    NSWorkspace.shared.open(SaveBackups.directory(forBottle: game.bottleName))
+                }
+                .disabled(latestBackup == nil)
+            }
+            .disabled(runner.busy)
+        }
+    }
+
+    private var backupSummary: String {
+        guard let backup = latestBackup else {
+            return "No backup yet. Cellar takes one by itself before a reset, an update or removing the bottle."
+        }
+        let when = RelativeDateTimeFormatter().localizedString(for: backup.manifest.created, relativeTo: Date())
+        return "Last backed up \(when) — \(backup.manifest.reason.description.lowercased()), \(ByteSize.describe(backup.manifest.bytes)). Cellar keeps the last \(SaveBackups.keep)."
+    }
+
+    private func refreshBackups() {
+        latestBackup = SaveBackups.list(bottle: game.bottleName).first
+    }
+
+    /// A restore replaces the saves the game has now, so it is asked first — with the one fact that
+    /// makes it safe to say yes: the current saves are kept too.
+    private func confirmRestore() {
+        guard let backup = latestBackup else { return }
+        let alert = NSAlert()
+        alert.messageText = "Restore \(game.name)'s saves from \(backup.id)?"
+        alert.informativeText = "The saves the game has now are replaced by that backup (\(backup.manifest.reason.description.lowercased())). Cellar keeps a copy of the current ones first, so you can go back."
+        alert.addButton(withTitle: "Restore")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        runner.run(["saves", "restore", game.slug, "--backup", backup.id], title: "Restoring saves", then: { refreshBackups() })
     }
 
     private var activityLog: some View {
