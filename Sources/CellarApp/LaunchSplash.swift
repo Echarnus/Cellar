@@ -23,14 +23,16 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
     /// Show the launch window for `game`, following `runner`. Presenting twice reuses the window
     /// rather than stacking two of them — Play is disabled while a launch runs, but a second
     /// "Show progress" must not open a second copy.
-    static func present(game: GameSummary, runner: CellarRunner) {
+    /// `onFinished` runs when a launch started from this window ends — a retry on another backend —
+    /// so the page behind it can pick up what changed.
+    static func present(game: GameSummary, runner: CellarRunner, onFinished: @escaping @MainActor () -> Void = {}) {
         if let current {
             current.window.makeKeyAndOrderFront(nil)
             NSApp.bringToFront()
             return
         }
         let controller = LaunchSplashWindow()
-        controller.show(game: game, runner: runner)
+        controller.show(game: game, runner: runner, onFinished: onFinished)
         current = controller
     }
 
@@ -39,7 +41,7 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
 
     static func dismiss() { current?.close() }
 
-    private func show(game: GameSummary, runner: CellarRunner) {
+    private func show(game: GameSummary, runner: CellarRunner, onFinished: @escaping @MainActor () -> Void) {
         // Borderless, so the game's own art runs to the top edge — a titled window keeps a title bar
         // above the content whatever `fullSizeContentView` claims, and a bare strip over the banner
         // is exactly the "assembled from parts" look this window exists to replace. Fixed size, like
@@ -56,7 +58,8 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.center()
         window.contentView = NSHostingView(rootView: LaunchSplashView(
-            game: game, runner: runner, onDismiss: { [weak self] in self?.close() }))
+            game: game, runner: runner, onFinished: onFinished,
+            onDismiss: { [weak self] in self?.close() }))
         window.delegate = self
         self.window = window
         window.makeKeyAndOrderFront(nil)
@@ -88,9 +91,13 @@ struct LaunchSplashView: View {
 
     let game: GameSummary
     @ObservedObject var runner: CellarRunner
+    let onFinished: @MainActor () -> Void
     let onDismiss: () -> Void
 
     @State private var elapsed = 0
+    /// Whether this window already retried on the profile's fallback backend. Offered once: a
+    /// second failure gets the logs, not another button that leads back to the same place.
+    @State private var retriedOnFallback = false
     /// Whether this launch ever asked for a sign-in — a step that has happened stays on the list.
     @State private var sawSignIn = false
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -195,9 +202,15 @@ struct LaunchSplashView: View {
             OutcomeBlock(symbol: "exclamationmark.triangle.fill", tint: .orange,
                     title: "\(game.name) didn't start",
                     detail: failureDetail)
-            Text("Nothing is broken by this — try again, or open the logs to see how far it got.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if let retry = offeredBackend {
+                Text("Its profile names \(retry.displayName) as the one to try when \(currentBackendName) doesn't work. \(retry.summary) If \(game.name) comes up, Cellar keeps using it; you can switch back on the game's page.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Nothing is broken by this — try again, or open the logs to see how far it got.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -216,7 +229,14 @@ struct LaunchSplashView: View {
                     .accessibilityLabel("Waiting \(elapsed) seconds so far.")
             }
             Spacer(minLength: 0)
-            if outcome == .failed {
+            if outcome == .failed, let retry = offeredBackend {
+                Button("Show logs") { NSWorkspace.shared.open(Paths.logs) }
+                Button("Close") { onDismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Try again with \(retry.displayName)") { retryLaunch(on: retry) }
+                    .keyboardShortcut(.defaultAction)
+                    .help("Start \(game.name) again on \(retry.displayName). \(retry.summary)")
+            } else if outcome == .failed {
                 Button("Show logs") { NSWorkspace.shared.open(Paths.logs) }
                 Button("Close") { onDismiss() }
                     .keyboardShortcut(.defaultAction)
@@ -302,6 +322,24 @@ struct LaunchSplashView: View {
             .last { !$0.isEmpty && !$0.hasPrefix("(exit ") && !$0.hasPrefix("$ cellar") }
             .map { $0.hasPrefix("Error:") ? String($0.dropFirst("Error:".count)).trimmingCharacters(in: .whitespaces) : $0 }
             ?? ""
+    }
+
+    /// The profile's fallback backend, when it is worth offering: the game itself was started (a
+    /// runner that isn't installed is not a graphics problem), and this window hasn't tried it yet.
+    private var offeredBackend: GraphicsBackend? {
+        guard !retriedOnFallback, runner.attempt > 0 else { return nil }
+        return game.retryBackend
+    }
+
+    private var currentBackendName: String {
+        GraphicsBackend(rawValue: game.backend)?.displayName ?? game.backend
+    }
+
+    private func retryLaunch(on backend: GraphicsBackend) {
+        retriedOnFallback = true
+        elapsed = 0
+        sawSignIn = false
+        runner.launch(slug: game.slug, showHUD: runner.launchShowsHUD, backend: backend) { onFinished() }
     }
 
     private func dismiss(after seconds: TimeInterval) {
