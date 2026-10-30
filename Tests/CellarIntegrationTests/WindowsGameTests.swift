@@ -146,7 +146,7 @@ struct WindowsGameTests {
         let ready = try #require(summary(for: slug))
         #expect(ready.nextStep == .play)
         #expect(ready.actionTitle == "Play")
-        #expect(ready.actionHint.contains("no store client at all"))
+        #expect(ready.actionHint.contains("without opening"))
 
         // 6. Launch it — the real thing, through the same call the Play button makes.
         let route = try Game.launch(plan) { IT.log($0) }

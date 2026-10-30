@@ -60,11 +60,17 @@ enum TestHome {
 
     /// Write a profile fixture and return the slug it can be looked up by. Slugs are made unique so
     /// tests never collide with each other or with the profiles the repo ships.
+    ///
+    /// Every real profile names its store, and `Game.plan` refuses one that doesn't. A fixture that
+    /// is about something else and leaves the store out gets `store = "steam"` added; pass
+    /// `namingAStore: false` to test the refusal itself.
     @discardableResult
-    static func writeProfile(_ toml: String, slug: String = "fixture") -> String {
+    static func writeProfile(_ toml: String, slug: String = "fixture", namingAStore: Bool = true) -> String {
         let unique = "\(slug)-\(UUID().uuidString.prefix(8))".lowercased()
         let url = profilesDirectory.appendingPathComponent("\(unique).toml")
-        try? toml.write(to: url, atomically: true, encoding: .utf8)
+        let namesStore = toml.range(of: #"(?m)^\s*store\s*="#, options: .regularExpression) != nil
+        let text = namingAStore && !namesStore ? "[game]\nstore = \"steam\"\n\n" + toml : toml
+        try? text.write(to: url, atomically: true, encoding: .utf8)
         return unique
     }
 

@@ -4,6 +4,9 @@ Cellar = a **general translation engine** + a **per-game profile database** + a 
 layer**. These mirror Proton's three pillars (bundled runtime, per-title fixes, invisible launch),
 adapted to where macOS differs from Linux.
 
+How the *code* is organised — modules, layers, state flow, and the proposed clean-architecture
+target — is in [`APP-ARCHITECTURE.md`](APP-ARCHITECTURE.md).
+
 ## The translation stack
 
 ```
