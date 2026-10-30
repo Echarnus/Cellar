@@ -98,6 +98,20 @@ public enum Wheels {
     public static let forceFeedbackNote =
         "Expect steering, pedals and buttons, but no force feedback: macOS needs a driver from the wheel's maker for that, and none ships one for Apple Silicon Macs."
 
+    /// What a profile's `wheel` field records, in the player's words. Nil for no field, so a game
+    /// nobody drives with a wheel shows no row at all. `untested` is said out loud: a race sim
+    /// with a blank where the wheel answer belongs reads as "works", which nobody has seen yet.
+    public static func support(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespaces).lowercased(), !value.isEmpty else { return nil }
+        switch value {
+        case "full":     return "Steering, pedals and force feedback"
+        case "steering": return "Steering and pedals, no force feedback"
+        case "untested": return "Made for a wheel, not yet tried with one in Cellar"
+        case "none":     return "No wheel support"
+        default:         return value
+        }
+    }
+
     /// Sorts one HID device into sim-racing hardware, or nil for anything else. Pure, so the
     /// table is tested without the hardware.
     public static func classify(vendorID: Int, productID: Int, product: String) -> Device? {

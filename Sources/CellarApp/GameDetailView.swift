@@ -337,6 +337,22 @@ struct GameDetailView: View {
 
             controllerLine
 
+            // A race sim's wheel is bound inside the game, not in Cellar, so say where — shown
+            // whether or not a wheel is plugged in now, because that is when a player reads it.
+            if let setup = facts.wheelSetup, !setup.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("Setting up a racing wheel", systemImage: "steeringwheel")
+                        .font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    Text(setup).font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if wheels.isEmpty {
+                        Link("Connecting a wheel to your Mac", destination: Links.controllersHelp)
+                            .font(.caption)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+
             if let notes = facts.notes, !notes.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {

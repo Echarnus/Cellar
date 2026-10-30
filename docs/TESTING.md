@@ -245,7 +245,14 @@ To test a wheel:
 4. In a racing game's controls menu: does the wheel appear, do steering and each pedal move a
    separate axis (Thrustmaster pedals arriving as buttons is a known failure), and is there any
    force feedback at all?
-5. Note the game, runner and backend, and record the result in the game's profile notes.
+5. Note the game, runner and backend, and record the result in the game's profile: `wheel =
+   "steering"` (steering and pedals, no force feedback) or `"full"` (with force feedback), plus the
+   wheel and firmware in `notes`. Only a game whose `status` is no longer `untested` may claim one;
+   `ProfileDatabaseTests` enforces it.
+
+The race sims to try first are `assetto-corsa` (DXVK by default) and `assetto-corsa-competizione`
+(D3DMetal by default). Both ship `wheel = "untested"` and in-game binding steps in `wheel_setup`,
+which the game page shows; check that those steps match the menus you actually see.
 
 ## Where this sits in the verification ladder
 

@@ -414,7 +414,8 @@ check, and `cellar doctor` / `cellar controllers` / the game page show it, alway
   answer with `IOHIDCheckAccess` and never asks itself; Wine's first open is what puts the dialog up.
 - **The runner's SDL** — whether the runner carries an SDL dylib on the library path Cellar gives
   Wine. A pointer, not proof: a Wine built without SDL support never tries to load it.
-- **What the profile recorded** — `controller = "full" | "partial" | "none"`.
+- **What the profile recorded** — `controller = "full" | "partial" | "none"`, and for a race sim
+  `wheel = "full" | "steering" | "untested" | "none"` plus `wheel_setup`, the in-game binding steps.
 - **Steam Input** — a Steam game started through the client gets its pad remapped by Steam first.
 
 Force feedback is the hard limit: macOS drives a wheel's motor only through a vendor

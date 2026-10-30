@@ -142,12 +142,19 @@ public struct GameFacts: Sendable {
     public let notes: String?
     /// `full` / `partial` / `none`: what the profile's author saw a controller do in this game.
     public let controller: String?
+    /// `full` / `steering` / `untested` / `none`: what a racing wheel was seen to do in this game.
+    public let wheel: String?
+    /// Free text: the in-game steps that bind a wheel, for a game made to be driven with one.
+    public let wheelSetup: String?
 
     public init(developer: String? = nil, released: String? = nil, engine: String? = nil,
                 graphicsAPI: String? = nil, anticheat: String? = nil, drm: String? = nil,
                 online: String? = nil, requiresAccount: String? = nil, status: String? = nil,
-                notes: String? = nil, controller: String? = nil) {
+                notes: String? = nil, controller: String? = nil, wheel: String? = nil,
+                wheelSetup: String? = nil) {
         self.controller = controller
+        self.wheel = wheel
+        self.wheelSetup = wheelSetup
         self.developer = developer
         self.released = released
         self.engine = engine
@@ -170,7 +177,7 @@ public struct GameFacts: Sendable {
     /// The facts that answer "will this actually run, and what does it want from me?".
     public var compatibility: [(label: String, value: String)] {
         [("Anti-cheat", anticheat), ("DRM", drm), ("Online", online), ("Account", requiresAccount),
-         ("Controller", Controllers.support(controller))]
+         ("Controller", Controllers.support(controller)), ("Racing wheel", Wheels.support(wheel))]
             .compactMap { label, value in value.map { (label, $0) } }
     }
 }
@@ -560,7 +567,9 @@ public enum Game {
                 requiresAccount: fields["requires_account"],
                 status: fields["status"],
                 notes: fields["notes"],
-                controller: fields["controller"]),
+                controller: fields["controller"],
+                wheel: fields["wheel"],
+                wheelSetup: fields["wheel_setup"]),
             metalFXUpscaling: performance.metalFXUpscaling,
             language: LanguageChoice.resolve(game: BottleConfig.language(bottleFile), global: CellarSettings.language),
             performance: performance,
