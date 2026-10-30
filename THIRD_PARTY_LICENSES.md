@@ -19,6 +19,7 @@ The distinction that decides the obligations is **who distributes the component*
 |---|---|---|---|
 | **Cellar** (`Sources/`, `Shim/`, `Scripts/`, `profiles/`) | everything below | **GPL-3.0** | Licence text with every binary (`Legal/LICENSE`); corresponding source at the matching tag on GitHub, named in `NOTICE` |
 | **swift-argument-parser** (Apple) | parses the `cellar` command line; statically linked | **Apache-2.0 with Runtime Library Exception** | The exception waives §4(a)(b)(d) for compiled use; Cellar ships the text anyway (`Legal/licenses/swift-argument-parser.txt`) and credits it in About |
+| **Sparkle 2** (`sparkle-project/Sparkle`, pinned in `Package.swift`) | the app's self-updater; embedded as `Cellar.app/Contents/Frameworks/Sparkle.framework` | **MIT**, plus the bsdiff, sais-lite and ed25519 notices in the same file | Copyright and permission notice with every copy: `Legal/licenses/Sparkle.txt`, `NOTICE`, credited in About. Not in the CLI |
 | **Swift runtime / standard library** | language runtime | Apache-2.0 with Runtime Library Exception | Provided by macOS itself; nothing is embedded that needs attribution |
 | **Dock shim** (`Shim/cellar-dock-shim.c`) | keeps the bottle's client out of the Dock | GPL-3.0 (Cellar's own code) | — |
 | **App icon** (`Resources/AppIcon.png`) | the keg icon | GPL-3.0 — drawn by Cellar's own `Scripts/make-icon.swift` | — |

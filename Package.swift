@@ -12,6 +12,9 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+        // The app's self-updater. Pinned exactly: it installs code on the player's Mac, so a new
+        // version is a deliberate bump, not whatever resolved last.
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
     ],
     targets: [
         // Core engine: environment detection, bottles, runners, profiles.
@@ -34,7 +37,13 @@ let package = Package(
 
         // Phase 3: a native SwiftUI "Steam-like" front-end over the same CellarKit core. Drives the
         // `cellar` CLI as a subprocess for actions, so it reuses every tested path.
-        .executableTarget(name: "CellarApp", dependencies: ["CellarKit", "CellarUI"]),
+        .executableTarget(
+            name: "CellarApp",
+            dependencies: ["CellarKit", "CellarUI", .product(name: "Sparkle", package: "Sparkle")],
+            // Inside Cellar.app the framework sits in Contents/Frameworks (Scripts/bundle-app.sh);
+            // SwiftPM's own @loader_path rpath still finds it beside the binary in .build.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
+        ),
 
         .testTarget(name: "CellarKitTests", dependencies: ["CellarKit"]),
 

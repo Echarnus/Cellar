@@ -52,6 +52,13 @@ Compiled into Cellar
                          https://github.com/apple/swift-argument-parser
                          Full text: licenses/swift-argument-parser.txt
 
+  Sparkle 2              Copyright (c) 2006-2013 Andy Matuschak and the Sparkle
+                         contributors. MIT, plus the bsdiff, sais-lite and
+                         ed25519 notices in the same file. Cellar.app's self-updater,
+                         shipped as Contents/Frameworks/Sparkle.framework.
+                         https://sparkle-project.org
+                         Full text: licenses/Sparkle.txt
+
 ------------------------------------------------------------------------------
 Source code
 ------------------------------------------------------------------------------

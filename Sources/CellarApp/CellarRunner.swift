@@ -37,7 +37,11 @@ final class CellarRunner: ObservableObject {
     /// SwiftUI update on macOS 27 that leaves the hosting view's graph unable to apply any later
     /// change: the library refreshed, logged "4 shown", and the window kept drawing "Sign in" and
     /// "0 games" forever. `Shell.locate` reads PATH with the file system instead.
-    private lazy var binary: String = Shell.locate("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
+    ///
+    /// The CLI inside Cellar.app comes first: it was built with this app, and an app update
+    /// replaces the two together. One on PATH would keep driving the new app with an old engine.
+    private lazy var binary: String = Bundle.main.path(forAuxiliaryExecutable: "cellar")
+        ?? Shell.locate("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
 
     /// The running command, so it can be called off.
     private var process: Process?

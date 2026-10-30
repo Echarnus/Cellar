@@ -40,16 +40,28 @@ struct CreditsTests {
         }
     }
 
-    @Test("The one compiled-in dependency is credited and its licence text ships")
-    func compiledDependencyIsCovered() throws {
+    /// Every package in Package.resolved, with the Credit and the licence text that cover it. A new
+    /// package fails this until it has a Credit, a row in THIRD_PARTY_LICENSES.md and a text in
+    /// licenses/ — and a line here.
+    private static let dependencies: [(identity: String, credit: String, text: String)] = [
+        ("sparkle", "Sparkle", "Sparkle.txt"),
+        ("swift-argument-parser", "swift-argument-parser", "swift-argument-parser.txt"),
+    ]
+
+    @Test("Every compiled-in or bundled dependency is credited and its licence text ships")
+    func dependenciesAreCovered() throws {
         let resolved = try String(contentsOf: Repo.root.appendingPathComponent("Package.resolved"), encoding: .utf8)
-        #expect(resolved.contains("swift-argument-parser"))
-        // A new package in Package.resolved means a new licence text in licenses/ and a new Credit.
-        let identities = resolved.components(separatedBy: "\"identity\"").count - 1
-        #expect(identities == 1, "a dependency was added: give it a Credit, a row in THIRD_PARTY_LICENSES.md and a text in licenses/")
-        #expect(Credits.all.contains { $0.name == "swift-argument-parser" })
-        let text = Repo.root.appendingPathComponent("licenses/swift-argument-parser.txt")
-        #expect(FileManager.default.fileExists(atPath: text.path))
+        let identities = resolved.components(separatedBy: "\"identity\" : \"").dropFirst()
+            .compactMap { $0.split(separator: "\"").first.map(String.init) }
+        #expect(Set(identities) == Set(Self.dependencies.map(\.identity)),
+                "a dependency was added or removed: give it a Credit, a row in THIRD_PARTY_LICENSES.md and a text in licenses/")
+        let inventory = try String(contentsOf: Repo.root.appendingPathComponent("THIRD_PARTY_LICENSES.md"), encoding: .utf8)
+        for dependency in Self.dependencies {
+            #expect(Credits.all.contains { $0.name == dependency.credit }, "\(dependency.credit) has no Credit")
+            #expect(inventory.contains(dependency.credit), "\(dependency.credit) is not in THIRD_PARTY_LICENSES.md")
+            let text = Repo.root.appendingPathComponent("licenses/\(dependency.text)")
+            #expect(FileManager.default.fileExists(atPath: text.path), "licenses/\(dependency.text) is missing")
+        }
     }
 
     @Test("Every release artifact carries the licence and notices", arguments: ["package.sh", "install-app.sh"])

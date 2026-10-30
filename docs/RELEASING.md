@@ -52,6 +52,38 @@ Open stopped bypassing Gatekeeper in macOS 15. Developer-ID signing and notarisa
 once there's a Developer ID (it needs the hardened runtime, `notarytool submit --wait` and
 `stapler staple`).
 
+## In-app updates (Sparkle)
+
+Cellar updates itself with [Sparkle 2](https://sparkle-project.org). **Cellar › Check for Updates…**
+(and Settings › Updates) reads the feed at
+`https://github.com/Echarnus/Cellar/releases/latest/download/appcast.xml` — the `appcast.xml` asset
+of the newest release — shows the release notes, and installs the new `Cellar-App-<v>.zip` when the
+player says so. Automatic checks are opt-in: Sparkle asks on the second launch, and Settings has the
+switch.
+
+The chain of trust is an **EdDSA key**, not Apple code signing (there is no Developer ID yet):
+
+- `Resources/sparkle-public-key` holds the public half. `Scripts/package.sh` writes it into
+  Info.plist as `SUPublicEDKey`, with `SUFeedURL`, and only when the file exists — before that, a
+  release simply ships with updates switched off. `Scripts/install-app.sh` never writes either, so a
+  build from source never replaces itself with a release.
+- The private half lives in the maintainer's login keychain and in the repository secret
+  `SPARKLE_ED_PRIVATE_KEY`, and nowhere else. `Scripts/make-appcast.sh <version> <notes.md>` signs the
+  zip with it, checks it matches the public key in the repo, and writes `dist/appcast.xml`; the
+  release workflow uploads that next to the zip.
+- **Set-up, once:** run `sh Scripts/sparkle-keys.sh` on the Mac, then commit
+  `Resources/sparkle-public-key`. It reuses an existing key rather than making a new one.
+- **Never rotate or lose the key casually.** Every installed copy accepts only updates signed by the
+  key it shipped with; a new key means every player downloads the next version by hand.
+
+Each `Cellar.app` carries its own `cellar` CLI (`Contents/MacOS/cellar`), which the app prefers over
+one on PATH, so an update replaces the app and the engine together. `Scripts/bundle-app.sh` puts the
+CLI and `Sparkle.framework` into the bundle before the ad-hoc seal covers them; Sparkle refuses an
+update whose bundle signature is present but broken.
+
+Players on a release from before the updater (0.2.x and earlier) have to download one version by
+hand; after that, updates arrive in the app.
+
 ## Supported-games site
 
 `.github/workflows/pages.yml` regenerates the [supported-games page](https://echarnus.github.io/Cellar/)

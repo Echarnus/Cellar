@@ -25,6 +25,7 @@ struct SettingsView: View {
     }
     @State private var export: Export = .idle
     @StateObject private var runner = CellarRunner()
+    @ObservedObject private var updater = AppUpdater.shared
     /// Read once per refresh, never from a view body — see `StoreAccountState`.
     @State private var accounts = StoreAccountState.unknown
 
@@ -105,6 +106,7 @@ struct SettingsView: View {
                         Text(Credits.nonAffiliation)
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                    updates
                     // Wine gets its own group rather than a line among the links: Cellar is a
                     // launcher over it, and a player reading "About" should leave knowing that.
                     Section("Built on Wine") {
@@ -178,6 +180,37 @@ struct SettingsView: View {
             let snapshot = StoreAccountState.current()
             await MainActor.run { accounts = snapshot }
         }
+    }
+
+    // MARK: - Updates
+
+    /// Every word here is true of this build: a release says when it last looked, a build from
+    /// source says it does not look at all rather than showing a switch that does nothing.
+    @ViewBuilder private var updates: some View {
+        Section("Updates") {
+            if updater.isAvailable {
+                Toggle("Check for updates automatically", isOn: $updater.checksAutomatically)
+                HStack {
+                    Button("Check Now") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheck)
+                    Spacer()
+                    Text(lastChecked).font(.caption).foregroundStyle(.secondary)
+                }
+                Text("Cellar looks for a new version once a day and shows you what changed. "
+                    + "Nothing is installed until you choose Install, and your games and bottles stay as they are.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("This copy of Cellar was built from source, so it doesn't update itself. "
+                    + "Pull the latest code and run Scripts/install-app.sh, or install a release from GitHub.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Link("Cellar releases", destination: Links.releases)
+            }
+        }
+    }
+
+    private var lastChecked: String {
+        guard let date = updater.lastChecked else { return "Not checked yet" }
+        return "Last checked " + date.formatted(.relative(presentation: .named))
     }
 
     // MARK: - Diagnostics

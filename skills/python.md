@@ -1,6 +1,8 @@
 # Skill: Python in Cellar (`Scripts/gen-site.py`)
 
-There is exactly one Python program in this repo: the 266-line static-site generator. Best practices
+There are two Python programs in this repo: the static-site generator, and the small
+`Scripts/make-appcast.py` that writes the update feed (same rules: stdlib only, 3.9 floor, escape
+every interpolation). Most of this file is about the generator. Best practices
 for changing it. Portable guide; Claude's auto-discovered copy is
 `.claude/skills/cellar-python/SKILL.md`. Read [`../AGENTS.md`](../AGENTS.md) first, and
 [`web.md`](web.md) for the HTML/CSS bar the output is judged against — this file is about the
