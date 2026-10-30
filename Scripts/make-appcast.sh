@@ -1,6 +1,6 @@
 #!/bin/sh
-# Sign a release's app zip and write its Sparkle update feed, dist/appcast.xml. Run after
-# Scripts/package.sh, which builds the zip and resolves Sparkle (whose sign_update this uses).
+# Sign a release's app zip and write its Sparkle update feed, dist/appcast.xml. Needs the zip from
+# Scripts/package.sh in dist/; resolves Sparkle itself if needed, for its sign_update tool.
 # The release workflow uploads the feed as a release asset; installed copies of Cellar read it at
 # https://github.com/Echarnus/Cellar/releases/latest/download/appcast.xml.
 #
@@ -19,9 +19,15 @@ ZIP="dist/Cellar-App-$VERSION.zip"
 [ -f "$ZIP" ] || { echo "$ZIP missing — run Scripts/package.sh $VERSION first"; exit 1; }
 [ -f "$NOTES" ] || { echo "Release notes $NOTES missing"; exit 1; }
 
-# SwiftPM unpacks Sparkle's release, tools included, under .build/artifacts.
-SIGN="$(find .build/artifacts -path '*/bin/sign_update' -type f 2>/dev/null | head -n 1)"
-[ -n "$SIGN" ] || { echo "sign_update not found under .build/artifacts — build CellarApp first"; exit 1; }
+# SwiftPM unpacks Sparkle's release, tools included, under .build/artifacts. The release job signs
+# in a separate job from the build, so resolve here when nothing has yet (download only, no build).
+find_sign() { find .build/artifacts -path '*/bin/sign_update' -type f 2>/dev/null | head -n 1; }
+SIGN="$(find_sign)"
+if [ -z "$SIGN" ]; then
+  env -u DEVELOPER_DIR -u SDKROOT swift package resolve >/dev/null
+  SIGN="$(find_sign)"
+fi
+[ -n "$SIGN" ] || { echo "sign_update not found under .build/artifacts after resolving packages"; exit 1; }
 
 SIGNATURE="$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$SIGN" -p --ed-key-file - "$ZIP")"
 LENGTH="$(wc -c < "$ZIP" | tr -d ' ')"
