@@ -568,12 +568,14 @@ public enum Game {
         guard SystemEnvironment.isAppleSilicon else {
             throw CellarError.invalidArgument("Cellar requires an Apple Silicon Mac.")
         }
-        guard SystemEnvironment.rosettaWorks else {
-            throw CellarError.invalidArgument(
-                "Rosetta 2 is required. Install it: softwareupdate --install-rosetta --agree-to-license")
-        }
         guard let spec = RunnerCatalog.spec(forID: plan.runnerID) else {
             throw CellarError.invalidArgument("Unknown runner '\(plan.runnerID)'.")
+        }
+        // Only an x86_64 runner needs Rosetta. Asking it of every runner would lock a native
+        // ARM64EC runner out of exactly the Macs it exists for: macOS 28 and later.
+        let needsRosetta = RunnerManager.find(id: spec.id)?.needsRosetta ?? spec.architecture.needsRosetta
+        if needsRosetta, !SystemEnvironment.rosettaWorks {
+            throw CellarError.invalidArgument(SystemEnvironment.rosettaMissingMessage())
         }
         if let why = spec.deprecated {
             step("Warning: runner '\(spec.id)' is deprecated — \(why)")

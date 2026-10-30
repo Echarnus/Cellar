@@ -63,7 +63,7 @@ final class GOGSignInWindow: NSObject, WKNavigationDelegate {
         window.delegate = self
         self.window = window
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
 
         webView.load(URLRequest(url: GOG.authorizationURL))
     }

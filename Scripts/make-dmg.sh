@@ -9,7 +9,7 @@ APP="dist/Cellar.app"
 
 STAGE="$(mktemp -d)/Cellar"
 mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/Cellar.app"
+ditto "$APP" "$STAGE/Cellar.app"  # keeps the ad-hoc seal and xattrs intact
 ln -s /Applications "$STAGE/Applications"           # drag-to-install target
 cat > "$STAGE/READ ME - install.txt" <<TXT
 Cellar — run Windows games on Apple Silicon.

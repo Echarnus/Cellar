@@ -87,7 +87,8 @@ The release flow is documented in [`../docs/RELEASING.md`](../docs/RELEASING.md)
 (zip naming, versionless DMG, Info.plist) are in
 [`shell-and-packaging.md`](shell-and-packaging.md). Two CI-specific points:
 
-- **Artifacts are unsigned and unnotarised**, and the release body tells users to right-click → Open.
+- **Artifacts are ad-hoc signed and unnotarised**, and the release body tells users to allow Cellar
+  under System Settings → Privacy & Security → Open Anyway.
   If signing is ever added, its certificate and password are repository **secrets**, and secrets must
   never be exposed to a `pull_request` run.
 - **The release body is user-facing copy.** It is held to the same bar as the app's text

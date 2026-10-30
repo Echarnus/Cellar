@@ -70,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             : NSHostingView(rootView: ContentView())
         window.makeKeyAndOrderFront(nil)
         self.window = window
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
 
         // Two things want the first launch, so they take it in turn — stacking two windows on a
         // player who has not seen the app yet is worse than either on its own.
@@ -171,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settingsWindow = w
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     /// There is one place to sign in, and it is Settings. "Accounts…" and every "Sign in" button
@@ -202,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         })
         folderAccessWindow = w
         w.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     /// The first-run tour. Its own window for the usual reason — a sheet under `NSHostingView` is a
@@ -225,7 +225,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         WelcomeTour.markSeen()
         welcomeTourWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     @objc private func showAbout() {
@@ -235,7 +235,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .applicationVersion: version,
             .credits: Self.aboutCredits(),
         ])
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.bringToFront()
     }
 
     /// The About panel's credits: the tagline, then the thank-you to Wine — the project Cellar is a
@@ -274,5 +274,18 @@ extension Bundle {
     /// version when the app runs unwrapped during development.
     var shortVersion: String {
         (infoDictionary?["CFBundleShortVersionString"] as? String) ?? CellarVersion.current
+    }
+}
+
+extension NSApplication {
+    /// Brings Cellar forward. `activate(ignoringOtherApps:)` is deprecated from macOS 14, where
+    /// activation became cooperative and the flag is ignored anyway; the plain `activate()` is the
+    /// call that stays.
+    func bringToFront() {
+        if #available(macOS 14, *) {
+            activate()
+        } else {
+            activate(ignoringOtherApps: true)
+        }
     }
 }

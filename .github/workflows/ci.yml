@@ -12,8 +12,14 @@ concurrency:
 
 jobs:
   build:
-    name: Build & self-test (macOS)
-    runs-on: macos-15
+    name: Build & self-test (${{ matrix.os }})
+    # The oldest and newest macOS images GitHub hosts, so an SDK deprecation or removal shows up
+    # here before it reaches a player on a new macOS.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Swift version
@@ -34,7 +40,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-snapshots
+          name: ui-snapshots-${{ matrix.os }}
           path: .build/ui-snapshots/*.png
           if-no-files-found: warn
       - name: Generate supported-games site (sanity)

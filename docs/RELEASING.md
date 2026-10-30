@@ -44,9 +44,13 @@ The tag triggers `.github/workflows/release.yml`, which on a macOS runner:
 
 `workflow_dispatch` builds the same artifacts on demand (uploaded as workflow artifacts, no Release).
 
-Artifacts are **unsigned / unnotarised** — the release notes tell users to clear the quarantine flag
-(`xattr -dr com.apple.quarantine Cellar.app`) or right-click → Open. Signing/notarisation is a later
-step once there's a Developer ID.
+Artifacts are **ad-hoc signed but not notarised**. `package.sh` seals the bundle with
+`codesign --sign -`, because an unsealed bundle (an Info.plist added after the linker signed the
+binary) is reported as "damaged" by macOS 15+ Gatekeeper with no way past it. The release notes tell
+users to allow it once under **System Settings → Privacy & Security → Open Anyway**; right-click →
+Open stopped bypassing Gatekeeper in macOS 15. Developer-ID signing and notarisation are a later step
+once there's a Developer ID (it needs the hardened runtime, `notarytool submit --wait` and
+`stapler staple`).
 
 ## Supported-games site
 

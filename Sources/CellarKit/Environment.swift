@@ -40,9 +40,29 @@ public enum SystemEnvironment {
     }
 
     /// Rosetta is considered functional if an x86_64 process can actually run.
+    ///
+    /// The probe runs the x86_64 slice of `/usr/bin/true`. Apple drops Intel slices from system
+    /// binaries once Intel Macs are unsupported (macOS 28), so a probe that fails because the slice
+    /// is gone must not be read as "Rosetta is missing" while Rosetta's own runtime is installed —
+    /// that runtime is what the gaming subset Apple keeps after macOS 27 still ships.
     public static var rosettaWorks: Bool {
         guard isAppleSilicon else { return false }
-        return Shell.run("/usr/bin/arch", ["-x86_64", "/usr/bin/true"]).succeeded
+        if Shell.run("/usr/bin/arch", ["-x86_64", "/usr/bin/true"]).succeeded { return true }
+        return FileManager.default.fileExists(atPath: rosettaRuntimePath)
+    }
+
+    /// Where Rosetta 2 installs its translator. Present exactly when `softwareupdate --install-rosetta`
+    /// has run, independent of which system binaries still carry an x86_64 slice.
+    static let rosettaRuntimePath = "/Library/Apple/usr/libexec/oah/libRosettaRuntime"
+
+    /// What to tell a player whose Mac has no working Rosetta, for an x86_64 runner. From macOS 28
+    /// Apple no longer promises Rosetta for every app, so the honest answer names that too.
+    public static func rosettaMissingMessage(macOSMajor: Int = macOSVersion.majorVersion) -> String {
+        let install = "Install it: softwareupdate --install-rosetta --agree-to-license"
+        guard macOSMajor >= 28 else { return "Rosetta 2 is required. \(install)" }
+        return "This runner is an Intel (x86_64) build and needs Rosetta 2, which macOS \(macOSMajor) "
+            + "only keeps for games. \(install) — if it will not install, this Mac cannot run an "
+            + "Intel runner; a native ARM64 runner is the way forward (cellar runner list)."
     }
 
     public static var armHomebrew: String? { fileIfExists("/opt/homebrew/bin/brew") }
