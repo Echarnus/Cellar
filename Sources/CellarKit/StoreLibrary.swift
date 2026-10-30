@@ -321,8 +321,7 @@ public enum StoreLibrary {
         for ref in ProfileStore.all() {
             let fields = ProfileStore.fields(ref)
             guard let appID = fields["steam_appid"].flatMap({ Int($0) }) else { continue }
-            let store = GameStore(profileValue: fields["store"]) ?? .default
-            guard store == .steam else { continue }
+            guard GameStore(profileValue: fields["store"]) == .steam else { continue }
             ids.insert(appID)
         }
         return ids
