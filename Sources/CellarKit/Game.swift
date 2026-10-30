@@ -927,6 +927,7 @@ public enum Game {
                 progress("Starting Steam quietly for \(plan.name)'s DRM, then launching the game…")
                 try SteamBottle.launchAlongside(runner: wine, exe: exe, appID: appID,
                                                 showHUD: showHUD, gameEnv: plan.launchEnv,
+                                                bundledLoader: GameApp.prepare(for: plan, runner: wine),
                                                 game: plan.name, expectsSignIn: signsItself,
                                                 progress: progress, stage: stage)
                 return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
@@ -1032,7 +1033,8 @@ public enum Game {
         let wineLog = Paths.logs.appendingPathComponent("game-\(plan.slug).log")
         CellarLog.debug(.launch, "Starting \(exe.lastPathComponent) directly; Wine output → "
             + wineLog.lastPathComponent, subject: plan.slug)
-        try wine.spawn([exe.path], extraEnv: env, log: wineLog)
+        try wine.spawn([exe.path], extraEnv: env, log: wineLog,
+                       bundledLoader: GameApp.prepare(for: plan, runner: wine))
     }
 
     /// Block until the player quits, then take the whole layer down — the behaviour that makes
