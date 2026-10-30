@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import GameController
 import CellarKit
 import CellarUI
 
@@ -16,6 +17,10 @@ struct GameDetailView: View {
     @State private var language = GameLanguageMenu.Selection()
     /// The newest copy of this game's saves, read when the page appears and after a backup or restore.
     @State private var latestBackup: SaveBackups.Backup?
+    /// The controllers macOS sees, kept current as pads come and go.
+    @State private var pads: [Controllers.Pad] = []
+    /// Wheels, pedals and shifters, read when the page appears (macOS posts no notice for them).
+    @State private var wheels: [Wheels.Device] = []
 
     var body: some View {
         ScrollView {
@@ -48,7 +53,11 @@ struct GameDetailView: View {
         .task(id: game.slug) {
             language = .load(game)
             latestBackup = SaveBackups.list(bottle: game.bottleName).first
+            pads = Controllers.connected()
+            wheels = Wheels.connected()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidConnect)) { _ in pads = Controllers.connected() }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in pads = Controllers.connected() }
     }
 
     // MARK: - Hero
@@ -326,6 +335,8 @@ struct GameDetailView: View {
                     .help("\(game.name) starts on \(profiles.displayName) again from its next launch. \(profiles.summary)")
             }
 
+            controllerLine
+
             if let notes = facts.notes, !notes.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
@@ -352,6 +363,40 @@ struct GameDetailView: View {
         // is the truth.
         guard (try? BackendChoice.set(nil, in: BottleConfig.url(forBottle: game.bottleName))) != nil else { return }
         onChange()
+    }
+
+    /// The pads connected now, next to what the profile recorded about this game and a controller.
+    /// Said as two facts, never combined into a promise that the pad will work in the game.
+    @ViewBuilder private var controllerLine: some View {
+        if !pads.isEmpty || !wheels.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                if !pads.isEmpty {
+                    Label("Connected: " + pads.map(\.name).joined(separator: ", "), systemImage: "gamecontroller")
+                        .font(.callout)
+                }
+                if !wheels.isEmpty {
+                    Label("Connected: " + wheels.map(\.name).joined(separator: ", "), systemImage: "steeringwheel")
+                        .font(.callout)
+                    Text(Wheels.forceFeedbackNote)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if game.facts.controller == nil {
+                    Text("This game's profile doesn't say how it handles a controller yet.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let note = Controllers.steamInputNote(store: game.store, throughClient: game.needsClientAtRuntime) {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            if !wheels.isEmpty {
+                // A wheel's set-up happens outside Cellar (PC mode, firmware), so say where to read it.
+                Link("How to set up a racing wheel", destination: Links.controllersHelp)
+                    .font(.caption)
+            }
+        }
     }
 
     @ViewBuilder private func factColumns(_ facts: GameFacts) -> some View {

@@ -140,11 +140,14 @@ public struct GameFacts: Sendable {
     public let status: String?
     /// Free text: the caveats, the hardware something was tested on, the known patch-day breakage.
     public let notes: String?
+    /// `full` / `partial` / `none`: what the profile's author saw a controller do in this game.
+    public let controller: String?
 
     public init(developer: String? = nil, released: String? = nil, engine: String? = nil,
                 graphicsAPI: String? = nil, anticheat: String? = nil, drm: String? = nil,
                 online: String? = nil, requiresAccount: String? = nil, status: String? = nil,
-                notes: String? = nil) {
+                notes: String? = nil, controller: String? = nil) {
+        self.controller = controller
         self.developer = developer
         self.released = released
         self.engine = engine
@@ -166,7 +169,8 @@ public struct GameFacts: Sendable {
 
     /// The facts that answer "will this actually run, and what does it want from me?".
     public var compatibility: [(label: String, value: String)] {
-        [("Anti-cheat", anticheat), ("DRM", drm), ("Online", online), ("Account", requiresAccount)]
+        [("Anti-cheat", anticheat), ("DRM", drm), ("Online", online), ("Account", requiresAccount),
+         ("Controller", Controllers.support(controller))]
             .compactMap { label, value in value.map { (label, $0) } }
     }
 }
@@ -555,7 +559,8 @@ public enum Game {
                 online: fields["online"],
                 requiresAccount: fields["requires_account"],
                 status: fields["status"],
-                notes: fields["notes"]),
+                notes: fields["notes"],
+                controller: fields["controller"]),
             metalFXUpscaling: performance.metalFXUpscaling,
             language: LanguageChoice.resolve(game: BottleConfig.language(bottleFile), global: CellarSettings.language),
             performance: performance,

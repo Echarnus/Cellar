@@ -288,7 +288,11 @@ extension SteamClientSession {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                         withIntermediateDirectories: true)
                 try file.text.write(to: url, atomically: true, encoding: .utf8)
+                PrivateFiles.restrict(file: url)
             }
+            // `local.vdf` now carries the token (under a DPAPI blob anyone with the file can open), so
+            // it is treated as the credential it is: out of backups as well as private.
+            PrivateFiles.protectCredential(localConfig(in: prefix, wineUser: wineUser))
         } catch {
             // Take back whatever landed, so a half-written hand-over leaves no token behind and no
             // claim of a sign-in.
