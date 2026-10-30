@@ -54,6 +54,7 @@ swift run cellar selftest         # in-repo smoke test
 sh Scripts/install-app.sh         # build + install ~/Applications/Cellar.app
 sh Scripts/build-dock-shim.sh     # build the Dock shim into .build/ (needed by `swift run cellar`)
 python3 Scripts/gen-site.py       # regenerate the Pages site into site/
+python3 Scripts/check-site.py     # check it: links, anchors, structure, contrast (what CI runs)
 ```
 
 `swift build` does **not** build the Dock shim — it is a universal C dylib, and SwiftPM builds for one

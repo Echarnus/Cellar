@@ -11,8 +11,11 @@ The full guide is [`skills/web.md`](../../../skills/web.md); read it. Key rules:
   step, inline CSS/JS. Edit the **generator**, not the HTML.
 - **Data-driven:** the games grid comes from `profiles/*.toml` — change the generator to change a
   card. Keep `gen-site.py` **Python 3.9-safe** (tomllib + fallback parser).
-- **Download CTA** links to the **versionless** `releases/latest/download/Cellar.dmg` — don't add a
-  version to that filename.
+- **Download CTA** is resolved at build time from the latest release's `.dmg` (falling back to the
+  releases page); `pages.yml` redeploys after every release so it stays current.
+- **Ships itself:** `pages.yml` builds + checks on PRs (artifact = preview), deploys from `main` and
+  after a release. `python3 Scripts/check-site.py` checks links, anchors, structure and the
+  palette's WCAG contrast — run it after generating.
 - **Quality bar:** semantic HTML, theme-aware via `:root` custom properties (+ `prefers-color-scheme`
   dark), responsive (no horizontal body scroll), accessible (focus states, WCAG AA contrast,
   `prefers-reduced-motion`), self-contained.
