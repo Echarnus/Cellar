@@ -184,6 +184,13 @@ struct ContentView: View {
         }
     }
 
+    /// When the game database was last fetched, so the daily check survives a relaunch.
+    @AppStorage("profilesLastChecked") private var lastDatabaseCheckStamp: Double = 0
+    private var lastDatabaseCheck: Date {
+        get { Date(timeIntervalSince1970: lastDatabaseCheckStamp) }
+        nonmutating set { lastDatabaseCheckStamp = newValue.timeIntervalSince1970 }
+    }
+
     /// How old an answer from Steam may get before the app asks again.
     private static let updateCheckInterval = GameUpdates.recheckInterval
 
@@ -204,6 +211,13 @@ struct ContentView: View {
                     _ = await runner.runBeside(["update", slug, "--check"])
                 }
                 lib.refresh()
+            }
+            // The game database, once a day, the same quiet way. A build with no signing key has
+            // nothing it could accept, so it doesn't ask.
+            if !ProfileUpdates.publicKey.isEmpty, !runner.busy,
+               Date().timeIntervalSince(lastDatabaseCheck) > 24 * 60 * 60 {
+                lastDatabaseCheck = Date()
+                if await runner.runBeside(["profiles", "update", "--quiet"]) == 0 { lib.refresh() }
             }
             try? await Task.sleep(for: .seconds(30 * 60))
         }
