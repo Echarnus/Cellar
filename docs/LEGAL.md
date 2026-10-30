@@ -10,12 +10,13 @@ verified research into each component's license and the relevant law.
    repo and never shipped in a Cellar release. Apple's license grants personal/non-commercial use and
    permits **distribution "solely for non-commercial purposes."** D3DMetal therefore reaches the
    user's machine in one of two ways, both consistent with that grant:
-   - **Default (minimal setup):** `cellar runner install gptk` downloads the **Gcenx Game Porting
-     Toolkit** Wine build at runtime. Gcenx is a non-commercial project redistributing D3DMetal under
-     Apple's non-commercial grant — the same model Heroic uses. Cellar fetches it; it is not part of
-     Cellar's source or releases.
+   - **Default:** the player's copy of Cellar downloads a community runner at run time — the
+     WineForge Wine build, with D3DMetal taken from **Sikarugir's** wrapper template (the legacy
+     `gptk` runner takes it from **Gcenx's** Game Porting Toolkit build instead). Those are
+     non-commercial projects redistributing D3DMetal under Apple's non-commercial grant — the same
+     model Heroic uses. Cellar fetches it from them; it is not part of Cellar's source or releases.
    - **Spotless (advanced):** the user downloads Apple's own GPTK `.dmg` (free Apple ID) and imports
-     it with `cellar gptk import` (Phase 2).
+     it with `cellar gptk import`.
    The fully open **DXVK / DXMT** path is always available as a no-Apple-component alternative for
    titles that don't need D3DMetal.
 
@@ -51,7 +52,7 @@ verified research into each component's license and the relevant law.
      icon Wine extracted from the Windows client's `.exe` during setup, or a loose `.ico` the client
      ships. This is the player's own copy of the store's artwork, displayed in place; nothing is
      redistributed, exactly as with Apple's D3DMetal.
-   - **A vector shape Cellar draws itself** (`Sources/CellarApp/StoreMark.swift`) when the store is
+   - **A vector shape Cellar draws itself** (`Sources/CellarUI/StoreMark.swift`) when the store is
      not installed and there is nothing to point at.
 
    This matters because every storefront's own brand terms rule out shipping the artwork: Valve's
@@ -101,10 +102,30 @@ Points worth being explicit about:
 ## License hygiene
 
 - Cellar's own code: **GPL-3.0**.
-- Every bundled component keeps its own license; texts and notices are reproduced in
-  [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md) and in a `licenses/` folder in release builds.
-- Publish any modifications Cellar makes to LGPL components (Wine, VKD3D-Proton).
-- Preserve MoltenVK's `NOTICE` and the zlib origin notices.
+- [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md) is the inventory: every component, whether
+  Cellar ships it or the player's copy fetches it at run time, and what its licence asks.
+- Every release carries `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES.md` and [`licenses/`](../licenses/)
+  — in `Cellar.app/Contents/Resources/Legal/` and the CLI zip's `share/cellar/legal/`
+  (`Scripts/package.sh`), and `LICENSE`/`NOTICE` at the top of the DMG (`Scripts/make-dmg.sh`).
+  GPL-3.0 §4 requires the licence text to travel with the binary; the source is the release's tag.
+- A component that ends up **inside** a Cellar artifact needs its licence text in `licenses/`, a row
+  in the inventory, and a `Credit` (`Sources/CellarKit/Credits.swift`) — the About screen and
+  Settings › About read that list. A component fetched at run time needs the row and the `Credit`;
+  `CreditsTests` fails when a runner or tool comes from a publisher the credits do not name.
+- Cellar carries no modifications to Wine or any other LGPL component. If it ever does, publish them.
+
+## Distributing Cellar
+
+GPL-3.0 lets anyone distribute or even sell Cellar. Apple's D3DMetal terms are narrower, and Cellar's
+default runner uses D3DMetal, so:
+
+- **Free downloads (GitHub Releases, the site): fine.** This is how Cellar ships today.
+- **Do not sell Cellar, put it behind a paywall, or bundle it into a paid product while its default
+  graphics path is D3DMetal**, and never pre-install a runner in an artifact. A commercial edition
+  would need the DXVK → MoltenVK path as its default and D3DMetal left as something the player
+  imports themselves, or a licence from Apple.
+- **Signing and notarising** the app with a Developer ID changes none of this; it is distribution,
+  not sale.
 
 ## If in doubt
 

@@ -37,7 +37,10 @@ public enum Credits {
         sourceURL: "https://gitlab.winehq.org/wine/wine")
 
     /// Everything else, in the order a player meets it: the Wine builds Cellar installs, the
-    /// graphics backend, then the tools that fetch games.
+    /// graphics backends inside them, then the tools that fetch games.
+    ///
+    /// `docs/LEGAL.md` → *License hygiene*: every publisher Cellar downloads from is named here, and
+    /// `CreditsTests` holds that true.
     public static let all: [Credit] = [
         wine,
         Credit(name: "CodeWeavers · CrossOver",
@@ -65,6 +68,22 @@ public enum Credits {
                role: "DirectX 11/12 → Metal. Never bundled by Cellar; grafted from a runner at run time under Apple's non-commercial grant.",
                license: "Apple (proprietary)",
                url: "https://developer.apple.com/games/game-porting-toolkit/"),
+        Credit(name: "DXMT",
+               role: "DirectX 11 → Metal, the open alternative to D3DMetal. Ships inside the Sikarugir template.",
+               license: "zlib",
+               url: "https://github.com/3Shain/dxmt"),
+        Credit(name: "DXVK",
+               role: "DirectX 9/10/11 → Vulkan, the fully open graphics path. Ships inside the Sikarugir template.",
+               license: "zlib",
+               url: "https://github.com/doitsujin/dxvk"),
+        Credit(name: "MoltenVK",
+               role: "Vulkan → Metal, underneath DXVK. Ships inside the Sikarugir template.",
+               license: "Apache-2.0",
+               url: "https://github.com/KhronosGroup/MoltenVK"),
+        Credit(name: "GStreamer",
+               role: "Plays games' intro and cut-scene videos inside Wine. Ships inside the runners.",
+               license: "LGPL-2.1+",
+               url: "https://gstreamer.freedesktop.org/"),
         Credit(name: "DepotDownloader",
                role: "Downloads the games you own from Steam without the Windows client.",
                license: "GPL-2.0",
@@ -77,5 +96,5 @@ public enum Credits {
 
     /// The non-affiliation line, in one place.
     public static let nonAffiliation =
-        "Cellar is GPL-3.0 and not affiliated with the Wine project, Apple, Valve, Blizzard, CodeWeavers or any game publisher."
+        "Cellar is GPL-3.0 and not affiliated with the Wine project, Apple, Valve, Blizzard, GOG, CodeWeavers or any game publisher."
 }

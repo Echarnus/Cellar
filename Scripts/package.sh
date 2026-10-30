@@ -24,6 +24,9 @@ cp "$BINDIR/cellar" "$DIST/cli/bin/cellar"
 cp profiles/*.toml "$DIST/cli/share/cellar/profiles/"
 # The Dock shim travels with the CLI: the CLI is what spawns Wine, so it is what needs to find it.
 sh Scripts/build-dock-shim.sh "$DIST/cli/share/cellar/cellar-dock-shim.dylib"
+# GPL-3.0 §4: the licence travels with the binary — and so do the notices of what is compiled into it.
+mkdir -p "$DIST/cli/share/cellar/legal"
+cp -R LICENSE NOTICE THIRD_PARTY_LICENSES.md licenses "$DIST/cli/share/cellar/legal/"
 ( cd "$DIST/cli" && zip -qr "../Cellar-CLI-$VERSION.zip" bin share )
 
 # GUI app
@@ -34,6 +37,7 @@ cp "$BINDIR/CellarApp" "$APP/Contents/MacOS/CellarApp"
 mkdir -p "$APP/Contents/Resources/profiles"
 cp profiles/*.toml "$APP/Contents/Resources/profiles/"
 cp "$DIST/cli/share/cellar/cellar-dock-shim.dylib" "$APP/Contents/Resources/"
+cp -R "$DIST/cli/share/cellar/legal" "$APP/Contents/Resources/Legal"
 
 [ -f Resources/AppIcon.png ] || swift Scripts/make-icon.swift Resources/AppIcon.png
 ISET="$(mktemp -d)/Cellar.iconset"; mkdir -p "$ISET"
