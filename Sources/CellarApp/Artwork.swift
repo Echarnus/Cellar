@@ -35,11 +35,12 @@ enum Artwork {
 struct RemoteArt<Fallback: View>: View {
     let url: URL?
     let fallback: Fallback
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     init(_ url: URL?, @ViewBuilder fallback: () -> Fallback) { self.url = url; self.fallback = fallback() }
 
     var body: some View {
         if let url {
-            AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
+            AsyncImage(url: url, transaction: Transaction(animation: reduceMotion ? nil : .easeOut(duration: 0.25))) { phase in
                 switch phase {
                 case .success(let image): image.resizable()
                 default: fallback
@@ -83,6 +84,9 @@ struct GameCover: View {
                     .offset(x: width * 0.10, y: width * 0.10)
             }
         }
+        // Every cover sits beside the game's name in words (the sidebar row, the page header, the
+        // launch splash), so to VoiceOver the art is decoration, not a second reading of the title.
+        .accessibilityHidden(true)
     }
 }
 
