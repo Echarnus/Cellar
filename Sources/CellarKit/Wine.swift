@@ -337,6 +337,13 @@ public struct WineRunner {
         }
     }
 
+    /// Wine's Retina mode for this bottle. Written to the registry, where the Mac driver reads it at
+    /// start-up, so it takes effect from the next launch of anything in the prefix.
+    public func setRetinaMode(_ on: Bool) {
+        run(["reg", "add", #"HKCU\Software\Wine\Mac Driver"#, "/v", "RetinaMode", "/t", "REG_SZ",
+             "/d", on ? "y" : "n", "/f"])
+    }
+
     /// Run a Windows executable inside the prefix.
     @discardableResult
     public func runExecutable(_ path: String, args: [String] = [],

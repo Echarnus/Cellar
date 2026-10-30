@@ -162,6 +162,17 @@ public enum Diagnostics {
             .suffix(lines)
     }
 
+    /// One game's log as the app's Log panel shows it: what Cellar did for the game, then the tail
+    /// of Wine's own output. Redacted like the report, since it is one Copy away from a forum post.
+    public static func sessionLog(slug: String, lines: Int = 200) -> String {
+        let cellar = CellarLog.entries(limit: lines, subject: slug).map(\.line)
+        let wine = wineLogTail(slug: slug, lines: lines)
+        var parts: [String] = []
+        if !cellar.isEmpty { parts.append("Cellar\n" + cellar.joined(separator: "\n")) }
+        if !wine.isEmpty { parts.append("Wine\n" + wine.joined(separator: "\n")) }
+        return redact(parts.joined(separator: "\n\n"))
+    }
+
     // MARK: - The report
 
     /// Default file name — dated, so a player can send two of them without confusion.
@@ -382,14 +393,26 @@ public enum Diagnostics {
     }
 
     /// Strip what a player would not want to post in public: their home path, their short user
-    /// name, and any `key=value` / `"key": "value"` pair whose key smells like a credential.
-    public static func redact(_ text: String) -> String {
-        var out = text.replacingOccurrences(
+    /// name, the store accounts they signed in with, anything shaped like a credential, and any
+    /// `key=value` / `"key": "value"` pair whose key smells like one.
+    ///
+    /// `identities` defaults to the account names Cellar itself recorded — the Steam account and the
+    /// GOG username. The report promises "account names are removed", and the place those names leak
+    /// from is not Cellar's own lines (which never print them) but the Wine and store-client logs it
+    /// quotes, which print them freely.
+    public static func redact(_ text: String, identities: [String]? = nil) -> String {
+        var out = redactCredentials(text)
+        out = out.replacingOccurrences(
             of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")
         let user = NSUserName()
         if user.count >= 3 {
             out = out.replacingOccurrences(of: "/Users/\(user)", with: "~")
             out = out.replacingOccurrences(of: user, with: "<user>")
+        }
+        for name in identities ?? knownIdentities where name.count >= 3 {
+            out = out.replacingOccurrences(
+                of: "(?i)(?<![A-Za-z0-9_])\(NSRegularExpression.escapedPattern(for: name))(?![A-Za-z0-9_])",
+                with: "<account>", options: [.regularExpression])
         }
         let secretKey = "(?i)(token|refresh_token|access_token|password|passwd|secret|api[_-]?key|authorization|cookie|session|code|auth|pin|guard)"
         for pattern in ["\(secretKey)\\s*[=:]\\s*\"[^\"]*\"", "\(secretKey)\\s*[=:]\\s*\\S+"] {
@@ -402,9 +425,47 @@ public enum Diagnostics {
         out = out.replacingOccurrences(
             of: "(?i)(--(?:password|token|secret|api[-_]?key|username|user|account|code|auth))(\\s+|=)\\S+",
             with: "$1$2<redacted>", options: [.regularExpression])
+        // DepotDownloader's options are single-dash words: `-username kennethdc -remember-password`.
         out = out.replacingOccurrences(
-            of: "(?<![\\w-])(-[upkc])(\\s+|=)\\S+",
+            of: "(?<![\\w-])(-(?:username|password|user)|-[upkc])(\\s+|=)\\S+",
             with: "$1$2<redacted>", options: [.regularExpression])
         return out
     }
+
+    /// The account names Cellar knows the player by, for `redact`.
+    static var knownIdentities: [String] {
+        [SteamAccount.record?.accountName, GOGAuth.cachedUsername].compactMap { $0 }
+    }
+
+    /// Take out anything that *is* a credential, whatever it is called — and nothing else, so it is
+    /// safe to run on every line written to the log without making that log useless to read.
+    ///
+    /// `redact` is the broad rule for a report about to be posted; this is the narrow one, applied
+    /// at write time, that does not depend on a key that "smells" right:
+    /// - JSON Web Tokens — Steam's refresh and access tokens are JWTs, and so are many OAuth tokens;
+    /// - `Bearer …` — an `Authorization` header quoted by a client log;
+    /// - the value of a key that is unambiguously a secret (`refresh_token`, `client_secret`, …);
+    /// - an OAuth `code=` in a redirect URL — GOG's sign-in ends on one;
+    /// - `-password` / `--password` values;
+    /// - long hex runs: the DPAPI blob of a Steam "Remember me" (`local.vdf` ConnectCache) is
+    ///   hundreds of hex digits, while every hash Cellar logs is at most 64.
+    public static func redactCredentials(_ text: String) -> String {
+        var out = text
+        let rules: [(String, String)] = [
+            // `ey` is how base64 of `{` starts. Not `eyJ`: Steam writes `{ "typ"…` with a space, which
+            // encodes as `eyAi…`, and a rule keyed on `eyJ` let every Steam token straight through.
+            ("ey[A-Za-z0-9_-]{8,}\\.ey[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]*", "<redacted token>"),
+            ("(?i)\\b(bearer)\\s+[A-Za-z0-9._~+/=-]{8,}", "$1 <redacted>"),
+            ("(?i)\\b(refresh_token|access_token|id_token|client_secret|password|passwd)([\"']?\\s*[=:]\\s*)(\"[^\"]*\"|'[^']*'|[^\\s,&;}]+)",
+             "$1$2<redacted>"),
+            ("(?<=[?&])code=[^&\\s\"']+", "code=<redacted>"),
+            ("(?i)(?<![\\w-])(--?password)(\\s+|=)\\S+", "$1$2<redacted>"),
+            ("\\b[0-9a-fA-F]{128,}\\b", "<redacted blob>"),
+        ]
+        for (pattern, template) in rules {
+            out = out.replacingOccurrences(of: pattern, with: template, options: [.regularExpression])
+        }
+        return out
+    }
 }
+

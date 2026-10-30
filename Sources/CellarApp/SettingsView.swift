@@ -206,10 +206,14 @@ struct SettingsView: View {
     /// over the network. Doing it inline in `onAppear` meant blocking the main thread and then
     /// mutating `@State` in the middle of `NSHostingView`'s first layout pass, which re-enters the
     /// view graph and aborts in AttributeGraph.
+    ///
+    /// The GOG name is the CLI's to learn, because the CLI is what holds the token: `cellar gog
+    /// status` asks GOG and writes the name both binaries read. The app never reads the token itself.
     private func refresh() {
+        let runner = runner
         Task.detached {
             if GOGAuth.isSignedIn, GOGAuth.cachedUsername == nil {
-                GOGAuth.cacheUsername(try? GOGAuth.username())
+                _ = await runner.runBeside(["gog", "status"])
             }
             let snapshot = StoreAccountState.current()
             await MainActor.run { accounts = snapshot }

@@ -913,6 +913,11 @@ public enum Game {
         // After a runner update Wine would rebuild the prefix inside this launch, with its own
         // "Please wait" box on screen. Do it first, where nothing is drawn.
         wine.updatePrefixIfStale()
+        // Retina mode lives in the registry, not the environment. Only written when the profile or
+        // the player said something about it: every other game keeps Wine's default and pays nothing.
+        if let retina = plan.performance.entries.first(where: { $0.setting == .retina }), retina.source != .cellarDefault {
+            wine.setRetinaMode(retina.value == "true")
+        }
 
         // A copy Cellar downloaded has nobody else to keep it current: Steam doesn't know it exists.
         // So Cellar does what Steam does before it starts anything — catch it up first.

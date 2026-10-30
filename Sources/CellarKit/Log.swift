@@ -168,8 +168,12 @@ public final class CellarLog: @unchecked Sendable {
 
     private func write(_ level: LogLevel, _ category: LogCategory, _ message: String, _ subject: String?) {
         guard let minimumLevel, level >= minimumLevel else { return }
+        // Credentials are taken out *here*, before anything reaches the disk — not only when a report
+        // is exported. A token that made it into the file once sits in every backup of it, and the
+        // log is exactly what a player attaches to a public issue (OWASP MASVS-STORAGE-2).
         let entry = LogEntry(date: Date(), level: level, source: source, category: category,
-                             subject: subject.flatMap { $0.isEmpty ? nil : $0 }, message: message)
+                             subject: subject.flatMap { $0.isEmpty ? nil : $0 },
+                             message: Diagnostics.redactCredentials(message))
         let line = entry.line + "\n"
         if mirrorsToStderr { FileHandle.standardError.write(Data(line.utf8)) }
 
@@ -178,14 +182,25 @@ public final class CellarLog: @unchecked Sendable {
         append(line)
     }
 
+    /// Whether this process has already narrowed the log's permissions. Once is enough: every file
+    /// it creates afterwards is created private.
+    private var isPrivate = false
+
     private func append(_ line: String) {
         let url = Self.fileURL
         try? fileManager.createDirectory(at: url.deletingLastPathComponent(),
                                          withIntermediateDirectories: true)
+        if !isPrivate {
+            // The log names games, paths and what went wrong with a sign-in: the player's to read,
+            // not every account's on the Mac. Covers logs written before this was enforced.
+            PrivateFiles.restrict(directory: Paths.logs)
+            for file in Self.files { PrivateFiles.restrict(file: file) }
+            isPrivate = true
+        }
         rotateIfNeeded(url)
         guard let handle = try? FileHandle(forWritingTo: url) else {
-            // First write on a fresh install: there is no file to open yet.
-            try? Data(line.utf8).write(to: url)
+            // First write on a fresh install, or straight after a rotation: there is no file to open.
+            try? PrivateFiles.write(Data(line.utf8), to: url)
             return
         }
         defer { try? handle.close() }
