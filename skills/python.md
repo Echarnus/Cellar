@@ -1,6 +1,7 @@
 # Skill: Python in Cellar (`Scripts/gen-site.py`)
 
-There are two Python programs in this repo: the static-site generator, and the small
+There are three Python programs in this repo: the static-site generator, its checker
+(`Scripts/check-site.py`, which CI runs on every site change), and the small
 `Scripts/make-appcast.py` that writes the update feed (same rules: stdlib only, 3.9 floor, escape
 every interpolation). Most of this file is about the generator. Best practices
 for changing it. Portable guide; Claude's auto-discovered copy is
@@ -22,16 +23,14 @@ for changing it. Portable guide; Claude's auto-discovered copy is
 
 ## Escape every interpolation
 
-The page is built with f-strings, so every value interpolated into HTML must be escaped, and
-`card()` aliases `n = html.escape` to make that cheap. It is applied consistently to the visible
-text — and **not** applied to several attribute values: `src="{g['portrait']}"`,
-`data-status="{g['status']}"`, `data-store="{g['storekey']}"` and `class="tag store {store['cls']}"`.
+The page is built with f-strings, so every value interpolated into HTML must be escaped, and the
+render functions alias `n = html.escape` to make that cheap. Every profile value is escaped, in text
+*and* in attributes (`src`, `data-*`, classes) — "escape everything, without having to reason about
+the source" is the only rule that stays true after someone adds a user-synced profile registry. The
+exception is the FAQ's answers, which are HTML authored in the generator itself.
 
-`status` is the one to fix first: `STATUS.get(...)` falls back to the **raw profile string** when the
-value is outside the known vocabulary, and that raw string lands in an attribute unquoted-escaped. A
-profile is repo-controlled, so this is not a live vulnerability — but "escape everything, without
-having to reason about the source" is the only rule that stays true after someone adds a
-user-synced profile registry. Wrap them.
+An unknown `store` or `status`, or a profile without `name`/`slug`, **fails the build with the
+filename** rather than rendering a wrong card.
 
 ## Style
 
@@ -39,15 +38,15 @@ user-synced profile registry. Wrap them.
   (`load_games`, `card`, `render`, `main`) and dict-shaped records. Ruff's `PTH` rules would push you
   to `pathlib` — that is a fine choice, but make it wholesale in its own commit, not by leaving half
   the script in each idiom.
-- **Always pass `encoding="utf-8"` to `open()`.** `main()` currently writes `index.html` without one,
-  so the output encoding depends on the machine's locale. Game names are not all ASCII.
-- **Close what you open.** `parse_toml`'s fallback iterates `open(path, encoding="utf-8")` directly,
-  leaving the handle to the garbage collector. Use a `with` block.
+- **Always pass `encoding="utf-8"` to `open()`**, and close what you open with a `with` block.
+  Game names are not all ASCII.
 - **Stay deterministic.** `sorted(glob(...))` and the explicit `sorted(games, key=…)` are why the
   generated page has a stable diff. Never iterate a set or an unsorted directory listing into output.
-- **Fail loudly on bad input.** A malformed profile currently produces a silently wrong card. If you
-  add validation, exit non-zero with the filename — CI runs this generator as a sanity step, so a
-  real failure there is free protection.
+- **Fail loudly on bad input.** Validation exits non-zero with the filename; CI runs the generator
+  on every site change, so a real failure there is free protection.
+- **Both parsers, every time.** `CELLAR_TOML_FALLBACK=1` forces the hand-rolled parser even where
+  `tomllib` exists; `pages.yml` builds the site both ways and diffs the output, so the 3.9 path is
+  no longer exercised only on this Mac.
 
 ## Linting
 
