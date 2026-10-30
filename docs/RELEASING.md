@@ -110,7 +110,17 @@ ships is trusted on its own; `make-dmg.sh` then signs and notarises the DMG.
    ```
 
    and pass `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID` and `NOTARY_KEY` as `env:` to the *Package* and
-   *Build installer DMG* steps. The build job then needs `environment: release` to read them.
+   *Build installer DMG* steps. All five are **`release` environment secrets**, never repository
+   secrets, and the build job only enters that environment on a tag push — it also runs on
+   `workflow_dispatch`, which must stay secret-free:
+
+   ```yaml
+   environment: ${{ github.event_name == 'push' && 'release' || '' }}
+   ```
+
+   A manual build then simply stays ad-hoc signed. (The alternative is to sign in the publish job,
+   which already holds the environment: download the build, run `sign-app.sh` + `notarize.sh` on
+   the app, re-zip it and re-run `make-dmg.sh` — more moving parts for the same result.)
 5. **Change the release notes in the same commit:** a notarised Cellar opens with a double-click,
    so "Open Anyway" must stop being part of the instructions (also in `make-dmg.sh`'s *Read Me*).
 
