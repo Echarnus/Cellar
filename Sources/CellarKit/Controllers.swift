@@ -1,5 +1,6 @@
 import Foundation
 import GameController
+import IOKit.hid
 
 /// Game controllers: which ones are connected, and what a game's profile says it does with one.
 ///
@@ -67,5 +68,99 @@ public enum Controllers {
     public static func steamInputNote(store: GameStore, throughClient: Bool) -> String? {
         guard store == .steam, throughClient else { return nil }
         return "Started through Steam, so Steam Input may remap your controller. Change it in Steam's controller settings for this game."
+    }
+
+    // MARK: - What macOS and the runner allow
+
+    /// macOS's Input Monitoring answer for this process. Wine's HID layer opens every matching
+    /// device, keyboards included, and macOS refuses the whole request until Input Monitoring is
+    /// granted — so without it a pad macOS itself sees never reaches the game (Wine bug 50153).
+    public enum InputMonitoring: Sendable, Equatable {
+        case granted, denied, notAsked
+    }
+
+    /// Peeks at the answer without asking: a check must never be what puts a dialog up.
+    public static func inputMonitoring() -> InputMonitoring {
+        let access = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
+        if access == kIOHIDAccessTypeGranted { return .granted }
+        if access == kIOHIDAccessTypeDenied { return .denied }
+        return .notAsked
+    }
+
+    /// What `cellar doctor` says about Input Monitoring, for whoever `who` is ("Cellar" or "this
+    /// terminal" — macOS records the answer per app). Never a ✓ for "not asked": macOS asks the
+    /// first time a game opens a pad, and that is fine.
+    public static func inputMonitoringCheck(_ answer: InputMonitoring, who: String) -> CheckResult {
+        switch answer {
+        case .granted:
+            return CheckResult("Input Monitoring", .ok, "allowed for \(who)")
+        case .notAsked:
+            return CheckResult("Input Monitoring", .info, "not asked yet",
+                hint: "The first time a game looks for a controller, macOS asks whether \(who) may "
+                    + "“receive keystrokes from any application”. Allow it: that is how macOS names "
+                    + "access to controllers and wheels for Wine.")
+        case .denied:
+            return CheckResult("Input Monitoring", .warn, "turned off for \(who)",
+                hint: "Games won't see a controller or wheel. Turn \(who) on in System Settings → "
+                    + "Privacy & Security → Input Monitoring, then quit and reopen the game.")
+        }
+    }
+
+    /// The SDL library a runner carries, if any. Wine's input layer uses SDL when it can load it,
+    /// and SDL is what presents a PlayStation or Switch pad to a game as an Xbox controller; without
+    /// it Wine falls back to plain HID, where only some pads get that treatment.
+    public static func sdlLibrary(in directories: [URL]) -> URL? {
+        let fm = FileManager.default
+        for directory in directories {
+            guard let names = try? fm.contentsOfDirectory(atPath: directory.path) else { continue }
+            if let name = names.sorted().first(where: { $0.hasPrefix("libSDL2") || $0.hasPrefix("libSDL3") }),
+               name.hasSuffix(".dylib") {
+                return directory.appendingPathComponent(name)
+            }
+        }
+        return nil
+    }
+
+    /// Where a runner's Wine looks for libraries: the directories `Wine.environment` puts on the
+    /// library path for that runner's layout, so a library found here is one Wine can load.
+    public static func libraryDirectories(of runner: RunnerInstall) -> [URL] {
+        let lib = runner.wineRoot.appendingPathComponent("lib", isDirectory: true)
+        if runner.isWineForgeStyle { return [lib] }
+        var directories = [lib, runner.wineRoot.appendingPathComponent("lib64", isDirectory: true)]
+        if let frameworks = runner.frameworks { directories.append(frameworks) }
+        return directories
+    }
+
+    /// What `cellar doctor` says about the runner's controller path. Information either way: a
+    /// runner can carry SDL and have been built without using it, so this is a pointer, not proof.
+    public static func sdlCheck(runnerID: String, library: URL?) -> CheckResult {
+        if let library {
+            return CheckResult("Controller layer", .info, "SDL in the \(runnerID) runner (\(library.lastPathComponent))",
+                hint: "Wine can present PlayStation and Switch pads to games as Xbox controllers.")
+        }
+        return CheckResult("Controller layer", .info, "no SDL in the \(runnerID) runner",
+            hint: "Wine reads pads through macOS's HID layer instead. Xbox pads work best this way; "
+                + "a PlayStation or Switch pad may need Steam Input (in Steam's controller settings) to act as one.")
+    }
+
+    // MARK: - cellar doctor
+
+    /// The controller rows `cellar doctor` prints, from what was found. Pure, so every state is
+    /// tested without hardware. Pads and wheels are `.info` whatever is connected: a device macOS
+    /// sees is not proof a game takes it.
+    public static func doctorChecks(pads: [Pad], wheels: [Wheels.Device], inputMonitoring: InputMonitoring,
+                                    who: String, runnerLayer: CheckResult?) -> [CheckResult] {
+        var checks: [CheckResult] = []
+        checks.append(CheckResult("Controllers", .info,
+            pads.isEmpty ? "none connected" : pads.map { "\($0.name) (\($0.kind.displayName))" }.joined(separator: ", "),
+            hint: pads.isEmpty ? nil : "Whether a game takes it depends on the game: its page says what its profile recorded."))
+        if !wheels.isEmpty {
+            checks.append(CheckResult("Racing wheels", .info,
+                wheels.map { "\($0.name) (\($0.vendor.displayName) \($0.kind.displayName))" }.joined(separator: ", "),
+                hint: Wheels.forceFeedbackNote + " What to set up first: cellar controllers"))
+        }
+        checks.append(inputMonitoringCheck(inputMonitoring, who: who))
+        if let runnerLayer { checks.append(runnerLayer) }
+        return checks
     }
 }

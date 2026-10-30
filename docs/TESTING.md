@@ -219,6 +219,34 @@ To test: connect the pad, check `cellar doctor` lists it, start a game whose pro
 `controller` yet, and note whether menus and gameplay respond. For a Steam game started through the
 client, say whether Steam Input was on, since it remaps the pad before the game sees it.
 
+What the unit and tier A tests already cover without hardware: the pad-family and wheel tables
+(`ControllersTests`, `WheelsTests`), every state of the Input Monitoring and runner-SDL rows, and on
+the CI Mac itself real GameController and HID enumeration through `cellar doctor`
+(`ControllerTests`). What they cannot cover is whether a device reaches a game, which is this table.
+
+### Racing wheels
+
+Wheels are found through the HID layer (`Wheels.connected()`), not GameController, which knows
+only a few Logitech models. Expected baseline: steering, pedals and buttons reach the game as a
+DirectInput device; **no force feedback**, since macOS needs a vendor ForceFeedback plug-in and none
+of these vendors ships one for Apple Silicon. Record anything better than that.
+
+| Wheel | Mode / firmware | Listed by `cellar controllers` | Steering + pedals in game | Force feedback |
+|---|---|---|---|---|
+| Fanatec (CSL DD / GT DD Pro / ClubSport) | PC mode, current firmware | not yet tested | — | — |
+| Logitech G29 / G920 / G923 | — | not yet tested | — | — |
+| Thrustmaster (T300 / T248 / TX) | PC mode | not yet tested | — | — |
+
+To test a wheel:
+
+1. Do the vendor's set-up first (`cellar controllers` prints it): PC mode, firmware current.
+2. `cellar controllers` lists the base, and pedals or shifter if they connect separately.
+3. `cellar doctor` shows *Input Monitoring*; allow it when macOS asks, the first time a game looks.
+4. In a racing game's controls menu: does the wheel appear, do steering and each pedal move a
+   separate axis (Thrustmaster pedals arriving as buttons is a known failure), and is there any
+   force feedback at all?
+5. Note the game, runner and backend, and record the result in the game's profile notes.
+
 ## Where this sits in the verification ladder
 
 `AGENTS.md` asks for the highest rung available before calling a change done. The suite maps onto it:

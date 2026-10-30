@@ -19,6 +19,8 @@ struct GameDetailView: View {
     @State private var latestBackup: SaveBackups.Backup?
     /// The controllers macOS sees, kept current as pads come and go.
     @State private var pads: [Controllers.Pad] = []
+    /// Wheels, pedals and shifters, read when the page appears (macOS posts no notice for them).
+    @State private var wheels: [Wheels.Device] = []
 
     var body: some View {
         ScrollView {
@@ -44,6 +46,7 @@ struct GameDetailView: View {
             language = .load(game)
             latestBackup = SaveBackups.list(bottle: game.bottleName).first
             pads = Controllers.connected()
+            wheels = Wheels.connected()
         }
         .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidConnect)) { _ in pads = Controllers.connected() }
         .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in pads = Controllers.connected() }
@@ -351,10 +354,19 @@ struct GameDetailView: View {
     /// The pads connected now, next to what the profile recorded about this game and a controller.
     /// Said as two facts, never combined into a promise that the pad will work in the game.
     @ViewBuilder private var controllerLine: some View {
-        if !pads.isEmpty {
+        if !pads.isEmpty || !wheels.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
-                Label("Connected: " + pads.map(\.name).joined(separator: ", "), systemImage: "gamecontroller")
-                    .font(.callout)
+                if !pads.isEmpty {
+                    Label("Connected: " + pads.map(\.name).joined(separator: ", "), systemImage: "gamecontroller")
+                        .font(.callout)
+                }
+                if !wheels.isEmpty {
+                    Label("Connected: " + wheels.map(\.name).joined(separator: ", "), systemImage: "steeringwheel")
+                        .font(.callout)
+                    Text(Wheels.forceFeedbackNote)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if game.facts.controller == nil {
                     Text("This game's profile doesn't say how it handles a controller yet.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -365,6 +377,11 @@ struct GameDetailView: View {
                 }
             }
             .accessibilityElement(children: .combine)
+            if !wheels.isEmpty {
+                // A wheel's set-up happens outside Cellar (PC mode, firmware), so say where to read it.
+                Link("How to set up a racing wheel", destination: Links.controllersHelp)
+                    .font(.caption)
+            }
         }
     }
 
