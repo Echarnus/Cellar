@@ -162,6 +162,17 @@ public enum Diagnostics {
             .suffix(lines)
     }
 
+    /// One game's log as the app's Log panel shows it: what Cellar did for the game, then the tail
+    /// of Wine's own output. Redacted like the report, since it is one Copy away from a forum post.
+    public static func sessionLog(slug: String, lines: Int = 200) -> String {
+        let cellar = CellarLog.entries(limit: lines, subject: slug).map(\.line)
+        let wine = wineLogTail(slug: slug, lines: lines)
+        var parts: [String] = []
+        if !cellar.isEmpty { parts.append("Cellar\n" + cellar.joined(separator: "\n")) }
+        if !wine.isEmpty { parts.append("Wine\n" + wine.joined(separator: "\n")) }
+        return redact(parts.joined(separator: "\n\n"))
+    }
+
     // MARK: - The report
 
     /// Default file name — dated, so a player can send two of them without confusion.
