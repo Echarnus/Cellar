@@ -75,6 +75,8 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
 `gen-site.py` maps these to labels and CSS classes; a value outside the set silently falls back:
 
 - `status`: **`playable` | `experimental` | `untested`**. An unknown value renders as *Untested*.
+  Players' reports arrive as `compatibility-report` issues (the app asks after a session; `cellar
+  report <slug>`): a report is evidence to test against, not a status to copy in unverified.
 - `store`: **`steam` | `battlenet` | `gog`**. An unknown value is treated as Steam — which
   would put a Battle.net game down the Steam pipeline. Spell it exactly.
 
