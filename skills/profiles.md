@@ -56,6 +56,9 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   Steam game is still `steam`, with `needs_live_session = false` so Cellar downloads the depot and
   runs the exe without standing Windows Steam up in the bottle.
 - **`[compatibility]`** — `anticheat`, `drm`, `requires_account`, `online`, `status`, `notes`.
+  Optional `network_check` — space-separated `https://` addresses of the game's own online services
+  (a workshop, an account server) that `cellar network <slug>` probes on top of the store's. Only
+  addresses you have seen the game use or the publisher documents; a guessed host proves nothing.
 - **`[runner]`** — `id`, `windows_version`. **`[graphics]`** — `backend`, `fallback_backend`.
   `fallback_backend` is live: when a launch starts the game but it never comes up, the launch window
   (and `cellar launch`) offers it once, and a switch that works is kept in the bottle as
