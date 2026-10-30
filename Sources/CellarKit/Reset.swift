@@ -225,9 +225,13 @@ public enum Reset {
     /// Saves live inside a bottle's `drive_c/users`, so wiping bottles wipes saves that the game
     /// never synced to a cloud. Named explicitly, because "it deletes bottles" does not read as
     /// "it deletes your saves" to anybody who isn't holding the source.
-    public static func saveGameWarning(in items: [Item]) -> String? {
+    /// `backedUp` is whether `perform` will copy them out first — it does, unless Cellar itself is
+    /// going and the copies would go with it.
+    public static func saveGameWarning(in items: [Item], backedUp: Bool = true) -> String? {
         guard items.contains(where: { $0.target == .path(Paths.prefixes) }) else { return nil }
-        return "Local save games live inside bottles. Anything a game only saved on this Mac — not to Steam Cloud — goes with them."
+        return backedUp
+            ? "Local save games live inside bottles. Cellar backs them up first and keeps the copies (cellar saves list <game>); the bottles themselves go."
+            : "Local save games live inside bottles. Anything a game only saved on this Mac — not to Steam Cloud — goes with them."
     }
 
     public static func totalBytes(_ items: [Item]) -> Int64 { items.reduce(0) { $0 + $1.bytes } }
@@ -235,8 +239,18 @@ public enum Reset {
     /// Delete everything in `items`. Each is removed independently: one failure (a file held open
     /// by a running game, say) must not leave the rest half-done and unexplained.
     @discardableResult
-    public static func perform(_ items: [Item], progress: (String) -> Void = { _ in }) -> [String] {
+    ///
+    /// Removing the bottles backs up every bottle's save games first (`SaveBackups`), and keeps the
+    /// bottles if that fails. `backUpSaves: false` is for removing Cellar outright, where the backups
+    /// would go with it and the player has already been asked about their saves.
+    public static func perform(_ items: [Item], backUpSaves: Bool = true,
+                               progress: (String) -> Void = { _ in }) -> [String] {
         var failures: [String] = []
+        var savesAtRisk: [String] = []
+        if backUpSaves, items.contains(where: { $0.target == .path(Paths.prefixes) && $0.exists }) {
+            progress("Backing up save games before the bottles go…")
+            savesAtRisk = SaveBackups.backUpAllBottles(reason: .beforeReset, progress: progress)
+        }
         // Cellar's Steam token also sits in every bottle's client (`SteamClientSession`). A reset
         // that takes the sign-in away but keeps the bottles would otherwise leave that copy behind,
         // still signing the player in — so it goes first, while the account name is still readable.
@@ -248,6 +262,10 @@ public enum Reset {
             SteamBottle.forgetClientSessions(account: account)
         }
         for item in items where item.exists {
+            if item.target == .path(Paths.prefixes), !savesAtRisk.isEmpty {
+                failures.append("Bottles kept: couldn't back up the save games in \(savesAtRisk.joined(separator: ", ")) first.")
+                continue
+            }
             progress("Removing \(item.title.lowercased())…")
             do {
                 switch item.target {

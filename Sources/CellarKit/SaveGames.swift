@@ -40,31 +40,41 @@ public enum SaveGames {
         let bottles = (try? fm.contentsOfDirectory(at: Paths.prefixes, includingPropertiesForKeys: nil)) ?? []
         for bottle in bottles.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
         where bottle.lastPathComponent != Preparation.scaffoldBottle && isDirectory(bottle) {
-            let users = bottle.appendingPathComponent("drive_c/users", isDirectory: true)
-            let profiles = (try? fm.contentsOfDirectory(at: users, includingPropertiesForKeys: nil)) ?? []
-            for profile in profiles where isDirectory(profile) && !isLink(profile) {
-                for folder in saveFolders {
-                    let url = profile.appendingPathComponent(folder, isDirectory: true)
-                    // A link is the Mac's real folder: it is not Cellar's, and it is not deleted.
-                    guard isDirectory(url), !isLink(url) else { continue }
-                    let entries = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
-                    for entry in entries where !isLink(entry) {
-                        let name = entry.lastPathComponent
-                        if folder.hasPrefix("AppData"), notSaves.contains(name.lowercased()) { continue }
-                        let bytes = Reset.size(of: entry)
-                        guard bytes > 0 else { continue }
-                        found.append(Location(
-                            bottle: bottle.lastPathComponent, url: entry,
-                            relativePath: "\(profile.lastPathComponent)/\(folder)/\(name)", bytes: bytes))
-                    }
-                }
-            }
+            found += locate(inBottle: bottle)
         }
         let userdata = Paths.sharedSteam.appendingPathComponent("userdata", isDirectory: true)
         if isDirectory(userdata), !isLink(userdata) {
             let bytes = Reset.size(of: userdata)
             if bytes > 0 {
                 found.append(Location(bottle: "Steam", url: userdata, relativePath: "userdata", bytes: bytes))
+            }
+        }
+        return found
+    }
+
+    /// The folders of saves in one bottle, by the same rules as `locate()`: the Windows user folders
+    /// games write into, minus links (the Mac's own folders) and the clients' caches.
+    public static func locate(inBottle bottle: URL) -> [Location] {
+        let fm = FileManager.default
+        var found: [Location] = []
+        let users = bottle.appendingPathComponent("drive_c/users", isDirectory: true)
+        let profiles = (try? fm.contentsOfDirectory(at: users, includingPropertiesForKeys: nil)) ?? []
+        for profile in profiles.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
+        where isDirectory(profile) && !isLink(profile) {
+            for folder in saveFolders {
+                let url = profile.appendingPathComponent(folder, isDirectory: true)
+                // A link is the Mac's real folder: it is not Cellar's, and it is not deleted.
+                guard isDirectory(url), !isLink(url) else { continue }
+                let entries = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
+                for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where !isLink(entry) {
+                    let name = entry.lastPathComponent
+                    if folder.hasPrefix("AppData"), notSaves.contains(name.lowercased()) { continue }
+                    let bytes = Reset.size(of: entry)
+                    guard bytes > 0 else { continue }
+                    found.append(Location(
+                        bottle: bottle.lastPathComponent, url: entry,
+                        relativePath: "\(profile.lastPathComponent)/\(folder)/\(name)", bytes: bytes))
+                }
             }
         }
         return found

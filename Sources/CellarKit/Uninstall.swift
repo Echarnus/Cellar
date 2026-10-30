@@ -159,6 +159,19 @@ public enum Uninstall {
         }
         guard !plan.isEmpty else { return 0 }
 
+        // The bottle holds the saves. They are copied out first, and nothing is removed if that
+        // fails: a removal is never the way a save game is lost.
+        if plan.scope == .bottle, FileManager.default.fileExists(atPath: game.prefix.path) {
+            do {
+                if try SaveBackups.backUp(bottle: game.prefix, reason: .beforeRemoval) != nil {
+                    progress("Backed up \(game.name)'s save games — cellar saves list \(game.slug)")
+                }
+            } catch {
+                throw CellarError.ioFailure(
+                    "Couldn't back up \(game.name)'s save games first (\(CellarLog.describe(error))), so nothing was removed.")
+            }
+        }
+
         // Asked now, not read off the plan: a client that came up since the plan was made is holding
         // exactly the files about to be deleted, and the plan would still say there was none.
         let touchesFiles = plan.removesGameFiles || plan.scope == .bottle
@@ -395,7 +408,7 @@ public enum Uninstall {
     /// neither (Steam knows the install directory, so they never had to). For those, Steam's own
     /// appmanifest names it, and `SteamBottle.isGameRunning` matches on that. Missing this is how a
     /// player's live game gets its files deleted out from under it.
-    static func isGameRunning(_ game: GamePlan) -> Bool {
+    public static func isGameRunning(_ game: GamePlan) -> Bool {
         if !game.gameProcessNeedles.isEmpty, ProcessWatch.isRunningAny(game.gameProcessNeedles) {
             return true
         }
