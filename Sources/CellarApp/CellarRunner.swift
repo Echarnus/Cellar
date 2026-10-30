@@ -156,12 +156,20 @@ final class CellarRunner: ObservableObject {
     /// Its own method rather than a `run(["launch", …])` at the call site: a launch is the one
     /// command with a window watching it, and the flag that feeds that window should not be
     /// something a future caller has to remember.
-    func launch(slug: String, showHUD: Bool, then: (@MainActor () -> Void)? = nil) {
+    ///
+    /// `backend` tries another graphics backend for this launch; the CLI keeps it if the game comes up.
+    func launch(slug: String, showHUD: Bool, backend: GraphicsBackend? = nil,
+                then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(["launch", slug, "--machine-progress"] + (showHUD ? ["--hud"] : []),
+        run(["launch", slug, "--machine-progress"] + (showHUD ? ["--hud"] : [])
+                + (backend.map { ["--backend", $0.rawValue] } ?? []),
             title: "Launching", stages: true, then: then)
         launchingSlug = slug
+        launchShowsHUD = showHUD
     }
+
+    /// Whether the last launch asked for the HUD, so a retry from the launch window asks again.
+    private(set) var launchShowsHUD = false
 
     /// Install a game, asking the CLI to report its phases so the page can draw a progress bar.
     /// Its own method for the same reason `launch` is: the flag that feeds the bar should not be

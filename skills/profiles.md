@@ -60,6 +60,10 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   (a workshop, an account server) that `cellar network <slug>` probes on top of the store's. Only
   addresses you have seen the game use or the publisher documents; a guessed host proves nothing.
 - **`[runner]`** — `id`, `windows_version`. **`[graphics]`** — `backend`, `fallback_backend`.
+  `fallback_backend` is live: when a launch starts the game but it never comes up, the launch window
+  (and `cellar launch`) offers it once, and a switch that works is kept in the bottle as
+  `graphics_backend` (`BackendChoice`), so a profile update never undoes it. `cellar backend <slug>`
+  shows or changes it.
 - **`[install]`** — `method`, plus the id the method needs.
 - **`[legal]`** — `drm_circumvention = "never"`. It is never anything else.
 
