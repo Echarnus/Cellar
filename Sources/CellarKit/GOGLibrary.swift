@@ -81,7 +81,9 @@ public enum GOGLibrary {
         let windows = installers.filter { ($0["os"] as? String) == "windows" }
         guard !windows.isEmpty else { return [] }
 
-        let preferred = Locale.current.language.languageCode?.identifier ?? "en"
+        // The language every game uses (the Mac's, unless the player picked another), not
+        // `Locale.current` — that is the region's, and an English Mac in Belgium would get Dutch.
+        let preferred = String(LanguageChoice.global().language.code.prefix(2))
         let chosen = windows.first { ($0["language"] as? String)?.hasPrefix(preferred) == true }
             ?? windows.first { ($0["language"] as? String)?.hasPrefix("en") == true }
             ?? windows[0]

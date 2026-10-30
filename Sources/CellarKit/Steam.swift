@@ -297,7 +297,12 @@ public enum SteamBottle {
         for (k, v) in gameEnv { extra[k] = v }
         if showHUD { extra["MTL_HUD_ENABLED"] = "1" }
         for (k, v) in DockShim.environment(for: .steam, dock: dock) { extra[k] = v }
-        try runner.spawn([steamExecutable(in: runner.prefix).path] + launchFlags + extraArgs,
+        var languageArgs: [String] = []
+        if let language = runner.language {
+            setLanguage(language, runner: runner)
+            languageArgs = ["-language", language.steamName]
+        }
+        try runner.spawn([steamExecutable(in: runner.prefix).path] + launchFlags + languageArgs + extraArgs,
                          extraEnv: extra,
                          log: Paths.logs.appendingPathComponent("steam-\(runner.prefix.lastPathComponent).log"))
     }
@@ -592,6 +597,60 @@ public extension SteamBottle {
         let key = #"HKCU\Software\Valve\Steam"#
         runner.run(["reg", "add", key, "/v", "AutoLoginUser", "/t", "REG_SZ", "/d", name, "/f"])
         runner.run(["reg", "add", key, "/v", "RememberPassword", "/t", "REG_DWORD", "/d", "1", "/f"])
+    }
+
+    // MARK: - Language
+
+    /// `HKCU\Software\Valve\Steam` `Language`: the interface language the client starts in, and
+    /// the one Steamworks reports to a game that has no appmanifest of its own — every copy Cellar
+    /// downloaded. `-language` says the same for one run; the registry is what a client started
+    /// some other way (a `steam://` link, Steam's own restart after an update) reads. Skipped when
+    /// already set, because asking Wine costs a few seconds.
+    internal static func setLanguage(_ language: GameLanguage, runner: WineRunner) {
+        let userReg = (try? String(contentsOf: runner.prefix.appendingPathComponent("user.reg"), encoding: .utf8)) ?? ""
+        guard registryLanguage(inUserReg: userReg) != language.steamName else { return }
+        runner.run(["reg", "add", #"HKCU\Software\Valve\Steam"#, "/v", "Language", "/t", "REG_SZ",
+                    "/d", language.steamName, "/f"])
+    }
+
+    /// The `Language` value under `[Software\\Valve\\Steam]` in a bottle's `user.reg`, if set. Read
+    /// from that key's own section only: other software keeps a `Language` value too.
+    static func registryLanguage(inUserReg text: String) -> String? {
+        var inSteamKey = false
+        for raw in text.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") {
+                inSteamKey = line.lowercased().hasPrefix(#"[software\\valve\\steam]"#)
+                continue
+            }
+            guard inSteamKey, line.lowercased().hasPrefix(#""language"=""#) else { continue }
+            return line.dropFirst(#""Language"=""#.count).split(separator: "\"").first.map(String.init)
+        }
+        return nil
+    }
+
+    /// The language Steam stored for one game it installed itself (`UserConfig` `language` in its
+    /// appmanifest) — which beats the client's own language for that game. Brought in line with
+    /// the player's choice, so a game Steam first installed in Dutch follows them too; Steam then
+    /// fetches the game's files for that language, as when it is changed in the game's Properties.
+    /// Only while no client is running: Steam holds its manifests in memory and writes them back.
+    public static func alignGameLanguage(_ language: GameLanguage, in prefix: URL, appID: Int) {
+        let manifest = steamDirectory(in: prefix).appendingPathComponent("steamapps/appmanifest_\(appID).acf")
+        guard let text = try? String(contentsOf: manifest, encoding: .utf8),
+              let updated = manifestText(text, language: language),
+              !isProcessRunning("steam.exe") else { return }
+        try? updated.write(to: manifest, atomically: true, encoding: .utf8)
+    }
+
+    /// The appmanifest with its `UserConfig` language set to `language`, or nil when there is
+    /// nothing to change — no such key (Steam is then using its own language, which `-language`
+    /// already set), the same language already, or a file that doesn't parse.
+    static func manifestText(_ text: String, language: GameLanguage) -> String? {
+        guard var vdf = TextVDF.parse(text),
+              let current = vdf.block(at: ["AppState", "UserConfig"])?.string("language"),
+              current != language.steamName else { return nil }
+        vdf.edit(["AppState", "UserConfig"]) { $0.set("language", language.steamName) }
+        return vdf.text
     }
 
     /// How far `connection_log.txt` has got, so a logon can be read from what Steam writes after it.
