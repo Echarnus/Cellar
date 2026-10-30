@@ -113,7 +113,11 @@ struct WheelsTests {
         for vendor in Wheels.Vendor.allCases {
             #expect(site.contains("<b>\(vendor.displayName)</b>"), "the FAQ has no set-up steps for \(vendor.displayName)")
         }
-        #expect(site.contains("Expect no force feedback"))
+        #expect(site.contains("Force feedback depends on the wheel"))
+        // Every wheel Cellar's SDL drives is named in the FAQ as driven.
+        for (vendor, models) in CellarSDL.forceFeedbackWheels {
+            #expect(site.contains("\(vendor.displayName) \(models)"), "the FAQ does not name \(vendor.displayName)'s driven wheels")
+        }
         #expect(site.contains("Input Monitoring"))
     }
 }
