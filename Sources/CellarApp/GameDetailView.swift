@@ -37,6 +37,8 @@ struct GameDetailView: View {
                     chips
                     information
                     if game.bottleExists { saves }
+                    if game.bottleExists { GameSettingsSection(game: game) }
+                    GameLogSection(game: game)
                     activityLog
                 }
                 .padding(24)

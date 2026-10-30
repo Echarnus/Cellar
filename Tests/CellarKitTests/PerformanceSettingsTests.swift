@@ -52,7 +52,7 @@ struct PerformanceSettingsTests {
         #expect(PerformanceSetting.metalFXUpscaling.rawValue == "metalfx_upscaling")
         #expect(PerformanceSetting.metalHUD.rawValue == "metal_hud")
         #expect(Set(PerformanceSetting.allCases.map(\.rawValue))
-                == ["wine_debug", "metal_validation", "metalfx_upscaling", "metal_hud"])
+                == ["wine_debug", "metal_validation", "metalfx_upscaling", "metal_hud", "retina"])
     }
 
     @Test("named() finds every setting by its key and nothing else")
@@ -65,7 +65,7 @@ struct PerformanceSettingsTests {
         #expect(PerformanceSetting.named("WINEDEBUG") == nil, "an env var name is not a setting key")
     }
 
-    static let boolSettings: [PerformanceSetting] = [.metalValidation, .metalFXUpscaling, .metalHUD]
+    static let boolSettings: [PerformanceSetting] = [.metalValidation, .metalFXUpscaling, .metalHUD, .retina]
 
     @Test("Bool settings accept the usual spellings of true, case-insensitively",
           arguments: boolSettings, ["true", "TRUE", "on", "On", "yes", "YES", "1"])
