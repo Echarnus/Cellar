@@ -141,9 +141,19 @@ public enum RunnerProcesses {
     /// Stop what a runner left behind once its bottle's wineserver is gone; returns what was stopped.
     @discardableResult
     public static func sweep(root: URL) -> [pid_t] {
-        let pids = leftovers(running(), root: root.resolvingSymlinksInPath().path)
+        let pids = leftovers(running(), root: canonicalPath(root))
         for pid in pids { kill(pid, SIGKILL) }
         return pids
+    }
+
+    /// `root` spelled the way the kernel reports an executable under it: every symlink resolved,
+    /// `/private` kept. `URL.resolvingSymlinksInPath` strips a leading `/private`, so a runner under
+    /// `/var/folders/…` would never match the `/private/var/folders/…` that `proc_pidpath` returns,
+    /// and its leftovers would never be found.
+    static func canonicalPath(_ root: URL) -> String {
+        guard let resolved = realpath(root.path, nil) else { return root.resolvingSymlinksInPath().path }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 
     /// Which of `entries` are left behind and safe to stop: every process whose executable lives

@@ -54,6 +54,17 @@ struct RunnerProcessesTests {
         #expect(URL(fileURLWithPath: me.path).lastPathComponent == expected)
     }
 
+    @Test("The runner's root is spelled as the kernel spells it, /private and all")
+    func rootMatchesTheKernelsSpelling() {
+        // `URL.resolvingSymlinksInPath` turns /private/var into /var; proc_pidpath never does. With the
+        // URL spelling, a runner in a temporary directory had leftovers that no sweep could find.
+        #expect(RunnerProcesses.canonicalPath(URL(fileURLWithPath: "/var")) == "/private/var")
+        #expect(RunnerProcesses.canonicalPath(URL(fileURLWithPath: "/tmp/")) == "/private/tmp")
+        let missing = "/nonexistent-\(UUID().uuidString)"
+        #expect(RunnerProcesses.canonicalPath(URL(fileURLWithPath: missing)) == missing,
+                "a root that isn't there is left as given")
+    }
+
     @Test("A sweep never stops the process doing the sweeping")
     func neverItself() {
         let me = RunnerProcesses.Entry(pid: getpid(), path: "\(root)/bin/wine")
