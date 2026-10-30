@@ -277,6 +277,48 @@ public struct WineRunner {
         Shell.run(wineserver.path, ["-k"], environment: environment())
     }
 
+    /// Take this bottle's Wine down and make sure it stayed down.
+    ///
+    /// `wineserver -k` asks the server to end every Windows process in the prefix, and on its own it
+    /// was trusted to: Planet Coaster 2 was quit and three `wine` processes were still in Activity
+    /// Monitor afterwards. So the server gets a few seconds, then `-k9`, and whatever still runs the
+    /// runner's own binaries once no server of this runner is left is stopped too.
+    ///
+    /// Returns the processes that had to be swept up — empty when Wine went down on its own.
+    @discardableResult
+    public func shutDown(grace: TimeInterval = 10) -> [pid_t] {
+        let bottle = prefix.lastPathComponent
+        killServer()
+        if !waitForServerToStop(within: grace) {
+            CellarLog.warn(.session, "wineserver for \(bottle) was still up \(Int(grace))s after -k; killing it.")
+            if FileManager.default.fileExists(atPath: wineserver.path) {
+                Shell.run(wineserver.path, ["-k9"], environment: environment())
+            }
+            _ = waitForServerToStop(within: 3)
+        }
+        let swept = RunnerProcesses.sweep(root: runnerRoot)
+        if !swept.isEmpty {
+            CellarLog.warn(.session, "Stopped \(swept.count) Wine process(es) that outlived \(bottle)'s "
+                + "wineserver: \(swept.map { "\($0)" }.joined(separator: ", ")).")
+        }
+        return swept
+    }
+
+    /// Poll until this prefix's wineserver is gone. False if it is still there at the deadline.
+    private func waitForServerToStop(within seconds: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while serverRunning {
+            guard Date() < deadline else { return false }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        return true
+    }
+
+    /// The runner's own directory: every Wine process of every bottle on it runs a binary in here.
+    private var runnerRoot: URL {
+        install?.wineRoot ?? binary.deletingLastPathComponent().deletingLastPathComponent()
+    }
+
     /// Whether a wineserver is currently alive for this prefix.
     public var serverRunning: Bool {
         // wineserver keeps its socket in /tmp/.wine-<uid>/server-<dev>-<inode>/ keyed on the
