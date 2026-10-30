@@ -55,10 +55,12 @@ struct LocalizationBundleTests {
         let bundle = try #require(Bundle(url: try Self.assembleApp(with: path)))
         #expect(bundle.developmentLocalization == "en")
         #expect(Set(bundle.localizations).isSuperset(of: ["en", "nl"]))
-        #expect(Bundle.preferredLocalizations(from: bundle.localizations, forPreferences: ["nl-BE"]) == ["nl"],
+        #expect(Bundle.preferredLocalizations(from: bundle.localizations, forPreferences: ["nl-BE"]).first == "nl",
                 "a Flemish Mac gets Dutch")
-        #expect(Bundle.preferredLocalizations(from: bundle.localizations, forPreferences: ["de-DE"]) == ["en"],
+        #expect(Bundle.preferredLocalizations(from: bundle.localizations, forPreferences: ["de-DE"]).first == "en",
                 "a language Cellar doesn't ship falls back to English, not to Dutch")
+        // (`preferredLocalizations` can list a language twice — it reads both the folders and the
+        // Info.plist — so these ask which one wins, not for the whole list.)
         let declared = bundle.object(forInfoDictionaryKey: "CFBundleLocalizations") as? [String]
         #expect(declared == ["en", "nl"])
     }
