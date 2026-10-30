@@ -241,6 +241,9 @@ These are correctness *and* legality constraints. They override any convenience.
 - **Never bundle Apple's D3DMetal** or any proprietary runtime in Cellar's source or release
   artifacts — it is grafted from community runners at runtime under Apple's non-commercial grant.
 - **Never commit game files, bottles, runners, downloaded depots, or logs.**
+- **Credentials stay in the keychain or a `0600` file, and never reach a log or a report.** Read
+  [`docs/SECURITY.md`](docs/SECURITY.md) before touching a sign-in; a new place a credential can go
+  needs a row there and a test in `CredentialStorageTests`.
 - **Never add DRM or anti-cheat circumvention.** Cellar runs DRM *through* the layer, untouched.
 - **Owned games only** — game data comes from the user's own authenticated Steam account.
 - **Trademark-safe** — not affiliated with Apple, Valve, Blizzard, CodeWeavers, or Frontier. Store

@@ -68,7 +68,10 @@ public enum GOGAuth {
     /// One keychain item; the account label is fixed because Cellar models one signed-in player.
     static let keychainAccount = "oauth-session"
 
-    public static var isSignedIn: Bool { storedSession() != nil }
+    /// Asks the keychain whether the item exists, without reading it. The app checks this to draw
+    /// Accounts; reading the token there would copy a secret into the GUI for a yes/no, and — the
+    /// item trusting the CLI that wrote it — put a keychain prompt in front of the player for it.
+    public static var isSignedIn: Bool { Keychain.contains(account: keychainAccount, store: .gog) }
 
     /// Exchange the authorization code from the sign-in page for a session. Called once per sign-in.
     @discardableResult
@@ -85,8 +88,11 @@ public enum GOGAuth {
         return try username()
     }
 
+    /// Sign out: the token, and the name Cellar showed beside it. A name left behind would draw
+    /// "Signed in as …" for a session that no longer exists.
     public static func signOut() throws {
         try Keychain.remove(account: keychainAccount, store: .gog)
+        cacheUsername(nil)
     }
 
     /// A valid access token, refreshing transparently. Every API call goes through here, so an
@@ -117,15 +123,29 @@ public enum GOGAuth {
     }
 
     /// Cached username, for a UI that must not block or throw while drawing a row.
+    ///
+    /// A file both binaries read, not `UserDefaults`: the CLI and the app have different defaults
+    /// domains, so a name the CLI learned at sign-in never reached the app — which then fetched it
+    /// itself, with the token, in the GUI process. Private (`0600`), because it says whose library
+    /// this is.
     public static var cachedUsername: String? {
-        UserDefaults.standard.string(forKey: "cellar.gog.username")
+        guard let text = try? String(contentsOf: usernameFile, encoding: .utf8) else { return nil }
+        let name = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
     }
 
     public static func cacheUsername(_ name: String?) {
-        let defaults = UserDefaults.standard
-        if let name { defaults.set(name, forKey: "cellar.gog.username") }
-        else { defaults.removeObject(forKey: "cellar.gog.username") }
+        // The old home of the cache, emptied whichever way this goes, so a sign-out leaves no name.
+        UserDefaults.standard.removeObject(forKey: "cellar.gog.username")
+        guard let name, !name.isEmpty else {
+            try? FileManager.default.removeItem(at: usernameFile)
+            return
+        }
+        try? PrivateFiles.write(Data(name.utf8), to: usernameFile)
     }
+
+    /// Beside Steam's record: both are the account's, not any one game's.
+    static var usernameFile: URL { Paths.shared.appendingPathComponent("gog-account") }
 
     // MARK: - Persistence
 

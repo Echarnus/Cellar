@@ -415,7 +415,22 @@ public enum DepotTool {
         }
     }
 
+    /// Tighten everything that holds the Steam token, after a run that may have written it.
+    ///
+    /// DepotDownloader creates its store with the default mode — readable by every account on the
+    /// Mac — and in a folder Time Machine backs up. Cellar cannot move the file (the tool would stop
+    /// finding it), so it narrows who can read it: `0600` and out of backups for each store file,
+    /// `0700` for the directories Cellar owns. Isolated storage itself is shared with every .NET
+    /// program here, so only the file is touched there, never its folder.
+    static func protectStoredSessions() {
+        for directory in [root, home] where FileManager.default.fileExists(atPath: directory.path) {
+            PrivateFiles.restrict(directory: directory)
+        }
+        for file in storedSessionFiles { PrivateFiles.protectCredential(file) }
+    }
+
     private static func runInheritingIO(args: [String]) throws {
+        defer { protectStoredSessions() }
         let p = try process(args)
         try p.run()
         p.waitUntilExit()
@@ -434,6 +449,7 @@ public enum DepotTool {
     private static func runStreaming(args: [String], timeout: TimeInterval? = nil,
                                      output: @escaping (String) -> Void,
                                      stopWhen: () -> Bool = { false }) throws -> Bool {
+        defer { protectStoredSessions() }
         let p = try process(args)
         let pipe = Pipe()
         p.standardOutput = pipe
