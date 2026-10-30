@@ -487,13 +487,16 @@ def load_games():
     for path in sorted(glob.glob(os.path.join(ROOT, "profiles", "*.toml"))):
         d = parse_toml(path)
         g, comp, art = d.get("game", {}), d.get("compatibility", {}), d.get("art", {})
-        storekey = g.get("store", "steam")
+        # Every game comes through a store — Cellar has no store-less or manual-download path —
+        # so a profile must name one.
+        storekey = g.get("store")
         status = comp.get("status", "untested")
         # A malformed profile fails the build with its filename, rather than shipping a wrong card.
         if not g.get("name") or not g.get("slug"):
             fail(path, "[game] needs both name and slug")
         if storekey not in STORES:
-            fail(path, f"unknown store {storekey!r} (expected one of: {', '.join(STORES)})")
+            fail(path, f"store must be one of {', '.join(STORES)} (got {storekey!r}); "
+                       "every game comes through a store")
         if status not in STATUS:
             fail(path, f"unknown status {status!r} (expected one of: {', '.join(STATUS)})")
         appid = g.get("steam_appid", "")
@@ -699,12 +702,14 @@ def card(g):
     store = STORES[g["store"]]
     art = (f'<img loading="lazy" decoding="async" src="{n(g["portrait"])}" alt="" width="600" height="900"'
            f' onerror="this.classList.add(\'broken\')">') if g["portrait"] else ""
-    client = (f"{n(store)} runs beside the game" if g["client"] else "Not needed")
+    # Every game comes through its store; this only says whether the store's app also has to be
+    # running while you play. Worded so it never reads as "no store".
+    client = (f"{n(store)} app runs alongside" if g["client"] else "Just the game")
     facts = []
     if g["api"]:
         facts.append(("Graphics", n(g["api"])))
     facts.append(("DRM", n(g["drm"]) or "Not stated"))
-    facts.append(("Store client", client))
+    facts.append(("While playing", client))
     dl = "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in facts)
     return f'''
     <li class="card" data-name="{n(g['name'].lower())}" data-status="{n(g['status'])}" data-store="{n(g['store'])}">
@@ -943,8 +948,9 @@ FAQ_SECTIONS = [
          "<p>Cellar downloads Steam games with your one sign-in, without starting a Steam window. "
          "But many Steamworks games check for a <i>running</i> Steam while they play, so for those "
          "Cellar installs the Windows Steam client in the bottle and starts it beside the game. "
-         "It is a dependency of the game, not a second account. Cards marked <b>Not needed</b> "
-         "under Store client skip it entirely.</p>"),
+         "It is a dependency of the game, not a second account. Cards that say <b>Just the game</b> "
+         "under While playing skip it: the game still comes from your Steam account, it just "
+         "doesn't need Steam running to play.</p>"),
         ("Can I sign out?",
          "<p>Yes. Accounts offers Sign out for each session Cellar itself holds. The Steam client "
          "and Battle.net are signed out from inside their own windows, because that is where those "
@@ -976,8 +982,9 @@ FAQ_SECTIONS = [
          "after a 60&nbsp;GB download.</p>"),
         ("Does the store's client have to be running while I play?",
          "<p>It depends on the game, and its card says which. Steamworks titles usually want a live "
-         "Steam session. GOG's games are DRM-free, so nothing needs to run beside them. Cards that "
-         "say <b>Not needed</b> install and launch without standing a store client up at all.</p>"),
+         "Steam session. GOG's games are DRM-free, so nothing needs to run beside them. Either "
+         "way the game is installed from your own store account; cards that say <b>Just the "
+         "game</b> under While playing simply don't need the store's app running beside it.</p>"),
     ]),
 
     ("Performance", "performance", "What to expect, and the levers that exist.", [
