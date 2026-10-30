@@ -71,9 +71,6 @@ struct StoreDescriptorTests {
     func signsInOnceFollowsAuthStyle(store: GameStore) {
         let d = store.descriptor
         #expect(d.signsInOnce == (d.authStyle == .cellarHeldToken))
-        if d.authStyle == .none {
-            #expect(d.signsInOnce == false, "\(store.rawValue) has nothing to sign in to")
-        }
     }
 
     /// GOG is the store with no client in the bottle, and that is exactly why its sign-in is

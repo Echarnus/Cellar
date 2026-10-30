@@ -19,10 +19,9 @@ public enum GameStore: String, CaseIterable, Sendable {
     /// library over HTTP, and installs the DRM-free installer itself.
     case gog
 
-    public static let `default` = GameStore.steam
-
-    /// Parse a profile's `store = "…"` value. Unknown values return nil so the caller can fall
-    /// back to the default rather than silently mis-classifying a game.
+    /// Parse a profile's `store = "…"` value. Unknown and missing values return nil, and a profile
+    /// that resolves to nil is refused (`Game.plan`) rather than guessed at: Cellar only runs games
+    /// a store installed, so there is no "no store" and no default store to fall back to.
     public init?(profileValue: String?) {
         guard let raw = profileValue?.trimmingCharacters(in: .whitespaces).lowercased(), !raw.isEmpty else {
             return nil
@@ -46,8 +45,6 @@ public enum StoreAuthStyle: String, Sendable {
     /// Cellar runs the sign-in itself and holds a token (GOG's OAuth, Steam's QR device flow for
     /// downloads). One sign-in, account-wide, no client involved.
     case cellarHeldToken
-    /// Nothing to sign in to.
-    case none
 }
 
 /// Everything that differs per store, in one table: the words, the marks, and the shape of the

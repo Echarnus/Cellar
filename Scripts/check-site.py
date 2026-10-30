@@ -8,7 +8,8 @@ Fails (exit 1) on:
   - a link into this repository's main branch (…/blob/main/<path>) whose file does not exist here
   - structure: not exactly one <h1>, a skipped heading level, an <img> without alt, a duplicate
     id, an <input> without a label, a <button> without a type or an accessible name, a missing
-    lang or <title>, or template text that leaked into the page ({…})
+    lang or <title>, template text that leaked into the page ({…}), or copy implying a game
+    can come from no store
   - any palette pair in gen-site.py's CONTRAST table under its WCAG 2.2 AA ratio
 With --external, also every other http(s) <a href>, failing on 404/410 only: a network error or a
 rate limit says nothing about the link, so it is reported and not failed.
@@ -20,6 +21,7 @@ import glob
 import html.parser
 import importlib.util
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -102,6 +104,10 @@ class Page(html.parser.HTMLParser):
             self.title += data
         if self._button is not None:
             self._button[1] += data
+        # Every game comes through a store (Kenneth, 2026-10-30): the site never offers or implies
+        # a store-less or manual-download path.
+        if re.search(r"\bno[- ]store\b|without (a|the|any) store\b|manual download", data, re.I):
+            self.problems.append(f"line {self.getpos()[0]}: implies a store-less path: {data.strip()[:60]!r}")
         if "{" in data or "}" in data:
             self.problems.append(f"line {self.getpos()[0]}: template text leaked into the page: {data.strip()[:60]!r}")
 

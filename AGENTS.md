@@ -34,9 +34,9 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 | `Sources/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
 | `Shim/` | `cellar-dock-shim.c` — the one piece of C in the repo. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts. Built by `Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
-| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `release-notes.py` (a release's notes, from the issues it closed), `test.sh` (the test runner). |
-| `docs/` | `ARCHITECTURE.md`, `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
-| `.github/` | Workflows (`ci`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
+| `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `release-notes.py` (a release's notes, from the issues it closed), `test.sh` (the test runner), `coverage.py` (the coverage ratchet), `check-pr.py` (the PR checklist). |
+| `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`, `TESTING.md`. |
+| `.github/` | Workflows (`ci`, `pr-checklist`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
 
 ## Build, run, verify
@@ -167,6 +167,12 @@ A game names the storefront it came from (`store = "steam" | "battlenet" | "gog"
 and that one field decides the whole pipeline: which client `cellar setup` installs (if any), what
 "installed" and "signed in" mean, how a launch is issued, and the words the player reads. Read
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → *The store layer* for the comparison table.
+
+**Every game comes through a store — there is no other way in.** Cellar does not run games the
+player downloaded or installed by hand, and it has no "no store" option anywhere: not in a
+profile (`store` is required, and `Game.plan` refuses a profile without one), not in the CLI, not
+in the app. A DRM-free game that launches without its client running is still a store's game,
+installed from the player's own account. Don't add a storeless path back.
 
 The differences are real, not cosmetic — the three that bite hardest:
 

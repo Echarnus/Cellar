@@ -122,7 +122,7 @@ struct GameSummaryTests {
                                 needsLiveSession: false, needsClientAtRuntime: false)
         #expect(installed.nextStep == .play)
         #expect(!installed.clientSignInPending)
-        #expect(installed.actionHint.contains("no store client"))
+        #expect(installed.actionHint.contains("without opening Steam's client"))
     }
 
     // MARK: - Copy
@@ -191,7 +191,7 @@ struct GameSummaryTests {
         #expect(withClient.contains("in the background"))
 
         let bare = summary(needsClientAtRuntime: false).actionHint
-        #expect(bare.contains("no store client at all"))
+        #expect(bare.contains("without opening"))
         #expect(bare.contains("in the background") == false)
     }
 

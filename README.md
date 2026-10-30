@@ -69,7 +69,7 @@ cellar setup --profile diablo-4     # runner + bottle + Battle.net (its installe
 cellar battlenet open diablo-4      # sign in, install the game from the client
 cellar launch diablo-4              # play — quitting the game closes the whole layer
 
-# The Witcher 3, via GOG — DRM-free, so no store client is involved at all
+# The Witcher 3, via GOG — DRM-free, so there is no client to open, only your GOG sign-in
 cellar gog login                    # sign in once, for your whole GOG library
 cellar gog install witcher-3        # Cellar downloads it and installs it silently
 cellar launch witcher-3             # play
