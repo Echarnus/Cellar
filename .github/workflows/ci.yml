@@ -42,6 +42,15 @@ jobs:
         run: sh Scripts/build-dock-shim.sh
       - name: Self-test (VDF/CRC/shortcut codecs)
         run: swift run -c release cellar selftest
+      # The release path itself: the bundle with its own CLI and Sparkle.framework, sealed and verified
+      # by package.sh. Without this, nothing short of a tagged release would notice it breaking.
+      - name: Package the app (sanity)
+        run: |
+          sh Scripts/package.sh 0.0.0-ci
+          APP=dist/Cellar.app/Contents
+          test -f "$APP/Frameworks/Sparkle.framework/Sparkle"
+          otool -l "$APP/MacOS/CellarApp" | grep -q '@executable_path/../Frameworks'
+          "$APP/MacOS/cellar" --version
       # The rendered store marks, light and dark. A reviewer can look at the actual pixels a PR
       # produces without checking it out and launching the app.
       - name: Upload rendered UI snapshots

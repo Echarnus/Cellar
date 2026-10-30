@@ -140,6 +140,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = submenu(appName)
         appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
             .target = self
+        // Left out of a build from source: it has no feed to check, and a disabled item would only
+        // raise a question it cannot answer. Settings › Updates says why.
+        if let updates = AppUpdater.shared.makeMenuItem() { appMenu.addItem(updates) }
         appMenu.addItem(withTitle: "Welcome to \(appName)…", action: #selector(showWelcomeTour), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
@@ -348,6 +351,7 @@ enum Links {
     static let help = URL(string: "https://echarnus.github.io/Cellar/faq.html")!
     static let supportedGames = URL(string: "https://echarnus.github.io/Cellar/")!
     static let repository = URL(string: "https://github.com/Echarnus/Cellar")!
+    static let releases = URL(string: "https://github.com/Echarnus/Cellar/releases")!
     static let newIssue = URL(string: "https://github.com/Echarnus/Cellar/issues/new")!
 }
 

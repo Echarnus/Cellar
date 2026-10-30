@@ -6,7 +6,8 @@ inside the app at `Cellar.app/Contents/Resources/Legal/`, and in the CLI zip at 
 | File | Covers |
 |---|---|
 | [`../LICENSE`](../LICENSE) | Cellar itself — GPL-3.0 |
-| [`swift-argument-parser.txt`](swift-argument-parser.txt) | swift-argument-parser, the one third-party library compiled into a Cellar binary |
+| [`swift-argument-parser.txt`](swift-argument-parser.txt) | swift-argument-parser, compiled into both Cellar binaries |
+| [`Sparkle.txt`](Sparkle.txt) | Sparkle 2, the app's self-updater, shipped as `Cellar.app/Contents/Frameworks/Sparkle.framework` (MIT, plus the bsdiff, sais-lite and ed25519 notices it carries) |
 
 Only code that is **inside** a Cellar artifact needs its licence here. Wine runners, DepotDownloader
 and the storefront clients are downloaded by the player's own copy of Cellar at run time from their
