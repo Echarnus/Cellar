@@ -32,6 +32,8 @@ if command -v gh >/dev/null 2>&1; then
   trap 'rm -rf "$TMP"' EXIT
   chmod 700 "$TMP"
   "$GEN" --account "$ACCOUNT" -x "$TMP/key"
+  # Creating the environment is idempotent; the secret cannot be set before it exists.
+  gh api --silent -X PUT "repos/$REPO/environments/release"
   gh secret set SPARKLE_ED_PRIVATE_KEY --repo "$REPO" --env release < "$TMP/key"
   echo "Stored the private key as SPARKLE_ED_PRIVATE_KEY in the release environment of $REPO."
 else
