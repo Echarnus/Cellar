@@ -72,10 +72,12 @@ struct CreditsTests {
         }
     }
 
-    @Test("The DMG carries the licence at the top level")
+    @Test("The DMG carries the licence and notices, in a folder in the install window")
     func dmgShipsLicence() throws {
         let body = try String(contentsOf: Repo.root.appendingPathComponent("Scripts/make-dmg.sh"), encoding: .utf8)
         #expect(body.contains("cp LICENSE"))
         #expect(body.contains("cp NOTICE"))
+        // …and the folder they are in is one of the three things laid out in the window.
+        #expect(body.contains("set position of item \"Licence and Read Me\""))
     }
 }

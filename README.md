@@ -196,6 +196,13 @@ cellar uninstall planet-coaster-2             # the game's files, its .app, its 
 cellar uninstall planet-coaster-2 --bottle    # …and the bottle: the Wine prefix and the client in it
 ```
 
+Taking Cellar itself off the Mac — *Cellar › Uninstall Cellar…* in the app, or:
+
+```sh
+cellar uninstall-cellar         # the plan: everything it would remove, and where your saves would go
+cellar uninstall-cellar --yes   # copies save games to ~/Documents/Cellar Saved Games, then removes the rest
+```
+
 Removal is a plan first: Cellar prints every path it will delete with its size, and what it keeps —
 your sign-in, the shared Steam install with everybody else's games, and the runner — then asks. It
 never follows the bottle's symlink to the shared Steam library, and it only deletes a `.app` that

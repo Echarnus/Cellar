@@ -44,13 +44,85 @@ The tag triggers `.github/workflows/release.yml`, which on a macOS runner:
 
 `workflow_dispatch` builds the same artifacts on demand (uploaded as workflow artifacts, no Release).
 
-Artifacts are **ad-hoc signed but not notarised**. `package.sh` seals the bundle with
-`codesign --sign -`, because an unsealed bundle (an Info.plist added after the linker signed the
-binary) is reported as "damaged" by macOS 15+ Gatekeeper with no way past it. The release notes tell
-users to allow it once under **System Settings → Privacy & Security → Open Anyway**; right-click →
-Open stopped bypassing Gatekeeper in macOS 15. Developer-ID signing and notarisation are a later step
-once there's a Developer ID (it needs the hardened runtime, `notarytool submit --wait` and
-`stapler staple`).
+Artifacts are **ad-hoc signed but not notarised** until a Developer ID is supplied (below).
+`package.sh` seals the bundle through `Scripts/sign-app.sh`, because an unsealed bundle (an
+Info.plist added after the linker signed the binary) is reported as "damaged" by macOS 15+ Gatekeeper
+with no way past it. The release notes tell users to allow it once under **System Settings → Privacy
+& Security → Open Anyway**; right-click → Open stopped bypassing Gatekeeper in macOS 15.
+
+## The installer DMG
+
+`Scripts/make-dmg.sh` turns `dist/Cellar.app` into `dist/Cellar.dmg`, the download the site links
+to. Opened, it is the window every Mac installer has: a background drawn by
+`Scripts/make-dmg-background.swift` (no image files in the repo), Cellar on the left, an arrow, the
+Applications folder on the right, and a *Licence and Read Me* folder underneath. Cellar's icon is the
+volume icon. Finder lays the window out through AppleScript, which needs a logged-in Finder — the
+GitHub macOS runners have one. If it ever fails the DMG is still built (plain Finder look) and the
+job shows a warning; `CELLAR_DMG_STRICT=1` turns that into a failure.
+
+What happens after the drag is the app's job, not the DMG's:
+
+- **Started from the disk image?** Cellar offers to move itself into Applications and reopens from
+  there (`InstallLocation`), so it does not vanish on eject and the updater can replace it.
+- **First launch** starts `cellar prepare` in the background: the Wine runner (with D3DMetal),
+  DepotDownloader and the shared Windows Steam client with its first update — a few GB, fetched from
+  their publishers on the player's Mac, never bundled. The first Install is then just the game. A
+  game set up meanwhile waits for it (`SetupLock`). Settings › Advanced can switch it off.
+- **Uninstalling** is *Cellar › Uninstall Cellar…* (or `cellar uninstall-cellar`): the app, the CLI,
+  bottles, runners, the Steam client and its games, caches, preferences and generated launchers.
+  Save games are copied to `~/Documents/Cellar Saved Games/<date>` first unless the player unticks
+  it; if that copy fails, nothing is deleted.
+
+## Developer ID signing and notarisation
+
+Everything is in place except the paid Apple Developer account. Until its secrets exist, releases
+stay ad-hoc signed and nothing below runs.
+
+| Script | Does | Needs |
+|---|---|---|
+| `Scripts/sign-app.sh <app>` | Signs inside-out (Sparkle's XPC services and helpers, the bundled CLI, the Dock shim, then the app). Ad-hoc by default; with an identity, hardened runtime + secure timestamp. | `CELLAR_SIGN_IDENTITY` (optional) |
+| `Scripts/notarize.sh <app\|dmg>` | Submits to Apple's notary service, waits, staples the ticket. Prints Apple's log on rejection. A no-op without credentials. | `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY` |
+| `Scripts/import-signing-identity.sh` | CI only: imports the certificate into a throwaway keychain and exports `CELLAR_SIGN_IDENTITY`. | `DEVELOPER_ID_P12`, `DEVELOPER_ID_P12_PASSWORD` |
+
+`package.sh` signs and (when it can) notarises the app before zipping it, so the zip the updater
+ships is trusted on its own; `make-dmg.sh` then signs and notarises the DMG.
+
+**To switch it on (Kenneth, once):**
+
+1. Join the Apple Developer Program, then in Xcode › Settings › Accounts › Manage Certificates
+   create a **Developer ID Application** certificate. Export it from Keychain Access as a `.p12`
+   with a password.
+2. In App Store Connect › Users and Access › Integrations › App Store Connect API, create a key with
+   the *Developer* role. Note its Key ID and the Issuer ID, and download the `.p8` (once only).
+3. Add these as secrets of the `release` environment (Settings › Environments › release):
+   `DEVELOPER_ID_P12` (`base64 -i cert.p12 | pbcopy`), `DEVELOPER_ID_P12_PASSWORD`,
+   `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY` (the `.p8` file's contents).
+4. In the release workflow's build job, before *Package*, add:
+
+   ```yaml
+   - name: Signing identity
+     env:
+       DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+       DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+     run: |
+       eval "$(sh Scripts/import-signing-identity.sh)"
+       echo "CELLAR_SIGN_IDENTITY=${CELLAR_SIGN_IDENTITY:--}" >> "$GITHUB_ENV"
+   ```
+
+   and pass `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID` and `NOTARY_KEY` as `env:` to the *Package* and
+   *Build installer DMG* steps. All five are **`release` environment secrets**, never repository
+   secrets, and the build job only enters that environment on a tag push — it also runs on
+   `workflow_dispatch`, which must stay secret-free:
+
+   ```yaml
+   environment: ${{ github.event_name == 'push' && 'release' || '' }}
+   ```
+
+   A manual build then simply stays ad-hoc signed. (The alternative is to sign in the publish job,
+   which already holds the environment: download the build, run `sign-app.sh` + `notarize.sh` on
+   the app, re-zip it and re-run `make-dmg.sh` — more moving parts for the same result.)
+5. **Change the release notes in the same commit:** a notarised Cellar opens with a double-click,
+   so "Open Anyway" must stop being part of the instructions (also in `make-dmg.sh`'s *Read Me*).
 
 ## In-app updates (Sparkle)
 
@@ -85,6 +157,7 @@ Players on a release from before the updater (0.2.x and earlier) have to downloa
 hand; after that, updates arrive in the app.
 
 ## Supported-games site
+
 
 `.github/workflows/pages.yml` regenerates the [supported-games page](https://echarnus.github.io/Cellar/)
 from `profiles/*.toml` (via `Scripts/gen-site.py`) and deploys it to GitHub Pages on every push to
