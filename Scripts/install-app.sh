@@ -64,6 +64,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>CellarApp</string>
   <key>CFBundleIdentifier</key><string>it.clercq.cellar.app</string>
   <key>CFBundleName</key><string>Cellar</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>nl</string></array>
   <key>CFBundleGetInfoString</key><string>Cellar — run Windows games on Apple Silicon via Wine + D3DMetal.</string>
   <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0; not affiliated with the Wine project, Valve, Blizzard, GOG, Apple or any game publisher.</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -80,6 +82,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 $ICON_KEY
 </dict></plist>
 PLIST
+# The app's translations: one <lang>.lproj per language, which SwiftUI reads through Bundle.main.
+# English is the development region, so a Mac set to a language Cellar lacks gets English.
+cp -R Resources/Localization/*.lproj "$APP/Contents/Resources/"
 # Ship the profile database inside the bundle. Cellar searches this *after* the player's own
 # ~/Library/Application Support/Cellar/profiles, so shipping a new game (or a fixed profile) never
 # overwrites a profile someone has edited by hand.

@@ -35,6 +35,9 @@ cp -R LICENSE NOTICE THIRD_PARTY_LICENSES.md licenses "$DIST/cli/share/cellar/le
 APP="$DIST/Cellar.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINDIR/CellarApp" "$APP/Contents/MacOS/CellarApp"
+# The app's translations: one <lang>.lproj per language, which SwiftUI reads through Bundle.main.
+# English is the development region, so a Mac set to a language Cellar lacks gets English.
+cp -R Resources/Localization/*.lproj "$APP/Contents/Resources/"
 # The shipped profile database. Searched after the player's own profiles, never instead of them.
 mkdir -p "$APP/Contents/Resources/profiles"
 cp profiles/*.toml "$APP/Contents/Resources/profiles/"
@@ -71,6 +74,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>CellarApp</string>
   <key>CFBundleIdentifier</key><string>it.clercq.cellar.app</string>
   <key>CFBundleName</key><string>Cellar</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>nl</string></array>
   <key>CFBundleGetInfoString</key><string>Cellar — run Windows games on Apple Silicon via Wine + D3DMetal.</string>
   <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0; not affiliated with the Wine project, Valve, Blizzard, GOG, Apple or any game publisher.</string>
   <key>CFBundlePackageType</key><string>APPL</string>
