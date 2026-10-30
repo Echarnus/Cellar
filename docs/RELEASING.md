@@ -61,7 +61,7 @@ update waits for a person.
 
 | Workflow | Runs on | Does |
 |---|---|---|
-| `ci.yml` | every PR, `main`, merge queue | Release build, test suite, Dock shim, `cellar selftest`, site generation; actionlint, ShellCheck, Python compile. |
+| `ci.yml` | every PR, `main`, merge queue | On macOS 15 and 26: release build, test suite, Dock shim, `cellar selftest`, site generation; actionlint, ShellCheck, Python compile. |
 | `codeql.yml` | every PR, `main`, weekly | CodeQL security-and-quality queries for Swift, Python and the workflows. |
 | `dependency-review.yml` | every PR | Blocks a new dependency with a known vulnerability or a licence that can't ship under GPL-3.0. |
 | `scorecard.yml` | `main`, weekly | OpenSSF Scorecard for the repository's supply-chain practices. |
@@ -112,9 +112,14 @@ To preview the notes before tagging: `GH_TOKEN=… python3 Scripts/release-notes
 Echarnus/Cellar --tag HEAD --out /tmp/notes.md`. `workflow_dispatch` builds the downloads for any
 version without publishing anything.
 
-Artifacts are **unsigned and unnotarised**: the notes tell players to right-click → Open the first
-time. Signing and notarisation come once there's a Developer ID; the certificate then goes into the
-`release` environment's secrets, never into repository secrets a PR could reach.
+Artifacts are **ad-hoc signed but not notarised**. `package.sh` seals the bundle with
+`codesign --sign -`, because an unsealed bundle (an Info.plist added after the linker signed the
+binary) is reported as "damaged" by macOS 15+ Gatekeeper with no way past it. The release notes tell
+users to allow it once under **System Settings → Privacy & Security → Open Anyway**; right-click →
+Open stopped bypassing Gatekeeper in macOS 15. Developer-ID signing and notarisation are a later step
+once there's a Developer ID (it needs the hardened runtime, `notarytool submit --wait` and
+`stapler staple`); the certificate then goes into the `release` environment's secrets, never into
+repository secrets a PR could reach.
 
 ## One-time repository setup
 

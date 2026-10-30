@@ -86,6 +86,10 @@ echo "Bundled $(ls profiles/*.toml | wc -l | tr -d ' ') game profiles."
 # The Dock shim goes in the bundle, and beside the CLI's own state, because it is the `cellar`
 # binary — not the app — that spawns Wine, and the CLI may live anywhere on PATH.
 cp "$SHIM" "$APP/Contents/Resources/cellar-dock-shim.dylib"
+# The same Legal/ folder package.sh ships, so a local install matches a release.
+rm -rf "$APP/Contents/Resources/Legal"
+mkdir -p "$APP/Contents/Resources/Legal"
+cp -R LICENSE NOTICE THIRD_PARTY_LICENSES.md licenses "$APP/Contents/Resources/Legal/"
 mkdir -p "$HOME/Library/Application Support/Cellar"
 install_file "$SHIM" "$HOME/Library/Application Support/Cellar/cellar-dock-shim.dylib"
 
@@ -101,6 +105,9 @@ cp profiles/*.toml "$PREFIX/share/cellar/profiles/"
 install_file "$SHIM" "$PREFIX/share/cellar/cellar-dock-shim.dylib"
 echo "Installed the cellar CLI at $PREFIX/bin/cellar (profiles in $PREFIX/share/cellar)."
 
+# Same ad-hoc seal as package.sh: the Info.plist and resources were added after the linker signed
+# the binary, and an unsealed bundle is one macOS may refuse to open.
+codesign --force --deep --sign - "$APP"
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
 echo "Installed $APP  —  open it with:  open \"$APP\""

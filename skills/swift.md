@@ -78,9 +78,17 @@ executable can't use a `@main` App scene). That host has sharp edges we've alrea
   window with the `.cellarOpenSettings` notification; the window's view takes an `onClose` callback
   (there's no `dismiss` environment for a plain `NSWindow`).
 - **The menu bar is built by hand** in `main.swift` — AppKit installs no default menu for a
-  hand-rolled app. Keep the App menu (About, Settings… ⌘,, Quit ⌘Q), the **Edit menu**
-  (cut/copy/paste/select-all — text fields need it), and the Window menu. If you add a window-level
-  command, add its menu item too.
+  hand-rolled app. It follows the HIG's standard order: **App** (About, Settings… ⌘,, Accounts…
+  ⌘⇧A, Services, Hide, Quit ⌘Q), **File** (Close Window ⌘W), **Edit** (cut/copy/paste/select-all —
+  text fields need it — and Find… ⌘F, which focuses the library search), **View** (Refresh Library
+  ⌘R, Enter Full Screen ⌃⌘F), **Window**, and **Help** (registered as `NSApp.helpMenu`, which is
+  what gives the menu search field). Menu items are title case; everything in a window is sentence
+  case. If you add a window-level command, add its menu item too.
+- **The main window has a full-size content view under a transparent, title-less title bar**, so
+  the sidebar's `NSVisualEffectView` (`SidebarMaterial`, the `.sidebar` material) runs up behind the
+  traffic lights. SwiftUI still lays content out below the title bar — it is a safe-area inset — so
+  only backgrounds (`.background` ignores the safe area by default) reach into it. Don't
+  `.ignoresSafeArea()` content, or it slides under the traffic lights.
 - **AppKit menu ↔ SwiftUI state** is bridged with a `Notification` (e.g. `.cellarOpenSettings`),
   because the menu lives in the `NSApplicationDelegate` and the state in a SwiftUI view. Reuse that
   seam rather than reaching across.

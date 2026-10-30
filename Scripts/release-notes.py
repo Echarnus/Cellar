@@ -163,9 +163,15 @@ def render(version, issues, prs, repo):
     lines += [
         "## Install",
         "",
-        "Download **Cellar.dmg**, open it and drag Cellar into Applications. The first time, "
-        "right-click Cellar and choose Open: the app is not notarised yet, so macOS asks once. "
-        "Cellar then sets up its runtime, you sign in to your store, and you pick a game to play.",
+        "Download **Cellar.dmg**, open it and drag Cellar into Applications. Cellar is not "
+        "notarised yet, so macOS blocks the first launch: open **System Settings → Privacy & "
+        "Security**, scroll to Cellar and click **Open Anyway** (right-click → Open no longer "
+        "bypasses this since macOS 15). Cellar then sets up its runtime, you sign in to your "
+        "store, and you pick a game to play.",
+        "",
+        "Requires an Apple Silicon Mac on macOS 14 or later. Today's runners are Intel builds that "
+        "run under Rosetta 2, which macOS 28 keeps only for games: `cellar doctor` says where your "
+        "Mac stands.",
         "",
         "`Cellar-App-*.zip` is the same app without the installer, and `Cellar-CLI-*.zip` is the "
         "`cellar` command. `SHA256SUMS.txt` lists every download's checksum, and each one carries "

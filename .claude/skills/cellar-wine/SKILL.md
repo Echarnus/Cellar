@@ -26,7 +26,8 @@ receipts there. Key rules:
 - **Performance switches** (`wine_debug`, `metal_validation`, `metalfx_upscaling`, `metal_hud`) are
   set by the profile and overridden per bottle (`cellar perf`); `PerformanceSettings.resolve` is the
   only place they are layered. Add a new one there, not as an `[env]` convention.
-- **Tear the layer down with the game:** client, `Agent.exe`, helpers, then `wineserver -k`. A
+- **Tear the layer down with the game:** client, `Agent.exe`, helpers, then `WineRunner.shutDown()`
+  (`-k`, `-k9`, then a sweep of the runner's leftover processes) — never a bare `killServer()`. A
   surviving `Agent.exe` greys out Install next session.
 - **Wine's stderr is exactly the volume that deadlocks `Shell.run`** — use `inheritIO` (see
   [`cellar-swift`](../cellar-swift/SKILL.md)).

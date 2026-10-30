@@ -9,8 +9,10 @@ APP="dist/Cellar.app"
 
 STAGE="$(mktemp -d)/Cellar"
 mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/Cellar.app"
+ditto "$APP" "$STAGE/Cellar.app"  # keeps the ad-hoc seal and xattrs intact
 ln -s /Applications "$STAGE/Applications"           # drag-to-install target
+cp LICENSE "$STAGE/LICENSE.txt"                     # GPL-3.0: the licence travels with the binary
+cp NOTICE "$STAGE/NOTICE.txt"
 cat > "$STAGE/READ ME - install.txt" <<TXT
 Cellar — run Windows games on Apple Silicon.
 
@@ -19,6 +21,10 @@ Cellar — run Windows games on Apple Silicon.
 3. Cellar sets up the runtime, you sign in to Steam, then pick a game and play.
 
 Supported games: https://echarnus.github.io/Cellar/
+
+Cellar is free software under the GPL-3.0 (LICENSE.txt). It is built on Wine and
+other people's work, credited in NOTICE.txt and in Cellar › About Cellar; their
+licence texts are inside the app, in Contents/Resources/Legal.
 TXT
 
 DMG="dist/Cellar.dmg"

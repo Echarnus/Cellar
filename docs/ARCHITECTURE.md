@@ -256,6 +256,20 @@ bar under *Preparing* in the launch window when Play meets a bootstrapper-only S
 `package/steam_client_win64.installed` plus a quiet log; the invisible session is then ended with
 `wineserver -k`, so the next start draws normally.
 
+The third mode is the game's own **name**. Wine is one binary for every Windows program, so a game
+started through it is called "wine" in the Dock's tooltip, ⌘-Tab, the menu bar and Force Quit, even
+while it wears its own icon (which Wine reads from the `.exe`). Every launch route starts its
+processes with `GamePlan.launchEnv` — the plan's `env` plus `CELLAR_APP_NAME` (the profile's `name`)
+and `CELLAR_APP_EXE` (the file name of its `exe`). In that one process the shim sets LaunchServices'
+display name (`_LSSetApplicationInformationItem` with `_kLSDisplayNameKey`, private, looked up at
+runtime and skipped if missing) just before Wine asks for a Dock icon, and answers the main bundle's
+`CFBundleName` with the game's name so Wine's own *Hide …* and *Quit …* items read right. A profile
+with no `exe` gets `CELLAR_APP_SKIP` instead — every store client's processes — so the Steam window
+a launch may have to show is never labelled as the game. Opening the client on its own uses plain
+`env`: that client is not this game. What it cannot change is the kernel's process name, fixed at
+exec: `ps`, and Activity Monitor's rows for Wine's windowless helpers (`wineserver`, `services.exe`,
+`explorer.exe`), still say wine — which is what they are.
+
 The shim is a universal dylib (a runner may be x86_64 under Rosetta or arm64), built by
 `Scripts/build-dock-shim.sh` and installed beside the CLI. If it is missing, `DockShim.environment`
 returns nothing and launches behave exactly as they did before — a cosmetic feature must never be

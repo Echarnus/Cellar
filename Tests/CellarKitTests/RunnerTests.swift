@@ -159,6 +159,26 @@ struct RunnerTests {
         }
     }
 
+    @Test("Missing Rosetta is explained per macOS: plain before 28, honest about the games-only subset from 28")
+    func rosettaMissingCopy() {
+        let before = SystemEnvironment.rosettaMissingMessage(macOSMajor: 27)
+        #expect(before.contains("softwareupdate --install-rosetta"))
+        #expect(!before.contains("only keeps"))
+
+        let after = SystemEnvironment.rosettaMissingMessage(macOSMajor: 28)
+        #expect(after.contains("macOS 28"))
+        #expect(after.contains("softwareupdate --install-rosetta"),
+                "the install command is still the first thing to try")
+        #expect(after.contains("cellar runner list"),
+                "a player who cannot get Rosetta needs to be pointed at the native-runner path")
+    }
+
+    @Test("Only an x86_64 runner needs Rosetta — a native ARM64EC runner must not be gated on it")
+    func rosettaGateFollowsArchitecture() {
+        #expect(RunnerArchitecture.x86_64.needsRosetta)
+        #expect(!RunnerArchitecture.arm64ec.needsRosetta)
+    }
+
     // MARK: - Wine environment
 
     @Test("The bottle directory is the WINEPREFIX, and the runner's libraries are on the path")
