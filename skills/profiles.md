@@ -80,8 +80,9 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
 - `status`: **`playable` | `experimental` | `untested`**. An unknown value renders as *Untested*.
   Players' reports arrive as `compatibility-report` issues (the app asks after a session; `cellar
   report <slug>`): a report is evidence to test against, not a status to copy in unverified.
-- `store`: **`steam` | `battlenet` | `gog`**. An unknown value is treated as Steam — which
-  would put a Battle.net game down the Steam pipeline. Spell it exactly.
+- `store`: **`steam` | `battlenet` | `gog`**, and **required**. Cellar only runs games installed
+  through a store — there is no "no store" value and no manual-install path. A profile that leaves
+  `store` out or names anything else is refused by `Game.plan` and never reaches the library.
 
 ## Honesty rules (these are not style preferences)
 

@@ -191,7 +191,7 @@ struct GameSummaryTests {
         #expect(withClient.contains("in the background"))
 
         let bare = summary(needsClientAtRuntime: false).actionHint
-        #expect(bare.contains("no store client at all"))
+        #expect(bare.contains("without opening"))
         #expect(bare.contains("in the background") == false)
     }
 

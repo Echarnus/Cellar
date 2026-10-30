@@ -23,30 +23,39 @@ struct StoreTests {
         #expect(GameStore(profileValue: input) == expected)
     }
 
-    @Test("An unknown or empty store is nil so the caller can fall back deliberately",
+    @Test("An unknown or empty store is nil, so the profile is refused rather than guessed at",
           arguments: [nil, "", "   ", "epic", "itch", "steam2", "standalone", "none", "drm-free"])
     func rejectsUnknownStores(_ input: String?) {
         #expect(GameStore(profileValue: input) == nil,
                 "mis-classifying a store silently would set up the wrong client in the bottle")
     }
 
-    @Test("A profile with no store falls back to Steam, the documented default")
-    func defaultsToSteam() throws {
-        let plan = try TestHome.plan("""
+    /// Cellar only runs games a store installed. A profile without one is not "a Steam game by
+    /// default" — it is refused, with the fix in the message.
+    @Test("A profile that names no store is refused, not guessed at")
+    func profileWithoutAStoreIsRefused() throws {
+        let slug = TestHome.writeProfile("""
         [game]
         name = "No Store Named"
-        """)
-        #expect(plan.store == .steam)
-        #expect(GameStore.default == .steam)
+        """, slug: "storeless", namingAStore: false)
+        do {
+            _ = try Game.plan(slug: slug)
+            Issue.record("a storeless profile must not resolve to a plan")
+        } catch {
+            #expect("\(error)".contains("doesn't name its store"))
+            #expect("\(error)".contains("store = \"steam\""), "the error names the fix")
+        }
+        #expect(Game.summaries().contains { $0.slug == slug } == false,
+                "and it never reaches the library")
     }
 
-    @Test("An unrecognised store falls back rather than throwing")
-    func unknownStoreFallsBack() throws {
-        let plan = try TestHome.plan("""
+    @Test("A profile naming an unsupported store is refused, not guessed at")
+    func unknownStoreIsRefused() throws {
+        let slug = TestHome.writeProfile("""
         [game]
         store = "epic"
-        """)
-        #expect(plan.store == .steam)
+        """, slug: "epic")
+        #expect(throws: CellarError.self) { try Game.plan(slug: slug) }
     }
 
     // MARK: - Descriptor invariants

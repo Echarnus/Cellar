@@ -86,7 +86,7 @@ struct Launch: ParsableCommand {
                     print(Term.yellow("Not signed in to \(plan.store.displayName) yet.")
                         + " Run: cellar \(plan.store.rawValue) login  and sign in first.")
                 }
-            case .inClientWindow, .none:
+            case .inClientWindow:
                 // Only when Cellar can't sign that client in with the session it already holds —
                 // otherwise this promised a window that never opens.
                 if plan.needsLiveSession,
