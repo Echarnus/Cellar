@@ -1,0 +1,40 @@
+name: Compatibility report
+description: Tell us how a game ran under Cellar. The app fills this in for you after you play.
+title: "[Report] "
+labels: ["compatibility-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. These reports are how a profile goes from "untested" to a status we can stand behind.
+        Nothing here was sent by Cellar: you are looking at it before anyone else does. Remove anything you'd rather not share.
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: The game's name and its Cellar profile, e.g. "Planet Coaster 2 (planet-coaster-2)".
+    validations:
+      required: true
+  - type: input
+    id: outcome
+    attributes:
+      label: How did it run?
+      description: Works, Runs with issues, or Didn't start.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Setup
+      description: Filled in by Cellar. Runner, graphics backend, macOS, chip and Cellar version.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What happened
+      description: |
+        What worked, what didn't, frame rate if you noticed it. For a crash or a game that didn't start, `cellar logs export` writes a redacted report you can attach here after reading it.
+    validations:
+      required: false

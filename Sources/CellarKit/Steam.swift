@@ -494,7 +494,7 @@ public extension SteamBottle {
     /// exactly what it asks for — a live session belonging to an account that owns the game — while
     /// keeping the download path free of the client's install dialog.
     static func launchAlongside(runner: WineRunner, exe: URL, appID: Int, showHUD: Bool = false,
-                                gameEnv: [String: String] = [:],
+                                gameEnv: [String: String] = [:], bundledLoader: URL? = nil,
                                 game: String = "the game", expectsSignIn: Bool = false,
                                 attempts: Int = 8,
                                 progress: (String) -> Void = { _ in },
@@ -530,7 +530,7 @@ public extension SteamBottle {
             attempts: attempts,
             appearSeconds: 40,
             cleanup: { ProcessWatch.kill([exe.lastPathComponent, "crash_reporter.exe"]) },
-            start: { try runner.spawn([exe.path], extraEnv: env, log: log) },
+            start: { try runner.spawn([exe.path], extraEnv: env, log: log, bundledLoader: bundledLoader) },
             isUp: { ProcessWatch.isRunning(exe.lastPathComponent) },
             progress: progress,
             stage: stage)

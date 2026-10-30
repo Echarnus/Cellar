@@ -11,8 +11,8 @@ struct ResetCommand: ParsableCommand {
         is re-obtainable: runners re-download, bottles rebuild, games come back from the store that
         sold them, and signing in is one QR scan.
 
-        Local save games live inside bottles. Anything a game saved only on this Mac — not to Steam
-        Cloud — goes with them.
+        Local save games live inside bottles. Cellar backs each bottle's saves up first and keeps the
+        copies, which a reset does not remove: cellar saves list <game>.
 
         This reaches outside Cellar's own folder: the launcher apps it put in ~/Applications and the
         entries it added to your Steam library go too, because leaving those behind means icons that

@@ -55,7 +55,7 @@ struct UninstallCellarCommand: ParsableCommand {
                 print(Term.green("Save games are kept: ") + "\(saves.count) folder(s), \(total), copied first to")
                 print("      " + Term.dim(destination.path))
             }
-        } else if let warning = Reset.saveGameWarning(in: items) {
+        } else if let warning = Reset.saveGameWarning(in: items, backedUp: false) {
             print(Term.yellow("Careful: ") + warning)
         }
         if SaveGames.someSavesAlreadyInDocuments {
@@ -81,7 +81,7 @@ struct UninstallCellarCommand: ParsableCommand {
             }
         }
 
-        var failures = Reset.perform(items) { print("  " + Term.dim($0)) }
+        var failures = Reset.perform(items, backUpSaves: false) { print("  " + Term.dim($0)) }
         // Last: the folder itself, with the logs this very run may have just written into it.
         if FileManager.default.fileExists(atPath: Paths.appSupport.path) {
             do { try FileManager.default.removeItem(at: Paths.appSupport) } catch {
