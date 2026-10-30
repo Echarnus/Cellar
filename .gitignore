@@ -30,3 +30,6 @@ DerivedData/
 # CI/build artifacts
 /dist/
 /site/
+
+# Python
+__pycache__/
