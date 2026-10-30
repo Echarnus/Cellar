@@ -43,6 +43,25 @@ struct InstallProgressBarTests {
         #expect(bar.detail.hasSuffix("."))
     }
 
+    @Test("Reduce Motion holds the sweep still; otherwise it moves with the clock")
+    func sweepRespectsReduceMotion() {
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+        let later = start.addingTimeInterval(0.35)
+        #expect(Track.sweepPhase(at: start, reduceMotion: true) == 0.5)
+        #expect(Track.sweepPhase(at: later, reduceMotion: true) == 0.5, "no motion at all, not slower motion")
+        #expect(Track.sweepPhase(at: start, reduceMotion: false) != Track.sweepPhase(at: later, reduceMotion: false))
+        for step in 0..<20 {
+            let phase = Track.sweepPhase(at: start.addingTimeInterval(Double(step) * 0.17), reduceMotion: false)
+            #expect(phase >= 0 && phase < 1)
+        }
+    }
+
+    @Test("Increase Contrast gets a stronger empty track")
+    func trackFollowsIncreaseContrast() {
+        #expect(Track.trackOpacity(increasedContrast: true) > Track.trackOpacity(increasedContrast: false))
+        #expect(Track.trackOpacity(increasedContrast: true) >= 0.25, "visible on its own against the window")
+    }
+
     @Test("draw every state, light and dark")
     func drawSheet() throws {
         for scheme in [ColorScheme.light, .dark] {
