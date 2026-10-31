@@ -77,14 +77,14 @@ public enum SteamAccount {
         public var summary: String {
             switch self {
             case .signedOut:
-                return "Not signed in. One scan with the Steam mobile app covers every Steam game."
+                return String(localized: "Not signed in. One scan with the Steam mobile app covers every Steam game.")
             case .signedIn(let name, let days, let aging):
-                let age = days == 0 ? "today" : days == 1 ? "yesterday" : "\(days) days ago"
+                let age = days == 0 ? String(localized: "today") : days == 1 ? String(localized: "yesterday") : String(localized: "\(days) days ago")
                 return aging
-                    ? "Signed in as \(name) \(age). Steam sessions last about \(expectedLifetimeInDays) days, so this one may ask you to scan again soon."
-                    : "Signed in as \(name) \(age)."
+                    ? String(localized: "Signed in as \(name) \(age). Steam sessions last about \(expectedLifetimeInDays) days, so this one may ask you to scan again soon.")
+                    : String(localized: "Signed in as \(name) \(age).")
             case .expired(let name, let reason):
-                return "Steam ended the session for \(name) (\(reason)). Sign in again — it takes one scan."
+                return String(localized: "Steam ended the session for \(name) (\(reason)). Sign in again — it takes one scan.")
             }
         }
     }

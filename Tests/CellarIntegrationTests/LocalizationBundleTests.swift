@@ -73,6 +73,11 @@ struct LocalizationBundleTests {
         #expect(dutch.localizedString(forKey: "Choose a game", value: nil, table: nil) == "Kies een game")
         let connected = dutch.localizedString(forKey: "Connected: %@", value: nil, table: nil)
         #expect(String(format: connected, "Xbox Wireless Controller") == "Verbonden: Xbox Wireless Controller")
+        // Engine copy (CellarDomain, CellarKit) resolves against the same bundle: Bundle.main is
+        // Cellar.app in the app and in the CLI that bundle-app.sh puts inside it.
+        #expect(dutch.localizedString(forKey: "Preparing the bottle", value: nil, table: nil) == "De bottle klaarmaken")
+        let days = dutch.localizedString(forKey: "%lld days ago", value: nil, table: nil)
+        #expect(String(format: days, 3) == "3 dagen geleden")
         // A key with no entry shows its English text: the fallback a reworded literal would hit.
         #expect(dutch.localizedString(forKey: "Not in the table", value: nil, table: nil) == "Not in the table")
     }
