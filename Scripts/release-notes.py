@@ -41,11 +41,13 @@ SKIP = "skip-changelog"
 
 # The install section, the same in every release. User-facing copy (skills/ux.md).
 INSTALL = (
-    "Download **Cellar.dmg**, open it and drag Cellar into Applications. Cellar is not "
-    "notarised yet, so macOS blocks the first launch: open **System Settings → Privacy & "
-    "Security**, scroll to Cellar and click **Open Anyway** (right-click → Open no longer "
-    "bypasses this since macOS 15). Cellar then sets up its runtime, you sign in to your "
-    "store, and you pick a game to play."
+    "Download **Cellar.dmg**, open it and drag Cellar into Applications. Cellar isn't signed "
+    "with an Apple Developer ID, so macOS blocks the first launch: click **Done** (not Move to "
+    "Trash), then open **System Settings → Privacy & Security**, scroll to Cellar and click "
+    "**Open Anyway** (right-click → Open no longer bypasses this). Before you do, check the "
+    "download against `SHA256SUMS.txt` below "
+    "([how](https://echarnus.github.io/Cellar/faq.html#how-do-i-know-the-download-really-is-cellar)). "
+    "Cellar then sets up its runtime, you sign in to your store, and you pick a game to play."
 )
 REQUIREMENTS = (
     "Requires an Apple Silicon Mac on macOS 27 or later (every M1 Mac can run it). Today's runners are Intel builds that "

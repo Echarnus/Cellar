@@ -237,6 +237,8 @@ code{font:.86em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(-
 .hero .ctas{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .hero .fine{margin:18px 0 0;font-size:.9rem;color:#fff}
 .hero .fine a{color:#fff}
+.hero .fine.sum{margin-top:8px;font-size:.82rem}
+.hero .fine code{overflow-wrap:anywhere;background:rgba(0,0,0,.28);color:#fff}
 .shelf{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:1.08/1}
 @media (max-width:600px){.shelf{display:none}}
 .shelf .cover{position:absolute;width:44%;aspect-ratio:2/3;border-radius:14px;overflow:hidden;
@@ -350,8 +352,9 @@ details.qa>summary::after{content:"";flex:none;margin-left:auto;width:9px;height
 details.qa[open]>summary::after{transform:rotate(225deg) translate(-2px,-2px)}
 details.qa[open]>summary{border-bottom:1px solid var(--line);border-radius:14px 14px 0 0}
 details.qa .a{padding:16px 18px 4px}
-details.qa .a p,details.qa .a ul{margin:0 0 14px}
-details.qa .a ul{padding-left:20px}
+details.qa .a p,details.qa .a ul,details.qa .a ol{margin:0 0 14px}
+details.qa .a ul,details.qa .a ol{padding-left:20px}
+details.qa .a pre{margin:0 0 14px;overflow-x:auto}
 details.qa .a li{margin:5px 0}
 .faq-layout{display:grid;gap:36px;padding:44px 0 0}
 @media (min-width:960px){.faq-layout{grid-template-columns:240px 1fr}}
@@ -563,13 +566,44 @@ def latest_release():
     # Prefer the versionless name the releases now use.
     dmg = sorted(dmgs, key=lambda a: a["name"] != "Cellar.dmg")[0]
     version = str(rel.get("tag_name", "")).lstrip("v")
+    sums = [a for a in rel.get("assets", []) if a.get("name") == "SHA256SUMS.txt"]
+    sums_url = str(sums[0]["browser_download_url"]) if sums else None
     return {
         "version": version,
         "url": str(dmg["browser_download_url"]),
         "size": f"{dmg.get('size', 0) / 1_000_000:.1f} MB",
         "notes": str(rel.get("html_url") or f"{RELEASES}/latest"),
         "date": str(rel.get("published_at", ""))[:10],
+        "name": str(dmg["name"]),
+        "sha256": release_checksum(sums_url, str(dmg["name"])) if sums_url else None,
+        "sums_url": sums_url,
     }
+
+
+def release_checksum(sums_url, name):
+    """The SHA-256 the release workflow published for `name`, or None.
+
+    Cellar isn't signed with an Apple Developer ID (docs/SECURITY.md), so macOS can't vouch for the
+    download; the published checksum is how a player can. Read from the release's own
+    SHA256SUMS.txt, never computed here, so the site shows exactly what the release says.
+    """
+    req = urllib.request.Request(sums_url, headers={"User-Agent": "cellar-gen-site"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            text = r.read(65536).decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        print(f"warning: {sums_url} not read ({e}); the page shows no checksum", file=sys.stderr)
+        return None
+    return parse_checksum(text, name)
+
+
+def parse_checksum(text, name):
+    """The digest for `name` in `shasum -a 256` output (`<hex>  <file>`), or None."""
+    for line in text.splitlines():
+        parts = line.strip().split()
+        if len(parts) == 2 and parts[1].lstrip("*") == name and re.fullmatch(r"[0-9a-f]{64}", parts[0]):
+            return parts[0]
+    return None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -612,6 +646,16 @@ def topbar(current, release, base=""):
   <button class="icon-btn" id="theme" type="button" aria-pressed="false" aria-label="Switch to dark mode">{icon("sun", "sun")}{icon("moon", "moon")}</button>
   <a class="btn btn-primary btn-small" href="{n(download_href(release))}">{icon("download")}Download</a>
 </div></header>'''
+
+
+def checksum_line(release):
+    """The download's SHA-256 under the Download button, so it can be checked before opening it."""
+    if not release or not release.get("sha256"):
+        return ""
+    n = html.escape
+    sums = f' · <a href="{n(release["sums_url"])}">SHA256SUMS.txt</a>' if release.get("sums_url") else ""
+    return (f'\n    <p class="fine sum">SHA-256 of {n(release["name"])}: <code>{n(release["sha256"])}</code>'
+            f' · <a href="faq.html#how-do-i-know-the-download-really-is-cellar">how to check it</a>{sums}</p>')
 
 
 def download_href(release):
@@ -797,8 +841,8 @@ def render_index(games, release):
       <a class="btn btn-light btn-big" href="{n(download_href(release))}">{icon("download")}<span class="lines">Download for Mac<small>{n(download_detail(release))}</small></span></a>
       <a class="btn btn-ghost btn-big" href="#games">See supported games</a>
     </div>
-    <p class="fine">{release_line} · Early builds aren&rsquo;t notarised yet:
-    <a href="faq.html#macos-says-cellar-can-t-be-opened">how to open Cellar the first time</a></p>
+    <p class="fine">{release_line} · Cellar isn&rsquo;t notarised by Apple, so macOS asks once:
+    <a href="faq.html#macos-says-cellar-can-t-be-opened">how to open Cellar the first time</a></p>{checksum_line(release)}
   </div>
   <div class="shelf" aria-hidden="true">{shelf}<img class="appicon" src="icon.png" alt="" width="256" height="256"></div>
 </div></section>
@@ -918,12 +962,35 @@ FAQ_SECTIONS = [
          "required, though there is a full <code>cellar</code> command-line tool if you prefer "
          "one.</p>"),
         ("macOS says Cellar can't be opened.",
-         "<p>Early releases are not yet notarised by Apple, so the first time you open Cellar, macOS "
-         "stops it. To allow it:</p>"
-         "<ul><li>Open <b>System Settings → Privacy &amp; Security</b>.</li>"
-         "<li>Scroll to the message saying Cellar was blocked, and click <b>Open Anyway</b>.</li>"
-         "<li>Confirm with your password or Touch ID.</li></ul>"
-         "<p>You only do this once; after that Cellar opens normally.</p>"),
+         "<p>Cellar is free software and isn't signed with a paid Apple Developer ID, so Apple "
+         "hasn't notarised it and macOS can't vouch for who made it. The first time you open it, "
+         "macOS stops it once. On macOS 27 there is no Open button in that first message — "
+         "right-clicking and choosing Open no longer skips it — so allow it from Settings:</p>"
+         "<ol><li>Drag Cellar to <b>Applications</b> and double-click it. macOS says "
+         "<b>“Cellar” Not Opened</b>. Click <b>Done</b> — not <b>Move to Trash</b>.</li>"
+         "<li>Open <b>System Settings → Privacy &amp; Security</b> and scroll down to "
+         "<b>Security</b>. You'll see <b>“Cellar” was blocked to protect your Mac</b>. Click "
+         "<b>Open Anyway</b>. The button only shows for about an hour after step 1; if it's gone, "
+         "do step 1 again.</li>"
+         "<li>macOS asks once more. Click <b>Open Anyway</b> and confirm with your password or "
+         "Touch ID.</li></ol>"
+         "<p>You only do this once; after that Cellar opens normally, and its updates are checked "
+         "against Cellar's own signing key. Before you do it, you can "
+         "<a href=\"faq.html#how-do-i-know-the-download-really-is-cellar\">check the download</a> is the "
+         "one we published.</p>"
+         "<p>Don't use a Terminal command that removes the quarantine flag: it skips the same "
+         "check for everything else it touches.</p>"),
+        ("How do I know the download really is Cellar?",
+         "<p>Every release publishes the SHA-256 checksum of each download, in "
+         "<code>SHA256SUMS.txt</code> on the release page and under the Download button on this "
+         "site. Open <b>Terminal</b> and run:</p>"
+         "<pre><code>shasum -a 256 ~/Downloads/Cellar.dmg</code></pre>"
+         "<p>The long line of letters and digits it prints must match the published one exactly. "
+         "If it doesn't, don't open the file: delete it, download it again from this site or "
+         f"<a href=\"{RELEASES}\">GitHub Releases</a>, and "
+         f"<a href=\"{REPO}/issues/new\">tell us</a> if it still doesn't match.</p>"
+         "<p>Get Cellar only from this site or the GitHub releases page. Any other copy is not "
+         "ours.</p>"),
         ("Is it free? Do I need an account with you?",
          "<p>Free, GPL-3.0, and there is no Cellar account, no sign-up and no telemetry. The only "
          "accounts involved are the game stores you already have.</p>"),
