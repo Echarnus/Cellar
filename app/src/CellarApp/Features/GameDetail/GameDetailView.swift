@@ -229,6 +229,13 @@ struct GameDetailView: View {
             Notice(symbol: "clock.fill", tint: game.store.tint,
                    title: String(localized: "The install runs with no window"),
                    detail: String(localized: "GOG ships a normal Windows installer and Cellar runs it silently, so there is nothing to watch for a few minutes. The activity log below is the progress."))
+        } else if let launcher = game.publisherLauncher, !(game.nextStep == .play && game.clientSignInPending) {
+            // A second program and a second account, neither of them Cellar's or the store's. Said
+            // on the page before the player meets its window, or that window reads as Cellar
+            // asking for a sign-in it already has.
+            Notice(symbol: "person.badge.key.fill", tint: game.store.tint,
+                   title: String(localized: "\(game.name) also needs the \(launcher.displayName)"),
+                   detail: String(localized: "Every copy starts through it, \(game.store.displayName)'s included. Cellar installs it in this game's bottle from the publisher's own download, and its installer needs a few clicks. The first time you press Play its window opens: sign in with your \(launcher.accountNoun), and it starts the game. Cellar can't see that sign-in, so it never shows a ✓ for it."))
         } else if game.nextStep == .play && game.clientSignInPending {
             // Cellar normally hands the client the player's session, so this only shows when it
             // can't — and a second sign-in needs its reason on the page, or it reads as Cellar

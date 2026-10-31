@@ -51,6 +51,13 @@ public struct GamePlan {
                                                           bottleFields: [:], bottleEnv: [:])
     /// A profile Cellar wrote itself from the game's files (`DraftProfile`): every value a guess.
     public var isDraft = false
+    /// A publisher's launcher the game starts through as well as its store — Rockstar's, for Red
+    /// Dead Redemption and GTA V (`PublisherLauncher`). Setup installs it into the bottle.
+    public var publisherLauncher: PublisherLauncher? = nil
+    /// The program to *start*, when it isn't the game's own process: `PlayRDR2.exe`, the stub Steam
+    /// runs, which hands off to Rockstar's launcher and exits. `launchExe` stays the game itself
+    /// (`RDR2.exe`), because that is the process Cellar watches and shuts the layer down behind.
+    public var startExe: String? = nil
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
@@ -87,6 +94,15 @@ public struct GamePlan {
         return installRoots
             .map { $0.appendingPathComponent(launchExe) }
             .first { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    /// The absolute program to start for a direct launch: `startExe` beside the game's exe when the
+    /// profile names one and it is on disk, else the exe itself.
+    public var directStartExe: URL? {
+        guard let exe = directLaunchExe else { return nil }
+        guard let startExe else { return exe }
+        let start = exe.deletingLastPathComponent().appendingPathComponent(startExe)
+        return FileManager.default.fileExists(atPath: start.path) ? start : exe
     }
 
     /// True when this store-installed game can be launched without its store's client running.

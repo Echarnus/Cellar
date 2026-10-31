@@ -1,0 +1,57 @@
+# Cellar game profile — Red Dead Redemption
+#
+# The 2024 PC release of Rockstar's 2010 western (with Undead Nightmare), ported by Double Eleven
+# and bought through Steam. Like every Rockstar game on Steam it starts through the Rockstar Games
+# Launcher: Steam runs PlayRDR.exe, which hands off to the launcher, which signs the player in to a
+# Rockstar Games account and then starts the game. Cellar's setup installs the launcher from
+# Rockstar's own download (publisher_launcher below, RockstarLauncher.swift).
+#
+# Not yet run on a Mac by Cellar, and no public report of it on Apple Silicon was found. The status
+# says untested, and the exe names below are the least certain facts in the file.
+
+[game]
+slug          = "red-dead-redemption"
+name          = "Red Dead Redemption"
+developer     = "Rockstar Games, Double Eleven"
+publisher     = "Rockstar Games"
+steam_appid   = 2668510
+engine        = "RAGE"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2024-10-29"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steamworks + Rockstar Games Launcher (needs a Rockstar Games account)"
+needs_live_session          = true
+requires_account            = "Steam + Rockstar Games account"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar, and no report of it on Apple Silicon was found. Needs the Rockstar Games Launcher, which Cellar installs in the bottle; the first Play opens its window to sign in to a Rockstar Games account, and that sign-in window is the step most often reported failing under Wine for Rockstar's other games."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal: DirectX 12 on Metal, the same route as Red Dead Redemption 2. DXVK translates no
+# DirectX 12, so the fallback only helps if the game offers a Vulkan renderer, which is unverified.
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method             = "windows-steam-in-bottle"
+steam_appid        = 2668510
+# PlayRDR.exe is the launch target players are told to look for in the game's folder. RDR.exe as
+# the game's own process, and the folder name, follow Rockstar's naming and are unverified: check
+# both against Steam's files when Kenneth installs it.
+install_dir        = "Red Dead Redemption"
+exe                = "RDR.exe"
+start_exe          = "PlayRDR.exe"
+publisher_launcher = "rockstar"
+
+[legal]
+drm_circumvention = "never"

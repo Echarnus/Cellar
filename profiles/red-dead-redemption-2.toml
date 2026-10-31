@@ -1,0 +1,63 @@
+# Cellar game profile — Red Dead Redemption 2
+#
+# Rockstar's 2019 open-world western, bought and downloaded through Steam. Every copy, Steam's
+# included, starts through the Rockstar Games Launcher: Steam runs PlayRDR2.exe, a stub that hands
+# off to the launcher, the launcher signs the player in to a Rockstar Games account, and only then
+# starts RDR2.exe, the game itself. On Windows Steam installs that launcher the first time the game
+# is played; a copy Cellar downloaded never gets that step, so Cellar's setup installs it from
+# Rockstar's own download (publisher_launcher below, RockstarLauncher.swift).
+#
+# Not yet run on a Mac by Cellar. Everything here comes from public reports, named inline, and the
+# status says untested until Kenneth runs it.
+
+[game]
+slug          = "red-dead-redemption-2"
+name          = "Red Dead Redemption 2"
+developer     = "Rockstar Studios"
+publisher     = "Rockstar Games"
+steam_appid   = 1174180
+engine        = "RAGE"
+# The game ships two renderers and lets the player pick in its graphics settings.
+graphics_api  = "Vulkan or DirectX 12"
+architecture  = "x86-64"
+released      = "2019-11-05"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none in story mode; Red Dead Online not tried under Cellar"
+drm                         = "Steamworks + Rockstar Games Launcher (needs a Rockstar Games account)"
+needs_live_session          = true
+requires_account            = "Steam + Rockstar Games account"
+online                      = "story mode is the target; Red Dead Online not tried"
+status                      = "untested"
+# The launcher's sign-in window is drawn by an embedded Chromium (SocialClubHelper.exe). It is the
+# most reported failure under Wine and Proton (ValveSoftware/Proton issue 3291), so it is named here.
+# Frame rates: iphones.ru's CrossOver 25 review on an M1 Pro. Vulkan crash: AppleGamingWiki report.
+notes                       = "Not yet launched under Cellar. Needs the Rockstar Games Launcher, which Cellar installs in the bottle; the first Play opens its window to sign in to a Rockstar Games account, and that sign-in window is the step most often reported failing under Wine. CrossOver 25 runs it on Apple Silicon: an M1 Pro review measured about 45 FPS at 1080p on low settings and about 25 on medium, with flickering cloud shadows outside towns and memory use that grows until the Mac starts swapping. An older report on an M2 MacBook Air saw Vulkan crash a few minutes in, so if the game starts on Vulkan and crashes, switch Graphics API to DirectX 12 under Settings, Graphics, Advanced Settings."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal first: it is DirectX 12 on Metal, the route CrossOver 25 shipped RDR2 support with. DXVK
+# as the fallback is for the game's own Vulkan renderer, which then runs on MoltenVK; DXVK itself
+# translates no DirectX 12, so that fallback only helps with the game set to Vulkan.
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method             = "windows-steam-in-bottle"
+steam_appid        = 1174180
+# Steam's install folder, and the two programs in it: RDR2.exe is the game (what Cellar watches and
+# shuts the layer down behind); PlayRDR2.exe is Steam's launch target, which hands off to Rockstar.
+install_dir        = "Red Dead Redemption 2"
+exe                = "RDR2.exe"
+start_exe          = "PlayRDR2.exe"
+publisher_launcher = "rockstar"
+
+[legal]
+# Steamworks and Rockstar's launcher run untouched inside the layer. Only ever a copy the player owns.
+drm_circumvention = "never"

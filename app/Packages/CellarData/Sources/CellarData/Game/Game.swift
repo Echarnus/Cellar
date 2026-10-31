@@ -48,6 +48,15 @@ public enum Game {
                 "The profile '\(slug)' \(named). Cellar only runs games installed through Steam, "
                 + "Battle.net or GOG — add store = \"steam\", \"battlenet\" or \"gog\" to \(ref.slug).toml.")
         }
+        // A publisher launcher the game can't start without. Named but unknown is refused for the
+        // same reason as an unknown store: launching without it fails in a way that looks like the
+        // game is broken.
+        let launcher = PublisherLauncher(profileValue: fields["publisher_launcher"])
+        if let named = fields["publisher_launcher"], !named.trimmingCharacters(in: .whitespaces).isEmpty, launcher == nil {
+            throw CellarError.invalidArgument(
+                "The profile '\(slug)' names the publisher launcher '\(named)', which Cellar doesn't know. "
+                + "The one it can set up is publisher_launcher = \"rockstar\".")
+        }
         // Several games can share one bottle (one sign-in, one download cache); a profile
         // opts in with `bottle = "<name>"`. Default: one bottle per game.
         let bottleName = fields["bottle"] ?? slug
@@ -95,7 +104,9 @@ public enum Game {
             metalFXUpscaling: performance.metalFXUpscaling,
             language: LanguageChoice.resolve(game: BottleConfig.language(bottleFile), global: CellarSettings.language),
             performance: performance,
-            isDraft: fields["generated"]?.lowercased() == "true"
+            isDraft: fields["generated"]?.lowercased() == "true",
+            publisherLauncher: launcher,
+            startExe: fields["start_exe"]
         )
     }
 
