@@ -54,9 +54,9 @@ jobs:
           fi
           # The app, the CLI and every diagnostics report name CellarVersion.current, so a tag that
           # disagrees with it would ship a build that misreports its own version.
-          source_version="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sources/CellarKit/Core/CellarVersion.swift)"
+          source_version="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' src/CellarKit/Core/CellarVersion.swift)"
           if [ "$EVENT" = "push" ] && [ "$source_version" != "$version" ]; then
-            echo "::error::Tag v$version but CellarVersion.current is '$source_version'. Bump Sources/CellarKit/Core/CellarVersion.swift in a PR first."
+            echo "::error::Tag v$version but CellarVersion.current is '$source_version'. Bump app/src/CellarKit/Core/CellarVersion.swift in a PR first."
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
