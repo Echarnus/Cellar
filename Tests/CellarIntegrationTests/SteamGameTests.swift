@@ -117,7 +117,7 @@ struct SteamGameTests {
         #expect(ready.actionHint.contains("without opening"))
 
         // 7. Launch it, through the same call the Play button makes.
-        let route = try Game.launch(plan) { IT.log($0) }
+        let route = try Game.launch(plan, progress: { IT.log($0) })
         guard case .direct(let launched) = route else {
             Issue.record("expected the direct route for a DRM-free game, got \(route)")
             return
