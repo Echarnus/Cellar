@@ -15,9 +15,10 @@
 4. [Clean architecture, translated to a Swift app](#clean-architecture-translated-to-a-swift-app)
 5. [State management: signal stores and their Swift equivalents](#state-management-signal-stores-and-their-swift-equivalents)
 6. [The target architecture](#the-target-architecture)
-7. [Migration plan](#migration-plan)
-8. [Decisions and rejected alternatives](#decisions-and-rejected-alternatives)
-9. [Sources](#sources)
+7. [Source layout](#source-layout)
+8. [Migration plan](#migration-plan)
+9. [Decisions and rejected alternatives](#decisions-and-rejected-alternatives)
+10. [Sources](#sources)
 
 ## Summary
 
@@ -391,6 +392,46 @@ CLI, but it still reads the library and the store clients' state in-process. No 
 app imports it, and `ArchitectureTests` fails the build if a view or store does, or if an entry
 point forgets to call `install()`. Every target is in Swift 6 language mode.
 
+## Source layout
+
+Every target is grouped by feature, and every file holds one top-level type, named after it. An
+extension of a type that lives elsewhere goes in `Type+Topic.swift` (`GameStore+StoreStyle.swift`).
+Nested types stay with their parent. `ArchitectureTests.oneTypePerFile` and `featureFolders` fail
+the build when a file gains a second type or a file is left loose at a target's root (#133).
+
+```
+Sources/
+  CellarDomain/          pure types, Foundation only
+    Store/  Install/  Launch/  Events/
+  CellarKit/             the engine
+    Core/                errors, environment, paths, version, the CLI command contract
+    Game/                plans, facts, summaries, updates, play time
+    UseCases/            LoadLibrary, SetUpGame, InstallGame, LaunchGame, UninstallGame
+    Stores/              the StoreAdapter port and registry, the library verdict, store icons
+      Steam/  BattleNet/  GOG/
+    Runners/             Wine, runners, prefixes, preparation, app bundles, the Dock shim
+    Library/             the profile database and the library query
+    Settings/            performance, language, backend, controllers, wheels
+    Storage/             game storage, saves, backups, uninstall, reset
+    Credentials/         keychain, private files
+    Diagnostics/         log, diagnostics report, frame stats
+    System/              shell, processes, downloads, environment checks
+    Codecs/              VDF, protobuf, PE, CRC32, archives
+  CellarInfrastructure/  the concrete store adapters
+    Adapters/
+  CellarUI/              presentation primitives a test can import
+    Marks/  Progress/  Snapshot/
+  CellarApp/             the SwiftUI app; main.swift is the composition root
+    App/                 AppModel, AppDelegate, activity, updater
+    Features/            Library/  GameDetail/  Accounts/  Settings/  Welcome/  Launch/
+  cellar/                the CLI; Cellar.swift is the entry point
+    Commands/            Games/  Stores/  Maintenance/
+    Output/
+```
+
+Next step (#133): the repository splits at the top into `app/` (Package.swift, `src/`, tests,
+resources, the app's scripts) and `pages/` (the GitHub Pages site), with `profiles/` shared by both.
+
 ## Migration plan
 
 Each step is one issue and one small PR, leaves `main` releasable, and changes no player-visible
@@ -468,6 +509,7 @@ test fails the build when the rule breaks, not that a reviewer has to notice.
 | State management: one owner, unidirectional updates | `AppModel` owns every `@Observable @MainActor` store; no singletons, no notification wiring | Pass, tested (`LibraryQueryTests`, store tests) |
 | Contract between processes is typed and versioned | `CellarCommand` (checked by `cellar selftest` against the CLI's parser), `--events` JSON lines with `v` | Pass, tested (`CellarCommandTests`, `CommandEventTests`, `cellar selftest`) |
 | Compile-time data-race safety | Swift 6 language mode in every target, tests included | Pass, enforced (`swift6Everywhere`, and the compiler) |
+| Code is findable: feature folders, one type per file | Every target grouped by feature; each file one top-level type, named after it | Pass, enforced (`oneTypePerFile`, `featureFolders`) |
 | Main thread kept free of blocking work | `LibraryStore.refresh()` still runs `LoadLibrary` on the main actor | Open: needs an Instruments trace on a real library before moving it (Apple's own advice, WWDC25 268). Not measurable from CI |
 
 ## Sources
