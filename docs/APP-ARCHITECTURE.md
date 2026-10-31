@@ -215,7 +215,7 @@ What changes in a Swift app compared with a backend:
 | `signal()` | a stored property of an `@Observable` class | Observation tracks reads per property, per view — the same fine-grained dependency tracking signals give. |
 | `computed()` | a computed property on the `@Observable` class | Re-evaluated when the tracked properties it reads change; no memo by default, so keep them cheap. |
 | `effect()` | `.task(id:)`, `.onChange(of:)`, or `withObservationTracking` | Side effects belong in intent methods, not in effects, in both worlds. |
-| NgRx `signalStore` (`withState`, `withComputed`, `withMethods`, `providedIn`) | `@Observable @MainActor final class FeatureStore` with `private(set)` state, computed properties and intent methods, injected with `.environment(store)` | This is the near-exact equivalent and the recommendation below. |
+| NgRx `signalStore` (`withState`, `withComputed`, `withMethods`, `providedIn`) | `@Observable @MainActor final class FeatureStore` with `private(set)` state, computed properties and intent methods, handed to each window through its initializer | This is the near-exact equivalent and the recommendation below. |
 | NgRx `Store` (actions, reducers, effects, selectors) | TCA (`@Reducer`, `Store`, `Effect`, `TestStore`) or a hand-rolled Redux | Full unidirectional data flow with a central state tree. |
 | Component with injected service | MVVM: a `View` plus an `ObservableObject`/`@Observable` view model | What Cellar has today, with `ObservableObject`. |
 
