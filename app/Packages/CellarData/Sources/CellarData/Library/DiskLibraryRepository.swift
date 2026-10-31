@@ -12,6 +12,7 @@ public struct DiskLibraryRepository: LibraryRepository {
         let all = LoadLibrary().summaries()
         return LibrarySnapshot(games: all.filter(\.isVisible), withheld: all.filter { !$0.isVisible },
                                steam: SteamAccount.state, hasConnectedStore: StoreLibrary.hasConnectedStore,
-                               gogSignedIn: GOGAuth.isSignedIn)
+                               gogSignedIn: GOGAuth.isSignedIn,
+                               connectedStores: GameStore.allCases.filter(StoreLibrary.isConnected))
     }
 }

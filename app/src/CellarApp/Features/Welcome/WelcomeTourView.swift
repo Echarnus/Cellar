@@ -156,7 +156,7 @@ struct WelcomeTourView: View {
             VStack(alignment: .leading, spacing: 12) {
                 FactRow(symbol: "person.crop.circle", tint: .blue,
                         title: String(localized: "Accounts — sign in any time"),
-                        detail: String(localized: "The person icon in the sidebar, ⌘⇧A, or Settings → Manage accounts. Signing in later works exactly as it does here."))
+                        detail: String(localized: "Your account at the bottom of the sidebar, ⌘⇧A, or Settings → Manage accounts. Signing in later works exactly as it does here."))
                 FactRow(symbol: "gearshape", tint: .gray,
                         title: String(localized: "Settings — ⌘,"),
                         detail: String(localized: "The Wine runner, your logs and the Cellar folder. It also replays this tour whenever you want it."))
