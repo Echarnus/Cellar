@@ -20,7 +20,7 @@ public struct OutputLines: Sendable {
 
     /// The complete lines in `data`, after whatever earlier reads left unfinished.
     public mutating func lines(in data: Data) -> [String] {
-        pending.append(contentsOf: data)
+        pending += data
         guard let last = pending.lastIndex(of: Self.newline) else {
             trimPending()
             return []
