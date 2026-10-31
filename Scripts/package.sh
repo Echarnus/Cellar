@@ -82,7 +82,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <!-- What Sparkle compares against the appcast's sparkle:version. -->
   <key>CFBundleVersion</key><string>$VERSION</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- Shown inside macOS's own permission dialog. Cellar asks for all three on first launch
        (WelcomeView) rather than letting a game trigger them mid-install; without these keys the
