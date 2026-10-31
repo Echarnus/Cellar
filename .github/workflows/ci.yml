@@ -48,6 +48,9 @@ jobs:
           test -f "$APP/Frameworks/Sparkle.framework/Sparkle"
           test -f "$APP/Resources/sdl/libSDL2-2.0.0.dylib"
           test -f "$APP/Resources/sdl/libSDL3.dylib"
+          test -f "$APP/Resources/nl.lproj/Localizable.strings"
+          plutil -lint "$APP/Resources/nl.lproj/Localizable.strings"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$APP/Info.plist" | grep -qx ' *nl'
           otool -l "$APP/MacOS/CellarApp" | grep -q '@executable_path/../Frameworks'
           "$APP/MacOS/cellar" --version
       # The rendered store marks, light and dark. A reviewer can look at the actual pixels a PR

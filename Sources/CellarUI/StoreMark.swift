@@ -42,6 +42,13 @@ public struct StoreMark: View {
     }
 
     public var body: some View {
+        mark
+            // Decorative to VoiceOver. A mark never stands alone — position + mark + word is the rule
+            // (skills/ux.md) — so the word beside it is what gets read, once, rather than "Steam" twice.
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var mark: some View {
         if artwork, let image = StoreIcons.image(for: store) {
             // Clipped to the mark's own silhouette rather than always a circle: GOG's outline is a
             // rounded tile, and `StoreBadge` rings whatever shape this returns. Real artwork has to

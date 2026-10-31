@@ -234,12 +234,16 @@ struct SettingsView: View {
                     Spacer()
                     Text(lastChecked).font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Cellar looks for a new version once a day and shows you what changed. "
-                    + "Nothing is installed until you choose Install, and your games and bottles stay as they are.")
+                Text("""
+                    Cellar looks for a new version once a day and shows you what changed. \
+                    Nothing is installed until you choose Install, and your games and bottles stay as they are.
+                    """)
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-                Text("This copy of Cellar was built from source, so it doesn't update itself. "
-                    + "Pull the latest code and run Scripts/install-app.sh, or install a release from GitHub.")
+                Text("""
+                    This copy of Cellar was built from source, so it doesn't update itself. \
+                    Pull the latest code and run Scripts/install-app.sh, or install a release from GitHub.
+                    """)
                     .font(.caption).foregroundStyle(.secondary)
                 Link("Cellar releases", destination: Links.releases)
             }
@@ -321,9 +325,11 @@ struct SettingsView: View {
                     .disabled(export == .working)
                 Button("Open logs folder") { NSWorkspace.shared.open(Paths.logs) }
             }
-            Text("Writes one text file — your Mac's details, Cellar's log of what it did, and the "
-                + "tail of each Wine log — to your Desktop. Account names, your home folder path "
-                + "and anything token-shaped are left out.")
+            Text("""
+                Writes one text file — your Mac's details, Cellar's log of what it did, and the \
+                tail of each Wine log — to your Desktop. Account names, your home folder path \
+                and anything token-shaped are left out.
+                """)
                 .font(.caption).foregroundStyle(.secondary)
 
             switch export {

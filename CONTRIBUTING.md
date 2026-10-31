@@ -42,6 +42,11 @@ Cite sources for non-obvious claims in the PR description.
   a branch in `Game.setUp`/`Game.launch`, and a CLI command group. Per-store *behaviour* goes in
   `GameStore.descriptor`, never a `switch` inside a view.
 
+- **Translations** live in `Resources/Localization/<lang>.lproj/Localizable.strings`, keyed by the
+  app's English text. A new string on a screen needs a Dutch line there (the tests say which), and a
+  new language is a copy of `nl.lproj` plus its code in the scripts' `CFBundleLocalizations` — see
+  [`skills/ux.md`](skills/ux.md) → *Localization*.
+
 Build and check before opening a PR:
 
 ```sh
