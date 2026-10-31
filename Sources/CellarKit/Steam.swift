@@ -531,7 +531,7 @@ public extension SteamBottle {
     // MARK: - The client signs in with Cellar's session
 
     /// Whether this bottle's Steam will sign in by itself — see `SteamClientSession`.
-    static func clientSessionReadiness(in prefix: URL) -> SteamClientSession.Readiness {
+    package static func clientSessionReadiness(in prefix: URL) -> SteamClientSession.Readiness {
         SteamClientSession.readiness(SteamClientSession.snapshot(
             prefix: prefix, steamDirectory: steamDirectory(in: prefix), wineUser: wineUser))
     }
