@@ -43,7 +43,7 @@ public enum Reset {
             case .path(let url):             return FileManager.default.fileExists(atPath: url.path)
             case .steamShortcuts(let names):  return !names.isEmpty
             case .storeCredentials(.gog):    return GOGAuth.isSignedIn || GOGAuth.cachedUsername != nil
-            case .storeCredentials(.steam):  return !Reset.steamTokenStoresOutsideCellar.isEmpty
+            case .storeCredentials(.steam):  return !Reset.steamTokenStoresOutsideCellar.isEmpty || SteamTokenVault.isSealed
             case .storeCredentials:          return false
             }
         }
@@ -94,9 +94,9 @@ public enum Reset {
         // player's real ones, and a test or a throwaway install must not sign the player out.
         if !isRelocated {
             let strays = steamTokenStoresOutsideCellar
-            if !strays.isEmpty {
+            if !strays.isEmpty || SteamTokenVault.isSealed {
                 items.append(Item(target: .storeCredentials(.steam),
-                                  title: "Your Steam sign-in token, kept by DepotDownloader outside Cellar's folder",
+                                  title: "Your Steam sign-in token (in your keychain, or DepotDownloader's file)",
                                   cost: "one QR scan", bytes: strays.reduce(0) { $0 + size(of: $1) }))
             }
             if GOGAuth.isSignedIn || GOGAuth.cachedUsername != nil {
@@ -300,6 +300,7 @@ public enum Reset {
                     StoreLibrary.forgetGOG()
                 case .storeCredentials(.steam):
                     for file in steamTokenStoresOutsideCellar { try FileManager.default.removeItem(at: file) }
+                    try SteamTokenVault.forget()
                 case .storeCredentials(let store):
                     throw CellarError.invalidArgument("No credential store for \(store.displayName).")
                 }
