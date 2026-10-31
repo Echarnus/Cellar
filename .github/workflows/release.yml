@@ -120,6 +120,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Tier A of the tests loads Cellar's SDL the way winebus does, exactly as in ci.yml, so it is
+      # built first. package.sh builds its own copy for the bundle.
+      - name: Build Cellar's SDL (universal)
+        run: sh Scripts/build-sdl.sh
       - name: Test suite
         run: sh Scripts/test.sh
       - name: Package (app + CLI zips)
