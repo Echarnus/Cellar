@@ -44,8 +44,8 @@ let package = Package(
         .target(name: "CellarKit", dependencies: ["CellarDomain"], swiftSettings: approachable),
 
         // Infrastructure: the concrete store adapters behind CellarKit's `StoreAdapter` port. Only
-        // a composition root imports it — the CLI's `main` and the tests' set-up. The app never
-        // does: it reaches the stores through the CLI subprocess, so a view cannot call one.
+        // a composition root imports it: the CLI's `main`, the app's `main.swift` and the tests'
+        // set-up. No view, store or UI type may (ArchitectureTests).
         .target(name: "CellarInfrastructure", dependencies: ["CellarKit", "CellarDomain"],
                 swiftSettings: approachable),
 
@@ -70,7 +70,7 @@ let package = Package(
         // `cellar` CLI as a subprocess for actions, so it reuses every tested path.
         .executableTarget(
             name: "CellarApp",
-            dependencies: ["CellarKit", "CellarDomain", "CellarUI", .product(name: "Sparkle", package: "Sparkle")],
+            dependencies: ["CellarKit", "CellarDomain", "CellarInfrastructure", "CellarUI", .product(name: "Sparkle", package: "Sparkle")],
             // Inside Cellar.app the framework sits in Contents/Frameworks (Scripts/bundle-app.sh);
             // SwiftPM's own @loader_path rpath still finds it beside the binary in .build.
             swiftSettings: mainActorByDefault,

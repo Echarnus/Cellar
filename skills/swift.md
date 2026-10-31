@@ -32,7 +32,7 @@ machinery unless a target genuinely needs it.
   one `run` that reports `GameEvent`s. CLI commands call the use case; `Game.setUp`/`Game.launch`
   are façades kept for older callers. Per-store behaviour goes in the store's `StoreAdapter`, never
   in a `switch plan.store` inside a use case. The adapters live in `CellarInfrastructure`, which only
-  composition roots import (the CLI's `main`, the tests' set-up); CellarKit sees them through
+  composition roots import (the CLI's `main`, the app's `main.swift`, the tests' set-up); CellarKit sees them through
   `StoreAdapters`. Import `CellarDomain` explicitly wherever a domain type is used.
 - **The app names a command with `CellarCommand`, never a hand-built argument list.** Add a case
   (and an entry in `CellarCommand.examples`) for anything new the app asks the CLI to do;
