@@ -217,4 +217,32 @@ struct GameLanguageTests {
         #expect(GameLanguage.latinAmericanSpanish.blizzardLocale == "esMX")
         #expect(GameLanguage.dutch.blizzardLocale == nil)
     }
+
+    // MARK: - settings.toml, shared with the wheel strength
+
+    @Test("The wheel strength round-trips through settings.toml beside the language, and reaches Wine")
+    func wheelStrengthSetting() throws {
+        TestHome.ensure()
+        defer {
+            try? CellarSettings.setForceFeedbackStrength(nil)
+            try? CellarSettings.setLanguage(nil)
+        }
+        try CellarSettings.setLanguage(.french)
+        try CellarSettings.setForceFeedbackStrength(75)
+        #expect(CellarSettings.forceFeedbackStrength == 75)
+        #expect(CellarSettings.language == "fr", "writing the strength kept the language")
+        #expect(throws: CellarError.self) { try CellarSettings.setForceFeedbackStrength(0) }
+        #expect(throws: CellarError.self) { try CellarSettings.setForceFeedbackStrength(101) }
+        #expect(CellarSettings.forceFeedbackStrength == 75, "a refused value changes nothing")
+
+        let install = try #require(TestHome.installStubRunner())
+        let env = WineRunner(install: install, prefix: TestHome.scratch("wine-strength")).environment()
+        #expect(env["CELLAR_FFB_MAX_PERCENT"] == "75")
+        #expect(env["SDL_HAPTIC_LG4FF_GAIN"] == "49151")
+
+        try CellarSettings.setForceFeedbackStrength(nil)
+        #expect(CellarSettings.forceFeedbackStrength == nil)
+        let reset = WineRunner(install: install, prefix: TestHome.scratch("wine-strength")).environment()
+        #expect(reset["SDL_HAPTIC_LG4FF_GAIN"] == ProcessInfo.processInfo.environment["SDL_HAPTIC_LG4FF_GAIN"])
+    }
 }

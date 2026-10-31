@@ -146,20 +146,25 @@ are the external standard here; this is what it means for Cellar specifically.
 
 ## Localization — English and Dutch
 
-**The app's screens are translated into Dutch; the CLI, alerts and CellarKit's copy are still
-English.** The tables live in `Resources/Localization/<lang>.lproj/Localizable.strings`, the install
-scripts copy them into the bundle, and SwiftUI looks every `Text("…")`, `Button("…")`, `Label("…", …)`,
-`Toggle`, `Section`, `Picker`, `Link`, `LabeledContent` and `.help` literal up by its English text.
+**The app is translated into Dutch — its screens, alerts and menu bar; the CLI and the copy CellarKit
+computes are still English.** The tables live in `Resources/Localization/<lang>.lproj/Localizable.strings`,
+the install scripts copy them into the bundle, and SwiftUI looks every `Text("…")`, `Button("…")`,
+`Label("…", …)`, `Toggle`, `Section`, `Picker`, `Link`, `LabeledContent`, `.help` and
+`.accessibility{Label,Value,Hint}` literal up by its English text. Anything that is not a SwiftUI
+view — an `NSAlert`, a menu item — wraps its literal in `String(localized: "…")`.
 
-- **A new literal on a screen needs a Dutch entry.** `LocalizationTests` fails until it has one, and
+- **A new literal in the app needs a Dutch entry.** `LocalizationTests` fails until it has one, and
   fails again when a reworded literal leaves its old key behind — the key *is* the English text.
 - **Write whole sentences with the variable interpolated in one piece.** `Text("Connected: \(names)")`
-  becomes the key `Connected: %@`; `Text("Needs " + store)` is a `String`, which SwiftUI shows verbatim
-  and never translates — and word order differs per language anyway.
+  becomes the key `Connected: %@` (an `Int` becomes `%lld`); `Text("Needs " + store)` is a `String`, which SwiftUI shows verbatim
+  and never translates — and word order differs per language anyway. Never interpolate an English word
+  (`"\(n) \(n == 1 ? "game" : "games")"`): write both sentences as literals and pick one.
 - **A long caption stays one literal.** Use a multi-line `"""` literal with `\` line continuations,
   not `"…" + "…"`: concatenation turns it into a `String` and it silently stays English.
-- **Text held in a `String` variable is not looked up.** Copy computed in CellarKit (readiness lines,
-  hints, errors) and `NSAlert` text are the next step, and need `String(localized:)` first.
+- **Text held in a `String` variable is not looked up.** A custom view that takes `title: String`
+  shows it verbatim, and so does copy computed in CellarKit (readiness lines, hints, errors): those
+  are the next step, and need the parameter to become a `LocalizedStringKey`, or the copy to come
+  from `String(localized:)` with a bundle CellarKit can find.
 - **Dutch runs about a third longer than English.** Check the minimum window width with the Mac set
   to Nederlands (System Settings → General → Language & Region, or per app under Applications).
 

@@ -14,7 +14,9 @@ so CI runs them on every PR. On Linux they run the same way against any SDL 3 (`
 
 Switches, read from the game's environment (they pass through `cellar launch`):
 
-- `CELLAR_FFB_MAX_PERCENT` — the strength cap, 1–100, default 50.
+- `CELLAR_FFB_MAX_PERCENT` — the strength cap, 1–100, default 50. Cellar sets it at launch from
+  Settings › General › Racing wheels (`CellarSDL.strengthEnvironment`), together with SDL's own
+  `SDL_HAPTIC_LG4FF_GAIN` for Logitech wheels; a value typed on the command line wins.
 - `CELLAR_FFB_DISABLE=1` — leave Fanatec bases to the runner's path: steering only, no force feedback.
 
 Rules, because this library runs inside every game's Wine process:
