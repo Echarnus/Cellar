@@ -698,28 +698,7 @@ public enum Game {
             wine.updatePrefixIfStale()
         }
 
-        switch plan.store {
-        case .steam:
-            // The client is a *runtime* dependency, not an install one: Cellar downloads the game
-            // itself now, so a title whose DRM never talks to a running Steam has no reason to pull
-            // a 1.4 GB client it will never start. Setting one up anyway would be an invented step,
-            // and the game screen already promises not to demand it (`GameSummary.nextStep`).
-            if plan.needsLiveSession {
-                if !SteamBottle.isInstalled(in: plan.prefix) { phase(InstallProgress(.client)) }
-                try SteamBottle.install(runner: wine, progress: step)
-                // Done here rather than on first Play, where Steam would draw its own update window.
-                try SteamBottle.updateClient(runner: wine, progress: step) {
-                    phase(InstallProgress(.clientUpdate, fraction: $0))
-                }
-            } else {
-                step("No Steam client needed — this game runs without a live Steam session.")
-            }
-        case .battlenet:
-            if !BattleNetBottle.isInstalled(in: plan.prefix) { phase(InstallProgress(.client)) }
-            try BattleNetBottle.install(runner: wine, progress: step)
-        case .gog:
-            step("No store client needed — GOG games are DRM-free, so Cellar installs and runs them directly.")
-        }
+        try plan.store.adapter.setUpClient(plan, wine: wine, step: step, phase: phase)
         CellarLog.info(.setup, "Setup finished for \(plan.name).", subject: plan.slug)
         return wine
     }
@@ -776,60 +755,7 @@ public enum Game {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
         }
-        switch plan.store {
-        case .steam:
-            guard let appID = plan.appID else {
-                throw CellarError.invalidArgument("Profile '\(plan.slug)' has no steam_appid.")
-            }
-            // Steam already installed it — leave that copy alone. Downloading a second one into
-            // Cellar's own directory would cost the player the whole game twice.
-            if SteamBottle.isGameInstalled(in: plan.prefix, appID: appID) {
-                step("\(plan.name) is already installed in your Steam library.")
-                return
-            }
-            guard let credentials = SteamAccount.credentials else {
-                throw CellarError.invalidArgument(
-                    "Not signed in to Steam. One scan covers every Steam game: cellar steam login")
-            }
-            step("Downloading \(plan.name) from your Steam library (AppID \(appID))…")
-            // `progress` is non-escaping and the download does not outlive this call — the tool's
-            // output is handed over line by line while it runs.
-            phase(InstallProgress(.downloading))
-            try withoutActuallyEscaping(progress) { report in
-                try withoutActuallyEscaping(phase) { phase in
-                    try DepotTool.fetch(appID: appID, into: plan.depotGameDir, credentials: credentials) { line in
-                        if let fraction = DepotProgress.fraction(in: line) {
-                            phase(InstallProgress(.downloading, fraction: fraction))
-                        }
-                        report(line)
-                    }
-                }
-            }
-            SteamDRM.markAppDirectory(plan.depotGameDir, appID: appID)
-            step("Downloaded to \(plan.depotGameDir.path)")
-        case .battlenet:
-            // Battle.net exposes no per-product install URL Cellar could drive, so the honest
-            // move is to open the client where the player can do it in two clicks.
-            step("Opening Battle.net — install \(plan.name) from the client, then come back.")
-            try BattleNetBottle.launchClient(runner: wine, gameEnv: plan.env)
-        case .gog:
-            guard let productID = plan.gogProductID else {
-                throw CellarError.invalidArgument(
-                    "Profile '\(plan.slug)' has no gog_product_id, so Cellar can't tell which GOG game it is.")
-            }
-            guard GOGAuth.isSignedIn else {
-                throw CellarError.invalidArgument("Not signed in to GOG. Run: cellar gog login")
-            }
-            phase(InstallProgress(.downloading))
-            let parts = try GOGInstall.download(productID: productID, progress: step)
-            phase(InstallProgress(.installing))
-            try GOGInstall.install(setup: parts[0], slug: plan.slug, runner: wine, progress: step)
-            guard plan.directLaunchExe != nil else {
-                throw CellarError.ioFailure(
-                    "The installer finished but Cellar can't find '\(plan.launchExe ?? "the game's exe")' under C:\\Games\\\(plan.slug). Check the profile's `exe`.")
-            }
-            step("\(plan.name) is installed. Play it with: cellar launch \(plan.slug)")
-        }
+        try plan.store.adapter.installGame(plan, wine: wine, step: step, progress: progress, phase: phase)
     }
 
     /// Open the store's client in the bottle (sign in, browse, manage installs).
@@ -840,24 +766,7 @@ public enum Game {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
         }
-        switch plan.store {
-        case .steam:
-            guard SteamBottle.isInstalled(in: plan.prefix) else {
-                throw CellarError.invalidArgument(
-                    "Windows Steam isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
-            }
-            try SteamBottle.updateClient(runner: wine)
-            try SteamBottle.launchClient(runner: wine, showHUD: showHUD, gameEnv: plan.env)
-        case .battlenet:
-            guard BattleNetBottle.isInstalled(in: plan.prefix) else {
-                throw CellarError.invalidArgument(
-                    "Battle.net isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
-            }
-            try BattleNetBottle.launchClient(runner: wine, showHUD: showHUD, gameEnv: plan.env)
-        case .gog:
-            throw CellarError.invalidArgument(
-                "GOG has no client in the bottle — Cellar talks to GOG directly. Sign in with: cellar gog login")
-        }
+        try plan.store.adapter.openClient(plan, wine: wine, showHUD: showHUD)
     }
 
     // MARK: - Launch
