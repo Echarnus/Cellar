@@ -36,7 +36,7 @@ public enum DepotTool {
     ///
     /// `session` is every run after that: the token stored under the account name is reused with no
     /// prompt at all. `password` stays for scripted use and for accounts without the mobile app.
-    public enum Credentials {
+    public enum Credentials: Sendable {
         case qr
         case session(username: String)
         case password(username: String)

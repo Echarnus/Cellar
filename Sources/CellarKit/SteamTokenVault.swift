@@ -48,11 +48,11 @@ public enum SteamTokenVault {
     }
 
     /// Where the keychain half is kept. A seam so tests use memory, not the player's keychain.
-    struct Storage {
-        var save: (String) throws -> Void
-        var load: () -> String?
-        var exists: () -> Bool
-        var remove: () throws -> Void
+    struct Storage: Sendable {
+        var save: @Sendable (String) throws -> Void
+        var load: @Sendable () -> String?
+        var exists: @Sendable () -> Bool
+        var remove: @Sendable () throws -> Void
 
         static let keychainAccount = "depotdownloader-account-store"
 

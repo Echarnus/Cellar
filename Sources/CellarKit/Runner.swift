@@ -2,8 +2,8 @@ import CellarDomain
 import Foundation
 
 /// One downloadable artifact of a runner and where its payload lands inside the runner root.
-public struct RunnerArtifact {
-    public enum Kind {
+public struct RunnerArtifact: Sendable {
+    public enum Kind: Sendable {
         /// A Wine engine tarball. `payloadPath` is the directory inside the archive that holds
         /// `bin/wine` (e.g. `wswine.bundle`); it is moved to `<runner>/wine`.
         case wineEngine
@@ -29,7 +29,7 @@ public struct RunnerArtifact {
 /// The game itself is an x86-64 Windows binary either way; some x86 translation is always in the
 /// loop. The question is only whether that translation is Apple's Rosetta 2 (going away as a
 /// general-purpose tool) or an emulator Cellar ships inside the Win32 layer.
-public enum RunnerArchitecture: String {
+public enum RunnerArchitecture: String, Sendable {
     /// x86-64 Wine. Wine, the renderer DLLs and the game all run under **Rosetta 2**.
     case x86_64
     /// arm64 Wine hosting an **ARM64EC** PE world: Wine's own DLLs are native ARM, and x86-64
@@ -48,7 +48,7 @@ public enum RunnerArchitecture: String {
 }
 
 /// Describes a downloadable Wine runner family (where to get it, how it's laid out).
-public struct RunnerSpec {
+public struct RunnerSpec: Sendable {
     public let id: String            // Cellar id, e.g. "sikarugir"
     public let displayName: String
     public let artifacts: [RunnerArtifact]

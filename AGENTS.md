@@ -25,8 +25,9 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 
 | Path | What lives there |
 |---|---|
-| `Sources/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store.swift`), launch stages, install phases, `GameEvent`/`CommandEvent`. Re-exported by CellarKit. |
-| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the use cases (`UseCases/`), the store adapters (`StoreAdapter.swift`), the store plugins (`Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
+| `Sources/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store.swift`), launch stages, install phases, `GameEvent`/`CommandEvent`. Imported explicitly (`import CellarDomain`); nothing re-exports it. |
+| `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the use cases (`UseCases/`), the `StoreAdapter` port and its registry (`StoreAdapter.swift`), the store plugins (`Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
+| `Sources/CellarInfrastructure/` | The concrete store adapters (`SteamAdapter`, `BattleNetAdapter`, `GOGAdapter`) behind CellarKit's `StoreAdapter` port. Only composition roots import it — the CLI's `main` and the tests' set-up call `CellarInfrastructure.install()`; the app never does. |
 | `Sources/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
 | `Sources/CellarUI/` | The app's presentation primitives — store marks, lockups, the generated cover, and `Snapshot`, which renders a SwiftUI view to pixels. A library rather than part of the app, because **a test cannot import an executable**. |
 | `Tests/CellarKitTests/` | Unit tests over the engine — parsing, the store table, launch routes, the readiness ladder and its copy, the profile database. Fast, hermetic, no Wine. |
@@ -172,7 +173,8 @@ The differences are real, not cosmetic — the three that bite hardest:
 
 Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarDomain/Store.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
-`StoreAdapter` (`Sources/CellarKit/StoreAdapter.swift`), and a CLI command group. Nothing else should
+`StoreAdapter` (`Sources/CellarInfrastructure/StoreAdapters.swift`, registered in
+`CellarInfrastructure.install()`), and a CLI command group. Nothing else should
 need to know: the use cases (`SetUpGame`, `InstallGame`, `LaunchGame`) ask the adapter.
 
 ## UX/UI is a requirement, not a finishing touch
