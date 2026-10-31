@@ -28,7 +28,8 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          if out=$(gh api "repos/$REPO/dependency-graph/compare/$BASE...$HEAD" 2>&1 >/dev/null); then
+          # gh prints the API's error body on stdout and only "HTTP 403" on stderr, so keep both.
+          if out=$(gh api "repos/$REPO/dependency-graph/compare/$BASE...$HEAD" 2>&1); then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           elif printf '%s' "$out" | grep -qiE 'dependency graph|not (enabled|supported)'; then
             echo "::warning title=Dependency review skipped::The Dependency graph is off. Turn it on at https://github.com/$REPO/settings/security_analysis and this check starts blocking vulnerable and non-GPL-compatible dependencies."
