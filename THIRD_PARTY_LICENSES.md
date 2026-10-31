@@ -24,7 +24,7 @@ The distinction that decides the obligations is **who distributes the component*
 | **Swift runtime / standard library** | language runtime | Apache-2.0 with Runtime Library Exception | Provided by macOS itself; nothing is embedded that needs attribution |
 | **Dock shim** (`Shim/cellar-dock-shim.c`) | keeps the bottle's client out of the Dock | GPL-3.0 (Cellar's own code) | — |
 | **App icon** (`Resources/AppIcon.png`) | the keg icon | GPL-3.0 — drawn by Cellar's own `Scripts/make-icon.swift` | — |
-| **Store marks** (`Sources/CellarUI/StoreMark.swift`) | small Steam / Battle.net / GOG marks | Cellar's own vector code; the marks themselves are their owners' trademarks | Nominative use only, non-affiliation in `NOTICE`. No logo file is bundled; see `docs/LEGAL.md` rule 4 |
+| **Store marks** (`Sources/CellarUI/Marks/`) | small Steam / Battle.net / GOG marks | Cellar's own vector code; the marks themselves are their owners' trademarks | Nominative use only, non-affiliation in `NOTICE`. No logo file is bundled; see `docs/LEGAL.md` rule 4 |
 | **Game profiles** (`profiles/*.toml`) | per-game facts | GPL-3.0 (Cellar's own data) | Facts only — AppIDs, paths, engine. No game files, no artwork |
 | **Fonts** | — | — | None shipped. The app uses the macOS system font; the site uses the visitor's system font stack |
 
@@ -74,6 +74,6 @@ Cellar is **GPL-3.0** ([LICENSE](LICENSE)), which is compatible with every shipp
 (Apache-2.0 is GPL-3.0-compatible; the Runtime Library Exception makes it moot for compiled code).
 Run-time components are separate programs and keep their own licences.
 
-When a new component is added, add a row here, a `Credit` in `Sources/CellarKit/Credits.swift`, and —
+When a new component is added, add a row here, a `Credit` in `Sources/CellarKit/Core/Credits.swift`, and —
 if it ends up inside a Cellar artifact — its licence text in [`licenses/`](licenses/). The test
 `CreditsTests` fails if a runner or tool is downloaded from a publisher the credits do not name.

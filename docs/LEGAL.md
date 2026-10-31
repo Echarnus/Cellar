@@ -46,13 +46,13 @@ verified research into each component's license and the relevant law.
    **Store marks.** Cellar labels each game with the storefront it came from, and that label carries a
    small mark. **No logo file is committed, bundled, or downloaded**, which keeps rule 1's "we
    redistribute nobody's proprietary assets" intact. The mark comes from one of two places
-   (`Sources/CellarKit/StoreIcon.swift`):
+   (`Sources/CellarKit/Stores/StoreIcon.swift`):
 
    - **The store's own installation on this machine** — the `.icns` inside the store's Mac app, the
      icon Wine extracted from the Windows client's `.exe` during setup, or a loose `.ico` the client
      ships. This is the player's own copy of the store's artwork, displayed in place; nothing is
      redistributed, exactly as with Apple's D3DMetal.
-   - **A vector shape Cellar draws itself** (`Sources/CellarUI/StoreMark.swift`) when the store is
+   - **A vector shape Cellar draws itself** (`Sources/CellarUI/Marks/`) when the store is
      not installed and there is nothing to point at.
 
    This matters because every storefront's own brand terms rule out shipping the artwork: Valve's
@@ -87,7 +87,7 @@ Points worth being explicit about:
   reads nothing from that page except the authorization code GOG hands back. No script is injected.
 - **Tokens live in the login keychain**, not in a file under Application Support, scoped per store and
   marked `WhenUnlockedThisDeviceOnly` so a refresh token is never carried to another Mac by keychain
-  sync or a Time Machine restore (`Sources/CellarKit/Keychain.swift`).
+  sync or a Time Machine restore (`Sources/CellarKit/Credentials/Keychain.swift`).
 - **GOG Galaxy's OAuth client id is used**, because GOG operates no registration portal for
   third-party applications — there is no per-app id to obtain instead. It is public knowledge, ships
   in GOG's own client, and is what every third-party GOG integration authenticates with. Cellar uses
@@ -151,7 +151,7 @@ work under Wine.
   (`Scripts/package.sh`), and `LICENSE`/`NOTICE` at the top of the DMG (`Scripts/make-dmg.sh`).
   GPL-3.0 §4 requires the licence text to travel with the binary; the source is the release's tag.
 - A component that ends up **inside** a Cellar artifact needs its licence text in `licenses/`, a row
-  in the inventory, and a `Credit` (`Sources/CellarKit/Credits.swift`) — the About screen and
+  in the inventory, and a `Credit` (`Sources/CellarKit/Core/Credits.swift`) — the About screen and
   Settings › About read that list. A component fetched at run time needs the row and the `Credit`;
   `CreditsTests` fails when a runner or tool comes from a publisher the credits do not name.
 - Cellar carries no modifications to Wine or any other LGPL component. If it ever does, publish them.

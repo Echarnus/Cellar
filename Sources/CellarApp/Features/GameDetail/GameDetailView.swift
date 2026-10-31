@@ -1,0 +1,561 @@
+import CellarDomain
+import SwiftUI
+import AppKit
+import GameController
+import CellarKit
+import CellarUI
+
+struct GameDetailView: View {
+    let game: GameSummary
+    let runner: ActivityStore
+    let onChange: () -> Void
+    @AppStorage("showHUD") private var showHUD = false
+    @State private var showDetails = false
+    /// True while a removal is being measured. Walking a 36 GB Steam library takes a few seconds,
+    /// and a menu item that appears to do nothing for that long reads as broken.
+    @State private var measuringRemoval = false
+    /// The game's language submenu, read when the page appears rather than from the body.
+    @State private var language = GameLanguageMenu.Selection()
+    /// The newest copy of this game's saves, read when the page appears and after a backup or restore.
+    @State private var latestBackup: SaveBackups.Backup?
+    /// The controllers macOS sees, kept current as pads come and go.
+    @State private var pads: [Controllers.Pad] = []
+    /// Wheels, pedals and shifters, read when the page appears (macOS posts no notice for them).
+    @State private var wheels: [Wheels.Device] = []
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                hero
+                VStack(alignment: .leading, spacing: 18) {
+                    actions
+                    Text(game.actionHint)
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let drive = game.missingDrive {
+                        Label("\(game.name) is on the drive “\(drive)”, which isn't connected. Connect it to play.",
+                              systemImage: "externaldrive.badge.xmark")
+                            .font(.callout).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let played = playedLine {
+                        Label(played, systemImage: "clock").font(.callout).foregroundStyle(.secondary)
+                    }
+                    notice
+                    chips
+                    information
+                    if game.bottleExists { saves }
+                    if game.bottleExists { GameSettingsSection(game: game) }
+                    GameLogSection(game: game)
+                    activityLog
+                }
+                .padding(24)
+            }
+        }
+        .background(.background)
+        .task(id: game.slug) {
+            language = .load(game)
+            latestBackup = SaveBackups.list(bottle: game.bottleName).first
+            pads = Controllers.connected()
+            wheels = Wheels.connected()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidConnect)) { _ in pads = Controllers.connected() }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in pads = Controllers.connected() }
+    }
+
+    /// "Played 12 h · last played yesterday" — kept on this Mac only.
+    private var playedLine: String? {
+        guard let record = game.playtime, record.sessions > 0, let last = record.lastPlayed else { return nil }
+        let when = RelativeDateTimeFormatter().localizedString(for: last, relativeTo: Date())
+        return String(localized: "Played \(Playtime.describe(seconds: record.totalSeconds)) · last played \(when)")
+    }
+
+    // MARK: - Hero
+
+    /// Banner, cover, title — and the store, spelled out directly under the name. Which storefront
+    /// a game belongs to is the first thing that changes what every control below does, so it is
+    /// given a line of its own rather than hidden in a details table.
+    private var hero: some View {
+        ZStack(alignment: .bottomLeading) {
+            GameBanner(game: game)
+            LinearGradient(colors: [.clear, .black.opacity(0.78)], startPoint: .center, endPoint: .bottom)
+            HStack(alignment: .bottom, spacing: 16) {
+                GameCover(game: game, width: 92, showsBadge: false)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(game.name)
+                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                        .foregroundStyle(.white).shadow(radius: 4).lineLimit(2)
+                    HStack(spacing: 8) {
+                        StoreLockup(store: game.store)
+                        if let account = game.account {
+                            Text("Signed in as \(account)")
+                                .font(.caption).foregroundStyle(.white.opacity(0.85))
+                        }
+                    }
+                }
+                Spacer()
+            }
+            .padding(20)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 240)
+        .clipped()
+    }
+
+    // MARK: - Actions
+
+    private var actions: some View {
+        HStack(spacing: 12) {
+            Button { primary() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: game.actionSymbol).font(.title3)
+                    Text(game.actionTitle).fontWeight(.semibold)
+                }
+                .frame(minWidth: 168).padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent).controlSize(.large)
+            // Green means "go" for Play; every other step is tinted by the store whose client is
+            // about to appear, so the button and the window that opens belong to each other.
+            .tint(game.nextStep == .play ? .green : game.store.tint)
+            .disabled(runner.busy || measuringRemoval)
+            .keyboardShortcut(.defaultAction)
+            .help(game.actionHint)
+
+            status
+            Spacer()
+            overflowMenu
+        }
+    }
+
+    /// What Cellar is doing right now, beside the button that started it.
+    ///
+    /// A launch is not like the other commands: `cellar launch` stays alive for the whole session so
+    /// it can close the layer afterwards, so a plain "busy" spinner would sit there saying
+    /// "Launching" for the length of the game. Playing is its own state, and it gets said.
+    @ViewBuilder private var status: some View {
+        if runner.phase == .playing, runner.launchingSlug == game.slug {
+            Label("Playing", systemImage: "play.circle.fill")
+                .font(.callout.weight(.medium)).foregroundStyle(.green)
+                .help("\(game.name) is running. Quit the game and Cellar closes the layer.")
+        } else if runner.busy, runner.installingSlug == game.slug {
+            InstallProgressBar(game: game.name, store: game.store, progress: runner.installProgress)
+        } else if runner.busy {
+            ProgressView().controlSize(.small)
+            Text(runner.busyTitle).font(.callout).foregroundStyle(.secondary)
+            if runner.launchingSlug == game.slug {
+                Button("Show progress") { LaunchSplashWindow.present(game: game, runner: runner) }
+                    .buttonStyle(.link)
+                    .help("Bring the launch window back.")
+            }
+        } else if measuringRemoval {
+            // Measuring runs before the uninstall sheet appears, and it touches the disk, so the
+            // gap has to be accounted for rather than looking like a dead button.
+            ProgressView().controlSize(.small)
+            Text("Working out what would be deleted…")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    private var overflowMenu: some View {
+        Menu {
+            Button("Set up bottle") { act(.setUp(slug: game.slug), String(localized: "Setting up")) }
+            Divider()
+            switch game.store {
+            case .steam:
+                // A game with no live-session DRM gets no Steam client in its bottle, so the
+                // client's own actions are only offered where there is (or will be) one.
+                let hasClient = game.needsLiveSession || game.clientInstalled
+                if hasClient {
+                    Button("Open Steam") { act(.steamOpen(slug: game.slug), String(localized: "Opening Steam")) }
+                }
+                Button("Download game") { act(.install(slug: game.slug, machineProgress: false), String(localized: "Downloading \(game.name)")) }
+                if hasClient {
+                    Button("Install through the Steam client") { act(.steamInstall(slug: game.slug), String(localized: "Installing")) }
+                }
+                Button("Add to Steam library") { act(.steamAddShortcut(slug: game.slug), String(localized: "Adding")) }
+            case .battlenet:
+                Button("Open Battle.net") { act(.battleNetOpen(slug: game.slug), String(localized: "Opening Battle.net")) }
+                Button("Re-apply Battle.net settings") { act(.battleNetConfigure(slug: game.slug), String(localized: "Configuring")) }
+            case .gog:
+                Button("Download and install from GOG") { act(.gogInstall(slug: game.slug), String(localized: "Installing")) }
+                Button("GOG accounts…") { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
+            }
+            // Any game whose files Cellar fetched from a Steam depot — with or without a live session.
+            if game.update != nil {
+                if game.updatePending {
+                    Button("Update now") { runner.update(slug: game.slug, name: game.name) { onChange() } }
+                }
+                Button("Check for updates") {
+                    act(.checkForUpdate(slug: game.slug), String(localized: "Checking \(game.name) for updates"))
+                }
+            }
+            // The game's own app — its name, its icon — whatever store it came from. A wrapper for
+            // the store client is not offered on a game's page: there it read as the game's app.
+            Button("Add \(game.name) to Applications") { act(.addToApplications(slug: game.slug), String(localized: "Adding to Applications")) }
+            // The game's own language needs its bottle to live in; before set-up there is none.
+            if game.bottleExists {
+                GameLanguageMenu(game: game, state: $language)
+            }
+            Divider()
+            if game.isDraft {
+                // A guess that works is worth handing in: the file is an ordinary profile.
+                Button("Save Profile As…") { exportProfile() }
+            }
+            if game.isOnOtherDrive {
+                Button("Move Back to This Mac") { act(.moveBack(slug: game.slug), String(localized: "Moving \(game.name) back")) }
+                    .disabled(game.missingDrive != nil)
+            } else if game.gameInstalled, game.store != .battlenet {
+                Button("Move to Another Drive…") { chooseDrive() }
+            }
+            Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
+            // Removal is last and on its own, where destructive actions belong. Each entry states
+            // what it takes, and neither does anything until the confirmation has been read.
+            if game.gameInstalled || game.bottleExists {
+                Divider()
+                if game.gameInstalled {
+                    Button("Uninstall \(game.name)…", role: .destructive) { confirmRemoval(scope: .game) }
+                }
+                if game.bottleExists {
+                    Button("Remove the bottle '\(game.bottleName)'…", role: .destructive) { confirmRemoval(scope: .bottle) }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle").font(.title3)
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .help("More actions for \(game.name)")
+        .accessibilityLabel("More actions")
+    }
+
+    // MARK: - Notices
+
+    /// A heads-up shown only where a store is about to behave in a way the player would otherwise
+    /// read as a bug. Setting the expectation costs one line; a mystery window costs a support thread.
+    @ViewBuilder private var notice: some View {
+        if game.setupPending && game.nextStep != .play && !game.store.descriptor.hasSilentInstaller {
+            Notice(symbol: "hand.raised.fill", tint: game.store.tint,
+                   title: String(localized: "\(game.store.displayName)'s installer needs a few clicks"),
+                   detail: String(localized: "Blizzard ships no silent installer. Partway through setup its window opens — click through it and leave the app running. Cellar picks up from there."))
+        } else if game.nextStep == .install && game.store == .gog {
+            Notice(symbol: "clock.fill", tint: game.store.tint,
+                   title: String(localized: "The install runs with no window"),
+                   detail: String(localized: "GOG ships a normal Windows installer and Cellar runs it silently, so there is nothing to watch for a few minutes. The activity log below is the progress."))
+        } else if game.nextStep == .play && game.clientSignInPending {
+            // Cellar normally hands the client the player's session, so this only shows when it
+            // can't — and a second sign-in needs its reason on the page, or it reads as Cellar
+            // forgetting the first one.
+            Notice(symbol: "person.crop.circle.badge.questionmark", tint: game.store.tint,
+                   title: String(localized: "\(game.store.displayName) asks you to sign in once more"),
+                   detail: String(localized: "\(game.name)'s DRM checks the \(game.store.displayName) app, which keeps a sign-in of its own. Cellar usually signs it in with your sign-in from Settings, but can't right now. The first time you press Play, its window opens — the QR code with the mobile app is quickest. Every \(game.store.displayName) game shares it."))
+        } else if game.nextStep == .play && game.store == .battlenet {
+            Notice(symbol: "bolt.horizontal.circle.fill", tint: game.store.tint,
+                   title: String(localized: "Battle.net stays open while you play"),
+                   detail: String(localized: "Diablo's login and patching live in the client, so Cellar keeps it running in the background and closes the whole layer when you quit the game."))
+        }
+    }
+
+    // MARK: - Chips
+
+    private var chips: some View {
+        HStack(spacing: 8) {
+            Chip(game.statusText, system: game.statusSymbol, tint: game.statusTint)
+            // Each store identifies a game its own way — an AppID, a product code, or neither.
+            // Showing the right one is a small honesty that saves a support round-trip.
+            switch game.store {
+            case .gog:
+                Chip("DRM-free", system: "lock.open.fill")
+            case .steam:
+                Chip(game.appID.map { String(localized: "AppID \(String($0))") } ?? String(localized: "No AppID"), system: "number")
+            case .battlenet:
+                Chip(game.productCode.map { String(localized: "Product \($0)") } ?? String(localized: "No product code"), system: "tag")
+            }
+            // From the profile, not from what is on disk: before the download, a game that never
+            // talks to its store must not be labelled as needing it.
+            let needsClient = game.needsClientAtRuntime && game.needsLiveSession
+                && game.store.descriptor.installsClientInBottle
+            Chip(needsClient ? String(localized: "Needs \(game.store.displayName) running") : String(localized: "Runs on its own"),
+                 system: needsClient ? "link" : "bolt.fill")
+            if let update = game.update { updateChip(update) }
+            Spacer()
+        }
+    }
+
+    /// Whether this copy is Steam's current build. Only for a game Cellar downloaded: Steam keeps
+    /// its own library current, and a chip claiming Cellar checked that would be a claim about
+    /// nothing. "Up to date" is only ever said with the time Steam said it.
+    @ViewBuilder private func updateChip(_ update: GameUpdates.State) -> some View {
+        switch update {
+        case .upToDate(let checked) where GameUpdates.isFresh(update, within: GameUpdates.recheckInterval):
+            Chip(String(localized: "Up to date"), system: "checkmark.seal")
+                .help("Steam confirmed this is the current build \(Self.relative(checked)).")
+        case .upToDate(let checked):
+            // An old "up to date" is only a fact about the past; say when, not what.
+            Chip(String(localized: "Checked \(Self.relative(checked))"), system: "clock")
+                .help("Steam said this was the current build then. Play checks again before it starts the game.")
+        case .available(let checked):
+            Chip(String(localized: "Update available"), system: "arrow.down.circle.fill", tint: .blue)
+                .help("Steam has a newer build than the one on disk (checked \(Self.relative(checked))). Play downloads only what changed, first.")
+        case .unknown:
+            Chip(String(localized: "Not checked for updates"), system: "questionmark.circle")
+                .help("Cellar hasn't been able to ask Steam yet. Play checks before it starts the game.")
+        }
+    }
+
+    private static func relative(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    // MARK: - Information
+
+    /// What this game actually is, and what Cellar knows about running it.
+    ///
+    /// A Steam title has a store page one click away; a Battle.net one has nothing of the sort, so
+    /// the profile is the only description the player gets. `notes` is the important one — it is
+    /// where the profile records what has genuinely been tested and what has not, and hiding that
+    /// would turn an honest "untested" into an implied promise.
+    @ViewBuilder private var information: some View {
+        let facts = game.facts
+        VStack(alignment: .leading, spacing: 14) {
+            if !facts.about.isEmpty || !facts.compatibility.isEmpty {
+                // Two columns when the pane is wide enough for them, one when it isn't. At the
+                // window's minimum width the side-by-side version wraps every value onto three
+                // lines, which reads as broken rather than compact.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 32) {
+                        factColumns(facts)
+                        Spacer(minLength: 0)
+                    }
+                    VStack(alignment: .leading, spacing: 14) { factColumns(facts) }
+                }
+            }
+
+            FactList(title: String(localized: "Runtime"), rows: [
+                ("Runner", game.runnerID),
+                ("Graphics", graphicsValue),
+                ("Store", game.store.displayName),
+                ("Bottle", game.bottleName),
+            ])
+
+            if game.backendIsPlayerChoice, let profiles = game.profileBackend.flatMap(GraphicsBackend.init(rawValue:)) {
+                Button("Go back to \(profiles.displayName), the profile's backend") { resetBackend() }
+                    .buttonStyle(.link).font(.callout)
+                    .disabled(runner.busy)
+                    .help("\(game.name) starts on \(profiles.displayName) again from its next launch. \(profiles.summary)")
+            }
+
+            controllerLine
+
+            // A race sim's wheel is bound inside the game, not in Cellar, so say where — shown
+            // whether or not a wheel is plugged in now, because that is when a player reads it.
+            if let setup = facts.wheelSetup, !setup.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("Setting up a racing wheel", systemImage: "steeringwheel")
+                        .font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    Text(setup).font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if wheels.isEmpty {
+                        Link("Connecting a wheel to your Mac", destination: Links.controllersHelp)
+                            .font(.caption)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+
+            if let notes = facts.notes, !notes.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text("Notes").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                            .kerning(0.5).textCase(.uppercase)
+                        if let status = facts.status { StatusBadge(status: status) }
+                    }
+                    Text(notes).font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    /// The backend, and whose choice it is — a switch the player made is never shown as the profile's.
+    private var graphicsValue: String {
+        let name = GraphicsBackend(rawValue: game.backend)?.displayName ?? game.backend
+        return game.backendIsPlayerChoice ? String(localized: "\(name) — your choice") : name
+    }
+
+    private func resetBackend() {
+        // A link has nowhere to show an error; a write that failed leaves the row as it was, which
+        // is the truth.
+        guard (try? BackendChoice.set(nil, in: BottleConfig.url(forBottle: game.bottleName))) != nil else { return }
+        onChange()
+    }
+
+    /// The pads connected now, next to what the profile recorded about this game and a controller.
+    /// Said as two facts, never combined into a promise that the pad will work in the game.
+    @ViewBuilder private var controllerLine: some View {
+        if !pads.isEmpty || !wheels.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                if !pads.isEmpty {
+                    Label("Connected: \(pads.map(\.name).joined(separator: ", "))", systemImage: "gamecontroller")
+                        .font(.callout)
+                }
+                if !wheels.isEmpty {
+                    Label("Connected: \(wheels.map(\.name).joined(separator: ", "))", systemImage: "steeringwheel")
+                        .font(.callout)
+                    Text(Wheels.forceFeedbackNote(for: wheels, cellarSDL: CellarSDL.libraryDirectory != nil))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if game.facts.controller == nil {
+                    Text("This game's profile doesn't say how it handles a controller yet.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let note = Controllers.steamInputNote(store: game.store, throughClient: game.needsClientAtRuntime) {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            if !wheels.isEmpty {
+                // A wheel's set-up happens outside Cellar (PC mode, firmware), so say where to read it.
+                Link("How to set up a racing wheel", destination: Links.controllersHelp)
+                    .font(.caption)
+            }
+        }
+    }
+
+    @ViewBuilder private func factColumns(_ facts: GameFacts) -> some View {
+        if !facts.about.isEmpty { FactList(title: String(localized: "About"), rows: facts.about) }
+        if !facts.compatibility.isEmpty { FactList(title: String(localized: "Compatibility"), rows: facts.compatibility) }
+    }
+
+    /// Saves live in the bottle; Cellar copies them out before anything that could lose them. This
+    /// says when it last did, and offers the two things a player wants from that: another copy now,
+    /// and the last one back.
+    private var saves: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Save games").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                .kerning(0.5).textCase(.uppercase)
+            Text(backupSummary).font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("Back up now") {
+                    runner.run(.backUpSaves(slug: game.slug), title: String(localized: "Backing up saves"), then: { refreshBackups() })
+                }
+                Button("Restore last backup…") { confirmRestore() }
+                    .disabled(latestBackup == nil)
+                Button("Show in Finder") {
+                    NSWorkspace.shared.open(SaveBackups.directory(forBottle: game.bottleName))
+                }
+                .disabled(latestBackup == nil)
+            }
+            .disabled(runner.busy)
+        }
+    }
+
+    private var backupSummary: String {
+        guard let backup = latestBackup else {
+            return String(localized: "No backup yet. Cellar takes one by itself before a reset, an update or removing the bottle.")
+        }
+        let when = RelativeDateTimeFormatter().localizedString(for: backup.manifest.created, relativeTo: Date())
+        return String(localized: "Last backed up \(when) — \(backup.manifest.reason.description.lowercased()), \(ByteSize.describe(backup.manifest.bytes)). Cellar keeps the last \(SaveBackups.keep).")
+    }
+
+    private func refreshBackups() {
+        latestBackup = SaveBackups.list(bottle: game.bottleName).first
+    }
+
+    /// A restore replaces the saves the game has now, so it is asked first — with the one fact that
+    /// makes it safe to say yes: the current saves are kept too.
+    private func confirmRestore() {
+        guard let backup = latestBackup else { return }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Restore \(game.name)'s saves from \(backup.id)?")
+        alert.informativeText = String(localized: "The saves the game has now are replaced by that backup (\(backup.manifest.reason.description.lowercased())). Cellar keeps a copy of the current ones first, so you can go back.")
+        alert.addButton(withTitle: String(localized: "Restore"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        runner.run(.restoreSaves(slug: game.slug, backupID: backup.id), title: String(localized: "Restoring saves"), then: { refreshBackups() })
+    }
+
+    private var activityLog: some View {
+        DisclosureGroup(isExpanded: $showDetails) {
+            ScrollView {
+                Text(runner.log.isEmpty ? String(localized: "Nothing has run yet.") : runner.log)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(6)
+            }
+            .frame(height: 200)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        } label: {
+            Label("Activity log", systemImage: "terminal").font(.callout)
+        }
+    }
+
+    // MARK: - Behaviour
+
+    private func primary() {
+        switch game.nextStep {
+        case .play:
+            // The launch gets a window of its own: it is a minute or two of work with several
+            // steps, and a spinner beside the button reads as a hang.
+            let launched = game
+            runner.launch(slug: game.slug, showHUD: showHUD) {
+                onChange()
+                // Played and quit: the one moment "how did it run?" has an answer.
+                if runner.stage == .closed { CompatibilityPrompt.offerAfterSession(launched) }
+            }
+            LaunchSplashWindow.present(game: game, runner: runner, onFinished: { onChange() })
+        case .setup:
+            act(.setUp(slug: game.slug), String(localized: "Setting up"))
+        case .install:
+            // One verb for every store. The route still differs — Cellar downloads a Steam or GOG
+            // game itself and opens Blizzard's client for a Battle.net one — but that is a fact
+            // about the store, not something the player should have to know to press a button.
+            runner.install(slug: game.slug,
+                           title: game.store == .battlenet ? String(localized: "Opening Battle.net") : String(localized: "Downloading \(game.name)"),
+                           then: { onChange() })
+        }
+    }
+
+    /// Copy a draft profile out, for contributing it once the game is known to run.
+    private func exportProfile() {
+        guard let source = ProfileStore.find(game.slug)?.url else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = source.lastPathComponent
+        panel.message = String(localized: "Cellar guessed this profile's settings. If \(game.name) runs, set status and notes to what you saw, then contribute it to Cellar's profiles.")
+        guard panel.runModal() == .OK, let target = panel.url else { return }
+        try? FileManager.default.removeItem(at: target)
+        try? FileManager.default.copyItem(at: source, to: target)
+    }
+
+    /// Pick a folder on another drive, then move the game there through the CLI.
+    private func chooseDrive() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = String(localized: "Move Here")
+        panel.message = String(localized: "Choose a folder on the drive to move \(game.name) to. Cellar puts it in a “Cellar Games” folder there, and the game plays and updates from it while the drive is connected.")
+        panel.directoryURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        act(.moveToDrive(slug: game.slug, folder: folder.path), String(localized: "Moving \(game.name)"))
+    }
+
+    private func act(_ command: CellarCommand, _ title: String) {
+        runner.run(command, title: title, then: { onChange() })
+    }
+
+    /// Show what removal would take, and only then run it — through the CLI, like every other
+    /// side-effecting action, so the app inherits the same tested path (and its activity log).
+    private func confirmRemoval(scope: RemovalScope) {
+        measuringRemoval = true
+        UninstallConfirmation.ask(for: game, scope: scope, measured: { measuringRemoval = false }) {
+            act(.uninstall(slug: game.slug, scope: scope),
+                scope == .bottle ? String(localized: "Removing the bottle") : String(localized: "Uninstalling"))
+        }
+    }
+}

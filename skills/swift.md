@@ -19,7 +19,7 @@ machinery unless a target genuinely needs it.
 
 ## Architecture rules
 
-- **Per-store behaviour belongs in `GameStore.descriptor`** (`Store.swift`), not in a `switch` inside
+- **Per-store behaviour belongs in `GameStore.descriptor`** (`GameStore.swift`), not in a `switch` inside
   a view or a command. If a view needs to know that Battle.net's installer isn't silent, that fact
   should reach it as data.
 - **All logic lives in `CellarKit`.** The CLI (`Sources/cellar`) and the app (`Sources/CellarApp`)
@@ -63,7 +63,7 @@ CLI itself. Two traps, one of which is live in the codebase today.
   - `WineRunner.run(..., inheritIO: true)` for anything long-running or noisy (it hands the child the
     parent's stdio, so no pipe can fill), or
   - a `readabilityHandler` on **both** pipes so they drain concurrently, the way
-    `CellarApp/ActivityStore.swift` streams the CLI's output.
+    `CellarApp/App/ActivityStore.swift` streams the CLI's output.
   If you ever do need both captured *and* volume-safe, drain both handlers into buffers and only then
   `waitUntilExit()`.
 - **Never `waitUntilExit()` before draining.** Same deadlock, more obvious.
