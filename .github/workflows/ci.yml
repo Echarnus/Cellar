@@ -26,6 +26,11 @@ jobs:
         run: swift --version
       - name: Build (release)
         run: swift build -c release
+      # Cellar's SDL (wheel force feedback). Built, checked for both architectures and the haptic API
+      # winebus binds to, and started once per slice by the script itself. Before the
+      # tests, whose tier A loads it the way winebus does.
+      - name: Build Cellar's SDL (universal)
+        run: sh Scripts/build-sdl.sh
       - name: Test suite
         run: sh Scripts/test.sh
       # SwiftPM does not build the Dock shim (it has to be universal), so nothing else here would
@@ -41,6 +46,11 @@ jobs:
           sh Scripts/package.sh 0.0.0-ci
           APP=dist/Cellar.app/Contents
           test -f "$APP/Frameworks/Sparkle.framework/Sparkle"
+          test -f "$APP/Resources/sdl/libSDL2-2.0.0.dylib"
+          test -f "$APP/Resources/sdl/libSDL3.dylib"
+          test -f "$APP/Resources/nl.lproj/Localizable.strings"
+          plutil -lint "$APP/Resources/nl.lproj/Localizable.strings"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$APP/Info.plist" | grep -qx ' *nl'
           otool -l "$APP/MacOS/CellarApp" | grep -q '@executable_path/../Frameworks'
           "$APP/MacOS/cellar" --version
       # The rendered store marks, light and dark. A reviewer can look at the actual pixels a PR

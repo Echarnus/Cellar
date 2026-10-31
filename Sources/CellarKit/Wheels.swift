@@ -91,12 +91,31 @@ public enum Wheels {
         public let productID: Int
     }
 
-    /// What force feedback a player can expect, said once for every vendor. macOS hands force
-    /// feedback to a device through a vendor plug-in (ForceFeedback.framework), and none of these
-    /// vendors ships one for Apple Silicon — so the honest default is "steering and pedals, no
-    /// feel", until someone tests otherwise.
+    /// What force feedback a player can expect from a wheel Cellar's SDL does not drive. macOS hands
+    /// force feedback to a device through a vendor plug-in (ForceFeedback.framework), and none of
+    /// these vendors ships one for Apple Silicon, so for those wheels it is "steering and pedals, no
+    /// feel" until Cellar's own driver covers them (`CellarSDL.forceFeedbackWheels`).
     public static let forceFeedbackNote =
-        "Expect steering, pedals and buttons, but no force feedback: macOS needs a driver from the wheel's maker for that, and none ships one for Apple Silicon Macs."
+        "Expect steering, pedals and buttons, but no force feedback yet: macOS needs a driver from the wheel's maker for that, none ships one for Apple Silicon Macs, and Cellar's own driver does not cover this wheel yet."
+
+    /// Said instead of `forceFeedbackNote` for a wheel Cellar's own SDL drives.
+    public static let drivenForceFeedbackNote =
+        "Cellar drives this wheel's force feedback over USB itself. It is new: if it feels wrong, or too strong, say so in a report."
+
+    /// Added for a Fanatec base Cellar drives: its own driver caps the strength
+    /// (`CellarSDL.defaultStrengthPercent`), and the player should know why it feels soft.
+    public static let cappedStrengthNote =
+        "Fanatec bases start at half strength, because a direct-drive base at full torque can hurt; the FAQ says how to raise it."
+
+    /// The force-feedback sentence for what is connected: the hopeful one only when every wheel
+    /// connected is one Cellar's SDL drives and that SDL is installed.
+    public static func forceFeedbackNote(for devices: [Device], cellarSDL: Bool) -> String {
+        let wheels = devices.filter { $0.kind == .wheel }
+        guard cellarSDL, !wheels.isEmpty, wheels.allSatisfy(CellarSDL.drivesForceFeedback) else { return forceFeedbackNote }
+        return wheels.contains { $0.vendor == .fanatec }
+            ? drivenForceFeedbackNote + " " + cappedStrengthNote
+            : drivenForceFeedbackNote
+    }
 
     /// What a profile's `wheel` field records, in the player's words. Nil for no field, so a game
     /// nobody drives with a wheel shows no row at all. `untested` is said out loud: a race sim

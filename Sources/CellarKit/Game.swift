@@ -391,6 +391,9 @@ public struct GameSummary: Identifiable, Sendable {
     public var missingDrive: String? = nil
     /// Whether the game's files live on another drive.
     public var isOnOtherDrive = false
+    /// How long and how recently it was played (`Playtime`); nil when it never was.
+    public var playtime: Playtime.Record? = nil
+    public var lastPlayed: Date? { playtime?.lastPlayed }
 
     /// The player switched this game off the profile's backend.
     public var backendIsPlayerChoice: Bool { profileBackend.map { $0 != backend } ?? false }
@@ -442,7 +445,9 @@ public struct GameSummary: Identifiable, Sendable {
 public enum Game {
     /// A readiness summary for every known profile — the GUI's data source.
     public static func summaries() -> [GameSummary] {
-        ProfileStore.all().compactMap { ref in
+        // Read once, closing any session a crash left open — unless that game is running now.
+        let played = Playtime.all(isRunning: { slug in (try? plan(slug: slug)).map(Uninstall.isGameRunning) ?? false })
+        return ProfileStore.all().compactMap { ref in
             guard let plan = try? plan(slug: ref.slug) else { return nil }
             let clientInstalled = storeClientInstalled(plan)
             var summary = GameSummary(
@@ -481,6 +486,7 @@ public enum Game {
             summary.isDraft = plan.isDraft
             summary.missingDrive = GameStorage.missingDrive(plan)
             summary.isOnOtherDrive = GameStorage.movedLocation(slug: plan.slug) != nil
+            summary.playtime = played[plan.slug]
             return summary
         }
     }
