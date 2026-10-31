@@ -1,6 +1,8 @@
+import CellarDomain
 import Foundation
 import Testing
 @testable import CellarKit
+import CellarInfrastructure
 
 /// Shared machinery for Cellar's integration tests.
 ///
@@ -51,6 +53,8 @@ enum IT {
     /// Runners are the one exception: they are hundreds of megabytes, so an already-installed
     /// runner tree is linked in read-only rather than downloaded again.
     static let home: URL = {
+        // A composition root, like the CLI's `main`: the real store adapters, wired in first.
+        CellarInfrastructure.install()
         let environment = ProcessInfo.processInfo.environment
         let root = (environment["CELLAR_TEST_ROOT"].flatMap { $0.isEmpty ? nil : $0 })
             .map { URL(fileURLWithPath: $0, isDirectory: true) }

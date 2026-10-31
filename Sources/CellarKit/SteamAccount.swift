@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// **The** Steam sign-in. One account, one credential, one place.

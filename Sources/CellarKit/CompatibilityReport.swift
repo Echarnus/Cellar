@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// A player's word on how a game ran, turned into a GitHub issue they file themselves.

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// One owned GOG game, as much of it as Cellar needs to show a row and install it.

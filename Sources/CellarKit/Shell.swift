@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Small wrapper around `Process` for running external tools and capturing output.

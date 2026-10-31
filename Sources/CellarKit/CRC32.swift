@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Standard IEEE (zlib) CRC32 — used to derive the Steam non-Steam-shortcut app id.

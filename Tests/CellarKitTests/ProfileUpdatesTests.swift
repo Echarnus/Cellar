@@ -1,3 +1,4 @@
+import CellarDomain
 import CryptoKit
 import Foundation
 import Testing

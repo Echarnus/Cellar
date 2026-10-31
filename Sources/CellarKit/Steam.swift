@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Installs and drives the *Windows* Steam client inside a Wine bottle — the robust way to install
@@ -482,7 +483,7 @@ public extension SteamBottle {
     /// the client up silently first and then starting the exe gives a Steamworks or Denuvo title
     /// exactly what it asks for — a live session belonging to an account that owns the game — while
     /// keeping the download path free of the client's install dialog.
-    static func launchAlongside(runner: WineRunner, exe: URL, appID: Int, showHUD: Bool = false,
+    package static func launchAlongside(runner: WineRunner, exe: URL, appID: Int, showHUD: Bool = false,
                                 gameEnv: [String: String] = [:], bundledLoader: URL? = nil,
                                 game: String = "the game", expectsSignIn: Bool = false,
                                 attempts: Int = 8,
@@ -547,7 +548,7 @@ public extension SteamBottle {
     ///
     /// `.canHandOver` means it was handed over this time; `.remembered` that nothing was needed.
     @discardableResult
-    static func handOverSession(runner: WineRunner, progress: (String) -> Void = { _ in }) -> SteamClientSession.Readiness {
+    package static func handOverSession(runner: WineRunner, progress: (String) -> Void = { _ in }) -> SteamClientSession.Readiness {
         let prefix = runner.prefix
         let readiness = clientSessionReadiness(in: prefix)
         guard readiness == .canHandOver else { return readiness }
@@ -735,7 +736,7 @@ public extension SteamBottle {
     ///
     /// Throws when the player closes Steam first, or never signs in, so the launch fails with the
     /// reason instead of starting a game that would die on its licence check.
-    static func waitForClientSignIn(runner: WineRunner, game: String, showHUD: Bool = false,
+    package static func waitForClientSignIn(runner: WineRunner, game: String, showHUD: Bool = false,
                                     gameEnv: [String: String] = [:], timeout: TimeInterval = 15 * 60,
                                     progress: (String) -> Void = { _ in }) throws {
         guard loggedInAccount(in: runner.prefix) == nil else { return }

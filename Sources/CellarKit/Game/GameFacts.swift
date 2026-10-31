@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// What a profile knows *about* the game, as opposed to how to run it.

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// A profile Cellar writes itself, for an owned game nobody has written one for.

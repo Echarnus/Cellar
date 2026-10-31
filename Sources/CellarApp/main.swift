@@ -1,3 +1,4 @@
+import CellarDomain
 import AppKit
 import CellarKit
 import SwiftUI

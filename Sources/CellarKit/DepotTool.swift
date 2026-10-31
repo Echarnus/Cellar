@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// DepotDownloader (SteamRE, GPL-2.0): downloads the files of a game you own directly from Steam's

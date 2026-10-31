@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// One downloadable artifact of a runner and where its payload lands inside the runner root.

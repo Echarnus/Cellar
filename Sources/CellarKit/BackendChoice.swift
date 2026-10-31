@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Which graphics backend a game actually runs on.

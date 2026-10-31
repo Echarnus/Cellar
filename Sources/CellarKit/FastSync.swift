@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Which fast synchronisation backend a Wine build implements — the thing that decides whether a

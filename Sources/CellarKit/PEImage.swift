@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// The two facts a draft profile needs from a Windows executable, read from its PE header: which

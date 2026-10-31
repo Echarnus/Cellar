@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// The performance switches a player can flip per game without editing a profile. Each is a plain

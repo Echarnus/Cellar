@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Turns the rolling log into something that can be *sent*.

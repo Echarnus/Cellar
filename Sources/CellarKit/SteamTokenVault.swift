@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Keeps Steam's refresh token in the keychain whenever DepotDownloader is not running (#82).

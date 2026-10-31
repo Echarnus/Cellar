@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Who Cellar is built on. One list, shown verbatim by the app's About panel and Settings › About,

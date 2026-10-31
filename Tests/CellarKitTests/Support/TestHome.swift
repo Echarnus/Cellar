@@ -1,5 +1,7 @@
+import CellarDomain
 import Foundation
 @testable import CellarKit
+import CellarInfrastructure
 
 /// A throwaway Cellar installation for the duration of the test process.
 ///
@@ -14,6 +16,9 @@ enum TestHome {
     /// the environment at all. Running `swift test` bare still works: the sandbox is created and the
     /// variables written once, from this lazy static.
     static let root: URL = {
+        // The tests are a composition root too: wire the real store adapters in, the way the
+        // CLI's `main` does, before anything can ask a store a question.
+        CellarInfrastructure.install()
         let environment = ProcessInfo.processInfo.environment
         // Symlinks and stray slashes resolved once, here. `/var` is a symlink to `/private/var`
         // and `TMPDIR` ends in a slash, so an unnormalised root compares unequal to the very paths

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Turns DepotDownloader's terminal QR code into a bit matrix a GUI can draw.
