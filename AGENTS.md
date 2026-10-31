@@ -277,9 +277,11 @@ Cellar is delivered through GitHub, end to end. Full strategy: [`docs/RELEASING.
 - **The checks are a floor, not the ladder.** CI cannot launch the app or play a real game. Climb the
   verification ladder above before enabling auto-merge, and say in the PR which rung you reached —
   *PR checklist* fails a PR that doesn't, or that changes Swift without touching a test.
-- **Releases are SemVer tags (`vMAJOR.MINOR.PATCH`) we push ourselves.** The tag runs
-  `release.yml`, which builds the downloads, writes the notes from the issues the release closed
-  (`app/Scripts/release-notes.py`) and publishes the GitHub Release.
+- **A release is a release branch.** Bump `CellarVersion.current` in a PR, then
+  `git push origin main:release/X.Y`. That push runs `release.yml`, which tags `vX.Y.Z` (SemVer),
+  builds the downloads, writes the notes from the issues the release closed
+  (`app/Scripts/release-notes.py`) and publishes the GitHub Release. A patch is a PR into the same
+  branch that bumps the version. See `docs/RELEASING.md`.
 - **Commit messages:** state what was done, one subject line; a body only when the *why* isn't
   obvious. **No attribution trailers** (no `Co-Authored-By`, no "Generated with").
 - **Never force-push or rewrite published history**, and never delete a branch someone else's
