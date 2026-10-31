@@ -10,11 +10,14 @@ struct OutputLinesTests {
     @Test("Lines come out whole, however the pipe cut them")
     func linesAcrossReads() {
         var lines = OutputLines()
-        #expect(lines.lines(in: Data("first li".utf8)).isEmpty)
+        let r1 = lines.lines(in: Data("first li".utf8))
+        #expect(r1.isEmpty)
         #expect(lines.partial == "first li")
-        #expect(lines.lines(in: Data("ne\nsecond\nthi".utf8)) == ["first line", "second"])
+        let r2 = lines.lines(in: Data("ne\nsecond\nthi".utf8))
+        #expect(r2 == ["first line", "second"])
         #expect(lines.partial == "thi")
-        #expect(lines.lines(in: Data("rd\n".utf8)) == ["third"])
+        let r3 = lines.lines(in: Data("rd\n".utf8))
+        #expect(r3 == ["third"])
         #expect(lines.partial.isEmpty)
     }
 
@@ -24,14 +27,17 @@ struct OutputLinesTests {
         let bytes = Array("Café ✓\n".utf8)
         // Cut inside the three bytes of "✓".
         let cut = bytes.count - 3
-        #expect(lines.lines(in: Data(bytes[..<cut])).isEmpty)
-        #expect(lines.lines(in: Data(bytes[cut...])) == ["Café ✓"])
+        let r4 = lines.lines(in: Data(bytes[..<cut]))
+        #expect(r4.isEmpty)
+        let r5 = lines.lines(in: Data(bytes[cut...]))
+        #expect(r5 == ["Café ✓"])
     }
 
     @Test("CRLF ends a line, and a redrawn line keeps only what a terminal would show")
     func carriageReturns() {
         var lines = OutputLines()
-        #expect(lines.lines(in: Data("windows\r\n 10%\r 20%\r 30%\n".utf8)) == ["windows", " 30%"])
+        let r6 = lines.lines(in: Data("windows\r\n 10%\r 20%\r 30%\n".utf8))
+        #expect(r6 == ["windows", " 30%"])
         _ = lines.lines(in: Data(" 40%\r 50%".utf8))
         #expect(lines.partial == " 50%")
     }
@@ -40,8 +46,10 @@ struct OutputLinesTests {
     func finish() {
         var lines = OutputLines()
         _ = lines.lines(in: Data("no newline".utf8))
-        #expect(lines.finish() == "no newline")
-        #expect(lines.finish() == nil)
+        let r7 = lines.finish()
+        #expect(r7 == "no newline")
+        let r8 = lines.finish()
+        #expect(r8 == nil)
     }
 
     @Test("A line that is only ever redrawn cannot grow without end")
@@ -49,7 +57,8 @@ struct OutputLinesTests {
         var lines = OutputLines()
         for i in 0..<20_000 { _ = lines.lines(in: Data(" \(i)% file\r".utf8)) }
         #expect(lines.partial.utf8.count <= OutputLines.pendingLimit)
-        #expect(lines.lines(in: Data("\n".utf8)).count == 1)
+        let r9 = lines.lines(in: Data("\n".utf8))
+        #expect(r9.count == 1)
     }
 
     // MARK: - LogTail

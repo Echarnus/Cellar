@@ -43,10 +43,12 @@ struct ChildProcessesTests {
     @Test("DepotDownloader's output is split on both line ends, and the rest waits for the next read")
     func takeLines() {
         var buffer = Data(" 1.00% a.pak\r 2.00% b.pak\nDownloading de".utf8)
-        #expect(DepotTool.takeLines(from: &buffer) == [" 1.00% a.pak", " 2.00% b.pak"])
+        let r1 = DepotTool.takeLines(from: &buffer)
+        #expect(r1 == [" 1.00% a.pak", " 2.00% b.pak"])
         #expect(String(decoding: buffer, as: UTF8.self) == "Downloading de")
         buffer.append(Data("pot\n".utf8))
-        #expect(DepotTool.takeLines(from: &buffer) == ["Downloading depot"])
+        let r2 = DepotTool.takeLines(from: &buffer)
+        #expect(r2 == ["Downloading depot"])
         #expect(buffer.isEmpty)
     }
 
@@ -55,7 +57,8 @@ struct ChildProcessesTests {
         var text = ""
         for i in 0..<20_000 { text += " \(i % 100).00% file\(i).pak\n" }
         var buffer = Data(text.utf8)
-        #expect(DepotTool.takeLines(from: &buffer).count == 20_000)
+        let r3 = DepotTool.takeLines(from: &buffer)
+        #expect(r3.count == 20_000)
         #expect(buffer.isEmpty)
     }
 }
