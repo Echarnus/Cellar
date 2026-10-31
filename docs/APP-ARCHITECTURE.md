@@ -85,7 +85,7 @@ public enum SaveBackups {
 }
 ```
 
-- **No protocols.** A `grep` for `protocol` in `Sources/CellarKit` finds none. Side effects —
+- **No protocols.** A `grep` for `protocol` in `app/src/CellarKit` finds none. Side effects —
   `FileManager`, `Process` (6 sites), `URLSession` (5), Keychain, `ProcessInfo.environment` — are
   called where they are needed.
 - **Configuration is ambient.** `Paths.appSupport` reads `CELLAR_HOME` from the process environment,
@@ -363,7 +363,7 @@ Keep the subprocess. Give it a contract:
 
 - **`CellarCommand`** in CellarKit — an enum with one case per command the app issues, rendering its
   own argument list. A test parses every case with the CLI's ArgumentParser types, so a renamed flag
-  fails `Scripts/test.sh` instead of a player's click.
+  fails `app/Scripts/test.sh` instead of a player's click.
 - **Typed progress events** — the use cases already know their stages; the CLI emits them as
   versioned JSON lines (`{"v":1,"type":"stage","stage":"starting"}`) separate from the prose the
   player reads, and the command client decodes them. The prose markers stay until an app that reads
@@ -394,13 +394,28 @@ point forgets to call `install()`. Every target is in Swift 6 language mode.
 
 ## Source layout
 
-Every target is grouped by feature, and every file holds one top-level type, named after it. An
+The checkout splits at the top into the Mac app and the website, with what both use beside them:
+
+```
+app/          the Mac app: a Swift package
+  Package.swift  Package.resolved
+  src/        one folder per module (below)
+  tests/      CellarKitTests, CellarUITests, CellarIntegrationTests
+  Resources/  icon, localizations, the update key
+  Shim/       the Dock shim and Cellar's SDL patches (C)
+  Scripts/    build, test, package, sign, release
+pages/        the GitHub Pages site: gen-site.py builds pages/dist/, check-site.py checks it
+profiles/     the game database: bundled into the app, and the site's game list
+docs/  .github/  licenses/  README, LICENSE, NOTICE …
+```
+
+Inside `app/src/`, every target is grouped by feature, and every file holds one top-level type, named after it. An
 extension of a type that lives elsewhere goes in `Type+Topic.swift` (`GameStore+StoreStyle.swift`).
 Nested types stay with their parent. `ArchitectureTests.oneTypePerFile` and `featureFolders` fail
 the build when a file gains a second type or a file is left loose at a target's root (#133).
 
 ```
-Sources/
+app/src/
   CellarDomain/          pure types, Foundation only
     Store/  Install/  Launch/  Events/
   CellarKit/             the engine
@@ -429,8 +444,9 @@ Sources/
     Output/
 ```
 
-Next step (#133): the repository splits at the top into `app/` (Package.swift, `src/`, tests,
-resources, the app's scripts) and `pages/` (the GitHub Pages site), with `profiles/` shared by both.
+Next step (#133): the libraries become local packages under `app/Packages/`, each with its own
+`Package.swift`, so a boundary is a package dependency and not only a target one. The full target
+tree is in the plan Kenneth reviewed (CellarDomain, CellarData, CellarUI; feature view models).
 
 ## Migration plan
 

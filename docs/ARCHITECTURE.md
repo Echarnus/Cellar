@@ -142,7 +142,7 @@ Three consequences worth stating plainly, because they shape the UI as much as t
 
 All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
 about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a `StoreAdapter`
-(`Sources/CellarInfrastructure/Adapters/`: client set-up, install, opening the client,
+(`app/src/CellarInfrastructure/Adapters/`: client set-up, install, opening the client,
 launching through it, registered in `CellarInfrastructure.install()`), and a CLI command group.
 
 ### One Steam, every bottle
@@ -232,7 +232,7 @@ Wine has no setting for this. The Mac driver's entire option list under `Softwar
 (`RetinaMode`, `EnableAppNap`, `CaptureDisplaysForFullscreen`, …) has no dock key, and macOS refuses
 to let one process change another's activation policy — `TransformProcessType` on a foreign
 `ProcessSerialNumber` returns `procNotFound`. The decision can only be changed inside the process
-making it, so Cellar inserts one (`Shim/cellar-dock-shim.c`, via `DYLD_INSERT_LIBRARIES`) that turns
+making it, so Cellar inserts one (`app/Shim/cellar-dock-shim.c`, via `DYLD_INSERT_LIBRARIES`) that turns
 that process's request for *Regular* into *Accessory*: windows, focus and keyboard all keep working,
 and only the Dock tile and the ⌘-Tab entry go away.
 
@@ -299,7 +299,7 @@ child, created from the runner's loader. Runners whose loader has no `ntdll.so` 
 launch, to tell whether a problem is this.
 
 The shim is a universal dylib (a runner may be x86_64 under Rosetta or arm64), built by
-`Scripts/build-dock-shim.sh` and installed beside the CLI. If it is missing, `DockShim.environment`
+`app/Scripts/build-dock-shim.sh` and installed beside the CLI. If it is missing, `DockShim.environment`
 returns nothing and launches behave exactly as they did before — a cosmetic feature must never be
 able to stop a game from starting.
 
@@ -381,7 +381,7 @@ save then lands where Finder and Time Machine can see it. Those three are exactl
 gates behind a privacy prompt, so left alone the player meets *"Cellar.app would like to access files
 in your Documents folder"* halfway through an install, with nothing on screen explaining it.
 
-So Cellar owns the timing instead (`Sources/CellarKit/System/HomeFolderAccess.swift`):
+So Cellar owns the timing instead (`app/src/CellarKit/System/HomeFolderAccess.swift`):
 
 - **The app asks on first launch** (`WelcomeView`) — the same three dialogs macOS would have shown,
   together, before anything is at stake, under a sentence saying what each folder is for. The
@@ -434,14 +434,14 @@ The path a game's effect takes, measured on the default runner (WineForge 0.6.0.
    `SDL_HapticRunEffect` calls. WineForge's `winebus.so` binds to SDL 2 by name
    (`libSDL2-2.0.0.dylib`, found on `DYLD_FALLBACK_LIBRARY_PATH`).
 3. **Cellar puts its own SDL first on that path** (`CellarSDL`, `Wine.environment`): SDL 3.4 behind
-   sdl2-compat, built by `Scripts/build-sdl.sh` from pinned, checksummed release tarballs, universal.
+   sdl2-compat, built by `app/Scripts/build-sdl.sh` from pinned, checksummed release tarballs, universal.
    SDL 3.4's HIDAPI layer has wheel drivers that write the vendor's reports itself.
 
 What that covers is exactly `CellarSDL.forceFeedbackWheels`: SDL 3.4's Logitech driver (G29, G27,
 G25, Driving Force GT/Pro), and Cellar's own Fanatec and Thrustmaster drivers. Until a wheel is on that list the app,
 the CLI and the FAQ say "no force feedback yet" for it; a unit test keeps the FAQ and the list in step.
 
-**The Fanatec driver** is `Shim/sdl/0001-cellar-fanatec-force-feedback.patch`. A Fanatec base in PC
+**The Fanatec driver** is `app/Shim/sdl/0001-cellar-fanatec-force-feedback.patch`. A Fanatec base in PC
 mode has no ForceFeedback plug-in, so SDL's IOKit joystick driver opens it as a plain joystick and
 SDL would call it not haptic. The patch makes `src/haptic/darwin/SDL_syshaptic.c` recognise a Fanatec
 base by vendor and product ID, and hand it to `SDL_cellar_fanatec.c` instead of ForceFeedback.framework:
@@ -464,11 +464,11 @@ base by vendor and product ID, and hand it to `SDL_cellar_fanatec.c` instead of 
 - Wine sees the base once: `winebus` drops the raw IOHID copy of a joystick whose `is_hidraw_enabled`
   is false. Fanatec wheel bases are not on Wine's hidraw list (only the ClubSport pedals are), so the
   game gets the SDL device, the one with force feedback.
-- `Shim/sdl/tests/test_fanatec.c` tests the engine against a fake base that records each command. It
+- `app/Shim/sdl/tests/test_fanatec.c` tests the engine against a fake base that records each command. It
   covers the init sequence, the encoding against hid-fanatecff, the cap, gain, durations, pause and
   stop-on-close. `build-sdl.sh` runs it on every build.
 
-**The Thrustmaster driver** is `Shim/sdl/0002-cellar-thrustmaster-force-feedback.patch`, of the same
+**The Thrustmaster driver** is `app/Shim/sdl/0002-cellar-thrustmaster-force-feedback.patch`, of the same
 shape, for the T300 family (T300 RS, T300 Ferrari Edition, TX, T248, TS-XW, TS-PC):
 
 - Unlike a Fanatec base, these wheels keep effects themselves, in 16 slots. `SDL_cellar_thrustmaster.c`
@@ -487,7 +487,7 @@ shape, for the T300 family (T300 RS, T300 Ferrari Edition, TX, T248, TS-XW, TS-P
   direct-drive one) goes through the wheel's own gain, multiplied with the game's, so every effect
   is scaled by it. Closing the haptic stops each effect still playing and closes the wheel's force
   feedback.
-- `Shim/sdl/tests/test_thrustmaster.c` checks every packet against the layouts above, the open and
+- `app/Shim/sdl/tests/test_thrustmaster.c` checks every packet against the layouts above, the open and
   close sequence per model, updates sent only on change, expiry, the cap, and stop-on-close.
 
 Logitech's HID++ wheels (G920/G923) are next. The Linux driver for them is GPL-2.0-only, which
@@ -506,10 +506,10 @@ the app, into one file.
 
 | Piece | Where | What it does |
 |---|---|---|
-| `CellarLog` | `Sources/CellarKit/Diagnostics/CellarLog.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
-| `Diagnostics` | `Sources/CellarKit/Diagnostics/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
-| `cellar logs` | `Sources/cellar/Commands/Maintenance/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
-| Settings → Diagnostics | `Sources/CellarApp/Features/Settings/SettingsView.swift` | The same export, one button, saved to the Desktop. |
+| `CellarLog` | `app/src/CellarKit/Diagnostics/CellarLog.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
+| `Diagnostics` | `app/src/CellarKit/Diagnostics/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
+| `cellar logs` | `app/src/cellar/Commands/Maintenance/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
+| Settings → Diagnostics | `app/src/CellarApp/Features/Settings/SettingsView.swift` | The same export, one button, saved to the Desktop. |
 
 What it records, and why each one is there:
 

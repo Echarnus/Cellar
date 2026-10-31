@@ -2,5 +2,7 @@
 # ruleset can require their review even if the default rule is ever relaxed.
 *                       @Echarnus
 /.github/               @Echarnus
-/Scripts/package.sh     @Echarnus
-/Scripts/release-notes.py @Echarnus
+/app/Scripts/package.sh     @Echarnus
+/app/Scripts/release-notes.py @Echarnus
+/app/Package.swift      @Echarnus
+/app/Package.resolved   @Echarnus

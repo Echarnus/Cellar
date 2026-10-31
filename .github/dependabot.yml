@@ -15,7 +15,7 @@ updates:
         patterns: ["*"]
 
   - package-ecosystem: swift
-    directory: /
+    directory: /app
     schedule:
       interval: weekly
       day: monday

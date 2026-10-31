@@ -1,6 +1,6 @@
 # The repository's labels, kept as code. `.github/workflows/labels.yml` applies this file on every
 # push to main that changes it. Release notes group closed issues by these labels, in the order
-# given in Scripts/release-notes.py.
+# given in app/Scripts/release-notes.py.
 - {name: breaking-change, color: b60205, description: "Changes the CLI, the profile schema or the on-disk layout"}
 - {name: security, color: d93f0b, description: "A vulnerability or a hardening change"}
 - {name: bug, color: d73a4a, description: "Something does not work as it should"}

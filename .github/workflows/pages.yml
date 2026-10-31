@@ -14,16 +14,14 @@ on:
     branches: [main]
     paths:
       - "profiles/**"
-      - "Resources/AppIcon.png"
-      - "Scripts/gen-site.py"
-      - "Scripts/check-site.py"
+      - "app/Resources/AppIcon.png"
+      - "pages/**"
       - ".github/workflows/pages.yml"
   pull_request:
     paths:
       - "profiles/**"
-      - "Resources/AppIcon.png"
-      - "Scripts/gen-site.py"
-      - "Scripts/check-site.py"
+      - "app/Resources/AppIcon.png"
+      - "pages/**"
       - ".github/workflows/pages.yml"
   workflow_run:
     workflows: [Release]
@@ -55,20 +53,20 @@ jobs:
         env:
           # Read-only; lifts the anonymous rate limit on the latest-release lookup.
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 Scripts/gen-site.py
+        run: python3 pages/gen-site.py
       # The runner has tomllib; a contributor's Mac may only have the hand-rolled parser. Both must
       # read every profile the same way, or the site differs depending on who built it.
       - name: Both TOML parsers agree
         run: |
-          CELLAR_SITE_OFFLINE=1 CELLAR_SITE_OUT="$RUNNER_TEMP/tomllib" python3 Scripts/gen-site.py
-          CELLAR_SITE_OFFLINE=1 CELLAR_TOML_FALLBACK=1 CELLAR_SITE_OUT="$RUNNER_TEMP/fallback" python3 Scripts/gen-site.py
+          CELLAR_SITE_OFFLINE=1 CELLAR_SITE_OUT="$RUNNER_TEMP/tomllib" python3 pages/gen-site.py
+          CELLAR_SITE_OFFLINE=1 CELLAR_TOML_FALLBACK=1 CELLAR_SITE_OUT="$RUNNER_TEMP/fallback" python3 pages/gen-site.py
           diff -ru "$RUNNER_TEMP/tomllib" "$RUNNER_TEMP/fallback"
       - name: Check site (links, structure, contrast)
-        run: python3 Scripts/check-site.py --external
+        run: python3 pages/check-site.py --external
       # The deployable bundle, on every event: a PR's copy is its preview.
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: site
+          path: pages/dist
 
   deploy:
     name: Deploy to GitHub Pages
