@@ -127,9 +127,10 @@ echo
 # variable to prove Cellar scrubs it. Serial is also plenty fast — the whole run is about a second.
 if [ "$COVERAGE" = "1" ]; then
     ARGS="$ARGS --enable-code-coverage"
+    # A report left by an older build would be counted as this run's, so none survive to it.
+    rm -f .build/*/debug/codecov/*.json .build/debug/codecov/*.json
 fi
 
-touch "$CELLAR_TEST_ROOT/started"
 set +e
 # shellcheck disable=SC2086
 swift test --no-parallel \
@@ -146,15 +147,16 @@ set -e
 if [ "$COVERAGE" = "1" ] && [ "$STATUS" = "0" ]; then
     echo
     # Every export this run wrote: SwiftPM may write one per test bundle, and its directory is per
-    # triple, so they are found rather than assumed. The marker keeps a stale report from an older
-    # build out of the count.
-    reports="$(find .build -path '*/debug/codecov/*.json' -newer "$CELLAR_TEST_ROOT/started" 2>/dev/null)"
+    # triple, so they are found rather than assumed. `-H` follows the start points, which SwiftPM may
+    # make symlinks; the same file reached twice is counted once by coverage.py.
+    reports="$(find -H .build/*/debug/codecov .build/debug/codecov -name '*.json' 2>/dev/null || true)"
     if [ -z "$reports" ]; then
         echo "error: --coverage was given but SwiftPM wrote no coverage report under .build/" >&2
         STATUS=1
-    # shellcheck disable=SC2086
-    elif ! python3 Scripts/coverage.py $reports; then
-        STATUS=1
+    else
+        # One path per line, none with a space: SwiftPM names them after the package.
+        # shellcheck disable=SC2086
+        python3 Scripts/coverage.py $reports || STATUS=1
     fi
 fi
 
