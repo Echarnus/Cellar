@@ -36,6 +36,7 @@ enum WelcomeTour {
 struct WelcomeTourView: View {
     /// The app's one activity (`AppModel`), handed on to the sign-in step.
     let runner: ActivityStore
+    let library: LibraryStore
     /// Called when the player finishes or skips — the host closes the window and records it.
     let onFinish: () -> Void
 
@@ -139,7 +140,7 @@ struct WelcomeTourView: View {
         VStack(alignment: .leading, spacing: 0) {
             PageHeading(title: "Sign in to your stores",
                         subtitle: "Sign in once per store and every game you own there can be installed. You can do this later instead — Settings, or ⌘⇧A — and Cellar works fine until you do.")
-            StoreSignInPanel(runner: runner, activityHeight: 78)
+            StoreSignInPanel(runner: runner, library: library, activityHeight: 78)
                 .frame(maxHeight: .infinity)
         }
     }

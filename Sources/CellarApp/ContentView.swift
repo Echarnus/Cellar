@@ -3,171 +3,9 @@ import AppKit
 import CellarKit
 import CellarUI
 
-@MainActor
-final class Library: ObservableObject {
-    @Published var games: [GameSummary] = []
-    @Published var query = ""
-    @Published var filter: Filter = .all
-    /// nil means "every store". The library's primary axis: which client a game needs decides
-    /// what every button in the app will do next.
-    @Published var storeFilter: GameStore?
-    @Published var selected: String? {
-        didSet {
-            // Reopening the app where you left it is the least a library can do.
-            if let selected { UserDefaults.standard.set(selected, forKey: Library.lastSelectedKey) }
-        }
-    }
-
-    static let lastSelectedKey = "lastSelectedGame"
-
-    /// Name, or most recently played first — remembered between launches.
-    @Published var sort: Sort = Sort(rawValue: UserDefaults.standard.string(forKey: "librarySort") ?? "") ?? .name {
-        didSet { UserDefaults.standard.set(sort.rawValue, forKey: "librarySort") }
-    }
-
-    enum Sort: String, CaseIterable, Identifiable {
-        case name = "Name", recent = "Recently played"
-        var id: String { rawValue }
-    }
-
-    /// Ordered by the chosen sort; a game never played sorts after every played one, by name.
-    func ordered(_ games: [GameSummary]) -> [GameSummary] {
-        games.sorted { a, b in
-            if sort == .recent, a.lastPlayed != b.lastPlayed {
-                return (a.lastPlayed ?? .distantPast) > (b.lastPlayed ?? .distantPast)
-            }
-            return a.name < b.name
-        }
-    }
-
-    enum Filter: String, CaseIterable, Identifiable {
-        case all = "All", installed = "Installed", notInstalled = "Not installed"
-        var id: String { rawValue }
-    }
-
-    /// Every profile Cellar ships that the player's stores did not confirm — kept only so the
-    /// sidebar can say *how many* games are being withheld and why. Never rendered as a list: a
-    /// list of games you don't own, presented in your library, is a claim no caption undoes.
-    @Published var withheld: [GameSummary] = []
-    /// The one Steam sign-in, so the empty state can name the fix rather than shrug.
-    @Published var steam: SteamAccount.State = .signedOut
-    /// Whether any store is signed in (or, for Battle.net, added) — once one is, the library stops
-    /// asking the player to sign in.
-    @Published var hasConnectedStore = false
-    /// A store's ownership check in progress, as its own progress sentence — set by Accounts while
-    /// a sign-in goes on to ask Steam, cleared when that command ends.
-    @Published var checking: String?
-
-    func refresh() {
-        // A store that has just been set up now has its own artwork on disk; re-resolve so its
-        // mark upgrades from the drawn one to the store's own without needing a relaunch.
-        StoreIcons.refresh()
-        let all = Game.summaries()
-        withheld = all.filter { !$0.isVisible }
-        steam = SteamAccount.state
-        hasConnectedStore = StoreLibrary.hasConnectedStore
-        games = all.filter(\.isVisible)
-        // What the sidebar just decided, on record: a reload that "does nothing" is otherwise
-        // indistinguishable from one that ran and read a signed-out Steam.
-        CellarLog.debug(.app, "Library refreshed: \(games.count) shown, \(withheld.count) withheld, \(hasConnectedStore ? "a store connected" : "no store connected") — \(SteamAccount.diagnosis)")
-        guard selected == nil || !games.contains(where: { $0.slug == selected }) else { return }
-        let remembered = UserDefaults.standard.string(forKey: Library.lastSelectedKey)
-        if let remembered, games.contains(where: { $0.slug == remembered }) {
-            selected = remembered
-        } else {
-            selected = filtered.first?.slug ?? games.first?.slug
-        }
-    }
-
-    var filtered: [GameSummary] {
-        games.filter { game in
-            (storeFilter == nil || game.store == storeFilter)
-                && (query.isEmpty || game.name.localizedCaseInsensitiveContains(query))
-                && {
-                    switch filter {
-                    case .all: return true
-                    case .installed: return game.gameInstalled
-                    case .notInstalled: return !game.gameInstalled
-                    }
-                }()
-        }
-    }
-
-    /// The filtered library, grouped into store sections in a fixed order — never alphabetical,
-    /// so a game doesn't move house when it is renamed.
-    ///
-    /// Games whose profile Cellar guessed (`DraftProfile`) come after every hand-made one, in
-    /// sections of their own that say so — a guess never sits among the tested games.
-    var sections: [LibrarySection] {
-        let stores = GameStore.allCases.sorted { $0.sortIndex < $1.sortIndex }
-        return [false, true].flatMap { guessed in
-            stores.compactMap { store in
-                let inStore = ordered(filtered.filter { $0.store == store && $0.isDraft == guessed })
-                return inStore.isEmpty ? nil : LibrarySection(store: store, guessed: guessed, games: inStore)
-            }
-        }
-    }
-
-    /// Stores that actually have a game, so the filter never offers an empty result.
-    var presentStores: [GameStore] {
-        GameStore.allCases
-            .sorted { $0.sortIndex < $1.sortIndex }
-            .filter { store in games.contains { $0.store == store } }
-    }
-
-    var current: GameSummary? { games.first { $0.slug == selected } }
-
-    /// Whether anything narrows the list, so "No games match" can offer the one way back.
-    var isFiltered: Bool { !query.isEmpty || filter != .all || storeFilter != nil }
-
-    func clearFilters() {
-        query = ""
-        filter = .all
-        storeFilter = nil
-    }
-
-    /// The ↑/↓ keys in the sidebar: the next game in the order the player sees them — store
-    /// sections first, then name — stopping at either end rather than wrapping, as Finder does.
-    func moveSelection(by offset: Int) {
-        let order = sections.flatMap { $0.games.map(\.slug) }
-        guard !order.isEmpty else { return }
-        guard let selected, let index = order.firstIndex(of: selected) else {
-            self.selected = offset > 0 ? order.first : order.last
-            return
-        }
-        self.selected = order[min(max(index + offset, 0), order.count - 1)]
-    }
-
-    /// Why the library is empty, named per store rather than assumed to be Steam's fault. Cellar
-    /// speaks to three stores; only one of them signs in with a QR code.
-    var signInReason: String {
-        let allStores = Set(withheld.map(\.store))
-        // Battle.net first, because it is the one store whose sentence is not about ownership at
-        // all: Blizzard publishes nothing to check, so what is missing is the player's own word.
-        if allStores == [.battlenet] {
-            return "Blizzard publishes nothing Cellar can check, so it asks you instead. Add Battle.net and its games appear."
-        }
-        // Only games whose store was never *asked* say anything about signing in. A game the store
-        // answered "no" to is withheld for a reason a sign-in cannot change — counting it here is
-        // how a signed-in player gets told they are not signed in.
-        let unasked = withheld.filter { game in
-            if case .unknown = game.ownership { return game.store.canAnswerOwnership }
-            return false
-        }
-        let stores = Set(unasked.map(\.store))
-        if stores.contains(.steam), !steam.isUsable { return steam.summary }
-        if stores == [.gog], !GOGAuth.isSignedIn {
-            return "Not signed in to GOG. One sign-in covers your whole GOG library."
-        }
-        if stores.isEmpty {
-            return "Nothing your stores confirmed you own is supported yet."
-        }
-        return "Cellar lists a game once its store confirms you own it, and it hasn't been able to ask yet."
-    }
-}
-
 struct ContentView: View {
-    @StateObject private var lib = Library()
+    /// The app's one library (`AppModel`), shared with Settings and the welcome tour.
+    @Bindable var lib: LibraryStore
     /// The app's one activity, shared with Settings and the welcome tour (`AppModel`).
     let runner: ActivityStore
     @ObservedObject private var preparation = RuntimePreparation.shared
@@ -185,27 +23,6 @@ struct ContentView: View {
         .frame(minWidth: 880, minHeight: 580)
         .onAppear { lib.refresh() }
         .task { await keepGamesCurrent() }
-        .onReceive(NotificationCenter.default.publisher(for: .cellarAccountsChanged)) { _ in
-            lib.checking = nil
-            lib.refresh()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .cellarLibraryChecking)) { note in
-            lib.checking = note.object as? String
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .cellarDraftProfiles)) { _ in
-            guard !runner.busy else { return }
-            runner.run(.draftProfiles, title: "Finding games without a profile",
-                       then: { lib.refresh() })
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .cellarRefreshLibrary)) { _ in
-            lib.refresh()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .cellarShowGame)) { note in
-            guard let slug = note.object as? String, lib.games.contains(where: { $0.slug == slug }) else { return }
-            lib.storeFilter = nil
-            lib.query = ""
-            lib.selected = slug
-        }
         .onReceive(NotificationCenter.default.publisher(for: .cellarFocusSearch)) { _ in
             searchFocused = true
         }
@@ -292,13 +109,13 @@ struct ContentView: View {
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.caption)
-            TextField("Search games", text: $lib.query).textFieldStyle(.plain)
+            TextField("Search games", text: $lib.query.text).textFieldStyle(.plain)
                 .focused($searchFocused)
                 // Escape clears and leaves the field, as Finder's search does.
-                .onExitCommand { lib.query = ""; searchFocused = false }
+                .onExitCommand { lib.query.text = ""; searchFocused = false }
                 .accessibilityLabel("Search games")
-            if !lib.query.isEmpty {
-                Button { lib.query = "" } label: { Image(systemName: "xmark.circle.fill") }
+            if !lib.query.text.isEmpty {
+                Button { lib.query.text = "" } label: { Image(systemName: "xmark.circle.fill") }
                     .buttonStyle(.borderless).foregroundStyle(.secondary).help("Clear search")
                     .accessibilityLabel("Clear search")
                     .help("Clear search")
@@ -315,14 +132,14 @@ struct ContentView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 FilterChip(title: "All stores", tint: .secondary,
-                           selected: lib.storeFilter == nil,
-                           action: { lib.storeFilter = nil }) {
+                           selected: lib.query.store == nil,
+                           action: { lib.query.store = nil }) {
                     Image(systemName: "square.grid.2x2.fill").font(.caption2.weight(.semibold))
                 }
                 ForEach(lib.presentStores, id: \.self) { store in
                     FilterChip(title: store.displayName, tint: store.tint,
-                               selected: lib.storeFilter == store,
-                               action: { lib.storeFilter = (lib.storeFilter == store) ? nil : store }) {
+                               selected: lib.query.store == store,
+                               action: { lib.query.store = (lib.query.store == store) ? nil : store }) {
                         StoreMark(store: store, size: 12)
                     }
                 }
@@ -334,22 +151,22 @@ struct ContentView: View {
 
     private var stateFilter: some View {
         HStack(spacing: 6) {
-            Picker("", selection: $lib.filter) {
-                ForEach(Library.Filter.allCases) { Text($0.rawValue).tag($0) }
+            Picker("", selection: $lib.query.filter) {
+                ForEach(LibraryStore.Filter.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden()
             .accessibilityLabel("Filter by readiness")
             Menu {
-                Picker("Sort by", selection: $lib.sort) {
-                    ForEach(Library.Sort.allCases) { Text($0.rawValue).tag($0) }
+                Picker("Sort by", selection: $lib.query.sort) {
+                    ForEach(LibraryStore.Sort.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.inline)
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-            .help("Sort by \(lib.sort == .name ? "name" : "most recently played")")
-            .accessibilityLabel("Sort, currently by \(lib.sort.rawValue.lowercased())")
+            .help("Sort by \(lib.query.sort == .name ? "name" : "most recently played")")
+            .accessibilityLabel("Sort, currently by \(lib.query.sort.rawValue.lowercased())")
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
     }
@@ -514,12 +331,6 @@ struct ContentView: View {
 
 /// A store's heading in the library. Carries the mark *and* the word, so the section — not each
 /// row — is what tells you where these games come from.
-struct LibrarySection {
-    let store: GameStore
-    /// Profiles Cellar wrote itself from the games' files.
-    let guessed: Bool
-    let games: [GameSummary]
-    var id: String { "\(store.rawValue)\(guessed ? "-guessed" : "")" }
 }
 
 struct StoreSectionHeader: View {

@@ -17,6 +17,8 @@ import CellarKit
 struct StoreSignInPanel: View {
     /// The app's one activity (`AppModel`).
     let runner: ActivityStore
+    /// The app's one library, told directly when an account changes.
+    let library: LibraryStore
     /// Height of the activity strip, or `nil` to leave it out entirely. Constant per instance —
     /// the tour is tighter for space than the Accounts window, but neither changes its mind
     /// half-way through a run, so the view tree's shape stays fixed.
@@ -28,7 +30,7 @@ struct StoreSignInPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                AccountsSection(runner: runner, state: state, refresh: refresh)
+                AccountsSection(runner: runner, library: library, state: state, refresh: refresh)
                     .padding(16)
             }
             if let activityHeight {

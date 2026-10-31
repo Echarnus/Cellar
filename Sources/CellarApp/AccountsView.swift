@@ -16,6 +16,7 @@ import CellarUI
 /// another sign-in to perform.
 struct AccountsSection: View {
     let runner: ActivityStore
+    let library: LibraryStore
     let state: StoreAccountState
     let refresh: () -> Void
 
@@ -39,10 +40,11 @@ struct AccountsSection: View {
 
     /// Every sign-in, sign-out and add ends here. Accounts is its own window, so the library in the
     /// main window has to be *told* — without this a player who just signed in keeps looking at
-    /// "Sign in to see your games" until they happen to press reload.
+    /// "Sign in to see your games" until they happen to press reload. It is the same `LibraryStore`
+    /// the main window draws, so telling it is a call.
     private func accountsChanged() {
         refresh()
-        NotificationCenter.default.post(name: .cellarAccountsChanged, object: nil)
+        library.accountsChanged()
     }
 
     // MARK: - Steam: one row, one action
@@ -106,11 +108,10 @@ struct AccountsSection: View {
                 steamSignInProgress = "Signed in. Checking which games you own…"
                 accountsChanged()           // the row says so now, not after every game is checked
                 // …and the library says it is checking, not "sign in", while the answers come in.
-                NotificationCenter.default.post(name: .cellarLibraryChecking,
-                                                object: "Checking which games you own…")
+                library.beganChecking("Checking which games you own…")
             case .checkingLibrary(let sentence)?:
                 steamSignInProgress = sentence
-                NotificationCenter.default.post(name: .cellarLibraryChecking, object: sentence)
+                library.beganChecking(sentence)
             case nil:
                 break
             }
