@@ -94,6 +94,9 @@ struct Cellar: ParsableCommand {
         // The composition root: CellarData's ports get their real adapters here, once, before any
         // command can reach a store.
         CellarInfrastructure.install()
+        // Cancel in the app terminates this process. The tools it started (DepotDownloader) go with
+        // it, instead of downloading on with nobody waiting for them.
+        ChildProcesses.stopWithThisProcess()
 
         let arguments = Array(CommandLine.arguments.dropFirst())
         // Reading the log must not write to it.

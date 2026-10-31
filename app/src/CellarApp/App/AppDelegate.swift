@@ -95,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let useDiagnostic = ProcessInfo.processInfo.environment["CELLAR_DIAG"] != nil
         window.contentView = useDiagnostic
             ? NSHostingView(rootView: AnyView(Text("Cellar GUI works").padding()))
-            : NSHostingView(rootView: LibraryView(lib: model.library, runner: model.activity, preparation: model.preparation))
+            : NSHostingView(rootView: LibraryView(lib: model.library, runner: model.activity, downloads: model.downloads, preparation: model.preparation))
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.bringToFront()
@@ -138,6 +138,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Clears the marker `processDidStart` looks for. Quitting cleanly is how the next start knows
     /// the last one didn't.
     func applicationWillTerminate(_ notification: Notification) {
+        // A download still running would otherwise go on without the app: `cellar` stops the tools
+        // it started when it is told to stop (`ChildProcesses`).
+        model.activity.cancel()
         Diagnostics.processWillExit()
     }
 

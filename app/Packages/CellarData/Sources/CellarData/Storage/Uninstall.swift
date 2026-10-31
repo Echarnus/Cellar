@@ -149,6 +149,9 @@ public enum Uninstall {
                 freed += item.bytes
             }
         }
+        // The files an unfinished install left are gone with the rest, so there is nothing left to
+        // resume: the game is "Not installed" again, not "Download incomplete".
+        if plan.removesGameFiles { UnfinishedInstall.finish(game) }
         return freed
     }
 

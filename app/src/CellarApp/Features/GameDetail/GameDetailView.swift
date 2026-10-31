@@ -8,6 +8,8 @@ import CellarUI
 struct GameDetailView: View {
     let game: GameSummary
     let runner: ActivityStore
+    /// The downloads queue: Install goes through it, and it says what this game is doing.
+    let downloads: DownloadsViewModel
     let onChange: () -> Void
     @AppStorage("showHUD") private var showHUD = false
     @State private var showDetails = false
@@ -93,12 +95,21 @@ struct GameDetailView: View {
 
     // MARK: - Actions
 
+    /// What Cellar is doing with this game: downloading, installing, or waiting in the queue.
+    private var activity: GameActivity? { downloads.activity(for: game.slug) }
+
+    /// Install while Cellar is busy with something else adds the game to the queue instead of
+    /// doing nothing, and the button says so before it is pressed.
+    private var queuesOnPress: Bool {
+        game.nextStep == .install && activity == nil && downloads.wouldQueue(game)
+    }
+
     private var actions: some View {
         HStack(spacing: 12) {
             Button { primary() } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: game.actionSymbol).font(.title3)
-                    Text(game.actionTitle).fontWeight(.semibold)
+                    Image(systemName: queuesOnPress ? "text.badge.plus" : game.actionSymbol).font(.title3)
+                    Text(queuesOnPress ? String(localized: "Add to queue") : game.actionTitle).fontWeight(.semibold)
                 }
                 .frame(minWidth: 168).padding(.vertical, 6)
             }
@@ -106,9 +117,11 @@ struct GameDetailView: View {
             // Green means "go" for Play; every other step is tinted by the store whose client is
             // about to appear, so the button and the window that opens belong to each other.
             .tint(game.nextStep == .play ? .green : game.store.tint)
-            .disabled(runner.busy || model.measuringRemoval)
+            .disabled((runner.busy && !queuesOnPress) || activity != nil || model.measuringRemoval)
             .keyboardShortcut(.defaultAction)
-            .help(game.actionHint)
+            .help(queuesOnPress
+                  ? String(localized: "\(game.name) downloads as soon as what Cellar is doing now, and anything queued before it, has finished.")
+                  : game.actionHint)
 
             status
             Spacer()
@@ -128,6 +141,27 @@ struct GameDetailView: View {
                 .help("\(game.name) is running. Quit the game and Cellar closes the layer.")
         } else if runner.busy, runner.installingSlug == game.slug {
             InstallProgressBar(game: game.name, store: game.store, progress: runner.installProgress)
+            Button("Cancel") { downloads.cancel(game.slug) }
+                .help("Stop installing \(game.name). What has downloaded stays, and Install picks up from there.")
+        } else if case .queued(let position) = activity {
+            Label(activity?.statusText ?? "", systemImage: "clock")
+                .font(.callout).foregroundStyle(.secondary)
+                .help(position == 1 ? Text("\(game.name) starts downloading when Cellar is done with what it is doing now.")
+                                    : Text("\(game.name) starts downloading after the games ahead of it in the queue."))
+            Button("Remove from queue") { downloads.cancel(game.slug) }
+                .buttonStyle(.link)
+        } else if runner.busy, runner.installingSlug != nil {
+            // Another game is downloading. This page is about this game: it says what Install will
+            // do now, not what the other game is doing (that is in the sidebar's downloads panel).
+            if queuesOnPress {
+                Text("Cellar is downloading another game. Install adds this one to the queue.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if game.nextStep == .play {
+                Text("Play is available once the download in progress has finished.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         } else if runner.busy {
             ProgressView().controlSize(.small)
             Text(runner.busyTitle).font(.callout).foregroundStyle(.secondary)
@@ -199,9 +233,10 @@ struct GameDetailView: View {
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
             // Removal is last and on its own, where destructive actions belong. Each entry states
             // what it takes, and neither does anything until the confirmation has been read.
-            if game.gameInstalled || game.bottleExists {
+            // A download that stopped partway has files to remove too, though it is not a game yet.
+            if game.gameInstalled || game.installInterrupted || game.bottleExists {
                 Divider()
-                if game.gameInstalled {
+                if game.gameInstalled || game.installInterrupted {
                     Button("Uninstall \(game.name)…", role: .destructive) { confirmRemoval(scope: .game) }
                 }
                 if game.bottleExists {
@@ -247,7 +282,11 @@ struct GameDetailView: View {
 
     private var chips: some View {
         HStack(spacing: 8) {
-            Chip(game.statusText, system: game.statusSymbol, tint: game.statusTint)
+            if let activity {
+                Chip(activity.statusText, system: activity.symbol, tint: .accentColor)
+            } else {
+                Chip(game.statusText, system: game.statusSymbol, tint: game.statusTint)
+            }
             // Each store identifies a game its own way — an AppID, a product code, or neither.
             // Showing the right one is a small honesty that saves a support round-trip.
             switch game.store {
@@ -495,9 +534,8 @@ struct GameDetailView: View {
             // One verb for every store. The route still differs — Cellar downloads a Steam or GOG
             // game itself and opens Blizzard's client for a Battle.net one — but that is a fact
             // about the store, not something the player should have to know to press a button.
-            runner.install(slug: game.slug,
-                           title: game.store == .battlenet ? String(localized: "Opening Battle.net") : String(localized: "Downloading \(game.name)"),
-                           then: { onChange() })
+            // Through the queue: started now when Cellar is free, otherwise when its turn comes.
+            downloads.install(game)
         }
     }
 

@@ -66,12 +66,36 @@ final class LibraryViewModel {
         refresh()
     }
 
+    /// Read the library again, off the main actor.
+    ///
+    /// The read walks every bottle, and the first one after a download also turns the game's icon
+    /// into an `.icns` with a dozen `sips` runs. Done on the main actor, that froze the window for
+    /// seconds just as a download finished. One read runs at a time; a refresh asked for meanwhile
+    /// runs once more after it, so the last word is always a read that started after the change.
     func refresh() {
         lastRefresh = Date()
         // A store that has just been set up now has its own artwork on disk; re-resolve so its
         // mark upgrades from the drawn one to the store's own without needing a relaunch.
         StoreIcons.refresh()
-        snapshot = repository.snapshot()
+        guard !reading else { readAgain = true; return }
+        reading = true
+        let repository = repository
+        Task {
+            let snapshot = await Task.detached(priority: .userInitiated) { repository.snapshot() }.value
+            reading = false
+            apply(snapshot)
+            if readAgain {
+                readAgain = false
+                refresh()
+            }
+        }
+    }
+
+    @ObservationIgnored private var reading = false
+    @ObservationIgnored private var readAgain = false
+
+    private func apply(_ snapshot: LibrarySnapshot) {
+        self.snapshot = snapshot
         // What the sidebar just decided, on record: a reload that "does nothing" is otherwise
         // indistinguishable from one that ran and read a signed-out Steam.
         CellarLog.debug(.app, "Library refreshed: \(games.count) shown, \(withheld.count) withheld, \(hasConnectedStore ? "a store connected" : "no store connected") — \(SteamAccount.diagnosis)")

@@ -9,6 +9,8 @@ struct LibraryView: View {
     @Bindable var lib: LibraryViewModel
     /// The app's one activity, shared with Settings and the welcome tour (`AppModel`).
     let runner: ActivityStore
+    /// The downloads queue (`AppModel`): each game's own state, and the panel above the footer.
+    let downloads: DownloadsViewModel
     let preparation: RuntimePreparation
     @FocusState private var searchFocused: Bool
 
@@ -17,7 +19,7 @@ struct LibraryView: View {
             sidebar.frame(minWidth: 272, maxWidth: 340)
             Group {
                 if let game = lib.current {
-                    GameDetailView(game: game, runner: runner) { lib.refresh() }.id(game.slug)
+                    GameDetailView(game: game, runner: runner, downloads: downloads) { lib.refresh() }.id(game.slug)
                 } else { EmptyState() }
             }.frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -92,6 +94,10 @@ struct LibraryView: View {
             if lib.presentStores.count > 1 { storeChips }
             stateFilter
             libraryList
+            if !downloads.isEmpty {
+                Divider()
+                DownloadsView(downloads: downloads)
+            }
             status
             Divider()
             SidebarAccountBar(
@@ -186,7 +192,8 @@ struct LibraryView: View {
                 ForEach(lib.sections, id: \.id) { section in
                     Section {
                         ForEach(section.games) { game in
-                            SidebarRow(game: game, selected: lib.selected == game.slug)
+                            SidebarRow(game: game, selected: lib.selected == game.slug,
+                                       activity: downloads.activity(for: game.slug))
                                 .contentShape(Rectangle())
                                 .onTapGesture { lib.selected = game.slug }
                         }
