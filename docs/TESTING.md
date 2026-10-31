@@ -256,8 +256,8 @@ To test a wheel:
    or crash shake it, and does all force stop the moment the game quits?
 5. If force feedback misbehaves, start the game once with the runner's own SDL —
    `CELLAR_RUNNER_SDL=1 cellar launch <game>` — to tell Cellar's SDL apart from the rest of the path.
-   For a Fanatec base, also try `CELLAR_FFB_MAX_PERCENT=100` (is it only weak?) and
-   `CELLAR_FFB_DISABLE=1` (steering without Cellar's driver).
+   For a Fanatec base, also try Settings › General › Racing wheels at 25% and then 100% (does the
+   strength follow?) and `CELLAR_FFB_DISABLE=1` (steering without Cellar's driver).
 6. Note the game, runner and backend, and record the result in the game's profile notes.
 
 ## Where this sits in the verification ladder

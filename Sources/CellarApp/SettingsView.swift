@@ -86,6 +86,7 @@ struct SettingsView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     GameLanguageSection()
+                    WheelStrengthSection()
                     Section("Folder access") {
                         Button("Review folder access…") {
                             onClose()
