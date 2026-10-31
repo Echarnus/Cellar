@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// Whether a store client Cellar is about to start should appear in the Dock.

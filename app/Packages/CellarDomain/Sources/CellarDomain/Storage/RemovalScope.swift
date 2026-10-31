@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// How much of a game's footprint to remove.

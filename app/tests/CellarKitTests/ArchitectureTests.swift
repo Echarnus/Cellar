@@ -47,6 +47,34 @@ struct ArchitectureTests {
         }
     }
 
+    /// Importing only Foundation still leaves the disk, processes and the network in reach. The
+    /// domain is values and rules; anything that touches the machine belongs to the engine.
+    @Test("The domain never touches the disk, a process, the network or the defaults")
+    func domainDoesNoIO() throws {
+        let io = ["FileManager", "Process(", "URLSession", "UserDefaults", "ProcessInfo", "FileHandle",
+                  "Bundle.main", "contentsOf:", "write(to:"]
+        for (file, text) in try Self.sources(in: "CellarDomain") {
+            for api in io {
+                #expect(!text.contains(api), "CellarDomain/\(file) uses \(api)")
+            }
+        }
+    }
+
+    /// The models every layer trades in live in the domain, so a view can name them without the
+    /// engine (#133). A type listed here coming back into CellarKit is a layering regression.
+    @Test("The shared models are declared in the domain, not the engine",
+          arguments: ["CellarError", "CellarCommand", "Credit", "LogCategory", "LogLevel", "ProfileRef",
+                      "DockPresence", "GraphicsBackend", "PrefixInfo", "RunnerArchitecture",
+                      "RunnerArtifact", "RunnerSpec", "RemovalScope", "Ownership", "CheckResult",
+                      "CheckStatus", "DetectedGraphicsAPI", "PerformanceSetting", "GameLanguage"])
+    func modelsLiveInTheDomain(_ type: String) throws {
+        func declares(_ folder: String) throws -> Bool {
+            try Self.sources(in: folder).contains { $0.file == "\(type).swift" }
+        }
+        #expect(try declares("CellarDomain"), "\(type) is not in CellarDomain")
+        #expect(try !declares("CellarKit"), "\(type) is back in CellarKit")
+    }
+
     @Test("The engine and the infrastructure never import a UI framework",
           arguments: ["CellarKit", "CellarInfrastructure"])
     func engineHasNoUI(_ folder: String) throws {

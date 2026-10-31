@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 public enum CellarError: Error, LocalizedError, CustomStringConvertible {

@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// Whether a store can answer the ownership question at all — the fact that decides what an

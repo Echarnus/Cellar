@@ -31,7 +31,7 @@ both use them.
 
 | Path | What lives there |
 |---|---|
-| `app/Packages/CellarDomain/Sources/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store/`), launch stages, install phases, `GameEvent`/`CommandEvent`. Imported explicitly (`import CellarDomain`); nothing re-exports it. |
+| `app/Packages/CellarDomain/Sources/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store/`), launch stages, install phases, `GameEvent`/`CommandEvent`, and the models every layer trades in (`CellarError`, `CellarCommand`, `GraphicsBackend`, `RunnerSpec`, `Ownership`, `GameLanguage`, …). Imported explicitly (`import CellarDomain`); nothing re-exports it. |
 | `app/Packages/CellarKit/Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the use cases (`UseCases/`), the `StoreAdapter` port and its registry (`StoreAdapter.swift`), the store plugins (`Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
 | `app/Packages/CellarKit/Sources/CellarInfrastructure/` | The concrete store adapters (`SteamAdapter`, `BattleNetAdapter`, `GOGAdapter`) behind CellarKit's `StoreAdapter` port. Only composition roots import it: the CLI's `main`, the app's `main.swift` and the tests' set-up call `CellarInfrastructure.install()`. No view or store may (`ArchitectureTests`). |
 | `app/src/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |

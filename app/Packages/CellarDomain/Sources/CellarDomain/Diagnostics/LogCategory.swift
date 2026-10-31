@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// What part of Cellar an entry came from. Kept coarse: enough to filter by, not a taxonomy.

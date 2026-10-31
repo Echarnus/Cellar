@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Just enough protobuf to walk a message: varints, length-delimited fields, and skipping the rest.
