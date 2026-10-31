@@ -508,8 +508,8 @@ the app, into one file.
 |---|---|---|
 | `CellarLog` | `Sources/CellarKit/Diagnostics/CellarLog.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
 | `Diagnostics` | `Sources/CellarKit/Diagnostics/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
-| `cellar logs` | `Sources/cellar/Commands/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
-| Settings → Diagnostics | `Sources/CellarApp/SettingsView.swift` | The same export, one button, saved to the Desktop. |
+| `cellar logs` | `Sources/cellar/Commands/Maintenance/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
+| Settings → Diagnostics | `Sources/CellarApp/Features/Settings/SettingsView.swift` | The same export, one button, saved to the Desktop. |
 
 What it records, and why each one is there:
 

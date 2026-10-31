@@ -3,21 +3,6 @@ import SwiftUI
 import AppKit
 import CellarKit
 
-/// Whether the first-run tour is owed, and the record that it has been seen.
-///
-/// Versioned rather than a bool: when the tour gains a step that matters (a new store, a changed
-/// sign-in), bumping `version` shows it once more to people who already ran the old one. Skipping
-/// counts as seen — a tour that reappears after you dismissed it is nagging, not helping. It can
-/// always be replayed from Settings.
-enum WelcomeTour {
-    /// Bump when the tour teaches something a returning player has not been told.
-    static let version = 1
-    private static let key = "welcomeTourVersionSeen"
-
-    static var isOwed: Bool { UserDefaults.standard.integer(forKey: key) < version }
-    static func markSeen() { UserDefaults.standard.set(version, forKey: key) }
-}
-
 /// The first thing a new player sees: what Cellar is, how a game gets running, and — the one step
 /// that actually does something — signing in to their stores.
 ///
@@ -230,77 +215,5 @@ struct WelcomeTourView: View {
         }
         .padding(.horizontal, 18)
         .frame(height: 67)
-    }
-}
-
-// MARK: - Pieces
-
-/// A page's title and its one plain sentence saying what this step is for.
-private struct PageHeading: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.title2.weight(.semibold))
-            Text(subtitle).font(.callout).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 40).padding(.top, 30).padding(.bottom, 20)
-    }
-}
-
-/// One thing worth knowing, as symbol + title + sentence.
-private struct FactRow: View {
-    let symbol: String
-    let tint: Color
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 13) {
-            Image(systemName: symbol)
-                .font(.system(size: 17))
-                .foregroundStyle(tint)
-                .frame(width: 26, height: 22)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                Text(detail).font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(detail)")
-    }
-}
-
-/// A numbered step in the three-step story, in a card so the order reads at a glance.
-private struct StepRow: View {
-    let number: Int
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 13) {
-            Text("\(number)")
-                .font(.callout.weight(.bold)).foregroundStyle(.white)
-                .frame(width: 26, height: 26)
-                .background(Color.pink, in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                Text(detail).font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(13)
-        .background(Color.primary.opacity(0.04),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(number). \(title). \(detail)")
     }
 }
