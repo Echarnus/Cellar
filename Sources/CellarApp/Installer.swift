@@ -15,9 +15,11 @@ import CellarKit
 /// runtime and the Steam client are already here. It runs on its own `ActivityStore`, not the
 /// library's, so it never holds the Play and Install buttons — a game set up meanwhile waits for it
 /// in the CLI (`SetupLock`) and says so in its own activity log.
+///
+/// One instance, owned by `AppModel` and handed to the views that show it.
 @MainActor
-final class RuntimePreparation: ObservableObject {
-    static let shared = RuntimePreparation()
+@Observable
+final class RuntimePreparation {
 
     enum State: Equatable {
         case idle
@@ -28,21 +30,20 @@ final class RuntimePreparation: ObservableObject {
         /// note, not an error.
         case incomplete
     }
-    @Published private(set) var state: State = .idle
+    private(set) var state: State = .idle
 
     /// The player's choice in Settings. On by default: the whole point is that a first game should
     /// not open on a 3 GB wait, and the welcome tour says it is happening.
     static let defaultsKey = "prepareAheadOfTime"
-    var isEnabled: Bool {
-        get { UserDefaults.standard.object(forKey: Self.defaultsKey) as? Bool ?? true }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Self.defaultsKey)
-            objectWillChange.send()
-            if newValue { startIfNeeded() } else { cancel() }
+    var isEnabled: Bool = UserDefaults.standard.object(forKey: RuntimePreparation.defaultsKey) as? Bool ?? true {
+        didSet {
+            guard isEnabled != oldValue else { return }
+            UserDefaults.standard.set(isEnabled, forKey: Self.defaultsKey)
+            if isEnabled { startIfNeeded() } else { cancel() }
         }
     }
 
-    private let runner = ActivityStore()
+    @ObservationIgnored private let runner = ActivityStore()
 
     var isWorking: Bool { if case .working = state { return true } else { return false } }
 
@@ -75,7 +76,7 @@ final class RuntimePreparation: ObservableObject {
 /// The library's footer line while preparation runs: a small spinner and what is happening, with
 /// the why on hover. Nothing at all once it is done — there is nothing left to say.
 struct PreparationStatus: View {
-    @ObservedObject var preparation: RuntimePreparation
+    let preparation: RuntimePreparation
 
     var body: some View {
         if case .working(let line) = preparation.state {
@@ -161,18 +162,19 @@ enum CellarUninstaller {
     /// Cellar › Uninstall Cellar…: measure, ask once with the save-game choice on the same dialog,
     /// then run `cellar uninstall-cellar` and quit. Measuring walks every bottle, so it happens off
     /// the main thread with the menu already closed.
-    static func begin() {
+    static func begin(preparation: RuntimePreparation) {
         Task {
             let summary = await Task.detached(priority: .userInitiated) { () -> (Int64, Int64, Int) in
                 let items = Reset.plan(includingCellarItself: true)
                 let saves = SaveGames.locate()
                 return (Reset.totalBytes(items), saves.reduce(0) { $0 + $1.bytes }, saves.count)
             }.value
-            confirm(totalBytes: summary.0, saveBytes: summary.1, saveCount: summary.2)
+            confirm(totalBytes: summary.0, saveBytes: summary.1, saveCount: summary.2, preparation: preparation)
         }
     }
 
-    private static func confirm(totalBytes: Int64, saveBytes: Int64, saveCount: Int) {
+    private static func confirm(totalBytes: Int64, saveBytes: Int64, saveCount: Int,
+                                preparation: RuntimePreparation) {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Uninstall Cellar?"
@@ -192,11 +194,11 @@ enum CellarUninstaller {
         alert.buttons.first?.hasDestructiveAction = true
         NSApp.bringToFront()
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        run(keepSaves: keep.state == .on && saveCount > 0)
+        run(keepSaves: keep.state == .on && saveCount > 0, preparation: preparation)
     }
 
-    private static func run(keepSaves: Bool) {
-        RuntimePreparation.shared.cancel()
+    private static func run(keepSaves: Bool, preparation: RuntimePreparation) {
+        preparation.cancel()
         let runner = ActivityStore()
         // Deleting a games library takes a while; a window that says so beats an app that seems
         // to have done nothing.

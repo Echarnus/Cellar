@@ -37,6 +37,8 @@ struct WelcomeTourView: View {
     /// The app's one activity (`AppModel`), handed on to the sign-in step.
     let runner: ActivityStore
     let library: LibraryStore
+    let accounts: AccountsStore
+    let preparation: RuntimePreparation
     /// Called when the player finishes or skips — the host closes the window and records it.
     let onFinish: () -> Void
 
@@ -140,7 +142,7 @@ struct WelcomeTourView: View {
         VStack(alignment: .leading, spacing: 0) {
             PageHeading(title: "Sign in to your stores",
                         subtitle: "Sign in once per store and every game you own there can be installed. You can do this later instead — Settings, or ⌘⇧A — and Cellar works fine until you do.")
-            StoreSignInPanel(runner: runner, library: library, activityHeight: 78)
+            StoreSignInPanel(runner: runner, library: library, accounts: accounts, activityHeight: 78)
                 .frame(maxHeight: .infinity)
         }
     }
@@ -174,7 +176,7 @@ struct WelcomeTourView: View {
                         detail: "The Wine runner, your logs and the Cellar folder. It also replays this tour whenever you want it.")
                 // Only while it is actually happening: a tour replayed later must not claim a
                 // download that finished weeks ago, or one the player switched off.
-                if RuntimePreparation.shared.isWorking {
+                if preparation.isWorking {
                     FactRow(symbol: "arrow.down.circle", tint: .pink,
                             title: "Getting ready in the background",
                             detail: "Cellar is already downloading the Windows runtime and Steam client every game shares — a few gigabytes — so your first game only has to download itself. The library's footer shows how it's going.")

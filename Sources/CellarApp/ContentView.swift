@@ -8,7 +8,7 @@ struct ContentView: View {
     @Bindable var lib: LibraryStore
     /// The app's one activity, shared with Settings and the welcome tour (`AppModel`).
     let runner: ActivityStore
-    @ObservedObject private var preparation = RuntimePreparation.shared
+    let preparation: RuntimePreparation
     @FocusState private var searchFocused: Bool
 
     var body: some View {

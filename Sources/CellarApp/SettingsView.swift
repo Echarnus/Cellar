@@ -15,6 +15,9 @@ struct SettingsView: View {
     let runner: ActivityStore
     /// The app's one library, told directly when an account changes.
     let library: LibraryStore
+    let accounts: AccountsStore
+    @Bindable var updater: AppUpdater
+    let preparation: RuntimePreparation
     @AppStorage("showHUD") private var showHUD = false
     /// Settings is shown in a standalone NSWindow (not a SwiftUI sheet — that crashes under
     /// NSHostingView), so anything that hands off to another window closes this one through this
@@ -33,10 +36,6 @@ struct SettingsView: View {
     @State private var databaseVersion = ""
     /// Measured off the main thread when the pane opens: walking a 100 GB game takes seconds.
     @State private var storageUsage: [GameStorage.Usage] = []
-    @ObservedObject private var updater = AppUpdater.shared
-    @ObservedObject private var preparation = RuntimePreparation.shared
-    /// Read once per refresh, never from a view body — see `StoreAccountState`.
-    @State private var accounts = StoreAccountState.unknown
 
     private var runnerName: String { RunnerManager.installed().first?.spec.displayName ?? "not installed" }
     private var depot: String { DepotTool.isInstalled ? "installed" : "installs on first download" }
@@ -72,7 +71,7 @@ struct SettingsView: View {
                     // Signing in is account-level, so it belongs here as well as behind ⌘⇧A — the
                     // welcome tour promises "you can do this later in Settings", and this is that.
                     Section {
-                        AccountsSection(runner: runner, library: library, state: accounts, refresh: refresh)
+                        AccountsSection(runner: runner, library: library, state: accounts.state, refresh: { accounts.refresh() })
                             .padding(.vertical, 4)
                     } footer: {
                         Text("One sign-in per store covers your whole library.")
@@ -175,7 +174,7 @@ struct SettingsView: View {
         // NSHostingView lets layout feed back into the view graph, and this app aborts in
         // AttributeGraph when that happens (skills/swift.md). Not worth being clever about.
         .frame(width: 560, height: 680)
-        .onAppear(perform: refresh)
+        .onAppear { accounts.refresh() }
     }
 
     /// Always present, at a fixed height, rather than appearing when something happens: a pane that
@@ -202,26 +201,6 @@ struct SettingsView: View {
             .frame(height: 92)
         }
         .background(Color.primary.opacity(0.04))
-    }
-
-    /// Re-read every store's state, **off the main thread and after layout has finished**.
-    ///
-    /// This work is not cheap — it stats bottles, reads the keychain, and asks GOG for a username
-    /// over the network. Doing it inline in `onAppear` meant blocking the main thread and then
-    /// mutating `@State` in the middle of `NSHostingView`'s first layout pass, which re-enters the
-    /// view graph and aborts in AttributeGraph.
-    ///
-    /// The GOG name is the CLI's to learn, because the CLI is what holds the token: `cellar gog
-    /// status` asks GOG and writes the name both binaries read. The app never reads the token itself.
-    private func refresh() {
-        let runner = runner
-        Task.detached {
-            if GOGAuth.isSignedIn, GOGAuth.cachedUsername == nil {
-                _ = await runner.runBeside(.gogStatus)
-            }
-            let snapshot = StoreAccountState.current()
-            await MainActor.run { accounts = snapshot }
-        }
     }
 
     // MARK: - Updates

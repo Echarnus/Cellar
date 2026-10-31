@@ -32,6 +32,12 @@ final class AppModel {
     let activity = ActivityStore()
     /// The games, the selection and the sidebar's filters.
     let library = LibraryStore()
+    /// Where the player is signed in.
+    lazy var accounts = AccountsStore(activity: activity)
+    /// The shared runtime downloading in the background — on its own runner, so it never holds Play.
+    let preparation = RuntimePreparation()
+    /// Sparkle, started the first time the menu bar asks for it.
+    lazy var updater = AppUpdater()
 
     /// View › Add Installed Games Without a Profile: write draft profiles for them (`DraftProfile`),
     /// then show what turned up.
@@ -133,7 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let useDiagnostic = ProcessInfo.processInfo.environment["CELLAR_DIAG"] != nil
         window.contentView = useDiagnostic
             ? NSHostingView(rootView: AnyView(Text("Cellar GUI works").padding()))
-            : NSHostingView(rootView: ContentView(lib: model.library, runner: model.activity))
+            : NSHostingView(rootView: ContentView(lib: model.library, runner: model.activity, preparation: model.preparation))
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.bringToFront()
@@ -158,11 +164,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The parts every game shares start downloading now, behind the tour, so the first
         // Install press is a game download and nothing else. A no-op once they are here.
         if !useDiagnostic {
-            DispatchQueue.main.async { RuntimePreparation.shared.startIfNeeded() }
+            DispatchQueue.main.async { [model] in model.preparation.startIfNeeded() }
         }
     }
 
-    @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin() }
+    @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin(preparation: model.preparation) }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
@@ -196,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .target = self
         // Left out of a build from source: it has no feed to check, and a disabled item would only
         // raise a question it cannot answer. Settings › Updates says why.
-        if let updates = AppUpdater.shared.makeMenuItem() { appMenu.addItem(updates) }
+        if let updates = model.updater.makeMenuItem() { appMenu.addItem(updates) }
         appMenu.addItem(withTitle: "Welcome to \(appName)…", action: #selector(showWelcomeTour), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
@@ -304,7 +310,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.title = "Settings"
             w.isReleasedWhenClosed = false
             w.center()
-            w.contentView = NSHostingView(rootView: SettingsView(runner: model.activity, library: model.library, onClose: { [weak self] in
+            w.contentView = NSHostingView(rootView: SettingsView(runner: model.activity, library: model.library, accounts: model.accounts,
+                                                                updater: model.updater, preparation: model.preparation, onClose: { [weak self] in
                 self?.settingsWindow?.close()
             }))
             settingsWindow = w
@@ -356,7 +363,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.title = "Welcome to Cellar"
             w.isReleasedWhenClosed = false
             w.center()
-            w.contentView = NSHostingView(rootView: WelcomeTourView(runner: model.activity, library: model.library, onFinish: { [weak self] in
+            w.contentView = NSHostingView(rootView: WelcomeTourView(runner: model.activity, library: model.library, accounts: model.accounts,
+                                                                   preparation: model.preparation, onFinish: { [weak self] in
                 WelcomeTour.markSeen()
                 self?.welcomeTourWindow?.close()
             }))

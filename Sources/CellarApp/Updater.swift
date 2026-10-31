@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Observation
 import Sparkle
 
 /// Cellar updating itself, through Sparkle.
@@ -12,15 +13,17 @@ import Sparkle
 ///
 /// Automatic checks are the player's choice. Info.plist leaves `SUEnableAutomaticChecks` unset, so
 /// Sparkle asks once — on the second launch, not the first, which already has the welcome tour.
-final class AppUpdater: ObservableObject {
-    static let shared = AppUpdater()
+///
+/// One instance, made by `AppModel` the first time the menu bar asks for it.
+@Observable
+final class AppUpdater {
 
     /// Nil when this build carries no feed or no signing key.
     private let controller: SPUStandardUpdaterController?
 
-    @Published private(set) var canCheck = false
-    @Published private(set) var lastChecked: Date?
-    @Published var checksAutomatically = false {
+    private(set) var canCheck = false
+    private(set) var lastChecked: Date?
+    var checksAutomatically = false {
         didSet {
             guard let updater, updater.automaticallyChecksForUpdates != checksAutomatically else { return }
             updater.automaticallyChecksForUpdates = checksAutomatically
@@ -30,7 +33,9 @@ final class AppUpdater: ObservableObject {
     var isAvailable: Bool { controller != nil }
     private var updater: SPUUpdater? { controller?.updater }
 
-    private init() {
+    @ObservationIgnored private var subscriptions: Set<AnyCancellable> = []
+
+    init() {
         let info = Bundle.main.infoDictionary ?? [:]
         let feed = (info["SUFeedURL"] as? String) ?? ""
         let key = (info["SUPublicEDKey"] as? String) ?? ""
@@ -43,10 +48,12 @@ final class AppUpdater: ObservableObject {
         guard let updater else { return }
         // KVO, delivered on the main thread by Sparkle's own changes — never from inside a view
         // update, which this app's hosting view cannot survive (skills/swift.md).
-        updater.publisher(for: \.canCheckForUpdates).receive(on: RunLoop.main).assign(to: &$canCheck)
-        updater.publisher(for: \.lastUpdateCheckDate).receive(on: RunLoop.main).assign(to: &$lastChecked)
+        updater.publisher(for: \.canCheckForUpdates).receive(on: RunLoop.main)
+            .sink { [weak self] in self?.canCheck = $0 }.store(in: &subscriptions)
+        updater.publisher(for: \.lastUpdateCheckDate).receive(on: RunLoop.main)
+            .sink { [weak self] in self?.lastChecked = $0 }.store(in: &subscriptions)
         updater.publisher(for: \.automaticallyChecksForUpdates).receive(on: RunLoop.main)
-            .removeDuplicates().assign(to: &$checksAutomatically)
+            .removeDuplicates().sink { [weak self] in self?.checksAutomatically = $0 }.store(in: &subscriptions)
     }
 
     /// Shows Sparkle's own window: "You're up to date", or the new version's notes and an Install
