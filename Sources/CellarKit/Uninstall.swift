@@ -159,6 +159,19 @@ public enum Uninstall {
         }
         guard !plan.isEmpty else { return 0 }
 
+        // The bottle holds the saves. They are copied out first, and nothing is removed if that
+        // fails: a removal is never the way a save game is lost.
+        if plan.scope == .bottle, FileManager.default.fileExists(atPath: game.prefix.path) {
+            do {
+                if try SaveBackups.backUp(bottle: game.prefix, reason: .beforeRemoval) != nil {
+                    progress("Backed up \(game.name)'s save games — cellar saves list \(game.slug)")
+                }
+            } catch {
+                throw CellarError.ioFailure(
+                    "Couldn't back up \(game.name)'s save games first (\(CellarLog.describe(error))), so nothing was removed.")
+            }
+        }
+
         // Asked now, not read off the plan: a client that came up since the plan was made is holding
         // exactly the files about to be deleted, and the plan would still say there was none.
         let touchesFiles = plan.removesGameFiles || plan.scope == .bottle
@@ -200,7 +213,9 @@ public enum Uninstall {
                 // A symlink is unlinked, never followed: the bottle's `Steam` directory is a link to
                 // the shared install that holds the sign-in and every other Steam game.
                 if isSymbolicLink(item.url) {
-                    progress("Unlinking the bottle's Steam — the shared install it points at, and your sign-in, stay…")
+                    progress(item.label == "Link to shared Steam"
+                        ? "Unlinking the bottle's Steam — the shared install it points at, and your sign-in, stay…"
+                        : "Unlinking \(item.label.lowercased())…")
                     try? fm.removeItem(at: item.url)
                     continue
                 }
@@ -289,6 +304,8 @@ public enum Uninstall {
             items.append(item("Launcher app", app))
         }
         items.append(item("Extracted icon", Paths.cache.appendingPathComponent("icons/\(game.slug).icns")))
+        let gameApp = GameApp.bundleURL(slug: game.slug)
+        if FileManager.default.fileExists(atPath: gameApp.path) { items.append(item("Game app", gameApp)) }
 
         // Only the shortcut Cellar wrote — identified by the launcher it points at, not by its name.
         // A player who added the same game to Steam by hand keeps their own entry.
@@ -350,7 +367,8 @@ public enum Uninstall {
 
     /// The directories Cellar owns. Anything outside them is never deleted, whatever a profile says.
     static var deletableRoots: [URL] {
-        [Paths.appSupport, AppBundle.applicationsDirectory]
+        // Plus the `Cellar Games` folders on other drives that games were moved into.
+        [Paths.appSupport, AppBundle.applicationsDirectory] + GameStorage.movedRoots
     }
 
     /// Directories that hold *other games' or other accounts'* data. Each is a legitimate parent of
@@ -359,7 +377,7 @@ public enum Uninstall {
         var roots = [Paths.appSupport, Paths.shared, Paths.sharedSteam, Paths.prefixes, Paths.runners,
                      Paths.cache, Paths.logs, Paths.userProfiles, AppBundle.applicationsDirectory,
                      Paths.cache.appendingPathComponent("icons"),
-                     Paths.cache.appendingPathComponent("gog")]
+                     Paths.cache.appendingPathComponent("gog")] + GameStorage.movedRoots
         let steamapps = Paths.sharedSteam.appendingPathComponent("steamapps")
         roots += [steamapps, steamapps.appendingPathComponent("common"),
                   steamapps.appendingPathComponent("downloading"),
@@ -393,7 +411,7 @@ public enum Uninstall {
     /// neither (Steam knows the install directory, so they never had to). For those, Steam's own
     /// appmanifest names it, and `SteamBottle.isGameRunning` matches on that. Missing this is how a
     /// player's live game gets its files deleted out from under it.
-    static func isGameRunning(_ game: GamePlan) -> Bool {
+    public static func isGameRunning(_ game: GamePlan) -> Bool {
         if !game.gameProcessNeedles.isEmpty, ProcessWatch.isRunningAny(game.gameProcessNeedles) {
             return true
         }

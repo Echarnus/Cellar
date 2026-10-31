@@ -202,6 +202,11 @@ struct SelfTest: ParsableCommand {
         try check(!secrets.contains("abc123"), "redaction removes a token value")
         try check(!secrets.contains("hunter2"), "redaction removes a --password value")
         try check(secrets.contains("~/Games"), "redaction replaces the home path with ~")
+        // Steam's tokens are JWTs whose header encodes as `eyAi…` (a space after the brace), and the
+        // log strips them at write time, not only on export.
+        let steamShaped = "eyAidHlwIjogIkpXVCIsICJhbGciOiAiRWREU0EiIH0.eyAiaXNzIjogInN0ZWFtIiB9.c2lnbmF0dXJl"
+        try check(!Diagnostics.redactCredentials("token \(steamShaped) ok").contains(steamShaped),
+                  "write-time redaction removes a Steam-shaped token")
 
         // 8. The command line as the log records it. `Cellar.main` logs every invocation, and the
         // export folds the log into a file players are told to attach to a public bug report — so

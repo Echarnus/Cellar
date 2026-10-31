@@ -42,7 +42,8 @@ public enum Reset {
             switch target {
             case .path(let url):             return FileManager.default.fileExists(atPath: url.path)
             case .steamShortcuts(let names):  return !names.isEmpty
-            case .storeCredentials(.gog):    return GOGAuth.isSignedIn
+            case .storeCredentials(.gog):    return GOGAuth.isSignedIn || GOGAuth.cachedUsername != nil
+            case .storeCredentials(.steam):  return !Reset.steamTokenStoresOutsideCellar.isEmpty
             case .storeCredentials:          return false
             }
         }
@@ -77,16 +78,32 @@ public enum Reset {
             "re-read from the stores when you next refresh; Battle.net added again in Accounts")
         add(SteamAccount.recordFile, "Cellar's record of your Steam account", "one QR scan")
         add(Paths.cache, "Downloaded installers and other scratch files", "re-downloaded when needed")
+        add(Paths.gameApps, "The app each game runs as, so macOS treats it as a game",
+            "remade the next time you press Play")
         add(Paths.logs, "Logs", "nothing to restore")
         add(Paths.userProfiles, "Game profiles you added yourself",
             "re-added by hand — Cellar's own profiles ship with the app and come back on their own")
-        // The keychain, last, because it is the one thing here that is a credential rather than a
-        // download. Steam's token goes with DepotDownloader's directory above; GOG's does not live
-        // in a file at all.
-        if GOGAuth.isSignedIn {
-            items.append(Item(target: .storeCredentials(.gog),
-                              title: "Your GOG sign-in (an OAuth token in your login keychain)",
-                              cost: "one sign-in", bytes: 0))
+        // Credentials, last, because they are the one thing here that is not a download.
+        //
+        // Steam's token does *not* reliably go with DepotDownloader's directory above: DepotDownloader
+        // 3.4.0 ignores the `HOME` Cellar gives it and writes its store into the shared .NET isolated
+        // storage in `~/Library`. A reset that only removed Cellar's folder printed "Clean slate."
+        // and left a working Steam refresh token behind — so the stores are named and removed here.
+        //
+        // Never from a relocated Cellar (`CELLAR_HOME`): those stores and the login keychain are the
+        // player's real ones, and a test or a throwaway install must not sign the player out.
+        if !isRelocated {
+            let strays = steamTokenStoresOutsideCellar
+            if !strays.isEmpty {
+                items.append(Item(target: .storeCredentials(.steam),
+                                  title: "Your Steam sign-in token, kept by DepotDownloader outside Cellar's folder",
+                                  cost: "one QR scan", bytes: strays.reduce(0) { $0 + size(of: $1) }))
+            }
+            if GOGAuth.isSignedIn || GOGAuth.cachedUsername != nil {
+                items.append(Item(target: .storeCredentials(.gog),
+                                  title: "Your GOG sign-in (an OAuth token in your login keychain)",
+                                  cost: "one sign-in", bytes: 0))
+            }
         }
 
         // Outside Application Support. Found by identity, never by name, so nothing the player made
@@ -223,9 +240,13 @@ public enum Reset {
     /// Saves live inside a bottle's `drive_c/users`, so wiping bottles wipes saves that the game
     /// never synced to a cloud. Named explicitly, because "it deletes bottles" does not read as
     /// "it deletes your saves" to anybody who isn't holding the source.
-    public static func saveGameWarning(in items: [Item]) -> String? {
+    /// `backedUp` is whether `perform` will copy them out first — it does, unless Cellar itself is
+    /// going and the copies would go with it.
+    public static func saveGameWarning(in items: [Item], backedUp: Bool = true) -> String? {
         guard items.contains(where: { $0.target == .path(Paths.prefixes) }) else { return nil }
-        return "Local save games live inside bottles. Anything a game only saved on this Mac — not to Steam Cloud — goes with them."
+        return backedUp
+            ? "Local save games live inside bottles. Cellar backs them up first and keeps the copies (cellar saves list <game>); the bottles themselves go."
+            : "Local save games live inside bottles. Anything a game only saved on this Mac — not to Steam Cloud — goes with them."
     }
 
     public static func totalBytes(_ items: [Item]) -> Int64 { items.reduce(0) { $0 + $1.bytes } }
@@ -233,12 +254,23 @@ public enum Reset {
     /// Delete everything in `items`. Each is removed independently: one failure (a file held open
     /// by a running game, say) must not leave the rest half-done and unexplained.
     @discardableResult
-    public static func perform(_ items: [Item], progress: (String) -> Void = { _ in }) -> [String] {
+    ///
+    /// Removing the bottles backs up every bottle's save games first (`SaveBackups`), and keeps the
+    /// bottles if that fails. `backUpSaves: false` is for removing Cellar outright, where the backups
+    /// would go with it and the player has already been asked about their saves.
+    public static func perform(_ items: [Item], backUpSaves: Bool = true,
+                               progress: (String) -> Void = { _ in }) -> [String] {
         var failures: [String] = []
+        var savesAtRisk: [String] = []
+        if backUpSaves, items.contains(where: { $0.target == .path(Paths.prefixes) && $0.exists }) {
+            progress("Backing up save games before the bottles go…")
+            savesAtRisk = SaveBackups.backUpAllBottles(reason: .beforeReset, progress: progress)
+        }
         // Cellar's Steam token also sits in every bottle's client (`SteamClientSession`). A reset
         // that takes the sign-in away but keeps the bottles would otherwise leave that copy behind,
         // still signing the player in — so it goes first, while the account name is still readable.
         let removingSignIn = items.contains { $0.target == .path(DepotTool.root) }
+            || items.contains { $0.target == .storeCredentials(.steam) }
             || items.contains { $0.target == .path(SteamAccount.recordFile) }
         if removingSignIn, let account = SteamAccount.record?.accountName,
            !items.contains(where: { $0.target == .path(Paths.prefixes) }) {
@@ -246,6 +278,10 @@ public enum Reset {
             SteamBottle.forgetClientSessions(account: account)
         }
         for item in items where item.exists {
+            if item.target == .path(Paths.prefixes), !savesAtRisk.isEmpty {
+                failures.append("Bottles kept: couldn't back up the save games in \(savesAtRisk.joined(separator: ", ")) first.")
+                continue
+            }
             progress("Removing \(item.title.lowercased())…")
             do {
                 switch item.target {
@@ -258,7 +294,12 @@ public enum Reset {
                     }
                 case .storeCredentials(.gog):
                     try GOGAuth.signOut()
+                    // Every item under Cellar's GOG service, not only today's account name: an item
+                    // filed under an older one is still somebody's token.
+                    try Keychain.removeAll(store: .gog)
                     StoreLibrary.forgetGOG()
+                case .storeCredentials(.steam):
+                    for file in steamTokenStoresOutsideCellar { try FileManager.default.removeItem(at: file) }
                 case .storeCredentials(let store):
                     throw CellarError.invalidArgument("No credential store for \(store.displayName).")
                 }
@@ -268,6 +309,13 @@ public enum Reset {
             }
         }
         return failures
+    }
+
+    /// DepotDownloader's token stores that removing `DepotTool.root` would not reach. Only the
+    /// `account.config` files — isolated storage is shared with other .NET programs, and resetting
+    /// Cellar is no licence to delete their state.
+    static var steamTokenStoresOutsideCellar: [URL] {
+        DepotTool.storedSessionFiles.filter { !$0.path.hasPrefix(DepotTool.root.path + "/") }
     }
 
     /// A directory's size on disk, for the plan. Walks file sizes only — no contents are read.

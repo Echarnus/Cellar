@@ -14,6 +14,9 @@ public enum PerformanceSetting: String, CaseIterable {
     case metalFXUpscaling = "metalfx_upscaling"
     /// Metal's performance HUD (FPS / frame time), remembered per game.
     case metalHUD = "metal_hud"
+    /// Wine's Retina mode (`HKCU\Software\Wine\Mac Driver\RetinaMode`): the game renders at the
+    /// display's full pixel density. Sharper, and a heavy cost — four times the pixels on most Macs.
+    case retina = "retina"
 
     public var key: String { rawValue }
 
@@ -27,7 +30,7 @@ public enum PerformanceSetting: String, CaseIterable {
         case .wineDebug:        return "WINEDEBUG"
         case .metalValidation:  return "MTL_DEBUG_LAYER"
         case .metalHUD:         return "MTL_HUD_ENABLED"
-        case .metalFXUpscaling: return nil
+        case .metalFXUpscaling, .retina: return nil
         }
     }
 
@@ -37,7 +40,7 @@ public enum PerformanceSetting: String, CaseIterable {
         case .wineDebug:        return env["WINEDEBUG"].map { $0 == "-all" ? "off" : $0 }
         case .metalValidation:  return env["MTL_DEBUG_LAYER"].map { $0 == "0" ? "false" : "true" }
         case .metalHUD:         return env["MTL_HUD_ENABLED"].map { $0 == "0" ? "false" : "true" }
-        case .metalFXUpscaling: return nil
+        case .metalFXUpscaling, .retina: return nil
         }
     }
 
@@ -50,6 +53,7 @@ public enum PerformanceSetting: String, CaseIterable {
         case .metalValidation:  return "Metal validation layer: a crash workaround for some games, costs FPS"
         case .metalFXUpscaling: return "MetalFX upscaling through the game's DLSS option (D3DMetal only)"
         case .metalHUD:         return "Metal performance HUD for this game (the app's overlay setting adds it to every game)"
+        case .retina:           return "Retina mode: render at the display's full resolution (sharper, much slower)"
         }
     }
 
@@ -144,6 +148,8 @@ public enum PerformanceSettings {
             env["MTL_HUD_ENABLED"] = on ? "1" : nil
         case .metalFXUpscaling:
             break   // not an env var of its own: WineRunner picks the GPU identity from it
+        case .retina:
+            break   // a registry value, written before launch (`WineRunner.setRetinaMode`)
         }
     }
 }

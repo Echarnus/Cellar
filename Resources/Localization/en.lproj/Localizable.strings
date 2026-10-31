@@ -1,0 +1,3 @@
+/* English is the development language: every key in Sources/CellarApp is already the English text,
+   so this table is empty on purpose. It exists so macOS lists English as a language the app has,
+   and a Mac set to a language Cellar doesn't ship falls back to English rather than Dutch. */

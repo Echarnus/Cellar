@@ -20,6 +20,26 @@ final class Library: ObservableObject {
 
     static let lastSelectedKey = "lastSelectedGame"
 
+    /// Name, or most recently played first — remembered between launches.
+    @Published var sort: Sort = Sort(rawValue: UserDefaults.standard.string(forKey: "librarySort") ?? "") ?? .name {
+        didSet { UserDefaults.standard.set(sort.rawValue, forKey: "librarySort") }
+    }
+
+    enum Sort: String, CaseIterable, Identifiable {
+        case name = "Name", recent = "Recently played"
+        var id: String { rawValue }
+    }
+
+    /// Ordered by the chosen sort; a game never played sorts after every played one, by name.
+    func ordered(_ games: [GameSummary]) -> [GameSummary] {
+        games.sorted { a, b in
+            if sort == .recent, a.lastPlayed != b.lastPlayed {
+                return (a.lastPlayed ?? .distantPast) > (b.lastPlayed ?? .distantPast)
+            }
+            return a.name < b.name
+        }
+    }
+
     enum Filter: String, CaseIterable, Identifiable {
         case all = "All", installed = "Installed", notInstalled = "Not installed"
         var id: String { rawValue }
@@ -75,13 +95,17 @@ final class Library: ObservableObject {
 
     /// The filtered library, grouped into store sections in a fixed order — never alphabetical,
     /// so a game doesn't move house when it is renamed.
-    var sections: [(store: GameStore, games: [GameSummary])] {
-        GameStore.allCases
-            .sorted { $0.sortIndex < $1.sortIndex }
-            .compactMap { store in
-                let inStore = filtered.filter { $0.store == store }.sorted { $0.name < $1.name }
-                return inStore.isEmpty ? nil : (store, inStore)
+    ///
+    /// Games whose profile Cellar guessed (`DraftProfile`) come after every hand-made one, in
+    /// sections of their own that say so — a guess never sits among the tested games.
+    var sections: [LibrarySection] {
+        let stores = GameStore.allCases.sorted { $0.sortIndex < $1.sortIndex }
+        return [false, true].flatMap { guessed in
+            stores.compactMap { store in
+                let inStore = ordered(filtered.filter { $0.store == store && $0.isDraft == guessed })
+                return inStore.isEmpty ? nil : LibrarySection(store: store, guessed: guessed, games: inStore)
             }
+        }
     }
 
     /// Stores that actually have a game, so the filter never offers an empty result.
@@ -167,12 +191,30 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .cellarLibraryChecking)) { note in
             lib.checking = note.object as? String
         }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarDraftProfiles)) { _ in
+            guard !runner.busy else { return }
+            runner.run(["profiles", "draft", "--all"], title: "Finding games without a profile",
+                       then: { lib.refresh() })
+        }
         .onReceive(NotificationCenter.default.publisher(for: .cellarRefreshLibrary)) { _ in
             lib.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarShowGame)) { note in
+            guard let slug = note.object as? String, lib.games.contains(where: { $0.slug == slug }) else { return }
+            lib.storeFilter = nil
+            lib.query = ""
+            lib.selected = slug
         }
         .onReceive(NotificationCenter.default.publisher(for: .cellarFocusSearch)) { _ in
             searchFocused = true
         }
+    }
+
+    /// When the game database was last fetched, so the daily check survives a relaunch.
+    @AppStorage("profilesLastChecked") private var lastDatabaseCheckStamp: Double = 0
+    private var lastDatabaseCheck: Date {
+        get { Date(timeIntervalSince1970: lastDatabaseCheckStamp) }
+        nonmutating set { lastDatabaseCheckStamp = newValue.timeIntervalSince1970 }
     }
 
     /// How old an answer from Steam may get before the app asks again.
@@ -195,6 +237,13 @@ struct ContentView: View {
                     _ = await runner.runBeside(["update", slug, "--check"])
                 }
                 lib.refresh()
+            }
+            // The game database, once a day, the same quiet way. A build with no signing key has
+            // nothing it could accept, so it doesn't ask.
+            if !ProfileUpdates.publicKey.isEmpty, !runner.busy,
+               Date().timeIntervalSince(lastDatabaseCheck) > 24 * 60 * 60 {
+                lastDatabaseCheck = Date()
+                if await runner.runBeside(["profiles", "update", "--quiet"]) == 0 { lib.refresh() }
             }
             try? await Task.sleep(for: .seconds(30 * 60))
         }
@@ -249,7 +298,7 @@ struct ContentView: View {
                 .accessibilityLabel("Search games")
             if !lib.query.isEmpty {
                 Button { lib.query = "" } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .buttonStyle(.borderless).foregroundStyle(.secondary).help("Clear search")
                     .accessibilityLabel("Clear search")
                     .help("Clear search")
             }
@@ -283,18 +332,31 @@ struct ContentView: View {
     }
 
     private var stateFilter: some View {
-        Picker("", selection: $lib.filter) {
-            ForEach(Library.Filter.allCases) { Text($0.rawValue).tag($0) }
+        HStack(spacing: 6) {
+            Picker("", selection: $lib.filter) {
+                ForEach(Library.Filter.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden()
+            .accessibilityLabel("Filter by readiness")
+            Menu {
+                Picker("Sort by", selection: $lib.sort) {
+                    ForEach(Library.Sort.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .help("Sort by \(lib.sort == .name ? "name" : "most recently played")")
+            .accessibilityLabel("Sort, currently by \(lib.sort.rawValue.lowercased())")
         }
-        .pickerStyle(.segmented).labelsHidden()
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .accessibilityLabel("Filter by readiness")
     }
 
     private var libraryList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 3, pinnedViews: [.sectionHeaders]) {
-                ForEach(lib.sections, id: \.store) { section in
+                ForEach(lib.sections, id: \.id) { section in
                     Section {
                         ForEach(section.games) { game in
                             SidebarRow(game: game, selected: lib.selected == game.slug)
@@ -302,7 +364,7 @@ struct ContentView: View {
                                 .onTapGesture { lib.selected = game.slug }
                         }
                     } header: {
-                        StoreSectionHeader(store: section.store, count: section.games.count)
+                        StoreSectionHeader(store: section.store, count: section.games.count, guessed: section.guessed)
                     }
                 }
                 if lib.filtered.isEmpty { emptyLibrary }
@@ -451,9 +513,18 @@ struct ContentView: View {
 
 /// A store's heading in the library. Carries the mark *and* the word, so the section — not each
 /// row — is what tells you where these games come from.
+struct LibrarySection {
+    let store: GameStore
+    /// Profiles Cellar wrote itself from the games' files.
+    let guessed: Bool
+    let games: [GameSummary]
+    var id: String { "\(store.rawValue)\(guessed ? "-guessed" : "")" }
+}
+
 struct StoreSectionHeader: View {
     let store: GameStore
     let count: Int
+    var guessed = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -462,6 +533,12 @@ struct StoreSectionHeader: View {
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(store.tint)
                 .kerning(0.6)
+            if guessed {
+                Text("· UNTESTED, CELLAR GUESSED")
+                    .font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                    .kerning(0.6).lineLimit(1)
+                    .help("Cellar wrote these games' settings itself from their files. Nobody has tested them yet.")
+            }
             Text("\(count)")
                 .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 .padding(.horizontal, 5).padding(.vertical, 1)
@@ -473,7 +550,7 @@ struct StoreSectionHeader: View {
         // sidebar rather than an opaque strip floating over it.
         .background(SidebarMaterial())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(store.displayName), \(count) \(count == 1 ? "game" : "games")")
+        .accessibilityLabel("\(store.displayName)\(guessed ? ", untested, settings guessed by Cellar" : ""), \(count) \(count == 1 ? "game" : "games")")
     }
 }
 
@@ -507,6 +584,8 @@ struct SidebarRow: View {
     let game: GameSummary
     let selected: Bool
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         HStack(spacing: 11) {
@@ -519,10 +598,10 @@ struct SidebarRow: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 5).padding(.horizontal, 8)
-        .background(selected ? Color.accentColor.opacity(0.20)
-                             : (hovering ? Color.primary.opacity(0.06) : Color.clear),
+        .background(selected ? Color.accentColor.opacity(contrast == .increased ? 0.40 : 0.20)
+                             : (hovering ? Color.primary.opacity(contrast == .increased ? 0.14 : 0.06) : Color.clear),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .onHover { hover in withAnimation(.easeOut(duration: 0.12)) { hovering = hover } }
+        .onHover { hover in withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { hovering = hover } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(game.name), \(game.store.displayName), \(game.statusText)")
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])

@@ -101,8 +101,9 @@ public enum SteamAccount {
 
     static func write(_ signIn: SignIn?) {
         guard let signIn else { try? FileManager.default.removeItem(at: recordFile); return }
-        try? FileManager.default.createDirectory(at: Paths.shared, withIntermediateDirectories: true)
-        try? JSONEncoder.cellar.encode(signIn).write(to: recordFile, options: .atomic)
+        // Not a credential, but it says whose library this is: the player's to read, nobody else's.
+        guard let data = try? JSONEncoder.cellar.encode(signIn) else { return }
+        try? PrivateFiles.write(data, to: recordFile)
     }
 
     /// The current state, read from disk.

@@ -25,6 +25,10 @@ extension Notification.Name {
     static let cellarRefreshLibrary = Notification.Name("cellar.refreshLibrary")
     /// Posted by Edit › Find… (⌘F), so the keyboard reaches the library search like any Mac app's.
     static let cellarFocusSearch = Notification.Name("cellar.focusSearch")
+    /// View › Add Installed Games Without a Profile: write draft profiles for them (`DraftProfile`).
+    static let cellarDraftProfiles = Notification.Name("cellar.draftProfiles")
+    /// The Dock menu's recently played games: select one in the library. The object is its slug.
+    static let cellarShowGame = Notification.Name("cellar.showGame")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -39,6 +43,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var accountsWindow: NSWindow?
     var folderAccessWindow: NSWindow?
     var welcomeTourWindow: NSWindow?
+
+    /// The Dock icon's menu: the last few games played, newest first. Reads the playtime record
+    /// only — no store is asked anything from a right-click.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let recent = Playtime.all()
+            .compactMap { slug, record in record.lastPlayed.map { (slug, $0) } }
+            .sorted { $0.1 > $1.1 }
+            .prefix(5)
+            .compactMap { slug, _ in (try? Game.plan(slug: slug)).map { (slug, $0.name) } }
+        guard !recent.isEmpty else { return nil }
+        let menu = NSMenu()
+        let header = menu.addItem(withTitle: "Recently Played", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        for (slug, name) in recent {
+            let item = menu.addItem(withTitle: name, action: #selector(showRecentGame(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = slug
+        }
+        return menu
+    }
+
+    @objc private func showRecentGame(_ sender: NSMenuItem) {
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.bringToFront()
+        NotificationCenter.default.post(name: .cellarShowGame, object: sender.representedObject)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // First thing, before anything can crash: this is also where a previous session that
@@ -202,6 +232,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let viewMenu = submenu("View")
         viewMenu.addItem(withTitle: "Refresh Library", action: #selector(refreshLibrary), keyEquivalent: "r")
             .target = self
+        viewMenu.addItem(withTitle: "Add Installed Games Without a Profile", action: #selector(draftProfiles), keyEquivalent: "")
+            .target = self
         viewMenu.addItem(.separator())
         let fullScreen = viewMenu.addItem(withTitle: "Enter Full Screen",
                                           action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
@@ -233,6 +265,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func refreshLibrary() {
         NotificationCenter.default.post(name: .cellarRefreshLibrary, object: nil)
+    }
+
+    @objc private func draftProfiles() {
+        NotificationCenter.default.post(name: .cellarDraftProfiles, object: nil)
     }
 
     @objc private func focusSearch() {
@@ -364,6 +400,7 @@ app.run()
 /// two different pages.
 enum Links {
     static let help = URL(string: "https://echarnus.github.io/Cellar/faq.html")!
+    static let controllersHelp = URL(string: "https://echarnus.github.io/Cellar/faq.html#controllers")!
     static let supportedGames = URL(string: "https://echarnus.github.io/Cellar/")!
     static let repository = URL(string: "https://github.com/Echarnus/Cellar")!
     static let releases = URL(string: "https://github.com/Echarnus/Cellar/releases")!

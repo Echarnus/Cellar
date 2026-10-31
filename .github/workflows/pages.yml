@@ -1,26 +1,50 @@
 name: Pages
 
-# Publishes the supported-games site (generated from profiles/*.toml) to GitHub Pages.
+# The site (https://echarnus.github.io/Cellar/) is generated from profiles/*.toml by
+# Scripts/gen-site.py and checked by Scripts/check-site.py.
+#
+# - A pull request that touches the site builds and checks it, and uploads the built pages as an
+#   artifact to look at. Nothing is deployed.
+# - A push to main that touches the site deploys it.
+# - A finished release deploys it again, so the Download button names the new version. That waits
+#   for the Release workflow instead of release.yml calling Pages, so the release job's token stays
+#   narrow, and it runs on main, so the github-pages environment can stay restricted to main.
 on:
   push:
     branches: [main]
     paths:
       - "profiles/**"
+      - "Resources/AppIcon.png"
       - "Scripts/gen-site.py"
+      - "Scripts/check-site.py"
       - ".github/workflows/pages.yml"
+  pull_request:
+    paths:
+      - "profiles/**"
+      - "Resources/AppIcon.png"
+      - "Scripts/gen-site.py"
+      - "Scripts/check-site.py"
+      - ".github/workflows/pages.yml"
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Let a running deploy finish and queue the next one: cancelling a deploy halfway is worse than a
-# minute's wait.
+# Deploys queue behind each other and are never cut off halfway; a PR's superseded build is.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
+    name: Build & check site
+    # After a release only when it published one: a tag push that succeeded, not a dry run.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -28,14 +52,28 @@ jobs:
         with:
           persist-credentials: false
       - name: Generate site
+        env:
+          # Read-only; lifts the anonymous rate limit on the latest-release lookup.
+          GITHUB_TOKEN: ${{ github.token }}
         run: python3 Scripts/gen-site.py
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      # The runner has tomllib; a contributor's Mac may only have the hand-rolled parser. Both must
+      # read every profile the same way, or the site differs depending on who built it.
+      - name: Both TOML parsers agree
+        run: |
+          CELLAR_SITE_OFFLINE=1 CELLAR_SITE_OUT="$RUNNER_TEMP/tomllib" python3 Scripts/gen-site.py
+          CELLAR_SITE_OFFLINE=1 CELLAR_TOML_FALLBACK=1 CELLAR_SITE_OUT="$RUNNER_TEMP/fallback" python3 Scripts/gen-site.py
+          diff -ru "$RUNNER_TEMP/tomllib" "$RUNNER_TEMP/fallback"
+      - name: Check site (links, structure, contrast)
+        run: python3 Scripts/check-site.py --external
+      # The deployable bundle, on every event: a PR's copy is its preview.
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
 
   deploy:
+    name: Deploy to GitHub Pages
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
