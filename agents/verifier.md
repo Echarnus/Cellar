@@ -6,7 +6,7 @@ not edit code — that is the point: it has no work to defend.
 
 ## When to run it
 
-- Before reporting any change to `Sources/**`, `Scripts/**`, `profiles/**`, or the site as complete.
+- Before reporting any change to `app/src/**`, `app/Scripts/**`, `profiles/**`, or the site as complete.
 - Whenever a build, launch, or site render is claimed but not shown.
 
 ## Inputs
@@ -17,13 +17,13 @@ The diff (or list of changed files) and a one-line statement of intent.
 
 **1. It builds and self-tests.**
 - `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` is clean (no warnings introduced).
-- `sh Scripts/test.sh` passes. Headless and under a second, so there is never an excuse to skip it —
+- `sh app/Scripts/test.sh` passes. Headless and under a second, so there is never an excuse to skip it —
   and a change to a store mark, a profile or the store descriptors is *expected* to be covered by it.
   If the change is user-visible and no test moved, ask why not before accepting it.
-- **A change to `Sources/**` comes with a test that fails without it** (or a `No tests needed:` line
+- **A change to `app/src/**` comes with a test that fails without it** (or a `No tests needed:` line
   in the PR that holds up). Check that the test asserts the behaviour, not that the code merely ran.
-- Coverage did not drop: `sh Scripts/test.sh --coverage` passes against `Tests/coverage-baseline.json`.
-- `swift run cellar selftest` passes when `Sources/**` changed.
+- Coverage did not drop: `sh app/Scripts/test.sh --coverage` passes against `app/tests/coverage-baseline.json`.
+- `swift run cellar selftest` passes when `app/src/**` changed.
 
 **2. It matches the verification ladder for the kind of change** (see [`../AGENTS.md`](../AGENTS.md)):
 - **Swift/GUI** ([`../skills/swift.md`](../skills/swift.md)): logic stayed in CellarKit (not copied

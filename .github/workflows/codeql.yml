@@ -51,6 +51,7 @@ jobs:
       # build without that sandbox here; ci.yml still builds with it.
       - name: Build (Swift)
         if: matrix.language == 'swift'
+        working-directory: app
         run: swift build -c release --disable-sandbox
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:

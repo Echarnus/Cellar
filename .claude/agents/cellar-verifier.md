@@ -1,6 +1,6 @@
 ---
 name: cellar-verifier
-description: Read-only reviewer that checks a proposed change against Cellar's verification ladder and hard project rules BEFORE it is called done. Use it before reporting any change to Sources/**, Scripts/**, profiles/**, or the site as complete, and whenever a build, app launch, or site render is claimed but not shown. It builds, self-tests, checks the per-language demands, and enforces the legal/hygiene rules — it cannot edit code, which is the point.
+description: Read-only reviewer that checks a proposed change against Cellar's verification ladder and hard project rules BEFORE it is called done. Use it before reporting any change to app/src/**, app/Scripts/**, profiles/**, or the site as complete, and whenever a build, app launch, or site render is claimed but not shown. It builds, self-tests, checks the per-language demands, and enforces the legal/hygiene rules — it cannot edit code, which is the point.
 tools: Read, Bash, Grep, Glob
 model: sonnet
 ---
@@ -13,14 +13,14 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
 
 ## 1. Build & self-test
 - Run `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` — must be clean, no new warnings.
-- Run `sh Scripts/test.sh` — must pass. It is headless and takes under a second, so it is never
+- Run `sh app/Scripts/test.sh` — must pass. It is headless and takes under a second, so it is never
   skipped. A user-visible change that moved no test is a finding: say so.
-- A change to `Sources/**` with no test that fails without it is a finding, unless the PR's
-  `No tests needed:` line holds up. Run `sh Scripts/test.sh --coverage`: a drop below
-  `Tests/coverage-baseline.json` is a finding too.
-- For a change to `Sources/CellarUI/**`, open `.build/ui-snapshots/store-marks-dark.png` and look at
+- A change to `app/src/**` with no test that fails without it is a finding, unless the PR's
+  `No tests needed:` line holds up. Run `sh app/Scripts/test.sh --coverage`: a drop below
+  `app/tests/coverage-baseline.json` is a finding too.
+- For a change to `app/src/CellarUI/**`, open `app/.build/ui-snapshots/store-marks-dark.png` and look at
   it. That is the "verify by looking" demand, met without launching the app.
-- If `Sources/**` changed, run `swift run cellar selftest` — must pass.
+- If `app/src/**` changed, run `swift run cellar selftest` — must pass.
 
 ## 2. Per-kind demands (climb the verification ladder in AGENTS.md)
 - **UX/UI — anything a player sees** ([`skills/ux.md`](../../skills/ux.md)): one obvious next action
@@ -39,7 +39,7 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
   every `@State`-gated sheet has a matching `.sheet`. Demand evidence the app was actually launched
   and the path exercised — compiling is not verifying.
 - **Web** ([`skills/web.md`](../../skills/web.md)): change is in `gen-site.py`, not hand-edited HTML;
-  `python3 Scripts/gen-site.py` regenerates; the Download CTA points at the versionless `Cellar.dmg`;
+  `python3 pages/gen-site.py` regenerates; the Download CTA points at the versionless `Cellar.dmg`;
   theme/responsive/a11y hold; generator stays Python-3.9-safe.
 - **Wine/runners/bottles** ([`skills/wine-and-runners.md`](../../skills/wine-and-runners.md)): no
   `/usr/bin/arch` wrapper (SIP strips `DYLD_*`); the environment is inherited **and** the caller's

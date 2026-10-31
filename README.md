@@ -133,7 +133,7 @@ Detailed rules: [docs/LEGAL.md](docs/LEGAL.md).
 - **macOS 27** or later — the newest macOS every M1 Mac can run
 - **Rosetta 2** (`softwareupdate --install-rosetta --agree-to-license`)
 - **Swift 6** to build from source. The Command Line Tools build the `cellar` CLI; the **app needs
-  Xcode** (the Command Line Tools have no SwiftUI macros). `Scripts/install-app.sh` picks an
+  Xcode** (the Command Line Tools have no SwiftUI macros). `app/Scripts/install-app.sh` picks an
   installed Xcode by itself; for a by-hand `swift build`, point `xcode-select` at Xcode or set
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 
@@ -146,7 +146,7 @@ their bottle instead, and **Settings → Review folder access…** shows where y
 
 ```sh
 git clone https://github.com/<you>/Cellar.git
-cd Cellar
+cd Cellar/app                # the Mac app is a Swift package in app/
 swift build
 swift run cellar doctor      # check your machine is ready
 ```
@@ -154,7 +154,7 @@ swift run cellar doctor      # check your machine is ready
 Install the binary onto your PATH:
 
 ```sh
-swift build -c release
+swift build -c release       # from app/
 cp .build/release/cellar /usr/local/bin/cellar
 cellar doctor
 ```

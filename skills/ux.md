@@ -56,7 +56,7 @@ inherits it, rather than special-casing a store in a view.
 ## Telling the stores apart
 
 A game's store decides what every button does next, so it is primary information, never a footnote.
-It is carried by **three signals, always together** — see `Sources/CellarUI/Marks/GameStore+StoreStyle.swift`:
+It is carried by **three signals, always together** — see `app/src/CellarUI/Marks/GameStore+StoreStyle.swift`:
 
 | Signal | Where |
 |---|---|
@@ -70,7 +70,7 @@ Notes that are easy to get wrong:
   `StoreDescriptor.accentHex` differentiate *tone*, but the mark and the word do the work.
 - **Store marks are never bundled — Cellar points at the install instead.** `AGENTS.md` forbids
   redistributing anyone's proprietary assets, and every store's own brand terms forbid shipping its
-  logo besides, so a logo PNG in `Resources/` is out twice over. Cellar shows the **real icon from
+  logo besides, so a logo PNG in `app/Resources/` is out twice over. Cellar shows the **real icon from
   the store already installed on this machine** (`StoreIcon.swift` — the Mac app's `.icns`, the icon
   Wine extracted from the Windows client, or a loose `.ico`), and falls back to a vector it draws
   itself when there is nothing to point at. The drawn mark is therefore not a placeholder: for a
@@ -147,7 +147,7 @@ are the external standard here; this is what it means for Cellar specifically.
 ## Localization — English and Dutch
 
 **The app is translated into Dutch — its screens, alerts, menu bar, and the engine copy it shows
-(a game's next-step hint, launch and install steps, library verdicts, the Steam sign-in line).** The tables live in `Resources/Localization/<lang>.lproj/Localizable.strings`,
+(a game's next-step hint, launch and install steps, library verdicts, the Steam sign-in line).** The tables live in `app/Resources/Localization/<lang>.lproj/Localizable.strings`,
 the install scripts copy them into the bundle, and SwiftUI looks every `Text("…")`, `Button("…")`,
 `Label("…", …)`, `Toggle`, `Section`, `Picker`, `Link`, `LabeledContent`, `.help` and
 `.accessibility{Label,Value,Hint}` literal up by its English text. Anything that is not a SwiftUI
@@ -173,7 +173,7 @@ view — an `NSAlert`, a menu item — wraps its literal in `String(localized: "
   to Nederlands (System Settings → General → Language & Region, or per app under Applications).
 
 To add a language: copy `nl.lproj` to `<code>.lproj`, translate the values (never the keys), and add
-the code to `CFBundleLocalizations` in both `Scripts/install-app.sh` and `Scripts/package.sh`.
+the code to `CFBundleLocalizations` in both `app/Scripts/install-app.sh` and `app/Scripts/package.sh`.
 
 ## Craft details that separate this from a tool
 
@@ -190,7 +190,7 @@ the code to `CFBundleLocalizations` in both `Scripts/install-app.sh` and `Script
 
 Compiling proves nothing about an interface.
 
-1. `sh Scripts/install-app.sh` (or `Scripts/package.sh` and run `dist/Cellar.app`).
+1. `sh app/Scripts/install-app.sh` (or `app/Scripts/package.sh` and run `dist/Cellar.app`).
 2. **Launch it and look at it.** Screenshot the changed screen.
 3. Check the states you changed — including the empty and not-installed ones — and both appearances.
 4. Re-read every new sentence aloud. If it sounds like a log line, rewrite it.

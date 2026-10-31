@@ -44,7 +44,7 @@ Every piece of work starts as an issue, because the issues are what a release's 
    cannot launch the app or a game.
 3. Open a PR from the template. Its body says **`Closes #N`**, which is what links it to the
    issue and closes the issue when it merges, and says how the change was verified. A change to
-   `Sources/` carries its tests. The *PR checklist* check fails until all of that is true, and it
+   `app/src/` carries its tests. The *PR checklist* check fails until all of that is true, and it
    re-runs whenever the description is edited ([`docs/TESTING.md`](TESTING.md)).
 4. **Turn on auto-merge (squash).** The PR merges by itself once every required check is green.
 
@@ -103,32 +103,32 @@ git push origin v0.4.0
 
 The tag runs [`release.yml`](../.github/workflows/release.yml):
 
-1. **Build** (macOS, read-only token): runs the test suite, `Scripts/package.sh` and
-   `Scripts/make-dmg.sh`, and writes `SHA256SUMS.txt`.
+1. **Build** (macOS, read-only token): runs the test suite, `app/Scripts/package.sh` and
+   `app/Scripts/make-dmg.sh`, and writes `SHA256SUMS.txt`.
 2. **Publish** (the `release` environment, the only job with write access):
-   - writes the notes with `Scripts/release-notes.py`: every issue closed by a PR merged since the
+   - writes the notes with `app/Scripts/release-notes.py`: every issue closed by a PR merged since the
      previous tag, plus any issue closed as completed in that window, grouped by label, then
      GitHub's list of merged PRs and the install instructions;
    - signs the app zip and writes `appcast.xml` for the in-app updater, once
-     `Resources/sparkle-public-key` and the `SPARKLE_ED_PRIVATE_KEY` secret exist;
+     `app/Resources/sparkle-public-key` and the `SPARKLE_ED_PRIVATE_KEY` secret exist;
    - attests build provenance for every download;
    - publishes the GitHub Release with the DMG, both zips, the checksums and the feed.
 
-To preview the notes before tagging: `GH_TOKEN=… python3 Scripts/release-notes.py --repo
+To preview the notes before tagging: `GH_TOKEN=… python3 app/Scripts/release-notes.py --repo
 Echarnus/Cellar --tag HEAD --out /tmp/notes.md`. `workflow_dispatch` builds the downloads for any
 version without publishing anything.
 
 Artifacts are **ad-hoc signed but not notarised** until a Developer ID is supplied (below).
-`package.sh` seals the bundle through `Scripts/sign-app.sh`, because an unsealed bundle (an
+`package.sh` seals the bundle through `app/Scripts/sign-app.sh`, because an unsealed bundle (an
 Info.plist added after the linker signed the binary) is reported as "damaged" by macOS 15+ Gatekeeper
 with no way past it. The release notes tell users to allow it once under **System Settings → Privacy
 & Security → Open Anyway**; right-click → Open stopped bypassing Gatekeeper in macOS 15.
 
 ## The installer DMG
 
-`Scripts/make-dmg.sh` turns `dist/Cellar.app` into `dist/Cellar.dmg`, the download the site links
+`app/Scripts/make-dmg.sh` turns `dist/Cellar.app` into `dist/Cellar.dmg`, the download the site links
 to. Opened, it is the window every Mac installer has: a background drawn by
-`Scripts/make-dmg-background.swift` (no image files in the repo), Cellar on the left, an arrow, the
+`app/Scripts/make-dmg-background.swift` (no image files in the repo), Cellar on the left, an arrow, the
 Applications folder on the right, and a *Licence and Read Me* folder underneath. Cellar's icon is the
 volume icon. Finder lays the window out through AppleScript, which needs a logged-in Finder — the
 GitHub macOS runners have one. If it ever fails the DMG is still built (plain Finder look) and the
@@ -154,9 +154,9 @@ stay ad-hoc signed and nothing below runs.
 
 | Script | Does | Needs |
 |---|---|---|
-| `Scripts/sign-app.sh <app>` | Signs inside-out (Sparkle's XPC services and helpers, the bundled CLI, the Dock shim, then the app). Ad-hoc by default; with an identity, hardened runtime + secure timestamp. | `CELLAR_SIGN_IDENTITY` (optional) |
-| `Scripts/notarize.sh <app\|dmg>` | Submits to Apple's notary service, waits, staples the ticket. Prints Apple's log on rejection. A no-op without credentials. | `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY` |
-| `Scripts/import-signing-identity.sh` | CI only: imports the certificate into a throwaway keychain and exports `CELLAR_SIGN_IDENTITY`. | `DEVELOPER_ID_P12`, `DEVELOPER_ID_P12_PASSWORD` |
+| `app/Scripts/sign-app.sh <app>` | Signs inside-out (Sparkle's XPC services and helpers, the bundled CLI, the Dock shim, then the app). Ad-hoc by default; with an identity, hardened runtime + secure timestamp. | `CELLAR_SIGN_IDENTITY` (optional) |
+| `app/Scripts/notarize.sh <app\|dmg>` | Submits to Apple's notary service, waits, staples the ticket. Prints Apple's log on rejection. A no-op without credentials. | `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY` |
+| `app/Scripts/import-signing-identity.sh` | CI only: imports the certificate into a throwaway keychain and exports `CELLAR_SIGN_IDENTITY`. | `DEVELOPER_ID_P12`, `DEVELOPER_ID_P12_PASSWORD` |
 
 `package.sh` signs and (when it can) notarises the app before zipping it, so the zip the updater
 ships is trusted on its own; `make-dmg.sh` then signs and notarises the DMG.
@@ -179,7 +179,7 @@ ships is trusted on its own; `make-dmg.sh` then signs and notarises the DMG.
        DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
        DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
      run: |
-       eval "$(sh Scripts/import-signing-identity.sh)"
+       eval "$(sh app/Scripts/import-signing-identity.sh)"
        echo "CELLAR_SIGN_IDENTITY=${CELLAR_SIGN_IDENTITY:--}" >> "$GITHUB_ENV"
    ```
 
@@ -197,7 +197,7 @@ ships is trusted on its own; `make-dmg.sh` then signs and notarises the DMG.
    the app, re-zip it and re-run `make-dmg.sh` — more moving parts for the same result.)
 5. **Change the release notes in the same commit:** a notarised Cellar opens with a double-click,
    so "Open Anyway" must stop being part of the instructions — the `INSTALL` text in
-   `Scripts/release-notes.py`, and `make-dmg.sh`'s *Read Me*.
+   `app/Scripts/release-notes.py`, and `make-dmg.sh`'s *Read Me*.
 
 ## One-time repository setup
 
@@ -210,7 +210,7 @@ These are settings, not files, so the maintainer applies them once:
    [`.github/rulesets/tags.json`](../.github/rulesets/tags.json) (release tags can't be moved or
    deleted).
 3. **Settings → Environments → release**: add a deployment rule allowing only tags matching `v*`.
-   `sh Scripts/sparkle-keys.sh` creates the environment if needed and stores `SPARKLE_ED_PRIVATE_KEY`
+   `sh app/Scripts/sparkle-keys.sh` creates the environment if needed and stores `SPARKLE_ED_PRIVATE_KEY`
    in it; the Developer ID secrets (below) go there too.
 4. **Settings → Code security**: turn on Dependabot alerts and security updates, secret scanning
    and push protection, and private vulnerability reporting.
@@ -228,22 +228,22 @@ switch.
 
 The chain of trust is an **EdDSA key**, not Apple code signing (there is no Developer ID yet):
 
-- `Resources/sparkle-public-key` holds the public half. `Scripts/package.sh` writes it into
+- `app/Resources/sparkle-public-key` holds the public half. `app/Scripts/package.sh` writes it into
   Info.plist as `SUPublicEDKey`, with `SUFeedURL`, and only when the file exists — before that, a
-  release simply ships with updates switched off. `Scripts/install-app.sh` never writes either, so a
+  release simply ships with updates switched off. `app/Scripts/install-app.sh` never writes either, so a
   build from source never replaces itself with a release.
 - The private half lives in the maintainer's login keychain and in the `SPARKLE_ED_PRIVATE_KEY`
   secret of the `release` environment (not a repository secret, so no PR run can read it), and
-  nowhere else. `Scripts/make-appcast.sh <version> <notes.md>` signs the
+  nowhere else. `app/Scripts/make-appcast.sh <version> <notes.md>` signs the
   zip with it, checks it matches the public key in the repo, and writes `dist/appcast.xml`; the
   release workflow uploads that next to the zip.
-- **Set-up, once:** run `sh Scripts/sparkle-keys.sh` on the Mac, then commit
-  `Resources/sparkle-public-key`. It reuses an existing key rather than making a new one.
+- **Set-up, once:** run `sh app/Scripts/sparkle-keys.sh` on the Mac, then commit
+  `app/Resources/sparkle-public-key`. It reuses an existing key rather than making a new one.
 - **Never rotate or lose the key casually.** Every installed copy accepts only updates signed by the
   key it shipped with; a new key means every player downloads the next version by hand.
 
 Each `Cellar.app` carries its own `cellar` CLI (`Contents/MacOS/cellar`), which the app prefers over
-one on PATH, so an update replaces the app and the engine together. `Scripts/bundle-app.sh` puts the
+one on PATH, so an update replaces the app and the engine together. `app/Scripts/bundle-app.sh` puts the
 CLI and `Sparkle.framework` into the bundle before the ad-hoc seal covers them; Sparkle refuses an
 update whose bundle signature is present but broken.
 
@@ -254,23 +254,23 @@ hand; after that, updates arrive in the app.
 
 
 `.github/workflows/pages.yml` regenerates the [supported-games page](https://echarnus.github.io/Cellar/)
-from `profiles/*.toml` (via `Scripts/gen-site.py`) and deploys it to GitHub Pages on every push to
+from `profiles/*.toml` (via `pages/gen-site.py`) and deploys it to GitHub Pages on every push to
 `main` that touches profiles or the generator. Enable it once under **Settings → Pages → Source:
 GitHub Actions**.
 
 The generator writes two pages: `index.html` (the games grid) and `faq.html` (the
 [questions &amp; answers](https://echarnus.github.io/Cellar/faq.html) page, which the app links to
-from **Settings → Help**). The FAQ's prose lives in `FAQ_SECTIONS` in `Scripts/gen-site.py` — it
+from **Settings → Help**). The FAQ's prose lives in `FAQ_SECTIONS` in `pages/gen-site.py` — it
 makes factual claims about how Cellar behaves, so it changes when the behaviour does.
 
 ## The game database between releases
 
 Every release should also publish the `profiles/` set as `profiles.json` + `profiles.json.sig`
-(`swift Scripts/profiles-bundle.swift <version> dist/` with `PROFILES_SIGNING_KEY` set), so
+(`swift app/Scripts/profiles-bundle.swift <version> dist/` with `PROFILES_SIGNING_KEY` set), so
 `cellar profiles update` and the app's daily check can fetch new and fixed games without a new
 build. Cellar refuses a bundle its compiled-in key (`ProfileUpdates.publicKey`) didn't sign, and
 ignores one made for an older Cellar than itself.
 
-One-time setup: `swift Scripts/profiles-bundle.swift --generate-key`, put the private key in the
+One-time setup: `swift app/Scripts/profiles-bundle.swift --generate-key`, put the private key in the
 `release` environment as `PROFILES_SIGNING_KEY`, and commit the public key into
 `ProfileUpdates.publicKey`. Until then every build says it uses the database it shipped with.

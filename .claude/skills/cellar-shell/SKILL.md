@@ -1,6 +1,6 @@
 ---
 name: cellar-shell
-description: Best practices for Cellar's shell scripts and macOS packaging. Use when editing Scripts/*.sh or anything about building the .app, the DMG, Info.plist, or release artifacts. Covers POSIX sh + set -eu, ShellCheck, mktemp/trap cleanup, the mandatory SDK-unset before swift build, Info.plist keys, signing/quarantine mechanics, the case-insensitive-FS zip-name trap, and the versionless DMG.
+description: Best practices for Cellar's shell scripts and macOS packaging. Use when editing app/Scripts/*.sh or anything about building the .app, the DMG, Info.plist, or release artifacts. Covers POSIX sh + set -eu, ShellCheck, mktemp/trap cleanup, the mandatory SDK-unset before swift build, Info.plist keys, signing/quarantine mechanics, the case-insensitive-FS zip-name trap, and the versionless DMG.
 ---
 
 # Cellar — shell & packaging
@@ -12,20 +12,20 @@ Key rules:
   idempotent, fail loudly on missing preconditions. `-u` is the one that stops a typo'd variable
   expanding to nothing inside an `rm -rf`. **The three current scripts are still `set -e` only** —
   adding `-u` is a real behaviour change and needs its own commit, with each script actually run.
-- **Lint:** `shellcheck -s sh Scripts/*.sh`. Not installed here and not in CI — a gap, not a
+- **Lint:** `shellcheck -s sh app/Scripts/*.sh`. Not installed here and not in CI — a gap, not a
   decision; run it if you have it.
 - **Temp files:** `tmp=$(mktemp -d)` + `trap 'rm -rf "$tmp"' EXIT`, so a `set -e` abort still cleans
   up.
 - **Signing:** artifacts are ad-hoc signed and unnotarised. What blocks a download is the
   `com.apple.quarantine` xattr, not the missing Developer ID. `package.sh` seals the bundle with
-  `Scripts/sign-app.sh` (inside-out; Developer ID + hardened runtime when `CELLAR_SIGN_IDENTITY` is
-  set) as the last step, or macOS 15+ calls it "damaged"; `Scripts/notarize.sh` is a no-op until the
+  `app/Scripts/sign-app.sh` (inside-out; Developer ID + hardened runtime when `CELLAR_SIGN_IDENTITY` is
+  set) as the last step, or macOS 15+ calls it "damaged"; `app/Scripts/notarize.sh` is a no-op until the
   notary key exists. The DMG window is laid out by Finder over `make-dmg-background.swift`'s drawing —
   keep the two layouts in step. Prefer
   `ditto` over `cp -R` when assembling the bundle. Users get past Gatekeeper via System Settings →
   Privacy & Security → Open Anyway (right-click → Open stopped working in macOS 15).
 - **Any script that runs `swift build` must `unset DEVELOPER_DIR SDKROOT` first** (Nix/devenv SDK
-  breaks the build). `install-app.sh` / `package.sh` do it by sourcing `Scripts/select-xcode.sh`,
+  breaks the build). `install-app.sh` / `package.sh` do it by sourcing `app/Scripts/select-xcode.sh`,
   which also switches to an installed Xcode when xcode-select points at the Command Line Tools (they
   cannot build the SwiftUI app). Source it; don't copy it.
 - **`install-app.sh` installs the CLI too** (`~/.local/bin/cellar` + `~/.local/share/cellar/`): the

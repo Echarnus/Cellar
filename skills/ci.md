@@ -43,7 +43,7 @@ CI is the softest target in any repo — it holds a write-capable token and runs
    - name: Package
      env:
        VERSION: ${{ steps.v.outputs.version }}
-     run: Scripts/package.sh "$VERSION"
+     run: app/Scripts/package.sh "$VERSION"
    ```
 
 4. **Keep the trigger `pull_request`, never `pull_request_target`.** `pull_request` runs fork code
@@ -65,7 +65,7 @@ CI is the softest target in any repo — it holds a write-capable token and runs
 
 Be honest about the gate's real strength — it is "it compiled and a smoke test exited 0":
 
-- **The Wine tiers never run in CI** — `Scripts/test.sh` runs the hermetic suite; `--integration`
+- **The Wine tiers never run in CI** — `app/Scripts/test.sh` runs the hermetic suite; `--integration`
   and `--steam` are local rungs.
 - **ShellCheck runs at warning severity**, so style notes (`SC2012` and the like) do not fail it.
 - **Python is only compiled**, not linted ([`python.md`](python.md)).
@@ -88,7 +88,7 @@ The release flow is documented in [`../docs/RELEASING.md`](../docs/RELEASING.md)
   Release secrets (the update-signing key now, a Developer ID later) live in the `release`
   **environment**, which only the tag-triggered publish job enters — never in repository secrets a
   `pull_request` run could reach.
-- **The release notes are user-facing copy.** They are written by `Scripts/release-notes.py` from
+- **The release notes are user-facing copy.** They are written by `app/Scripts/release-notes.py` from
   issue titles, so an issue title is release-note copy too. It is held to the same bar as the app's text
   ([`ux.md`](ux.md)) — say what happens, name what the player will see, no jargon.
 

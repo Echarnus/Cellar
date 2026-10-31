@@ -1,7 +1,7 @@
 name: PR checklist
 
 # Holds every pull request to the bar in AGENTS.md before it can merge: an issue it closes, a
-# description of how it was verified, and tests for the Swift it changes (Scripts/check-pr.py).
+# description of how it was verified, and tests for the Swift it changes (app/Scripts/check-pr.py).
 # Runs again whenever the description is edited, so fixing the text is enough to turn it green.
 on:
   pull_request:
@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 2
       # The gate's own tests first: a broken checker must fail loudly, not wave PRs through.
       - name: Test the checker
-        run: python3 -m unittest discover -s Tests/Scripts -v
+        run: python3 -m unittest discover -s app/tests/Scripts -v
       - name: Check the description and the changed files
         if: github.event_name == 'pull_request'
         env:
@@ -38,5 +38,5 @@ jobs:
         run: |
           printf '%s' "$PR_BODY" > "$RUNNER_TEMP/body.md"
           git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/files.txt"
-          python3 Scripts/check-pr.py --body "$RUNNER_TEMP/body.md" --files "$RUNNER_TEMP/files.txt" \
+          python3 app/Scripts/check-pr.py --body "$RUNNER_TEMP/body.md" --files "$RUNNER_TEMP/files.txt" \
             --author "$PR_AUTHOR"

@@ -32,17 +32,17 @@ Cite sources for non-obvious claims in the PR description.
 
 ## 2. Work on the engine (Swift)
 
-- `Sources/CellarKit` — the core library (environment, bottles, runners, profiles, the store
+- `app/src/CellarKit` — the core library (environment, bottles, runners, profiles, the store
   clients). The CLI and the SwiftUI app both import this; **all logic belongs here**.
-- `Sources/cellar` — the CLI (one file per command group under `Commands/`).
-- `Sources/CellarApp` — the SwiftUI app. Anything a player sees is held to
+- `app/src/cellar` — the CLI (one file per command group under `Commands/`).
+- `app/src/CellarApp` — the SwiftUI app. Anything a player sees is held to
   [`skills/ux.md`](skills/ux.md); read it before you start, and verify by launching the app, not by
   reading your diff.
 - Adding a **store** is a `GameStore` case, a `*Bottle` type beside `SteamBottle`/`BattleNetBottle`,
   a branch in `Game.setUp`/`Game.launch`, and a CLI command group. Per-store *behaviour* goes in
   `GameStore.descriptor`, never a `switch` inside a view.
 
-- **Translations** live in `Resources/Localization/<lang>.lproj/Localizable.strings`, keyed by the
+- **Translations** live in `app/Resources/Localization/<lang>.lproj/Localizable.strings`, keyed by the
   app's English text. A new string on a screen needs a Dutch line there (the tests say which), and a
   new language is a copy of `nl.lproj` plus its code in the scripts' `CFBundleLocalizations` — see
   [`skills/ux.md`](skills/ux.md) → *Localization*.
@@ -50,8 +50,9 @@ Cite sources for non-obvious claims in the PR description.
 Build and check before opening a PR:
 
 ```sh
+cd app
 swift build
-sh Scripts/test.sh --coverage   # unit + hermetic integration tests, coverage held to the baseline
+sh Scripts/test.sh --coverage     # unit + hermetic integration tests, coverage held to the baseline
 sh Scripts/test.sh --integration  # for runners, prefixes, launching: a real Windows exe under Wine
 swift run cellar selftest
 ```

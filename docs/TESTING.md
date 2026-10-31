@@ -5,17 +5,17 @@ compiles" says almost nothing. The suite is arranged around that: a fast hermeti
 every push, and an opt-in layer that actually translates Windows.
 
 ```sh
-sh Scripts/test.sh                  # unit tests — fast, hermetic, no network. What CI runs.
-sh Scripts/test.sh --coverage       # + line coverage, held to Tests/coverage-baseline.json.
-sh Scripts/test.sh --integration    # + the Wine tiers: real runner, real prefix, real Windows game.
-sh Scripts/test.sh --steam          # + tier D: download a real Steam game and run it.
-sh Scripts/test.sh --filter Store   # anything else is passed straight to `swift test`.
+sh app/Scripts/test.sh                  # unit tests — fast, hermetic, no network. What CI runs.
+sh app/Scripts/test.sh --coverage       # + line coverage, held to app/tests/coverage-baseline.json.
+sh app/Scripts/test.sh --integration    # + the Wine tiers: real runner, real prefix, real Windows game.
+sh app/Scripts/test.sh --steam          # + tier D: download a real Steam game and run it.
+sh app/Scripts/test.sh --filter Store   # anything else is passed straight to `swift test`.
 ```
 
 > **Why a script and not `swift test`.** Two reasons. A Nix/devenv shell exports
 > `DEVELOPER_DIR`/`SDKROOT` pointing at a non-macOS SDK — the same trap the rest of the repo works
 > around by unsetting them. But tests need more than an SDK: `Testing.framework` ships only with a
-> full **Xcode**, not with the Command Line Tools and not with the Nix SDK. `Scripts/test.sh` finds
+> full **Xcode**, not with the Command Line Tools and not with the Nix SDK. `app/Scripts/test.sh` finds
 > a developer directory that actually has it. If it can't, it says so rather than failing obscurely.
 >
 > First time on a machine: `sudo xcodebuild -license accept`.
@@ -30,8 +30,8 @@ Windows game on a Mac) cannot run in a unit test:
 
 | Layer | Where | Runs | Proves |
 |---|---|---|---|
-| **Unit** | `Tests/CellarKitTests` | every PR, seconds | decisions: parsing, routes, readiness, copy, the store table |
-| **Rendered UI** | `Tests/CellarUITests` | every PR | store marks and views, drawn offscreen and measured |
+| **Unit** | `app/tests/CellarKitTests` | every PR, seconds | decisions: parsing, routes, readiness, copy, the store table |
+| **Rendered UI** | `app/tests/CellarUITests` | every PR | store marks and views, drawn offscreen and measured |
 | **Hermetic integration** | tier A + `FakeWine` | every PR | what Cellar writes to disk and hands to Wine; launch → watch → shut down |
 | **Wine tiers** | tiers B and C | every PR (*Wine tiers* job) | a real runner, a real prefix, a real Windows exe |
 | **A real game** | tier D | before a release | a real Steam depot downloaded and started |
@@ -54,7 +54,7 @@ Three rules carry it, the same ones that make testing stick at teams that ship:
 Cellar's external world is processes and files, so its doubles sit at those boundaries rather than
 behind protocols written only for tests:
 
-- **The sandbox** (`TestHome`, `Scripts/test.sh`) — `CELLAR_HOME`, `CELLAR_PROFILES_DIR` and
+- **The sandbox** (`TestHome`, `app/Scripts/test.sh`) — `CELLAR_HOME`, `CELLAR_PROFILES_DIR` and
   `CELLAR_APPLICATIONS_DIR` move every byte Cellar writes into a throwaway directory.
 - **Profile fixtures** (`TestHome.writeProfile`/`plan`) — a game is a TOML string, resolved through
   the same `Game.plan` the app uses.
@@ -70,19 +70,19 @@ behind protocols written only for tests:
 ### Coverage and the ratchet
 
 ```sh
-sh Scripts/test.sh --coverage
+sh app/Scripts/test.sh --coverage
 ```
 
-runs the suite with `--enable-code-coverage` and hands SwiftPM's report to `Scripts/coverage.py`,
+runs the suite with `--enable-code-coverage` and hands SwiftPM's report to `app/Scripts/coverage.py`,
 which measures `CellarDomain`, `CellarKit` and `CellarUI` (the executables cannot be imported by a test, so they are
-not counted — keep logic out of them) and compares each with `Tests/coverage-baseline.json`. More
+not counted — keep logic out of them) and compares each with `app/tests/coverage-baseline.json`. More
 than 0.3 points below the baseline fails the run and names the least-covered files. CI writes the
 table to the job summary on every run.
 
 When a change raises coverage, lock it in within the same PR:
 
 ```sh
-python3 Scripts/coverage.py --update .build/*/debug/codecov/*.json
+python3 app/Scripts/coverage.py --update app/.build/*/debug/codecov/*.json
 ```
 
 `--update` only ever raises a number, so it cannot paper over a drop.
@@ -93,7 +93,7 @@ python3 Scripts/coverage.py --update .build/*/debug/codecov/*.json
 |---|---|---|
 | Build, tests, coverage | *Build & self-test* (macOS 27) | the build breaks, a test fails, coverage drops |
 | The layer | *Wine tiers* | a real runner can't start and stop a Windows exe under Cellar |
-| The description | *PR checklist* | no `Closes #N`, nothing ticked under *How it was verified*, or `Sources/` changed without `Tests/` |
+| The description | *PR checklist* | no `Closes #N`, nothing ticked under *How it was verified*, or `app/src/` changed without `app/tests/` |
 | Hygiene | *Lint*, CodeQL, dependency review | see `docs/RELEASING.md` |
 
 *Wine tiers* is reported on every PR but is not yet a required check: it downloads its runner from
@@ -189,7 +189,7 @@ To run a real title instead, point the test at one:
 ```sh
 CELLAR_IT_GAME_URL='https://example.com/SomeSmallGame.zip' \
 CELLAR_IT_GAME_EXE='SomeSmallGame/game.exe' \
-sh Scripts/test.sh --integration --filter WindowsGameTests
+sh app/Scripts/test.sh --integration --filter WindowsGameTests
 ```
 
 | Variable | Meaning |
@@ -230,7 +230,7 @@ Cellar finds out here rather than in a bug report.
 
 ```sh
 cellar steam login              # once — a QR scan in the Steam mobile app, no password
-sh Scripts/test.sh --steam
+sh app/Scripts/test.sh --steam
 ```
 
 ### It skips loudly
@@ -310,13 +310,13 @@ the CI Mac itself real GameController and HID enumeration through `cellar doctor
 
 Wheels are found through the HID layer (`Wheels.connected()`), not GameController, which knows
 only a few Logitech models. Steering, pedals and buttons reach the game as a DirectInput device.
-Force feedback comes from Cellar's own SDL (`Scripts/build-sdl.sh`, see ARCHITECTURE →
+Force feedback comes from Cellar's own SDL (`app/Scripts/build-sdl.sh`, see ARCHITECTURE →
 *Force feedback*), and only for the wheels in `CellarSDL.forceFeedbackWheels`; for the rest expect
 none yet.
 
 Tier A loads the real built SDL the way winebus does and starts its joystick and haptic subsystems
 (`CellarSDLIntegrationTests`), and `build-sdl.sh` starts both architecture slices. Cellar's Fanatec
-and Thrustmaster drivers are tested by `build-sdl.sh` too (`Shim/sdl/tests/test_fanatec.c`,
+and Thrustmaster drivers are tested by `build-sdl.sh` too (`app/Shim/sdl/tests/test_fanatec.c`,
 `test_thrustmaster.c`): the init sequence, every effect's encoding, the strength cap, gain,
 durations and stop-on-close, against a fake wheel that records every command, plus the Thrustmaster
 model table behind the mode switch. None of it can show a motor turning: that is this table.
@@ -363,10 +363,10 @@ which the game page shows; check that those steps match the menus you actually s
 |---|---|
 | 1. Builds | `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` |
 | 2. Self-test | `swift run cellar selftest` |
-| 2b. **Unit + tier A** | `sh Scripts/test.sh` |
-| 2c. **Wine tiers** | `sh Scripts/test.sh --integration` |
-| 2d. **A real game** | `sh Scripts/test.sh --steam` |
-| 3. Behaviour | the CLI command, or `sh Scripts/install-app.sh` and launch the app |
+| 2b. **Unit + tier A** | `sh app/Scripts/test.sh` |
+| 2c. **Wine tiers** | `sh app/Scripts/test.sh --integration` |
+| 2d. **A real game** | `sh app/Scripts/test.sh --steam` |
+| 3. Behaviour | the CLI command, or `sh app/Scripts/install-app.sh` and launch the app |
 
 `cellar selftest` stays: it is a check an *installed* binary can run on a player's machine, which a
 test target cannot. The unit suite is the superset a developer runs.
@@ -381,7 +381,7 @@ release**.
 
 ## Adding tests
 
-**Every PR that changes Swift under `Sources/` changes a test under `Tests/`**, and the test is one
+**Every PR that changes Swift under `app/src/` changes a test under `app/tests/`**, and the test is one
 that would fail without the change. A bug fix starts with the test that reproduces it. The *PR
 checklist* check enforces this (a `No tests needed: <reason>` line in the PR body is the only way
 past it, and the reason has to be about the change). Where the test goes:

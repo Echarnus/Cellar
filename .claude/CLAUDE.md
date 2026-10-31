@@ -16,35 +16,35 @@ one matching your work; each points back at the portable guide for the full deta
 
 - **cellar-ux** — **anything a player sees** (the app, CLI wording, errors). Read this one first;
   the UX bar is a requirement in this repo, not a polish pass.
-- **cellar-swift** — `Sources/**` (CellarKit, the CLI, the SwiftUI app).
+- **cellar-swift** — `app/src/**` (CellarKit, the CLI, the SwiftUI app).
 - **cellar-wine** — runners, graphics backends, bottles, launching the layer.
 - **cellar-profiles** — `profiles/*.toml`: adding a game, changing the schema.
 - **cellar-web** — the static site (the page itself).
-- **cellar-python** — `Scripts/gen-site.py`, the generator that emits it.
-- **cellar-shell** — `Scripts/*.sh`, the `.app`/DMG, releases.
+- **cellar-python** — `pages/gen-site.py`, the generator that emits it.
+- **cellar-shell** — `app/Scripts/*.sh`, the `.app`/DMG, releases.
 - **cellar-ci** — `.github/workflows/**`: CI, releases, Pages.
 
 ### Verifier subagent
 
 `.claude/agents/cellar-verifier.md` is the spawnable form of [`agents/verifier.md`](../agents/verifier.md).
-Run it (read-only) before reporting any change to `Sources/**`, `Scripts/**`, `profiles/**`, or the
+Run it (read-only) before reporting any change to `app/src/**`, `app/Scripts/**`, `profiles/**`, or the
 site as done.
 
 ### Tests
 
-`sh Scripts/test.sh` runs the whole suite headlessly in about half a second — use it before
+`sh app/Scripts/test.sh` runs the whole suite headlessly in about half a second — use it before
 reaching for `install-app.sh`. A bare `swift test` fails on this machine with *"no such module
 'Testing'"* because `xcode-select` points at a Nix SDK with no swift-testing framework; the script
 finds a developer directory that has one. Every run also writes
-`.build/ui-snapshots/store-marks-{light,dark}.png` — open that to check the marks instead of
+`app/.build/ui-snapshots/store-marks-{light,dark}.png` — open that to check the marks instead of
 launching the app. Details in `AGENTS.md` → *Testing*.
 
 ### Build reminder
 
-Build with `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` — a Nix/devenv shell exports an
+Build from `app/` (the Swift package) with `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` — a Nix/devenv shell exports an
 SDK that breaks a plain `swift build`. If xcode-select points at the Command Line Tools, that builds
 the CLI but not the app — add `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (the install
-scripts do this themselves). GUI changes are verified by `sh Scripts/install-app.sh` and launching the
+scripts do this themselves). GUI changes are verified by `sh app/Scripts/install-app.sh` and launching the
 app, never by reading the diff.
 
 ### Second brain
