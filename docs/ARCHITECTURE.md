@@ -381,7 +381,7 @@ save then lands where Finder and Time Machine can see it. Those three are exactl
 gates behind a privacy prompt, so left alone the player meets *"Cellar.app would like to access files
 in your Documents folder"* halfway through an install, with nothing on screen explaining it.
 
-So Cellar owns the timing instead (`Sources/CellarKit/HomeFolders.swift`):
+So Cellar owns the timing instead (`Sources/CellarKit/System/HomeFolderAccess.swift`):
 
 - **The app asks on first launch** (`WelcomeView`) — the same three dialogs macOS would have shown,
   together, before anything is at stake, under a sentence saying what each folder is for. The
@@ -506,8 +506,8 @@ the app, into one file.
 
 | Piece | Where | What it does |
 |---|---|---|
-| `CellarLog` | `Sources/CellarKit/Log.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
-| `Diagnostics` | `Sources/CellarKit/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
+| `CellarLog` | `Sources/CellarKit/Diagnostics/CellarLog.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
+| `Diagnostics` | `Sources/CellarKit/Diagnostics/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
 | `cellar logs` | `Sources/cellar/Commands/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
 | Settings → Diagnostics | `Sources/CellarApp/SettingsView.swift` | The same export, one button, saved to the Desktop. |
 
