@@ -38,7 +38,7 @@ public enum ProfileUpdates {
     /// The Ed25519 public key profile bundles are signed with, base64 (raw 32 bytes). Empty until the
     /// release key exists (`Scripts/profiles-bundle.swift --generate-key`): a build without one
     /// refuses every download rather than trusting an unsigned one.
-    public static let publicKey = ""
+    public static let publicKey = "E/JvNBs4PKYI1fbjyx6l55yjGsRBLrvYM2Jx9dVuCCU="
 
     static let bundleURL = "https://github.com/Echarnus/Cellar/releases/latest/download/profiles.json"
     static var signatureURL: String { bundleURL + ".sig" }
