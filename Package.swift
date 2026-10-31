@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         // The app's self-updater. Pinned exactly: it installs code on the player's Mac, so a new
         // version is a deliberate bump, not whatever resolved last.
-        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
     ],
     targets: [
         // Core engine: environment detection, bottles, runners, profiles.
