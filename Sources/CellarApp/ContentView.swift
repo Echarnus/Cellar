@@ -331,8 +331,6 @@ struct ContentView: View {
 
 /// A store's heading in the library. Carries the mark *and* the word, so the section — not each
 /// row — is what tells you where these games come from.
-}
-
 struct StoreSectionHeader: View {
     let store: GameStore
     let count: Int

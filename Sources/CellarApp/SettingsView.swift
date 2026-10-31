@@ -125,7 +125,7 @@ struct SettingsView: View {
                     Section("Uninstall") {
                         Button("Uninstall Cellar…") {
                             onClose()
-                            CellarUninstaller.begin()
+                            CellarUninstaller.begin(preparation: preparation)
                         }
                         Text("Removes Cellar and everything it downloaded. You choose whether to keep your save games first.")
                             .font(.caption).foregroundStyle(.secondary)

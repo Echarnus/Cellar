@@ -54,6 +54,7 @@ final class AppModel {
 //
 // Because there is no App scene, AppKit installs no default menu bar — so we build one ourselves
 // (⌘Q to quit, About, Settings…, and the Edit menu that text fields need for cut/copy/paste).
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     var window: NSWindow!
