@@ -105,7 +105,7 @@ public enum Wheels {
     /// Added for a Fanatec base Cellar drives: its own driver caps the strength
     /// (`CellarSDL.defaultStrengthPercent`), and the player should know why it feels soft.
     public static let cappedStrengthNote =
-        "Fanatec bases start at half strength, because a direct-drive base at full torque can hurt; the FAQ says how to raise it."
+        "Fanatec bases start at half strength, because a direct-drive base at full torque can hurt; raise it in Settings › General › Racing wheels."
 
     /// The force-feedback sentence for what is connected: the hopeful one only when every wheel
     /// connected is one Cellar's SDL drives and that SDL is installed.

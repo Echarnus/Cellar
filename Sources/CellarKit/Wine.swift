@@ -73,6 +73,8 @@ public struct WineRunner {
             env.removeValue(forKey: "LANGUAGE")
             for (k, v) in language.environment { env[k] = v }
         }
+        // The wheel strength from Settings, for the wheel drivers in Cellar's SDL.
+        CellarSDL.applyStrength(CellarSettings.forceFeedbackStrength, to: &env)
 
         if let install, install.isWineForgeStyle {
             // WineForge: backend selected by GRAPHICS_BACKEND + *_RUNTIME_DIR, DLLs forced native.

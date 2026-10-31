@@ -89,3 +89,62 @@ public enum CellarSDL {
         return [directory.path] + dyld.filter { $0 != directory.path }
     }
 }
+
+// MARK: - Force-feedback strength
+
+extension CellarSDL {
+    /// The variable Cellar's Fanatec driver reads its cap from (`Shim/sdl/`).
+    static let fanatecStrengthVariable = "CELLAR_FFB_MAX_PERCENT"
+    /// The variable SDL's own Logitech driver reads its device gain from, 0–65535.
+    static let logitechGainVariable = "SDL_HAPTIC_LG4FF_GAIN"
+
+    /// The strengths offered in Settings and accepted by `cellar controllers strength`, in percent.
+    public static let strengthChoices = [25, 50, 75, 100]
+
+    /// What a wheel Cellar drives is told about its strength, for a launch. nil — the player has not
+    /// chosen — leaves every driver at its own default: Fanatec at `defaultStrengthPercent`,
+    /// Logitech at full, since a G29's motor is a fraction of a direct-drive base's.
+    public static func strengthEnvironment(_ percent: Int?) -> [String: String] {
+        guard let percent else { return [:] }
+        let clamped = min(max(percent, 1), 100)
+        return [fanatecStrengthVariable: String(clamped),
+                logitechGainVariable: String(65535 * clamped / 100)]
+    }
+
+    /// Adds `strengthEnvironment` to a launch's environment. A value already there — someone typed
+    /// `CELLAR_FFB_MAX_PERCENT=80 cellar launch …` — wins over Settings.
+    public static func applyStrength(_ percent: Int?, to env: inout [String: String]) {
+        for (key, value) in strengthEnvironment(percent) where env[key]?.isEmpty ?? true {
+            env[key] = value
+        }
+    }
+
+    /// The strength in the player's words, for Settings, the CLI and doctor.
+    public static func strengthDescription(_ percent: Int?) -> String {
+        guard let percent else {
+            return "Cellar's default: Fanatec bases at half strength, Logitech wheels at full strength"
+        }
+        return "\(min(max(percent, 1), 100))% of the wheel's maximum, for every wheel Cellar drives"
+    }
+}
+
+extension CellarSettings {
+    static let strengthKey = "force_feedback_strength"
+
+    /// The force-feedback strength the player chose for every wheel Cellar drives, in percent; nil
+    /// keeps each driver's own default (`CellarSDL.strengthEnvironment`).
+    public static var forceFeedbackStrength: Int? {
+        BottleConfig.fields(url)[strengthKey].flatMap(Int.init).map { min(max($0, 1), 100) }
+    }
+
+    public static func setForceFeedbackStrength(_ percent: Int?) throws {
+        if let percent {
+            guard (1...100).contains(percent) else {
+                throw CellarError.invalidArgument("Force-feedback strength is a percentage from 1 to 100, not \(percent).")
+            }
+            try BottleConfig.set(key: strengthKey, to: String(percent), section: "controllers", in: url)
+        } else {
+            try BottleConfig.unset(key: strengthKey, in: url)
+        }
+    }
+}
