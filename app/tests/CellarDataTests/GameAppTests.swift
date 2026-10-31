@@ -30,6 +30,17 @@ struct GameAppTests {
         #expect(GameApp.loader(for: runner.binary)?.path == runner.loader.resolvingSymlinksInPath().path)
     }
 
+    @Test("A runner whose loader can be copied makes the game app available; one that can't does not")
+    func availability() throws {
+        let runner = try modernRunner()
+        #expect(GameApp.isAvailable(runnerBinary: runner.binary))
+        let bin = TestHome.scratch("game-app-unavailable").appendingPathComponent("bin", isDirectory: true)
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        let wine64 = bin.appendingPathComponent("wine64")
+        try Data().write(to: wine64)
+        #expect(!GameApp.isAvailable(runnerBinary: wine64))
+    }
+
     @Test("A runner without ntdll.so beside its loader is started the usual way")
     func skipsOtherLayouts() throws {
         let bin = TestHome.scratch("game-app-gptk").appendingPathComponent("bin", isDirectory: true)
