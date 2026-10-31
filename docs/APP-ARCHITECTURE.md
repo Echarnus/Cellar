@@ -105,7 +105,7 @@ public enum SaveBackups {
 ```mermaid
 flowchart LR
     subgraph Windows
-        CV[ContentView<br/>+ Library + CellarRunner]
+        CV[LibraryView<br/>+ Library + CellarRunner]
         SV[SettingsView<br/>+ its own CellarRunner]
         SP[StoreSignInPanel<br/>+ its own CellarRunner]
         GD[GameDetailView]
@@ -137,7 +137,7 @@ them. After a command finishes, the app re-queries.
 
 That split is sound. The problems are in how the app side is wired:
 
-- **Three `CellarRunner`s.** `ContentView`, `SettingsView` and `StoreSignInPanel` each create one with
+- **Three `CellarRunner`s.** `LibraryView`, `SettingsView` and `StoreSignInPanel` each create one with
   `@StateObject`. "Busy" is per window, so Settings can start a command while the library is
   installing, and the library window does not know a sign-in is running.
 - **Global singletons.** `RuntimePreparation.shared` and `AppUpdater.shared` are reached from any
@@ -148,7 +148,7 @@ That split is sound. The problems are in how the app side is wired:
   inside `NSHostingView` trips the AttributeGraph crash (see `skills/swift.md`), so they do not share a
   view tree. But nothing typed says who listens to what.
 - **Views read the engine directly**, e.g. `GameDetailView` calls `SaveBackups.list(…)` and
-  `AccountsSection` reads `GOGAuth.isSignedIn`. Those reads touch the disk from inside a view update,
+  `AccountsView` reads `GOGAuth.isSignedIn`. Those reads touch the disk from inside a view update,
   and the view cannot be previewed or tested without a real Cellar home.
 - **A stringly-typed command contract.** Call sites build `["saves", "restore", slug, "--backup", id]`
   by hand; the CLI reports progress by printing marker lines (`LaunchMarker`, `InstallMarker`) among
@@ -256,7 +256,7 @@ boilerplate than B and none of TCA's tooling.
 
 **B: `@Observable` feature stores, with unidirectional rules.** Concretely:
 
-- One store per feature: `LibraryStore`, `ActivityStore` (the single command runner), `AccountsStore`,
+- One store per feature: `LibraryViewModel`, `ActivityStore` (the single command runner), `AccountsViewModel`,
   `PreparationStore`, `UpdaterStore`. Each is `@Observable @MainActor final class`.
 - State is `private(set)`. Views read state and call intent methods; they never assign to a store.
   The one exception is state that *is* a control's value (the library's search text, filters, sort
@@ -333,9 +333,9 @@ Arrows point inward; infrastructure depends on the ports, not the other way roun
 
 ```mermaid
 flowchart LR
-    Main[main.swift<br/>AppModel] --> LS[LibraryStore]
+    Main[main.swift<br/>AppModel] --> LS[LibraryViewModel]
     Main --> AS[ActivityStore]
-    Main --> ACS[AccountsStore]
+    Main --> ACS[AccountsViewModel]
     Main --> PS[PreparationStore]
     Main --> US[UpdaterStore]
     AS --> CC{{CommandClient}}
@@ -463,8 +463,13 @@ runner specs, removal scope, ownership, check results, languages, performance sw
 declared in CellarDomain, and `ArchitectureTests.modelsLiveInTheDomain` keeps them there;
 `domainDoesNoIO` keeps the disk, processes and the network out of it.
 
+Each feature folder holds an `@Observable` `<Feature>ViewModel`, one smart `<Feature>View` that
+owns it, and dumb subviews. A row (`*Row.swift`) takes values and closures only, so its preview is
+one line (`#Preview` in `AccountRow` and `StepRow`); `ArchitectureTests.rowsAreDumb` fails if a row
+names a view model, the activity or the app model, or imports the engine.
+
 A view model reaches the machine only through a port declared in the domain. The library is the
-first: `LibraryStore` holds an `any LibraryRepository`, the composition root (`AppModel`) hands it
+first: `LibraryViewModel` holds an `any LibraryRepository`, the composition root (`AppModel`) hands it
 the engine's `DiskLibraryRepository`, and a preview can hand it a fixed `LibrarySnapshot`. Values
 that used to be nested in engine types (`GameUpdates.State`, `Playtime.Record`,
 `StoreLibrary.Verdict`, `SteamAccount.State`) are domain types now, kept under their old names as
@@ -486,8 +491,8 @@ them.
 | 1 | Raise the minimum macOS to 14 | #68 | Done (#97) |
 | 2 | Typed `CellarCommand` between the app and the CLI, checked by `cellar selftest` | #69 | Done (#100). `CommandClient` left out: a test can't import the app executable, so the testable rules moved into CellarKit instead |
 | 3 | One shared `ActivityStore` for every window, created by `AppModel` | #70 | Done (#100) |
-| 4 | `LibraryStore` as `@Observable`, its rules in CellarKit's `LibraryQuery`; library notifications become store calls | #71 | Done (#100) |
-| 5 | `AccountsStore`, `RuntimePreparation`, `AppUpdater` as `@Observable` stores; no app singletons | #72 | Done (#100) |
+| 4 | `LibraryViewModel` as `@Observable`, its rules in CellarKit's `LibraryQuery`; library notifications become store calls | #71 | Done (#100) |
+| 5 | `AccountsViewModel`, `RuntimePreparation`, `AppUpdater` as `@Observable` stores; no app singletons | #72 | Done (#100) |
 | 6 | `CellarEnvironment` (home + clock) in CellarKit, proven on save backups | #73 | Done (#100) |
 | 7 | One `StoreAdapter` per store; no `switch plan.store` left in set-up, install, open or launch | #74 | Done (#100) |
 | 8 | `Game.swift` split into domain types and use cases (`LoadLibrary`, `SetUpGame`, `InstallGame`, `LaunchGame`, `UninstallGame`) reporting `GameEvent`s | #75 | Done (#100) |
@@ -530,7 +535,7 @@ packaging guidance. What matches, and what does not yet:
 | Value types are the safest thing to share; make them `Sendable` (WWDC25 268) | Domain types are `Sendable` structs and enums; `LaunchRoute` was not and now is | Fixed in #100 |
 | Adopt Swift 6 one module at a time (`swiftLanguageMode` per target, SE-0435; Swift 6 migration guide) | Every target sets its own `swiftLanguageMode` | Done in #77 (see `Package.swift` for each target's mode) |
 | Turn on *Approachable Concurrency*, and default main-actor isolation for UI modules (WWDC25 268, SE-0466, SE-0461, SE-0470) | `swift-tools-version: 6.2`; `CellarApp` and `CellarUI` use `.defaultIsolation(MainActor.self)` with Approachable Concurrency; CellarKit stays nonisolated, as a library should | Done in #77 |
-| Work that blocks the main thread moves off it (`@concurrent`), after profiling (WWDC25 268) | `LibraryStore.refresh()` runs `LoadLibrary` (profiles, icons, bottle state) on the main actor | Gap: profile it in Instruments, then move `LoadLibrary` into a `@concurrent` function if it shows |
+| Work that blocks the main thread moves off it (`@concurrent`), after profiling (WWDC25 268) | `LibraryViewModel.refresh()` runs `LoadLibrary` (profiles, icons, bottle state) on the main actor | Gap: profile it in Instruments, then move `LoadLibrary` into a `@concurrent` function if it shows |
 | Narrowest access that works; `package` for what only the package uses (SE-0386, SE-0409) | `StoreDescriptor.components(fromHex:)` and `GameStore.sortIndex` were `public` for tests and the CLI | Fixed in #100: now `package` |
 | Re-exporting a module is not an official Swift feature (`@_exported` is underscored; SE-0409 left it unspecified) | Every file that uses a domain type writes `import CellarDomain`; nothing is re-exported | Fixed in #77 |
 | Organise app code into local packages and library targets (Apple, *Organizing your code with local packages*) | One SwiftPM package, library targets per layer | Matches |
@@ -552,7 +557,7 @@ test fails the build when the rule breaks, not that a reviewer has to notice.
 | Contract between processes is typed and versioned | `CellarCommand` (checked by `cellar selftest` against the CLI's parser), `--events` JSON lines with `v` | Pass, tested (`CellarCommandTests`, `CommandEventTests`, `cellar selftest`) |
 | Compile-time data-race safety | Swift 6 language mode in every target, tests included | Pass, enforced (`swift6Everywhere`, and the compiler) |
 | Code is findable: feature folders, one type per file | Every target grouped by feature; each file one top-level type, named after it | Pass, enforced (`oneTypePerFile`, `featureFolders`) |
-| Main thread kept free of blocking work | `LibraryStore.refresh()` still runs `LoadLibrary` on the main actor | Open: needs an Instruments trace on a real library before moving it (Apple's own advice, WWDC25 268). Not measurable from CI |
+| Main thread kept free of blocking work | `LibraryViewModel.refresh()` still runs `LoadLibrary` on the main actor | Open: needs an Instruments trace on a real library before moving it (Apple's own advice, WWDC25 268). Not measurable from CI |
 
 ## Sources
 

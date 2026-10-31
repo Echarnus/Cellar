@@ -7,7 +7,7 @@ import SwiftUI
 /// and ⌘F reaching a view's focus. State changes are not here — they are calls on the stores
 /// `AppModel` owns (docs/APP-ARCHITECTURE.md).
 extension Notification.Name {
-    /// Posted by the "Settings…" menu item; ContentView opens its settings sheet on receipt.
+    /// Posted by the "Settings…" menu item; LibraryView opens its settings sheet on receipt.
     static let cellarOpenSettings = Notification.Name("cellar.openSettings")
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.

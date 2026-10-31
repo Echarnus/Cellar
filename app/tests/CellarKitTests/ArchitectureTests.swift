@@ -143,6 +143,34 @@ struct ArchitectureTests {
     }
 
     /// Every target is laid out by feature, one type per file (#133).
+    /// A row is a dumb view: a value and a closure, so its preview is one line (#133). It names no
+    /// view model, no activity and no app model, and it does not import the engine.
+    @Test("Every feature row is a dumb view: values and closures, no view model, no engine")
+    func rowsAreDumb() throws {
+        let rows = try Self.sources(in: "CellarApp").filter { $0.file.hasSuffix("Row.swift") }
+        #expect(!rows.isEmpty)
+        for (file, text) in rows {
+            for word in ["ViewModel", "ActivityStore", "AppModel", "@Bindable", "import CellarKit",
+                         "import CellarInfrastructure"] {
+                #expect(!text.contains(word), "CellarApp/\(file) mentions \(word)")
+            }
+        }
+    }
+
+    /// Each feature has one view model, named after it, and one smart view that owns it.
+    @Test("The library and accounts features have a view model and a smart view",
+          arguments: [("Library", "LibraryViewModel", "LibraryView"),
+                      ("Accounts", "AccountsViewModel", "AccountsView")])
+    func featureHasViewModel(_ feature: String, _ model: String, _ view: String) throws {
+        let folder = Repo.source("CellarApp/Features/\(feature)")
+        for name in [model, view] {
+            #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(name).swift").path),
+                    "Features/\(feature) has no \(name).swift")
+        }
+        let text = try String(contentsOf: folder.appendingPathComponent("\(model).swift"), encoding: .utf8)
+        #expect(text.contains("@Observable"), "\(model) is not @Observable")
+    }
+
     static let oneTypePerFileTargets = ["CellarDomain", "CellarInfrastructure", "CellarUI", "CellarKit",
                                         "CellarApp", "cellar"]
 

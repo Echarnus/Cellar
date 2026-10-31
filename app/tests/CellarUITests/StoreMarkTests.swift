@@ -58,7 +58,7 @@ struct StoreMarkTests {
     /// This is the test that was missing when a GOG mark whose wordmark needed 26 grid cells shipped
     /// into a 12pt filter chip — 24 device pixels — and every assertion in this file passed while the
     /// app on screen showed static. A coverage ratio cannot see that; only rendering at the real scale
-    /// can. The sizes below are the ones the app actually asks for, `ContentView`'s 12 and 13
+    /// can. The sizes below are the ones the app actually asks for, `LibraryView`'s 12 and 13
     /// included — not a tidy series.
     @Test("every mark survives the screen it is drawn on",
           arguments: GameStore.allCases, [CGFloat(11), 12, 13, 14, 16, 22, 30])

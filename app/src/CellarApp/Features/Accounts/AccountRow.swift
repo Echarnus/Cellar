@@ -1,6 +1,5 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
 import CellarUI
 
 /// One store's sign-in state, as position + mark + word (never colour alone).
@@ -73,4 +72,11 @@ struct AccountRow: View {
         case .notAdded:            return String(localized: "not added, so its games are not listed")
         }
     }
+}
+
+#Preview("Signed out") {
+    AccountRow(store: .steam, title: "Steam", state: .signedOut,
+               detail: "One scan with the Steam mobile app covers every Steam game.",
+               actionTitle: "Sign in", busy: false, action: {})
+        .padding()
 }

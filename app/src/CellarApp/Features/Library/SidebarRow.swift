@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 import CellarUI
 
 struct SidebarRow: View {

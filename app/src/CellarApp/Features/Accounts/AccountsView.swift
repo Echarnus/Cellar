@@ -15,9 +15,9 @@ import CellarUI
 /// The in-bottle Windows client is not a second account. It is a runtime dependency of the games
 /// whose DRM talks to a running Steam, and it is reported as a fact about the machine — never as
 /// another sign-in to perform.
-struct AccountsSection: View {
+struct AccountsView: View {
     let runner: ActivityStore
-    let library: LibraryStore
+    let library: LibraryViewModel
     let state: StoreAccountState
     let refresh: () -> Void
 
@@ -45,7 +45,7 @@ struct AccountsSection: View {
 
     /// Every sign-in, sign-out and add ends here. Accounts is its own window, so the library in the
     /// main window has to be *told* — without this a player who just signed in keeps looking at
-    /// "Sign in to see your games" until they happen to press reload. It is the same `LibraryStore`
+    /// "Sign in to see your games" until they happen to press reload. It is the same `LibraryViewModel`
     /// the main window draws, so telling it is a call.
     private func accountsChanged() {
         refresh()

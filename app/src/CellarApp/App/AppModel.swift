@@ -12,9 +12,9 @@ final class AppModel {
     /// The player's actions — one at a time, for the whole app.
     let activity = ActivityStore()
     /// The games, the selection and the sidebar's filters.
-    let library = LibraryStore(repository: DiskLibraryRepository())
+    let library = LibraryViewModel(repository: DiskLibraryRepository())
     /// Where the player is signed in.
-    lazy var accounts = AccountsStore(activity: activity)
+    lazy var accounts = AccountsViewModel(activity: activity)
     /// The shared runtime downloading in the background — on its own runner, so it never holds Play.
     let preparation = RuntimePreparation()
     /// Sparkle, started the first time the menu bar asks for it.

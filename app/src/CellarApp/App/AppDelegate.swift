@@ -4,7 +4,7 @@ import CellarKit
 import SwiftUI
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
-// whose window hosts the SwiftUI ContentView. This is the Phase-3 "Steam-like" front-end over
+// whose window hosts the SwiftUI LibraryView. This is the Phase-3 "Steam-like" front-end over
 // CellarKit — choose a game, see its state, and play it, with the game's own icon.
 //
 // Because there is no App scene, AppKit installs no default menu bar — so we build one ourselves
@@ -68,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self, selector: #selector(showWelcomeTour), name: .cellarOpenWelcomeTour, object: nil)
 
         let window = NSWindow(
-            // Comfortably above ContentView's minimum: at the minimum the detail pane's two
+            // Comfortably above LibraryView's minimum: at the minimum the detail pane's two
             // information columns collapse into one, which is a fallback, not the intended look.
             contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
             // A full-size content view under a transparent title bar: the sidebar's material runs
@@ -95,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let useDiagnostic = ProcessInfo.processInfo.environment["CELLAR_DIAG"] != nil
         window.contentView = useDiagnostic
             ? NSHostingView(rootView: AnyView(Text("Cellar GUI works").padding()))
-            : NSHostingView(rootView: ContentView(lib: model.library, runner: model.activity, preparation: model.preparation))
+            : NSHostingView(rootView: LibraryView(lib: model.library, runner: model.activity, preparation: model.preparation))
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.bringToFront()

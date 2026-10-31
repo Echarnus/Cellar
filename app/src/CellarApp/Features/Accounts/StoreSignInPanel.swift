@@ -9,7 +9,7 @@ import CellarKit
 /// picked a game. Sharing the view rather than re-typing the copy means the tour cannot promise
 /// something the real screen doesn't do — which is the point of the honesty rule in `skills/ux.md`.
 ///
-/// The rows themselves are `AccountsSection`, so there is exactly one definition of what a store's
+/// The rows themselves are `AccountsView`, so there is exactly one definition of what a store's
 /// sign-in state *is* and how it is drawn. This adds only what the hosts differ on: the activity
 /// strip, and owning the runner and the state snapshot.
 ///
@@ -19,8 +19,8 @@ struct StoreSignInPanel: View {
     /// The app's one activity (`AppModel`).
     let runner: ActivityStore
     /// The app's one library, told directly when an account changes.
-    let library: LibraryStore
-    let accounts: AccountsStore
+    let library: LibraryViewModel
+    let accounts: AccountsViewModel
     /// Height of the activity strip, or `nil` to leave it out entirely. Constant per instance —
     /// the tour is tighter for space than the Accounts window, but neither changes its mind
     /// half-way through a run, so the view tree's shape stays fixed.
@@ -29,7 +29,7 @@ struct StoreSignInPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                AccountsSection(runner: runner, library: library, state: accounts.state, refresh: { accounts.refresh() })
+                AccountsView(runner: runner, library: library, state: accounts.state, refresh: { accounts.refresh() })
                     .padding(16)
             }
             if let activityHeight {

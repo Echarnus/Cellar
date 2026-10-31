@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// One thing worth knowing, as symbol + title + sentence.
 struct FactRow: View {

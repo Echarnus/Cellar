@@ -8,7 +8,7 @@ import CellarUI
 /// Reading disk in a view body would run `Game.summaries()` (which resolves game icons, spawning
 /// tools) during view creation, on the main thread, in the middle of a window's first layout —
 /// which is how this app has crashed in AttributeGraph before (skills/swift.md).
-// Built off the main actor (`AccountsStore.refresh`) and handed back to it, so it is plain Sendable data.
+// Built off the main actor (`AccountsViewModel.refresh`) and handed back to it, so it is plain Sendable data.
 nonisolated struct StoreAccountState: Sendable {
     /// The one Steam sign-in, as CellarKit computed it. The view never derives this itself, so the
     /// app and `cellar accounts` cannot describe the same session differently.
