@@ -69,8 +69,8 @@ extension ControllersCommand {
             abstract: "Show or set how hard a wheel Cellar drives may push, from the next launch.",
             discussion: """
             A percentage of the wheel's maximum, for every wheel Cellar drives force feedback for.
-            "default" goes back to Cellar's own: Fanatec bases at half strength, Logitech wheels at
-            full. A direct-drive base is strong: raise it a step at a time.
+            "default" goes back to Cellar's own: Fanatec bases at half strength, Logitech and
+            Thrustmaster wheels at full. A direct-drive base is strong: raise it a step at a time.
 
               cellar controllers strength
               cellar controllers strength 75

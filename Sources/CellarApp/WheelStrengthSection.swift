@@ -23,7 +23,7 @@ struct WheelStrengthSection: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 if chosen == nil {
-                    Text("Fanatec bases start at half strength and Logitech wheels at full.")
+                    Text("Fanatec bases start at half strength; Logitech and Thrustmaster wheels at full.")
                 } else {
                     Text("Every wheel Cellar drives pushes at most the strength chosen above.")
                 }

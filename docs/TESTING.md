@@ -234,16 +234,19 @@ none yet.
 
 Tier A loads the real built SDL the way winebus does and starts its joystick and haptic subsystems
 (`CellarSDLIntegrationTests`), and `build-sdl.sh` starts both architecture slices. Cellar's Fanatec
-driver is tested by `build-sdl.sh` too (`Shim/sdl/tests/test_fanatec.c`): the init sequence, every
-slot's encoding, the strength cap, gain, durations, pause and stop-on-close, against a fake base that
-records every command. None of it can show a motor turning: that is this table.
+and Thrustmaster drivers are tested by `build-sdl.sh` too (`Shim/sdl/tests/test_fanatec.c`,
+`test_thrustmaster.c`): the init sequence, every effect's encoding, the strength cap, gain,
+durations and stop-on-close, against a fake wheel that records every command, plus the Thrustmaster
+model table behind the mode switch. None of it can show a motor turning: that is this table.
 
 | Wheel | Mode / firmware | Listed by `cellar controllers` | Steering + pedals in game | Force feedback |
 |---|---|---|---|---|
 | Fanatec (CSL DD / GT DD Pro / ClubSport DD / CSL Elite) | PC mode, current firmware | not yet tested | — | — (expected: yes, Cellar's Fanatec driver, half strength) |
 | Logitech G29 / G27 / G25 | PS3 or PS4 position | not yet tested | — | — (expected: yes, via Cellar's SDL) |
 | Logitech G920 / G923 | — | not yet tested | — | — (expected: none yet) |
-| Thrustmaster (T300 / T248 / TX) | PC mode | not yet tested | — | — |
+| Thrustmaster T300 RS / T300 Ferrari | PC mode | not yet tested | — | — (expected: the wheel disconnects once as a game starts, then force feedback from Cellar's Thrustmaster driver) |
+| Thrustmaster T248 / TX / TS-XW / TS-PC | PC mode | not yet tested | — | — (expected: yes, Cellar's Thrustmaster driver) |
+| Thrustmaster T150 / T500 / TMX | PC mode | not yet tested | — | — (expected: none yet) |
 
 To test a wheel:
 
@@ -256,8 +259,11 @@ To test a wheel:
    or crash shake it, and does all force stop the moment the game quits?
 5. If force feedback misbehaves, start the game once with the runner's own SDL —
    `CELLAR_RUNNER_SDL=1 cellar launch <game>` — to tell Cellar's SDL apart from the rest of the path.
-   For a Fanatec base, also try Settings › General › Racing wheels at 25% and then 100% (does the
-   strength follow?) and `CELLAR_FFB_DISABLE=1` (steering without Cellar's driver).
+   For a Fanatec base or a Thrustmaster wheel, also try Settings › General › Racing wheels at 25%
+   and then 100% (does the strength follow?) and `CELLAR_FFB_DISABLE=1` (steering without Cellar's
+   driver). For a T300, check `cellar controllers` before and after a game starts: the product
+   should change from "Thrustmaster FFB Wheel" to the T300's own name. If it never does, the Mac
+   refused the USB mode switch; say so in a report.
 6. Note the game, runner and backend, and record the result in the game's profile: `wheel =
    "steering"` (steering and pedals, no force feedback) or `"full"` (with force feedback), plus the
    wheel and firmware in `notes`. Only a game whose `status` is no longer `untested` may claim one;

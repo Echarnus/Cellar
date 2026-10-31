@@ -62,6 +62,7 @@ public enum Wheels {
                 return [
                     "Set the base to its PC mode, as its manual describes, and connect it over USB.",
                     "Thrustmaster's drivers and firmware updates are Windows-only. Without that driver some bases report the pedals as buttons rather than axes, which most racing games cannot use.",
+                    "A T300 disconnects for a moment when a game starts: Cellar is switching it into the mode that has force feedback, as Thrustmaster's Windows driver does.",
                 ]
             case .moza:
                 return [
@@ -107,14 +108,24 @@ public enum Wheels {
     public static let cappedStrengthNote =
         "Fanatec bases start at half strength, because a direct-drive base at full torque can hurt; raise it in Settings › General › Racing wheels."
 
+    /// Said for a Thrustmaster wheel still in its generic mode: which models Cellar's SDL switches out
+    /// of it when a game starts, and which it cannot.
+    public static let thrustmasterGenericNote =
+        "This Thrustmaster wheel is still in its generic mode. When a game starts, Cellar switches a T300 RS or T300 Ferrari Edition into its own mode, which turns force feedback on; a T150, T500 or TMX keeps steering without it."
+
     /// The force-feedback sentence for what is connected: the hopeful one only when every wheel
-    /// connected is one Cellar's SDL drives and that SDL is installed.
+    /// connected is one Cellar's SDL drives and that SDL is installed. A Thrustmaster wheel in its
+    /// generic mode gets its own sentence, since Cellar can only tell which model it is once it asks.
     public static func forceFeedbackNote(for devices: [Device], cellarSDL: Bool) -> String {
         let wheels = devices.filter { $0.kind == .wheel }
-        guard cellarSDL, !wheels.isEmpty, wheels.allSatisfy(CellarSDL.drivesForceFeedback) else { return forceFeedbackNote }
-        return wheels.contains { $0.vendor == .fanatec }
-            ? drivenForceFeedbackNote + " " + cappedStrengthNote
-            : drivenForceFeedbackNote
+        let generic = wheels.filter(CellarSDL.isGenericThrustmaster)
+        let others = wheels.filter { !CellarSDL.isGenericThrustmaster($0) }
+        guard cellarSDL, !wheels.isEmpty, others.allSatisfy(CellarSDL.drivesForceFeedback) else { return forceFeedbackNote }
+        var sentences: [String] = []
+        if !others.isEmpty { sentences.append(drivenForceFeedbackNote) }
+        if others.contains(where: { $0.vendor == .fanatec }) { sentences.append(cappedStrengthNote) }
+        if !generic.isEmpty { sentences.append(thrustmasterGenericNote) }
+        return sentences.joined(separator: " ")
     }
 
     /// What a profile's `wheel` field records, in the player's words. Nil for no field, so a game

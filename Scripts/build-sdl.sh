@@ -116,9 +116,11 @@ for symbol in SDL_Init SDL_JoystickOpen SDL_HapticOpenFromJoystick SDL_HapticNew
 done
 nm -gU "$CACHE/libSDL3.dylib" | grep -q " _SDL_OpenHapticFromJoystick\$" \
   || { echo "error: libSDL3.dylib has no haptic support" >&2; exit 1; }
-# Cellar's Fanatec driver is inside it (a private symbol, so not -g).
-nm "$CACHE/libSDL3.dylib" | grep -q " _CellarFanatec_Create\$" \
-  || { echo "error: libSDL3.dylib was built without Cellar's Fanatec driver" >&2; exit 1; }
+# Cellar's wheel drivers are inside it (private symbols, so not -g).
+for driver in Fanatec Thrustmaster; do
+  nm "$CACHE/libSDL3.dylib" | grep -q " _Cellar${driver}_Create\$" \
+    || { echo "error: libSDL3.dylib was built without Cellar's $driver driver" >&2; exit 1; }
+done
 
 # And that it starts: load it the way winebus does (dlopen by path), bring up the joystick and
 # haptic subsystems, and check sdl2-compat found the SDL 3 beside it. Both slices, where the Mac can
@@ -154,15 +156,17 @@ fi
 
 # Cellar's drivers, tested against this exact SDL on a fake wheel base that records every command:
 # the init sequence, the encoding, the strength cap and stopping on close. Both slices.
-FANATEC="$SDL3_SRC/src/haptic/darwin"
-/usr/bin/clang -arch x86_64 -arch arm64 -mmacosx-version-min=13.0 -std=c99 -Wall -Wextra -Werror \
-  -Wno-unused-parameter -DCELLAR_FFB_STANDALONE -I"$FANATEC" -I"$WORK/prefix/include" \
-  "$FANATEC/SDL_cellar_fanatec.c" Shim/sdl/tests/test_fanatec.c \
-  -L"$WORK/prefix/lib" -lSDL3 -Wl,-rpath,"$PWD/$WORK/prefix/lib" -o "$WORK/test_fanatec"
-"$WORK/test_fanatec"
-if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
-  /usr/bin/arch -x86_64 "$WORK/test_fanatec"
-fi
+DRIVERS="$SDL3_SRC/src/haptic/darwin"
+for driver in fanatec thrustmaster; do
+  /usr/bin/clang -arch x86_64 -arch arm64 -mmacosx-version-min=13.0 -std=c99 -Wall -Wextra -Werror \
+    -Wno-unused-parameter -DCELLAR_FFB_STANDALONE -I"$DRIVERS" -I"$WORK/prefix/include" \
+    "$DRIVERS/SDL_cellar_$driver.c" "Shim/sdl/tests/test_$driver.c" \
+    -L"$WORK/prefix/lib" -lSDL3 -Wl,-rpath,"$PWD/$WORK/prefix/lib" -o "$WORK/test_$driver"
+  "$WORK/test_$driver"
+  if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+    /usr/bin/arch -x86_64 "$WORK/test_$driver"
+  fi
+done
 
 echo "$STAMP" > "$WORK/stamp"
 copy_out

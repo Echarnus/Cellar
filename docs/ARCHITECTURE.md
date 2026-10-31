@@ -437,7 +437,7 @@ The path a game's effect takes, measured on the default runner (WineForge 0.6.0.
    SDL 3.4's HIDAPI layer has wheel drivers that write the vendor's reports itself.
 
 What that covers is exactly `CellarSDL.forceFeedbackWheels`: SDL 3.4's Logitech driver (G29, G27,
-G25, Driving Force GT/Pro), and Cellar's own Fanatec driver. Until a wheel is on that list the app,
+G25, Driving Force GT/Pro), and Cellar's own Fanatec and Thrustmaster drivers. Until a wheel is on that list the app,
 the CLI and the FAQ say "no force feedback yet" for it; a unit test keeps the FAQ and the list in step.
 
 **The Fanatec driver** is `Shim/sdl/0001-cellar-fanatec-force-feedback.patch`. A Fanatec base in PC
@@ -467,8 +467,30 @@ base by vendor and product ID, and hand it to `SDL_cellar_fanatec.c` instead of 
   covers the init sequence, the encoding against hid-fanatecff, the cap, gain, durations, pause and
   stop-on-close. `build-sdl.sh` runs it on every build.
 
-Thrustmaster (T300 family, after `hid-tmff2`) and Logitech's HID++ wheels (G920/G923) are next, as
-patches of the same shape.
+**The Thrustmaster driver** is `Shim/sdl/0002-cellar-thrustmaster-force-feedback.patch`, of the same
+shape, for the T300 family (T300 RS, T300 Ferrari Edition, TX, T248, TS-XW, TS-PC):
+
+- Unlike a Fanatec base, these wheels keep effects themselves, in 16 slots. `SDL_cellar_thrustmaster.c`
+  uploads an effect once, then starts, modifies (only what changed) and stops it by slot, all as
+  output report 0x60. The wheel drops commands that arrive too fast, so calls queue work and a thread
+  sends it every 8 ms. Every packet layout and value scaling is ported from `hid-tmff2`
+  (GPL-2.0-or-later), including its 30% default for spring, damper and friction.
+- **The mode switch.** Every Thrustmaster wheel starts as a generic "Thrustmaster FFB Wheel"
+  (0xb65d) without force feedback, until the host asks its model (USB vendor request 73) and
+  switches it (request 83). Thrustmaster's Windows driver and Linux's `hid-thrustmaster` do this; on
+  a Mac, nothing does. So when Wine asks SDL whether that joystick is haptic, the patch makes the two
+  requests through IOUSBLib and answers no; the wheel drops off the bus and comes back as its own
+  product, which the driver takes. Only T300 models are switched: a T150, T500 or TMX speaks
+  another protocol, and is left alone. The model table is `CellarThrustmaster_SwitchValue`, tested.
+- **Safety.** The cap (`CELLAR_FFB_MAX_PERCENT`, default 100: a belt-driven base is not a
+  direct-drive one) goes through the wheel's own gain, multiplied with the game's, so every effect
+  is scaled by it. Closing the haptic stops each effect still playing and closes the wheel's force
+  feedback.
+- `Shim/sdl/tests/test_thrustmaster.c` checks every packet against the layouts above, the open and
+  close sequence per model, updates sent only on change, expiry, the cap, and stop-on-close.
+
+Logitech's HID++ wheels (G920/G923) are next. The Linux driver for them is GPL-2.0-only, which
+cannot be ported into a GPL-3.0 program, so that one waits on a licence decision.
 `CELLAR_RUNNER_SDL=1` goes back to the runner's SDL, for comparing or when ours misbehaves.
 
 Everything a player must do outside Cellar (PC mode, firmware updates that need Windows) is in
