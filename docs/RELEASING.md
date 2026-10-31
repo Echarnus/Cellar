@@ -112,7 +112,8 @@ publishes the release with its notes.
 `release/0.4` that carries the fix and bumps `CellarVersion.current` to `0.4.1`. Merging that PR
 releases `v0.4.1`. A push to the branch whose version is already tagged releases nothing: the run
 stops after its plan job and says so, so landing a fix without a bump can never move a release.
-`release/0.4` must not be deleted or force-pushed
+Because a push there publishes, only a repository admin can create, push to, or merge into a
+`release/` branch, and nobody can delete or force-push one
 ([`release-branches.json`](../.github/rulesets/release-branches.json)).
 
 Two older ways still work, both from `main`:
@@ -239,7 +240,7 @@ These are settings, not files, so the maintainer applies them once:
    [`.github/rulesets/main.json`](../.github/rulesets/main.json) (protects `main`),
    [`.github/rulesets/tags.json`](../.github/rulesets/tags.json) (release tags can't be moved or
    deleted) and [`.github/rulesets/release-branches.json`](../.github/rulesets/release-branches.json)
-   (release branches can't be deleted or force-pushed).
+   (only an admin can create or update a release branch; none can be deleted or force-pushed).
 3. **Settings → Environments → release**: if it has deployment rules, allow tags matching `v*`
    and the branches `release/*` and `main` (a release runs on one of those; the workflow refuses to
    publish from any other ref).
