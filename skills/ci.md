@@ -10,8 +10,8 @@ The full table, and the delivery flow it serves (issue → PR → auto-merge →
 [`../docs/RELEASING.md`](../docs/RELEASING.md) → *Checks*. In short: `ci.yml` (build, tests,
 self-test, lint), `codeql.yml`, `dependency-review.yml` and `scorecard.yml` guard every PR;
 `release.yml` turns a `v*` tag into a GitHub Release whose notes come from the issues it closed;
-`pages.yml` publishes the site; `labels.yml` applies `.github/labels.yml`;
-`dependabot-auto-merge.yml` merges patch and minor dependency bumps once they are green.
+`pages.yml` publishes the site; `labels.yml` applies `.github/labels.yml`. Nothing auto-merges a PR
+the maintainer didn't open, Dependabot's included.
 
 The runners are **pinned to `macos-15`/`macos-26`** and `ubuntu-24.04`, not `-latest`. Keep it that way —
 `-latest` moves and takes the Xcode/Swift toolchain with it, which is exactly the variable this

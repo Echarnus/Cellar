@@ -36,7 +36,7 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 | `Shim/` | `cellar-dock-shim.c` — the one piece of C in the repo. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts. Built by `Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
 | `Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `gen-site.py` (the GitHub Pages site generator), `release-notes.py` (a release's notes, from the issues it closed), `test.sh` (the test runner). |
 | `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
-| `.github/` | Workflows (`ci`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
+| `.github/` | Workflows (`ci`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
 
 ## Build, run, verify

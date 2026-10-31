@@ -54,8 +54,8 @@ resolved. What this gives up is a second human pair of eyes; with one maintainer
 there. If a contributor joins, raise `required_approving_review_count` to 1 and turn on
 `require_code_owner_review` — CODEOWNERS is already in place.
 
-Dependabot's patch and minor updates auto-merge the same way (`dependabot-auto-merge.yml`); a major
-update waits for a person.
+Only the maintainer's own PRs (including those an agent opens on their behalf) use auto-merge.
+Dependabot's PRs never merge themselves: they are merged by hand once their checks are green.
 
 ## Checks
 
