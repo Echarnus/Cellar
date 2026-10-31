@@ -267,10 +267,19 @@ final class ActivityStore {
                 // From a newer CLI than this app knows: not for the player to read as JSON.
                 continue
             } else {
-                committed += line + "\n"
+                // The observer sees the line as printed — the Accounts QR panel is drawn from it —
+                // but the log never keeps a row of Steam's sign-in code (`isSignInCodeRow`).
                 lineObserver?(line)
+                if Diagnostics.isSignInCodeRow(line) {
+                    if !committed.hasSuffix(Diagnostics.signInCodeRemoved + "\n") {
+                        committed += Diagnostics.signInCodeRemoved + "\n"
+                    }
+                } else {
+                    committed += line + "\n"
+                }
             }
         }
-        log = committed + pending
+        // A partial line can be half a QR row; it is shown once it is whole, or not at all.
+        log = committed + (Diagnostics.isSignInCodeRow(pending) ? "" : pending)
     }
 }

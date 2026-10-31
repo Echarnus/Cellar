@@ -123,7 +123,7 @@ struct GameSummaryTests {
                                 needsLiveSession: false, needsClientAtRuntime: false)
         #expect(installed.nextStep == .play)
         #expect(!installed.clientSignInPending)
-        #expect(installed.actionHint.contains("without opening Steam's client"))
+        #expect(installed.actionHint.contains("without opening Steam."))
     }
 
     // MARK: - Copy

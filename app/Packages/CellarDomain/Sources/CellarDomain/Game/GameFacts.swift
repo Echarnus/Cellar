@@ -46,6 +46,18 @@ public struct GameFacts: Sendable {
         self.notes = notes
     }
 
+    /// What the game page shows about the game: who made it and when. Plain facts a player reads.
+    public var overview: [(label: String, value: String)] {
+        [("Developer", developer), ("Released", released)]
+            .compactMap { label, value in value.map { (label, $0) } }
+    }
+
+    /// How the game is built — for Technical Details, where whoever is fixing a launch looks.
+    public var technical: [(label: String, value: String)] {
+        [("Engine", engine), ("Graphics API", graphicsAPI)]
+            .compactMap { label, value in value.map { (label, $0) } }
+    }
+
     /// The facts worth printing as a spec list, in reading order, skipping what a profile omits.
     public var about: [(label: String, value: String)] {
         [("Developer", developer), ("Released", released),
