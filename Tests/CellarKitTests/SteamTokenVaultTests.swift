@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 import Testing
 @testable import CellarKit
@@ -13,7 +14,9 @@ import Testing
 struct SteamTokenVaultTests {
 
     /// The keychain, in memory. Counts reads of the secret, so a test can prove a path never made one.
-    final class Memory {
+    /// `@unchecked Sendable` because the vault's storage closures are `@Sendable`: the suite is
+    /// serialized, so only one test ever touches a `Memory` at a time.
+    final class Memory: @unchecked Sendable {
         var value: String?
         var reads = 0
         var failSave = false

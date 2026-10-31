@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// `cellar setup`: runner → bottle → initialised prefix → the store's client.

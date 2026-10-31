@@ -1,12 +1,18 @@
+import CellarDomain
 import Testing
 @testable import CellarKit
+import CellarInfrastructure
 
-/// Every store has exactly one adapter, and it is that store's — the one `switch` left.
+/// Every store has exactly one adapter, and it is that store's. The adapters live in
+/// `CellarInfrastructure`; CellarKit sees them only through the registry.
 @Suite(.serialized)
 struct StoreAdapterTests {
 
-    @Test("Each store's adapter is its own", arguments: GameStore.allCases)
+    @Test("Wiring the infrastructure in gives every store an adapter, and each one is its own",
+          arguments: GameStore.allCases)
     func adapterMatchesStore(_ store: GameStore) {
+        CellarInfrastructure.install()
+        #expect(StoreAdapters.isComplete)
         #expect(store.adapter.store == store)
     }
 

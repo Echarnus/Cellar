@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// The game's own `.app`, which the game's Wine process runs from — so macOS sees a game.

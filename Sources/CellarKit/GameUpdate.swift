@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Keeping a game Cellar downloaded itself on the build Steam is serving.

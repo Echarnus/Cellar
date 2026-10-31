@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Downloads files via curl (handles redirects, large files, and shows a live progress bar on a TTY).

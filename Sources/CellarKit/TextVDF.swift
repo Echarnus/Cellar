@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Steam's text key-values format (`config.vdf`, `loginusers.vdf`, `local.vdf`): quoted keys, each

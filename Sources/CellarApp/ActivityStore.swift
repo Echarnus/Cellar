@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 import Observation
 import CellarKit

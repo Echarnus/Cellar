@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// A reference to a game profile TOML on disk. Structured decoding of the full schema

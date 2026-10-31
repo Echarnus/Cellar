@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Where a running Cellar.app is, and whether it ought to be somewhere else.

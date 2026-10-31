@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// A game's readiness, for the GUI to decide what to show (and which button to offer next).

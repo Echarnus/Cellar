@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Generates minimal double-clickable macOS .apps in ~/Applications whose launcher calls `cellar`:

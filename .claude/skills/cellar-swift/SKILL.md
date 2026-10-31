@@ -14,7 +14,9 @@ The full guide is [`skills/swift.md`](../../../skills/swift.md); read it. Key ru
   terminal output is the CLI's job, and it is UI.
 - **Engine actions are use cases** (`Sources/CellarKit/UseCases/`): `LoadLibrary`, `SetUpGame`,
   `InstallGame`, `LaunchGame`, `UninstallGame` — dependencies in `init`, one `run` reporting
-  `GameEvent`s. Per-store behaviour lives in that store's `StoreAdapter`, never a `switch plan.store`.
+  `GameEvent`s. Per-store behaviour lives in that store's `StoreAdapter`, never a `switch plan.store`;
+  the adapters are in `CellarInfrastructure`, imported only by composition roots. Import
+  `CellarDomain` explicitly.
 - **Subprocesses (this project is mostly a process driver).** `Shell.run` drains stdout to EOF *then*
   stderr — safe only because its outputs are tiny, and it says so. A chatty child (Wine, above all)
   can fill the stderr pipe buffer while the parent blocks on stdout and **deadlock both sides**. Use

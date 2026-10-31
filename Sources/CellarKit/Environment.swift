@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 public enum CheckStatus: String {

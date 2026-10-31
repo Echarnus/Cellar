@@ -142,8 +142,8 @@ Three consequences worth stating plainly, because they shape the UI as much as t
 
 All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
 about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a `StoreAdapter`
-(`Sources/CellarKit/StoreAdapter.swift`: client set-up, install, opening the client, launching
-through it), and a CLI command group.
+(`Sources/CellarInfrastructure/StoreAdapters.swift`: client set-up, install, opening the client,
+launching through it, registered in `CellarInfrastructure.install()`), and a CLI command group.
 
 ### One Steam, every bottle
 

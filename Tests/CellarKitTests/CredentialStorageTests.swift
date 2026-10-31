@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 import Security
 import Testing

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// `cellar uninstall`: what removing a game would take away, then taking it.

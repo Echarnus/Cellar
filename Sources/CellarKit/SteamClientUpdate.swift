@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Steam's first self-update, done where the player can see it: in Cellar.

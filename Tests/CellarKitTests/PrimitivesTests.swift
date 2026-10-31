@@ -1,3 +1,4 @@
+import CellarDomain
 import Testing
 import Foundation
 @testable import CellarKit

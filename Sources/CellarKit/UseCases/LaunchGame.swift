@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// `cellar launch`: start the game by whichever route its profile and its store call for,

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// A game's frame rate, measured rather than eyeballed — read back from the Metal performance HUD's

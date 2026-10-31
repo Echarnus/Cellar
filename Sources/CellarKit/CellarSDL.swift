@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Cellar's own build of SDL, loaded by Wine ahead of the runner's.

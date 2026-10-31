@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Shared helper for the Windows installers the stores hand us.

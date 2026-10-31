@@ -1,3 +1,4 @@
+import CellarDomain
 import SwiftUI
 import AppKit
 import CellarKit
@@ -108,7 +109,7 @@ public enum StoreIcons {
 
 /// A type-erased `InsettableShape`, so `outline(of:size:)` can hand back either a circle or a tile
 /// and callers can still `strokeBorder` it. SwiftUI's own `AnyShape` loses insettability.
-public struct AnyInsettableShape: InsettableShape {
+nonisolated public struct AnyInsettableShape: InsettableShape {
     private let makePath: @Sendable (CGRect) -> Path
     private let makeInset: @Sendable (CGFloat) -> AnyInsettableShape
 
@@ -169,7 +170,7 @@ private struct SteamMark: View {
 }
 
 /// A straight segment between two points given in fractions of the mark's box.
-private struct MarkLine: Shape {
+nonisolated private struct MarkLine: Shape {
     let from: CGPoint, to: CGPoint
 
     func path(in rect: CGRect) -> Path {
@@ -182,7 +183,7 @@ private struct MarkLine: Shape {
 }
 
 /// A disc whose centre and radius are fractions of the mark's box.
-private struct MarkDisc: Shape {
+nonisolated private struct MarkDisc: Shape {
     let center: CGPoint, radius: CGFloat
 
     func path(in rect: CGRect) -> Path {
@@ -227,7 +228,7 @@ private struct BattleNetMark: View {
 /// The arc is sampled rather than fitted to Béziers on purpose: the taper is the whole character of
 /// the mark, and a sampled centreline with an offset normal is the one construction where the
 /// profile stays exactly what the numbers say at every size.
-private struct OrbitBlade: Shape {
+nonisolated private struct OrbitBlade: Shape {
     /// Semi-axes of the orbit, in fractions of the box. Flattened hard — `b` is what sets how close
     /// the arc passes to the middle, and so how large the triangle in the centre comes out.
     var a: CGFloat = 0.415
@@ -350,7 +351,7 @@ private struct GOGMark: View {
 /// stroke around a four-unit counter, and the two details that make the word read as *gog* rather
 /// than as *909* are both in here — the `g`'s crossbar stops one unit short of the right stem, and
 /// the `g` carries a real descender that drops below the `o`'s baseline.
-private struct BlockWord: Shape {
+nonisolated private struct BlockWord: Shape {
     let lines: [String]
 
     /// The glyphs, drawn as they are: `#` is ink, `.` is paper. Rows are the grid's rows, so a

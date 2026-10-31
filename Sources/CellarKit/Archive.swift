@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Archive and disk-image helpers built on the system `tar`, `unzip`, and `hdiutil`.

@@ -42,7 +42,9 @@ public struct KegMark: View {
 
 /// The keg's parts, each as a `Shape` so SwiftUI does the scaling. Everything is in fractions of the
 /// shape's box; the box is square and the keg fills its height, standing a little narrower than wide.
-public enum KegShape {
+// Pure geometry, so it opts out of the module's main-actor default: SwiftUI asks a `Shape` for its
+// path from any thread, and `Shape` requires `Sendable`.
+nonisolated public enum KegShape {
     // Rim centres and radii. `ry` is the half-height of the elliptical rims — the same slight top-down
     // view as the icon, so the hoops curve the same way the lid does.
     static let left = 0.14, right = 0.86, topY = 0.12, botY = 0.80, ry = 0.055, bulge = 0.10
@@ -98,7 +100,7 @@ public enum KegShape {
 
     /// The solid glyph: body minus the two hoops, joined with the tap hanging below the rim. Built
     /// with CoreGraphics set operations so the result is one region and fills under any rule.
-    public struct Filled: Shape {
+    nonisolated public struct Filled: Shape {
         public init() {}
         public func path(in r: CGRect) -> Path {
             let body = silhouette(in: r).cgPath
@@ -108,7 +110,7 @@ public enum KegShape {
     }
 
     /// The line drawing: body, lid front edge, and both hoops as strokes.
-    public struct Outline: Shape {
+    nonisolated public struct Outline: Shape {
         public init() {}
         public func path(in r: CGRect) -> Path {
             var p = silhouette(in: r)
@@ -120,7 +122,7 @@ public enum KegShape {
 
     /// The tap: a short spout reaching below the bottom rim, with a handle across it. Solid in both
     /// styles — at glyph sizes it is two or three pixels, and a stroked version would be noise.
-    public struct Tap: Shape {
+    nonisolated public struct Tap: Shape {
         public init() {}
         public func path(in r: CGRect) -> Path {
             let spoutW = 0.10, spoutTop = botY + 0.02, spoutBot = 0.97

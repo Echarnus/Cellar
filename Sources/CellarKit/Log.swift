@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// How loud an entry is. `debug` is kept too — the point of the log is that when a player comes

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Putting the machine back to "Cellar has never run here".

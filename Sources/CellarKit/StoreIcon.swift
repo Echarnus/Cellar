@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Each store's **own** icon, taken from the copy of that store already on this machine.

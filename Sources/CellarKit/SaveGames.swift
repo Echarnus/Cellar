@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// The save games inside Cellar's bottles, found and copied out before an uninstall removes them.

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Installs and drives the **Battle.net desktop app** inside a Wine bottle — the way Blizzard

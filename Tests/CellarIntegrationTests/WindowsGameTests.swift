@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 import Testing
 @testable import CellarKit
@@ -149,7 +150,7 @@ struct WindowsGameTests {
         #expect(ready.actionHint.contains("without opening"))
 
         // 6. Launch it — the real thing, through the same call the Play button makes.
-        let route = try Game.launch(plan) { IT.log($0) }
+        let route = try Game.launch(plan, progress: { IT.log($0) })
         guard case .direct(let exeName) = route else {
             Issue.record("expected the direct route for a DRM-free game, got \(route)")
             return

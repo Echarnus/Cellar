@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Drives a Wine runner against a specific prefix. The x86_64-only Wine binaries are executed

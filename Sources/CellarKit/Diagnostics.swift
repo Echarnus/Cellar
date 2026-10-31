@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Turns the rolling log into something that can be *sent*.
@@ -54,8 +55,8 @@ public enum Diagnostics {
     private static let lock = NSLock()
     /// Keyed by slug, not a single slot: one process can have two games up (the app launches each
     /// through its own `cellar launch`, but nothing stops two launches sharing a process), and the
-    /// second one must not erase the first one's start time.
-    private static var open: [String: PlaySession] = [:]
+    /// second one must not erase the first one's start time. Only touched under `lock`.
+    nonisolated(unsafe) private static var open: [String: PlaySession] = [:]
 
     /// A game is up. Remembered in-process so the matching exit can be logged with a duration —
     /// `cellar launch` starts the game and waits for it in the same process.

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// A node in Steam's binary key-values (binKV) format used by shortcuts.vdf.

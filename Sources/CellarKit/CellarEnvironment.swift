@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// The outside world, as one value a piece of CellarKit is handed instead of reaching for it.

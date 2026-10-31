@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Files that hold a credential, or say whose account this is, kept readable by the player alone.

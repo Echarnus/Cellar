@@ -1,3 +1,4 @@
+import CellarDomain
 import Compression
 import Foundation
 import Testing

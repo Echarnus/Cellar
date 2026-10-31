@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Copies of one bottle's save games, taken before anything that could lose them and on request.
