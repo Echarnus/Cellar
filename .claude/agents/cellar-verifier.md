@@ -33,7 +33,7 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
   controls have both
   `.accessibilityLabel` and `.help`. Per-store behaviour lives in `GameStore.descriptor`, not in a
   `switch` inside a view. **Demand a screenshot of the changed screen from a launched build.**
-- **Swift/GUI** ([`skills/swift.md`](../../skills/swift.md)): logic stayed in CellarKit (not copied
+- **Swift/GUI** ([`skills/swift.md`](../../skills/swift.md)): logic stayed in CellarData (not copied
   into a command/view); the app still drives the CLI for actions; **no** `NavigationSplitView` and
   **no** detail-pane `.animation`/`.transition`; the hand-built menu (App/Edit/Window, ⌘Q) is intact;
   every `@State`-gated sheet has a matching `.sheet`. Demand evidence the app was actually launched

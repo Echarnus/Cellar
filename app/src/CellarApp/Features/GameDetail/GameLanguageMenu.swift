@@ -1,6 +1,6 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
+import CellarData
 
 /// The game page's language submenu: this game's own language, or the one every game uses. Kept in
 /// the game's bottle (`bottle.toml`), so it needs one — a game not set up yet has nowhere to keep it.

@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 
 /// The Battle.net plugin — the sibling of `cellar steam`, deliberately shaped the same way so the
 /// two stores are learned once. Where the wording differs, it is because Battle.net genuinely

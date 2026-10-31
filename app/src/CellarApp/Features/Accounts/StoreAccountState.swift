@@ -1,6 +1,6 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
+import CellarData
 import CellarUI
 
 /// A snapshot of every store's sign-in state, read once per refresh — never from a view body.
@@ -10,7 +10,7 @@ import CellarUI
 /// which is how this app has crashed in AttributeGraph before (skills/swift.md).
 // Built off the main actor (`AccountsViewModel.refresh`) and handed back to it, so it is plain Sendable data.
 nonisolated struct StoreAccountState: Sendable {
-    /// The one Steam sign-in, as CellarKit computed it. The view never derives this itself, so the
+    /// The one Steam sign-in, as CellarData computed it. The view never derives this itself, so the
     /// app and `cellar accounts` cannot describe the same session differently.
     var steam: SteamAccount.State = .signedOut
     /// The account signed in to the *in-bottle Windows client*, when there is one. A fact about the

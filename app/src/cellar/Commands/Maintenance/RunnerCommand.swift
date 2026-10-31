@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 
 struct RunnerCommand: ParsableCommand {
     static let configuration = CommandConfiguration(

@@ -1,4 +1,4 @@
-// Builds the signed game-database bundle a release publishes (`ProfileUpdates` in CellarKit).
+// Builds the signed game-database bundle a release publishes (`ProfileUpdates` in CellarData).
 //
 //   swift Scripts/profiles-bundle.swift VERSION OUT_DIR
 //       writes OUT_DIR/profiles.json from profiles/*.toml, and OUT_DIR/profiles.json.sig when

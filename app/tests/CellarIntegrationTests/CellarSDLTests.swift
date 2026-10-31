@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// Tier A: the SDL Cellar actually ships. `Scripts/build-sdl.sh` builds it into `.build/sdl` (CI does
 /// that before the tests); this loads that real library the way winebus does — `dlopen`, then the

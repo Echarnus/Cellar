@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 import CellarUI
 
 /// Settings — and, first of all, **the** sign-in.

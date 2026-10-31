@@ -1,7 +1,7 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
+import CellarData
 
 /// The library's footer line while preparation runs: a small spinner and what is happening, with
 /// the why on hover. Nothing at all once it is done — there is nothing left to say.

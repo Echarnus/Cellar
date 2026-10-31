@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 import CellarInfrastructure
 import Foundation
 
@@ -91,7 +91,7 @@ struct Cellar: ParsableCommand {
         // the code ~20s later. One command that streams is an exception someone has to remember; the
         // whole CLI streaming is just how it behaves, and flushing per line costs nothing here.
         setvbuf(stdout, nil, _IOLBF, 0)
-        // The composition root: CellarKit's ports get their real adapters here, once, before any
+        // The composition root: CellarData's ports get their real adapters here, once, before any
         // command can reach a store.
         CellarInfrastructure.install()
 

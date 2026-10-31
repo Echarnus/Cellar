@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Observation
-import CellarKit
+import CellarData
 import CellarUI
 
 /// The library: which games the player has, which one is selected, and how the sidebar is narrowed.

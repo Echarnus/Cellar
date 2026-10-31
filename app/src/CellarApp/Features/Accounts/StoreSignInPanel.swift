@@ -1,6 +1,6 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
+import CellarData
 
 /// Every store's sign-in row, in one reusable view — the single place that behaviour is written.
 ///

@@ -1,11 +1,11 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
+import CellarData
 
 /// Settings › General › Racing wheels: how hard a wheel Cellar drives may push. Kept in
 /// `settings.toml` and handed to Cellar's SDL at launch (`CellarSDL.strengthEnvironment`).
 ///
-/// Writes through CellarKit directly rather than through the `cellar` subprocess, for the same
+/// Writes through CellarData directly rather than through the `cellar` subprocess, for the same
 /// reason as `GameLanguageSection`: one line in a settings file, which must not be refused while a
 /// game is playing.
 struct WheelStrengthSection: View {

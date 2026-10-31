@@ -1,7 +1,7 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
+import CellarData
 
 /// The game's log, live: what Cellar did for it and the tail of Wine's output, re-read every two
 /// seconds while it is open. Copy for a forum post, or the full diagnostics report for an issue.

@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Observation
-import CellarKit
+import CellarData
 
 /// Settings' own state: the facts its panes read from this Mac (the runner, the game database, what
 /// Cellar takes on disk, the kept log) and the diagnostics export, in every state it can be in.

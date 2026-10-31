@@ -2,7 +2,7 @@ import CellarDomain
 import Testing
 import SwiftUI
 import Foundation
-import CellarKit
+import CellarData
 import CellarUI
 
 /// Renders every store mark, lockup and cover into one PNG.

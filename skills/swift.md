@@ -22,17 +22,17 @@ machinery unless a target genuinely needs it.
 - **Per-store behaviour belongs in `GameStore.descriptor`** (`GameStore.swift`), not in a `switch` inside
   a view or a command. If a view needs to know that Battle.net's installer isn't silent, that fact
   should reach it as data.
-- **All logic lives in `CellarKit`.** The CLI (`app/src/cellar`) and the app (`app/src/CellarApp`)
-  are thin. Never duplicate engine logic in a command or a view — add it to CellarKit and call it.
+- **All logic lives in `CellarData`.** The CLI (`app/src/cellar`) and the app (`app/src/CellarApp`)
+  are thin. Never duplicate engine logic in a command or a view — add it to CellarData and call it.
 - **The GUI drives the CLI as a subprocess** for side-effecting actions (setup, install, launch), so
   it inherits every tested path (silent Steam, the launch auto-retry, close-on-exit). Read-only state
   comes from `LoadLibrary`. Don't reimplement an action inside the app.
-- **An engine action is a use case** (`app/Packages/CellarKit/Sources/CellarKit/UseCases/`: `LoadLibrary`, `SetUpGame`,
+- **An engine action is a use case** (`app/Packages/CellarData/Sources/CellarData/UseCases/`: `LoadLibrary`, `SetUpGame`,
   `InstallGame`, `LaunchGame`, `UninstallGame`): a small struct, its dependencies passed to `init`,
   one `run` that reports `GameEvent`s. CLI commands call the use case; `Game.setUp`/`Game.launch`
   are façades kept for older callers. Per-store behaviour goes in the store's `StoreAdapter`, never
   in a `switch plan.store` inside a use case. The adapters live in `CellarInfrastructure`, which only
-  composition roots import (the CLI's `main`, the app's `main.swift`, the tests' set-up); CellarKit sees them through
+  composition roots import (the CLI's `main`, the app's `main.swift`, the tests' set-up); CellarData sees them through
   `StoreAdapters`. Import `CellarDomain` explicitly wherever a domain type is used.
 - **The app names a command with `CellarCommand`, never a hand-built argument list.** Add a case
   (and an entry in `CellarCommand.examples`) for anything new the app asks the CLI to do;
@@ -43,7 +43,7 @@ machinery unless a target genuinely needs it.
   actions. Views read state and call the store's methods; they never assign to it. The target and
   the migration are in [`docs/APP-ARCHITECTURE.md`](../docs/APP-ARCHITECTURE.md).
 - **CLI:** one file per command group under `Commands/`, ArgumentParser, small `struct` commands.
-- **CellarKit never prints.** Terminal output is the CLI's job (and is UI — see [`ux.md`](ux.md)).
+- **CellarData never prints.** Terminal output is the CLI's job (and is UI — see [`ux.md`](ux.md)).
   A library function that `print`s cannot be reused by the app, which renders the same information.
   Return values or `throw`; let the front-end word it.
 
@@ -118,7 +118,7 @@ executable can't use a `@main` App scene). That host has sharp edges we've alrea
 Swift 5 language mode means the compiler is *not* checking you. That is a reason for discipline, not
 a licence:
 
-- Keep CellarKit's public types **value types with no shared mutable state** — they are then
+- Keep CellarData's public types **value types with no shared mutable state** — they are then
   `Sendable` by construction, and the eventual Swift 6 migration is mechanical.
 - Anything that touches `NSHostingView`, `NSWindow` or SwiftUI state is **`@MainActor` in practice**.
   Annotate it, even in v5 mode, so the intent survives the migration.
@@ -153,9 +153,9 @@ When you add tests (and new pure logic should come with them):
 - Match the file you're in: small types, descriptive names, comments only where intent isn't obvious.
 - Follow the Swift API Design Guidelines: name methods for their side effects (`setUp()`, not
   `doSetup()`), keep argument labels reading as a phrase, and don't abbreviate.
-- Prefer value types and pure functions in CellarKit; keep side effects (shell, filesystem) behind
+- Prefer value types and pure functions in CellarData; keep side effects (shell, filesystem) behind
   named helpers (`Shell`, `Paths`, …) that already exist.
-- Public API on CellarKit types is a contract the CLI and app both use — widen it deliberately.
+- Public API on CellarData types is a contract the CLI and app both use — widen it deliberately.
 - Every `CellarError` on a player-facing path ends with the command or button that fixes it — that is
   a UX rule, enforced in [`ux.md`](ux.md).
 

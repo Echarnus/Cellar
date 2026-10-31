@@ -1,6 +1,6 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
+import CellarData
 import CellarUI
 
 /// Steam's QR challenge, drawn at a size a phone camera can actually read.

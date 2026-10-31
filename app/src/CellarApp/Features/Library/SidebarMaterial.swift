@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 import CellarUI
 
 /// The sidebar's translucent material. `NSVisualEffectView` rather than a SwiftUI `Material`,

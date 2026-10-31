@@ -26,7 +26,7 @@ The diff (or list of changed files) and a one-line statement of intent.
 - `swift run cellar selftest` passes when `app/src/**` changed.
 
 **2. It matches the verification ladder for the kind of change** (see [`../AGENTS.md`](../AGENTS.md)):
-- **Swift/GUI** ([`../skills/swift.md`](../skills/swift.md)): logic stayed in CellarKit (not copied
+- **Swift/GUI** ([`../skills/swift.md`](../skills/swift.md)): logic stayed in CellarData (not copied
   into a command or view); the app still drives the CLI for actions; no `NavigationSplitView` and no
   detail-pane `.animation`/`.transition` (AttributeGraph crash); the hand-built menu (App/Edit/Window,
   ⌘Q) is intact; any `@State`-gated sheet has a matching `.sheet`. Evidence that the app was actually

@@ -7,7 +7,7 @@ these for the language you're touching. Claude Code auto-discovers its own copie
 | Skill | Use when you're working on |
 |---|---|
 | [`ux.md`](ux.md) | **anything a player sees** — the app, CLI wording, errors. Read this first |
-| [`swift.md`](swift.md) | `app/src/**` — CellarKit, the `cellar` CLI, or the SwiftUI app |
+| [`swift.md`](swift.md) | `app/src/**` — CellarData, the `cellar` CLI, or the SwiftUI app |
 | [`wine-and-runners.md`](wine-and-runners.md) | the translation layer — runners, backends, bottles, launching |
 | [`profiles.md`](profiles.md) | `profiles/*.toml` — adding a game, changing the schema |
 | [`web.md`](web.md) | the static site (the page itself) |

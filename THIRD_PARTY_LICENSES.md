@@ -74,6 +74,6 @@ Cellar is **GPL-3.0** ([LICENSE](LICENSE)), which is compatible with every shipp
 (Apache-2.0 is GPL-3.0-compatible; the Runtime Library Exception makes it moot for compiled code).
 Run-time components are separate programs and keep their own licences.
 
-When a new component is added, add a row here, a `Credit` in `app/Packages/CellarKit/Sources/CellarKit/Core/Credits.swift`, and —
+When a new component is added, add a row here, a `Credit` in `app/Packages/CellarData/Sources/CellarData/Core/Credits.swift`, and —
 if it ends up inside a Cellar artifact — its licence text in [`licenses/`](licenses/). The test
 `CreditsTests` fails if a runner or tool is downloaded from a publisher the credits do not name.

@@ -1,13 +1,13 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
+import CellarData
 
 /// The game page's display and performance switches. Each is one `PerformanceSetting`, written into
 /// the bottle (`bottle.toml`) exactly as `cellar perf set` writes it, so the app and the CLI can
 /// never disagree about what a game will get. Applies from the next launch.
 ///
-/// Writes through CellarKit directly, like the language picker: one line in a settings file, and
+/// Writes through CellarData directly, like the language picker: one line in a settings file, and
 /// the runner refuses work while a game is playing.
 struct GameSettingsSection: View {
     let game: GameSummary

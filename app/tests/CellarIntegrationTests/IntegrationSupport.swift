@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 import CellarInfrastructure
 
 /// Shared machinery for Cellar's integration tests.

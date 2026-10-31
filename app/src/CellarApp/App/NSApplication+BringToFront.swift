@@ -1,6 +1,6 @@
 import CellarDomain
 import AppKit
-import CellarKit
+import CellarData
 import SwiftUI
 
 extension NSApplication {

@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Observation
-import CellarKit
+import CellarData
 
 /// Where the player is signed in, for every window that shows it — Settings and the welcome tour
 /// used to read it into a `@State` each, with a copy of the same refresh in both.
