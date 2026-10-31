@@ -176,4 +176,28 @@ struct SupplyChainTests {
         #expect(script.contains("<key>SUPublicEDKey</key>"))
         #expect(script.contains("<key>SUAllowsAutomaticUpdates</key><false/>"))
     }
+
+    // MARK: - The signing keys
+
+    @Test("A release publishes the signed game database once its key exists, and the bundler finds the profiles")
+    func releasePublishesGameDatabase() throws {
+        let workflow = try String(contentsOf: Repo.root.appendingPathComponent(".github/workflows/release.yml"), encoding: .utf8)
+        #expect(workflow.contains("PROFILES_SIGNING_KEY: ${{ secrets.PROFILES_SIGNING_KEY }}"))
+        #expect(workflow.contains("swift Scripts/profiles-bundle.swift \"$VERSION\" dist"))
+        #expect(workflow.contains("dist/profiles.json dist/profiles.json.sig"))
+        // The bundler runs from app/Scripts; the profiles live at the checkout root.
+        let bundler = try String(contentsOf: Repo.app.appendingPathComponent("Scripts/profiles-bundle.swift"), encoding: .utf8)
+        #expect(bundler.contains("root.deletingLastPathComponent().appendingPathComponent(\"profiles\""))
+        #expect(bundler.contains("--public-key"))
+    }
+
+    @Test("The one-time key script keeps private keys off disk and out of the repository")
+    func signingKeysScript() throws {
+        let script = try String(contentsOf: Repo.app.appendingPathComponent("Scripts/signing-keys.sh"), encoding: .utf8)
+        #expect(script.contains("sh Scripts/sparkle-keys.sh"))
+        #expect(script.contains("gh secret set PROFILES_SIGNING_KEY --repo \"$REPO\" --env release"))
+        #expect(script.contains("security add-generic-password -s \"$SERVICE\""), "the keychain copy is the backup")
+        #expect(!script.contains("> \"$"), "a private key is never redirected into a file")
+        #expect(script.contains("ProfileUpdates.swift"))
+    }
 }

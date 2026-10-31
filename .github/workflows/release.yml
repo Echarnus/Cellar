@@ -215,6 +215,18 @@ jobs:
           else
             echo "::notice::No appcast: needs Scripts/make-appcast.sh, Resources/sparkle-public-key and the SPARKLE_ED_PRIVATE_KEY secret."
           fi
+      # The game database between releases (ProfileUpdates): profiles.json + its Ed25519 signature,
+      # published with every release once the key exists (Scripts/signing-keys.sh). Without the
+      # key nothing is published, because no installed Cellar would accept an unsigned set.
+      - name: Game database (profiles.json)
+        env:
+          PROFILES_SIGNING_KEY: ${{ secrets.PROFILES_SIGNING_KEY }}
+        run: |
+          if [ -n "$PROFILES_SIGNING_KEY" ]; then
+            swift Scripts/profiles-bundle.swift "$VERSION" dist
+          else
+            echo "::notice::No game database published: needs the PROFILES_SIGNING_KEY secret (Scripts/signing-keys.sh)."
+          fi
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -226,6 +238,7 @@ jobs:
         run: |
           set -- dist/*.dmg dist/*.zip dist/SHA256SUMS.txt
           [ -f dist/appcast.xml ] && set -- "$@" dist/appcast.xml
+          [ -f dist/profiles.json.sig ] && set -- "$@" dist/profiles.json dist/profiles.json.sig
           prerelease=""
           case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
           # shellcheck disable=SC2086 # $prerelease is intentionally empty or one flag
