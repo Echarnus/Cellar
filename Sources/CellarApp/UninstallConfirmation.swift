@@ -21,7 +21,8 @@ enum UninstallConfirmation {
     /// `confirmed` is called only when the player has actually agreed.
     @MainActor
     static func ask(for game: GameSummary, scope: RemovalScope,
-                    measured: @escaping () -> Void = {}, confirmed: @escaping () -> Void) {
+                    measured: @escaping @MainActor () -> Void = {},
+                    confirmed: @escaping @MainActor () -> Void) {
         guard let plan = try? Game.plan(slug: game.slug) else { measured(); return }
 
         Task.detached {
@@ -35,7 +36,7 @@ enum UninstallConfirmation {
 
     @MainActor
     private static func present(_ removal: RemovalPlan, game: GameSummary,
-                                confirmed: @escaping () -> Void) {
+                                confirmed: @escaping @MainActor () -> Void) {
         let alert = NSAlert()
         alert.alertStyle = .warning
 
