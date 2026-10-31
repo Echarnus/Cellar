@@ -237,7 +237,7 @@ code{font:.86em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(-
 .hero .ctas{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .hero .fine{margin:18px 0 0;font-size:.9rem;color:#fff}
 .hero .fine a{color:#fff}
-.shelf{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:1/1}
+.shelf{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:1.08/1}
 @media (max-width:600px){.shelf{display:none}}
 .shelf .cover{position:absolute;width:44%;aspect-ratio:2/3;border-radius:14px;overflow:hidden;
   box-shadow:0 26px 60px rgba(0,0,0,.45);background:linear-gradient(160deg,#c4466e,#4a0f22)}
@@ -245,10 +245,11 @@ code{font:.86em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(-
 .shelf .c1{left:2%;top:14%;transform:rotate(-8deg)}
 .shelf .c2{left:28%;top:2%;z-index:2;width:46%}
 .shelf .c3{right:2%;top:14%;transform:rotate(8deg)}
-/* The icon sits under the covers, not on them, so it never hides a game's title. Its PNG carries
-   macOS's transparent margin and its own rounded tile: the shadow follows the tile (drop-shadow),
-   and height:auto keeps it square — the height attribute alone would pin it at 256px tall. */
-.shelf .appicon{position:absolute;z-index:3;left:50%;bottom:0;transform:translateX(-50%);width:24%;height:auto;
+/* The icon overlaps the bottom edge of the middle cover by about 40% of its height: enough to
+   tie it to the shelf, low enough to leave cover titles clear. Its PNG carries macOS's transparent
+   margin and its own rounded tile: the shadow follows the tile (drop-shadow), and height:auto
+   keeps it square — the height attribute alone would pin it at 256px tall. */
+.shelf .appicon{position:absolute;z-index:3;left:50%;bottom:8%;transform:translateX(-50%);width:24%;height:auto;
   aspect-ratio:1/1;filter:drop-shadow(0 14px 22px rgba(0,0,0,.45))}
 .page-head{color:#fff;background:radial-gradient(120% 140% at 15% -20%,var(--hero-1) 0%,var(--hero-2) 50%,var(--hero-3) 100%)}
 .page-head .wrap{padding-top:56px;padding-bottom:56px}
