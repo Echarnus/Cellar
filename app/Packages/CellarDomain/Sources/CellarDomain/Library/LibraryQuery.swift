@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// What the library sidebar shows, worked out from the games and the player's search and filters —

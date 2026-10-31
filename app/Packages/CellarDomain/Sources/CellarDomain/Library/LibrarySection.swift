@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// One store's games in the sidebar — or the games of that store whose profile Cellar guessed.
