@@ -1,0 +1,58 @@
+# Cellar game profile — Cities: Skylines II
+#
+# Colossal Order's city builder, on Unity's HDRP with DirectX 11. From Steam's Play button the
+# game does not start itself: Steam runs the Paradox Launcher (Launcher/dowser.exe in the install
+# folder), which then starts Cities2.exe. Wine players report that launcher failing to open again
+# after the first run. A copy Cellar downloaded is started as Cities2.exe directly, beside a quiet
+# Steam client, so the launcher is never in the way; a copy Steam's own client installed still
+# goes through `steam://rungameid` and therefore through the launcher.
+#
+# Not yet run on a Mac by Cellar; status says untested until Kenneth runs it.
+
+[game]
+slug          = "cities-skylines-2"
+name          = "Cities: Skylines II"
+developer     = "Colossal Order"
+publisher     = "Paradox Interactive"
+steam_appid   = 949230
+engine        = "Unity (HDRP)"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2023-10-24"
+store         = "steam"
+
+[compatibility]
+# No kernel anti-cheat: the game is single-player. Paradox publishes no anti-cheat for it.
+anticheat                   = "none"
+drm                         = "Steamworks (needs a running Steam client)"
+needs_live_session          = true
+# A Paradox account is only asked for by Paradox Mods, the in-game mod browser. Playing does not
+# need one. Wine reports say Paradox Mods downloads fail with a disk error; not yet seen by Cellar.
+requires_account            = "Steam (a Paradox account is optional, for Paradox Mods)"
+online                      = "single-player (Paradox Mods and Steam Cloud are optional)"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Public reports all run it through D3DMetal: CrossOver 24 on an M1 MacBook Pro 16 GB rated playable at about 15 FPS, Whisky on an M1 Max 32 GB playable on the Very Low preset, and GPTK 2 on an M3 Pro on High (about 25 FPS reported on an M1 Pro, 30 on an M1 Max). Known under Wine: switching away from the game can leave its lighting or input broken until a restart, and borderless windowed mode can run in slow motion, so pick full screen. Expect a large city to be limited by the CPU, as it is on Windows. DXVK is the fallback."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal first: the only route any public Mac report used for this DX11 Unity title.
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 949230
+# Steam's install folder (steamapps/common/Cities Skylines II, no colon) and the game binary at its
+# root, as Proton players quote them when they point Steam past the launcher.
+install_dir = "Cities Skylines II"
+exe         = "Cities2.exe"
+
+[legal]
+# Steamworks runs untouched inside the layer, and Cellar does not edit the game's own files.
+# Only ever used with a copy the player owns.
+drm_circumvention = "never"
