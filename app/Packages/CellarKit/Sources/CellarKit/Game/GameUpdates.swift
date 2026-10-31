@@ -13,16 +13,8 @@ import Foundation
 /// hands the same account for the same app today (`-manifest-only`, which moves no game files).
 /// They are compared depot by depot, by manifest id — no version strings, no guessing from dates.
 public enum GameUpdates {
-    /// What Cellar knows about whether a downloaded game is current.
-    public enum State: Sendable, Equatable {
-        /// Steam confirmed every depot matches what is on disk, at `checked`.
-        case upToDate(checked: Date)
-        /// Steam is serving a newer build than the one on disk.
-        case available(checked: Date)
-        /// Not asked yet, or the question could not be answered. Never shown as "up to date": a
-        /// check that did not happen is not a check that passed.
-        case unknown(String)
-    }
+    /// The answer, as a domain value every layer can name.
+    public typealias State = UpdateState
 
     /// Whether Cellar is the one keeping this copy current: a Steam app it downloaded itself, and
     /// not one Steam's own library also has (Steam updates those, and Play goes through Steam).

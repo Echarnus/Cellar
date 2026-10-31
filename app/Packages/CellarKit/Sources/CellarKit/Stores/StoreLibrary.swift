@@ -4,16 +4,8 @@ import Foundation
 /// The library gate: connected? owned? — asked once, answered the same way everywhere.
 public enum StoreLibrary {
 
-    /// Why a game is or isn't in the library, in a form both front-ends can render.
-    public struct Verdict: Sendable, Equatable {
-        public let ownership: Ownership
-        /// Whether the game belongs in the player's library at all.
-        public let isVisible: Bool
-        /// What to say about it, when it needs saying.
-        public let note: String?
-        /// The action that would resolve an unknown, when there is one.
-        public let fix: String?
-    }
+    /// Why a game is or isn't in the library, as a domain value every layer can name.
+    public typealias Verdict = LibraryVerdict
 
     /// Decide one game's place in the library.
     ///

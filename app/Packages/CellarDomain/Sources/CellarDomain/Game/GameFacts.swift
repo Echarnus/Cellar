@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// What a profile knows *about* the game, as opposed to how to run it.
@@ -51,13 +50,6 @@ public struct GameFacts: Sendable {
     public var about: [(label: String, value: String)] {
         [("Developer", developer), ("Released", released),
          ("Engine", engine), ("Graphics", graphicsAPI)]
-            .compactMap { label, value in value.map { (label, $0) } }
-    }
-
-    /// The facts that answer "will this actually run, and what does it want from me?".
-    public var compatibility: [(label: String, value: String)] {
-        [("Anti-cheat", anticheat), ("DRM", drm), ("Online", online), ("Account", requiresAccount),
-         ("Controller", Controllers.support(controller)), ("Racing wheel", Wheels.support(wheel))]
             .compactMap { label, value in value.map { (label, $0) } }
     }
 }
