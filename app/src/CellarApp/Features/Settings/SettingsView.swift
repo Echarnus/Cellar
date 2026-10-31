@@ -25,21 +25,8 @@ struct SettingsView: View {
     /// callback rather than `dismiss`.
     var onClose: () -> Void = {}
 
-    /// Where the diagnostics export has got to. Every one of these states is drawn: a button that
-    /// silently writes a file somewhere is a button the player can't trust.
-    private enum Export: Equatable {
-        case idle, working
-        case written(URL)
-        case failed(String)
-    }
-    @State private var export: Export = .idle
-    /// Read after the first layout, never from the body (skills/swift.md).
-    @State private var databaseVersion = ""
-    /// Measured off the main thread when the pane opens: walking a 100 GB game takes seconds.
-    @State private var storageUsage: [GameStorage.Usage] = []
-
-    private var runnerName: String { RunnerManager.installed().first?.spec.displayName ?? String(localized: "not installed") }
-    private var depot: String { DepotTool.isInstalled ? "installed" : String(localized: "installs on first download") }
+    /// What the panes read from this Mac, and the diagnostics export.
+    @State private var model = SettingsViewModel()
 
     /// Every state of the background download, said plainly — including "off".
     private var preparationNote: String {
@@ -112,8 +99,8 @@ struct SettingsView: View {
 
                 Form {
                     Section("Runtime") {
-                        LabeledContent("Wine runner", value: runnerName)
-                        LabeledContent("DepotDownloader", value: depot)
+                        LabeledContent("Wine runner", value: model.runnerName)
+                        LabeledContent("DepotDownloader", value: model.depot)
                         Toggle("Download what every game needs ahead of time", isOn: Binding(
                             get: { preparation.isEnabled },
                             set: { preparation.isEnabled = $0 }))
@@ -246,27 +233,21 @@ struct SettingsView: View {
     /// build that has no key to check a download with.
     @ViewBuilder private var gameDatabase: some View {
         Section("Game database") {
-            LabeledContent("In use", value: databaseVersion)
+            LabeledContent("In use", value: model.databaseVersion)
             if ProfileUpdates.publicKey.isEmpty {
                 Text("This copy of Cellar can't check a downloaded game database, so it uses the one it shipped with. Installing a newer Cellar brings newer games.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 Button("Check for new games now") {
                     runner.run(.updateProfiles(quiet: false), title: String(localized: "Updating the game database"),
-                               then: { databaseVersion = Self.describeDatabase() })
+                               then: { model.refreshDatabase() })
                 }
                 .disabled(runner.busy)
                 Text("New and fixed game profiles are published with every Cellar release, signed. Cellar checks once a day and keeps the ones it has if anything doesn't check out. Profiles you add yourself always win.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .task { databaseVersion = Self.describeDatabase() }
-    }
-
-    static func describeDatabase() -> String {
-        guard let installed = ProfileUpdates.installed else { return String(localized: "The one Cellar \(CellarVersion.current) shipped with") }
-        let fetched = installed.fetched.formatted(.relative(presentation: .named))
-        return String(localized: "\(installed.count) profiles from Cellar \(installed.cellarVersion), fetched \(fetched)")
+        .task { model.refreshDatabase() }
     }
 
     // MARK: - Storage
@@ -274,28 +255,21 @@ struct SettingsView: View {
     /// What Cellar takes on disk, measured when the pane opens, with the one safe clean-up.
     @ViewBuilder private var storage: some View {
         Section("Storage") {
-            if storageUsage.isEmpty {
+            if model.storageUsage.isEmpty {
                 Text("Measuring…").font(.caption).foregroundStyle(.secondary)
             } else {
-                ForEach(storageUsage.prefix(8), id: \.label) { item in
+                ForEach(model.storageUsage.prefix(8), id: \.label) { item in
                     LabeledContent(item.label, value: ByteSize.describe(item.bytes))
                 }
             }
             Button("Clean Up Installers and Scratch Files") {
-                runner.run(.cleanStorage, title: String(localized: "Cleaning up"), then: { measureStorage() })
+                runner.run(.cleanStorage, title: String(localized: "Cleaning up"), then: { model.measureStorage() })
             }
             .disabled(runner.busy)
             Text("Removes downloaded installers and temporary files Cellar fetches again when it needs them. Games, bottles, save games and sign-ins stay. To move a game to an external drive, use the ••• menu on its page.")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        .task { measureStorage() }
-    }
-
-    private func measureStorage() {
-        Task.detached(priority: .utility) {
-            let usage = GameStorage.usage()
-            await MainActor.run { storageUsage = usage }
-        }
+        .task { model.measureStorage() }
     }
 
     // MARK: - Diagnostics
@@ -304,10 +278,10 @@ struct SettingsView: View {
     /// turns that into one file they can attach to a bug report — the whole reason it is kept.
     @ViewBuilder private var diagnostics: some View {
         Section("Diagnostics") {
-            LabeledContent("Kept log", value: logSize)
+            LabeledContent("Kept log", value: model.logSize)
             HStack {
-                Button("Export diagnostics…") { exportReport() }
-                    .disabled(export == .working)
+                Button("Export diagnostics…") { model.exportReport(cellarVersion: appVersion) }
+                    .disabled(model.export == .working)
                 Button("Open logs folder") { NSWorkspace.shared.open(Paths.logs) }
             }
             Text("""
@@ -317,7 +291,7 @@ struct SettingsView: View {
                 """)
                 .font(.caption).foregroundStyle(.secondary)
 
-            switch export {
+            switch model.export {
             case .idle:
                 EmptyView()
             case .working:
@@ -341,27 +315,6 @@ struct SettingsView: View {
                         .accessibilityLabel("Export failed")
                     Text(reason).font(.caption).textSelection(.enabled)
                 }
-            }
-        }
-    }
-
-    private var logSize: String {
-        let bytes = CellarLog.historySize
-        if bytes == 0 { return String(localized: "nothing logged yet") }
-        return bytes < 1024 ? String(localized: "\(bytes) bytes") : String(localized: "\(bytes / 1024) KB")
-    }
-
-    /// Off the main thread: the report shells out to `sysctl`, `arch` and `gh`, and a Settings
-    /// window that beachballs while doing it would be its own bug.
-    private func exportReport() {
-        export = .working
-        let version = appVersion
-        Task.detached {
-            do {
-                let url = try Diagnostics.exportReport(cellarVersion: version)
-                await MainActor.run { export = .written(url) }
-            } catch {
-                await MainActor.run { export = .failed(CellarLog.describe(error)) }
             }
         }
     }

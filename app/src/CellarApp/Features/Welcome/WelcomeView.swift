@@ -20,9 +20,8 @@ struct WelcomeView: View {
     let isReview: Bool
     let onClose: () -> Void
 
-    @State private var answers: [HomeFolder: HomeFolderAccess.Access] = [:]
-    @State private var asking: HomeFolder?
-    @State private var finished = false
+    /// What macOS answered, folder by folder, and the walk that asks it.
+    @State private var model = WelcomeViewModel()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,12 +42,7 @@ struct WelcomeView: View {
         .background(.background)
         .onAppear {
             guard isReview else { return }
-            // Already answered, so reading the answers cannot put a dialog on screen. Still off the
-            // main thread: it touches the disk.
-            DispatchQueue.global(qos: .userInitiated).async {
-                let current = HomeFolderAccess.statuses()
-                DispatchQueue.main.async { answers = current; finished = true }
-            }
+            model.loadAnswers()
         }
     }
 
@@ -73,7 +67,7 @@ struct WelcomeView: View {
         if isReview {
             return String(localized: "What macOS currently lets Cellar reach. Windows games save into these folders, so a game whose folder is off keeps its saves inside its bottle instead.")
         }
-        if finished {
+        if model.finished {
             return deniedFolders.isEmpty
                 ? String(localized: "That is everything Cellar needs. No further permission prompts while you are installing or playing.")
                 : String(localized: "Cellar will not ask again. The folders you turned down stay off, and games use their bottle instead.")
@@ -104,12 +98,12 @@ struct WelcomeView: View {
     /// Mark **and** word, never colour alone — and never a mark for something not yet asked.
     @ViewBuilder
     private func state(_ folder: HomeFolder) -> some View {
-        if asking == folder {
+        if model.asking == folder {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
                 Text("Asking…").font(.caption).foregroundStyle(.secondary)
             }
-        } else if let access = answers[folder] {
+        } else if let access = model.answers[folder] {
             HStack(spacing: 5) {
                 Image(systemName: access == .granted ? "checkmark.circle.fill" : "slash.circle")
                     .foregroundStyle(access == .granted ? Color.green : Color.secondary)
@@ -125,33 +119,33 @@ struct WelcomeView: View {
     }
 
     private func accessibilityState(_ folder: HomeFolder) -> String {
-        if asking == folder { return String(localized: "asking") }
-        guard let access = answers[folder] else { return String(localized: "not asked yet") }
+        if model.asking == folder { return String(localized: "asking") }
+        guard let access = model.answers[folder] else { return String(localized: "not asked yet") }
         return access == .granted ? String(localized: "allowed") : String(localized: "off")
     }
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if finished && !deniedFolders.isEmpty {
+            if model.finished && !deniedFolders.isEmpty {
                 Text(deniedSentence)
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 10) {
-                if finished && !deniedFolders.isEmpty {
+                if model.finished && !deniedFolders.isEmpty {
                     Button("Open System Settings") {
                         NSWorkspace.shared.open(HomeFolderAccess.systemSettingsURL)
                     }
                 }
                 Spacer()
-                if finished || isReview {
+                if model.finished || isReview {
                     Button(isReview ? String(localized: "Done") : String(localized: "Start playing"), action: onClose)
                         .keyboardShortcut(.defaultAction)
                 } else {
                     Button("Not now", action: skip)
                     Button("Continue", action: ask)
                         .keyboardShortcut(.defaultAction)
-                        .disabled(asking != nil)
+                        .disabled(model.asking != nil)
                 }
             }
         }
@@ -174,25 +168,11 @@ struct WelcomeView: View {
                 """)
     }
 
-    private var deniedFolders: [HomeFolder] {
-        HomeFolder.allCases.filter { answers[$0] == .denied }
-    }
+    private var deniedFolders: [HomeFolder] { model.deniedFolders }
 
     // MARK: - Actions
 
-    /// Walk the folders one at a time. Each call blocks until the player answers that dialog, so it
-    /// runs off the main thread and the row it is waiting on is marked while it does.
-    private func ask() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            for folder in HomeFolder.allCases {
-                DispatchQueue.main.async { asking = folder }
-                let access = HomeFolderAccess.request(folder)
-                DispatchQueue.main.async { answers[folder] = access; asking = nil }
-            }
-            HomeFolderAccess.hasAsked = true
-            DispatchQueue.main.async { finished = true }
-        }
-    }
+    private func ask() { model.ask() }
 
     /// "Not now" leaves macOS to ask on its own later — so the flag stays unset and the next launch
     /// offers this screen again. Nothing is claimed about folders that were never asked about.

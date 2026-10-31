@@ -466,7 +466,10 @@ declared in CellarDomain, and `ArchitectureTests.modelsLiveInTheDomain` keeps th
 Each feature folder holds an `@Observable` `<Feature>ViewModel`, one smart `<Feature>View` that
 owns it, and dumb subviews. A row (`*Row.swift`) takes values and closures only, so its preview is
 one line (`#Preview` in `AccountRow` and `StepRow`); `ArchitectureTests.rowsAreDumb` fails if a row
-names a view model, the activity or the app model, or imports the engine.
+names a view model, the activity or the app model, or imports the engine. Library, Accounts, Game
+detail, Settings and Welcome each have their view model (`ArchitectureTests.featureHasViewModel`):
+the view keeps what only AppKit can do (panels, alerts) and asks its view model for every read of
+the machine. Launch has no state of its own; its splash draws the app's one `ActivityStore`.
 
 A view model reaches the machine only through a port declared in the domain. The library is the
 first: `LibraryViewModel` holds an `any LibraryRepository`, the composition root (`AppModel`) hands it
@@ -476,8 +479,7 @@ that used to be nested in engine types (`GameUpdates.State`, `Playtime.Record`,
 typealiases so no caller had to change.
 
 Next steps (#133): the repository protocols and the use cases move into CellarDomain, and the I/O
-into a CellarData package (absorbing CellarKit and CellarInfrastructure); then each app feature
-gets an `@Observable` view model, a smart view and dumb subviews.
+into a CellarData package (absorbing CellarKit and CellarInfrastructure).
 
 ## Migration plan
 

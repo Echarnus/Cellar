@@ -158,9 +158,12 @@ struct ArchitectureTests {
     }
 
     /// Each feature has one view model, named after it, and one smart view that owns it.
-    @Test("The library and accounts features have a view model and a smart view",
+    @Test("Every feature with state of its own has a view model and a smart view",
           arguments: [("Library", "LibraryViewModel", "LibraryView"),
-                      ("Accounts", "AccountsViewModel", "AccountsView")])
+                      ("Accounts", "AccountsViewModel", "AccountsView"),
+                      ("GameDetail", "GameDetailViewModel", "GameDetailView"),
+                      ("Settings", "SettingsViewModel", "SettingsView"),
+                      ("Welcome", "WelcomeViewModel", "WelcomeView")])
     func featureHasViewModel(_ feature: String, _ model: String, _ view: String) throws {
         let folder = Repo.source("CellarApp/Features/\(feature)")
         for name in [model, view] {
