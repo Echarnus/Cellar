@@ -342,7 +342,7 @@ flowchart LR
     CC -. tests .-> Fake[FakeCommandClient]
     LS -- LoadLibrary --> Kit[(CellarKit)]
     ACS --> AS
-    W1[Library window] & W2[Settings window] & W3[Accounts window] -->|".environment(store)"| LS & AS & ACS
+    W1[Library window] & W2[Settings window] & W3[Accounts window] -->|"init(store)"| LS & AS & ACS
 ```
 
 - **`AppModel`** is the composition root: built once in `applicationDidFinishLaunching`, holding every
