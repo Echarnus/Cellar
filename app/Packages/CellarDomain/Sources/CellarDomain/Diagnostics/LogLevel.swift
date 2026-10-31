@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// How loud an entry is. `debug` is kept too — the point of the log is that when a player comes
@@ -6,7 +5,7 @@ import Foundation
 public enum LogLevel: String, CaseIterable, Comparable {
     case debug, info, warn, error
 
-    var rank: Int {
+    public var rank: Int {
         switch self {
         case .debug: return 0
         case .info:  return 1
@@ -18,7 +17,7 @@ public enum LogLevel: String, CaseIterable, Comparable {
     public static func < (lhs: LogLevel, rhs: LogLevel) -> Bool { lhs.rank < rhs.rank }
 
     /// Fixed width so the columns line up for whoever opens the file in a text editor.
-    var tag: String { rawValue.uppercased().padding(toLength: 5, withPad: " ", startingAt: 0) }
+    public var tag: String { rawValue.uppercased().padding(toLength: 5, withPad: " ", startingAt: 0) }
 
     /// Mark used when the log is printed to a terminal. Colour never carries the level alone.
     public var symbol: String {

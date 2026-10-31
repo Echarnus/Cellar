@@ -1,3 +1,4 @@
+import CellarDomain
 import CellarKit
 
 /// The one call a composition root makes to wire the engine's ports to real infrastructure.

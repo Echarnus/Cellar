@@ -426,10 +426,11 @@ and `featureFolders` fail the build when a file gains a second type or a file is
 target's root (#133).
 
 ```
-Packages/CellarDomain/Sources/CellarDomain/      pure types, Foundation only
-  Store/  Install/  Launch/  Events/
+Packages/CellarDomain/Sources/CellarDomain/      pure types, Foundation only, no I/O
+  Store/  Install/  Launch/  Events/  Core/  Commands/  About/  Checks/
+  Diagnostics/  Game/  Library/  Runners/  Settings/  Storage/
 Packages/CellarKit/Sources/CellarKit/            the engine
-  Core/                errors, environment, paths, version, the CLI command contract
+  Core/                environment, paths, version, credits
   Game/                plans, facts, summaries, updates, play time
   UseCases/            LoadLibrary, SetUpGame, InstallGame, LaunchGame, UninstallGame
   Stores/              the StoreAdapter port and registry, the library verdict, store icons
@@ -453,6 +454,11 @@ src/cellar/            the CLI; Cellar.swift is the entry point
   Commands/            Games/  Stores/  Maintenance/
   Output/
 ```
+
+The models every layer trades in (errors, the CLI command contract, log levels, graphics backends,
+runner specs, removal scope, ownership, check results, languages, performance switches) are
+declared in CellarDomain, and `ArchitectureTests.modelsLiveInTheDomain` keeps them there;
+`domainDoesNoIO` keeps the disk, processes and the network out of it.
 
 Next steps (#133): the repository protocols and the use cases move into CellarDomain, and the I/O
 into a CellarData package (absorbing CellarKit and CellarInfrastructure); then each app feature

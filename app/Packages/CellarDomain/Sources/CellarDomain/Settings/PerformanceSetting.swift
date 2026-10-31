@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// The performance switches a player can flip per game without editing a profile. Each is a plain
@@ -23,7 +22,7 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
 
     public static func named(_ key: String) -> PerformanceSetting? { PerformanceSetting(rawValue: key) }
 
-    var isBool: Bool { self != .wineDebug }
+    public var isBool: Bool { self != .wineDebug }
 
     /// The variable a raw `[env]` block would use for the same switch, if it has one.
     public var environmentVariable: String? {
@@ -36,7 +35,7 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
     }
 
     /// The switch's value as a raw `[env]` block states it, if that block sets its variable.
-    func value(fromEnv env: [String: String]) -> String? {
+    public func value(fromEnv env: [String: String]) -> String? {
         switch self {
         case .wineDebug:        return env["WINEDEBUG"].map { $0 == "-all" ? "off" : $0 }
         case .metalValidation:  return env["MTL_DEBUG_LAYER"].map { $0 == "0" ? "false" : "true" }

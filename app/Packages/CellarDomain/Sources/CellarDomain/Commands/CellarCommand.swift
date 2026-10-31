@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// Every `cellar` command the app issues, as a value rather than a hand-built argument list.

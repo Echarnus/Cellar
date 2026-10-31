@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// Describes a downloadable Wine runner family (where to get it, how it's laid out).
@@ -16,4 +15,18 @@ public struct RunnerSpec: Sendable {
     /// The in-layer x86 emulator an ARM64EC runner uses (e.g. "FEX"), when it has one.
     /// `nil` on x86_64 runners — there the translator is Rosetta 2, outside our layer.
     public var emulator: String? = nil
+
+    public init(id: String, displayName: String, artifacts: [RunnerArtifact], wineBinaryName: String,
+                hasD3DMetal: Bool, license: String, deprecated: String?,
+                architecture: RunnerArchitecture = .x86_64, emulator: String? = nil) {
+        self.id = id
+        self.displayName = displayName
+        self.artifacts = artifacts
+        self.wineBinaryName = wineBinaryName
+        self.hasD3DMetal = hasD3DMetal
+        self.license = license
+        self.deprecated = deprecated
+        self.architecture = architecture
+        self.emulator = emulator
+    }
 }

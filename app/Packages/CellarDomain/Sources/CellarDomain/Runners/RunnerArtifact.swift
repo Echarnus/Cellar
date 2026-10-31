@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// One downloadable artifact of a runner and where its payload lands inside the runner root.
@@ -26,4 +25,11 @@ public struct RunnerArtifact: Sendable {
     /// every game — so a download that does not match is refused before it is unpacked
     /// (`Checksum.verify`). Bumping a pin is a deliberate change, made in a reviewed PR.
     public let sha256: String
+
+    public init(kind: Kind, url: String, payloadPath: String, sha256: String) {
+        self.kind = kind
+        self.url = url
+        self.payloadPath = payloadPath
+        self.sha256 = sha256
+    }
 }

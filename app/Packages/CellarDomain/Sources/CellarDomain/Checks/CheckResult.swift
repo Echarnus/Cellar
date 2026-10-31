@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 public struct CheckResult {
