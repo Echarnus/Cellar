@@ -62,12 +62,27 @@ struct ArchitectureTests {
         }
     }
 
-    @Test("The app and its UI library never import the infrastructure: they reach stores through the CLI",
-          arguments: ["CellarApp", "CellarUI"])
-    func uiDoesNotImportInfrastructure(_ folder: String) throws {
-        for (file, module) in try Self.imports(in: folder) {
-            #expect(module != "CellarInfrastructure", "\(folder)/\(file) imports CellarInfrastructure")
+    @Test("The UI library never imports the infrastructure")
+    func uiLibraryDoesNotImportInfrastructure() throws {
+        for (file, module) in try Self.imports(in: "CellarUI") {
+            #expect(module != "CellarInfrastructure", "CellarUI/\(file) imports CellarInfrastructure")
         }
+    }
+
+    @Test("In the app, only the composition root imports the infrastructure: no view or store does")
+    func onlyTheAppsRootImportsInfrastructure() throws {
+        for (file, module) in try Self.imports(in: "CellarApp") where module == "CellarInfrastructure" {
+            #expect(file == "main.swift", "CellarApp/\(file) imports CellarInfrastructure")
+        }
+    }
+
+    /// Both binaries read store state in-process (the library, a bottle's client), so each must wire
+    /// the adapters in before it runs anything. Missing this is a crash at launch that no other
+    /// headless test can see, because none of them starts the app.
+    @Test("Every entry point wires the store adapters in", arguments: ["cellar/Cellar.swift", "CellarApp/main.swift"])
+    func entryPointsInstallInfrastructure(_ path: String) throws {
+        let text = try String(contentsOf: Repo.root.appendingPathComponent("Sources/\(path)"), encoding: .utf8)
+        #expect(text.contains("CellarInfrastructure.install()"), "\(path) never calls CellarInfrastructure.install()")
     }
 
     @Test("The engine knows the store adapters only through the StoreAdapter port")

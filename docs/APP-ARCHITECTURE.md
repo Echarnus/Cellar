@@ -374,7 +374,8 @@ The final step lets SwiftPM enforce the layers:
 
 ```mermaid
 flowchart TD
-    App[CellarApp] --> Kit[CellarKit<br/>use cases + ports]
+    App[CellarApp] --> Infra[CellarInfrastructure]
+    App --> Kit[CellarKit<br/>use cases + ports]
     App --> UI[CellarUI]
     CLI[cellar] --> Infra
     CLI --> Kit
@@ -383,11 +384,12 @@ flowchart TD
     UI --> Domain
 ```
 
-Only composition roots import `CellarInfrastructure`: the CLI's `main` and the tests' set-up, each
-calling `CellarInfrastructure.install()` to register the store adapters with CellarKit's
-`StoreAdapters`. The app is deliberately not one. It reaches the stores through the CLI subprocess,
-so it does not depend on the infrastructure at all, and no view can import it. Each target moves to
-Swift 6 language mode on its own, `CellarDomain` first.
+Only composition roots import `CellarInfrastructure`: the CLI's `main`, the app's `main.swift` and
+the tests' set-up. Each calls `CellarInfrastructure.install()` to register the store adapters with
+CellarKit's `StoreAdapters` before anything runs. The app needs it too: its actions go through the
+CLI, but it still reads the library and the store clients' state in-process. No other file in the
+app imports it, and `ArchitectureTests` fails the build if a view or store does, or if an entry
+point forgets to call `install()`. Every target is in Swift 6 language mode.
 
 ## Migration plan
 
