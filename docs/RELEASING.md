@@ -51,7 +51,8 @@ GitHub never lets the author of a pull request approve it, and Claude opens PRs 
 An approving review from a second bot account would be a rubber stamp: it would look like review
 without being one, and it is one more credential that can write to `main`. So the ruleset requires
 **zero** approvals and makes the checks the gate instead: build, tests with the coverage ratchet,
-self-test, lint, the PR checklist, CodeQL and dependency review must all pass on an up-to-date branch, and every review conversation must be
+self-test, lint, the PR checklist, CodeQL and dependency review must all pass on an up-to-date
+branch, and every review conversation must be
 resolved. What this gives up is a second human pair of eyes; with one maintainer that was never
 there. If a contributor joins, raise `required_approving_review_count` to 1 and turn on
 `require_code_owner_review` — CODEOWNERS is already in place.

@@ -416,14 +416,9 @@ extension Bundle {
 }
 
 extension NSApplication {
-    /// Brings Cellar forward. `activate(ignoringOtherApps:)` is deprecated from macOS 14, where
-    /// activation became cooperative and the flag is ignored anyway; the plain `activate()` is the
-    /// call that stays.
+    /// Brings Cellar forward. Activation is cooperative from macOS 14, so the plain `activate()` is
+    /// the call — `activate(ignoringOtherApps:)` is deprecated and its flag ignored.
     func bringToFront() {
-        if #available(macOS 14, *) {
-            activate()
-        } else {
-            activate(ignoringOtherApps: true)
-        }
+        activate()
     }
 }

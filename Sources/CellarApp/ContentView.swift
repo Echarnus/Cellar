@@ -667,13 +667,9 @@ struct SidebarMaterial: NSViewRepresentable {
 
 extension View {
     /// A list the keyboard can reach shouldn't draw a blue ring round the whole sidebar: the
-    /// selected row is the focus indicator, as in Finder. The modifier only exists from macOS 14.
-    @ViewBuilder func noFocusRing() -> some View {
-        if #available(macOS 14.0, *) {
-            focusEffectDisabled()
-        } else {
-            self
-        }
+    /// selected row is the focus indicator, as in Finder.
+    func noFocusRing() -> some View {
+        focusEffectDisabled()
     }
 }
 
