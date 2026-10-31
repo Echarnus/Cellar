@@ -34,6 +34,11 @@ jobs:
         run: swift --version
       - name: Build (release)
         run: swift build -c release
+      # Cellar's SDL (wheel force feedback). Built, checked for both architectures and the haptic API
+      # winebus binds to, and started once per slice by the script itself. Before the
+      # tests, whose tier A loads it the way winebus does.
+      - name: Build Cellar's SDL (universal)
+        run: sh Scripts/build-sdl.sh
       # Unit + hermetic integration tiers, with line coverage held to Tests/coverage-baseline.json:
       # a change that lowers it fails here and says which files are least covered.
       - name: Test suite + coverage ratchet
@@ -51,6 +56,11 @@ jobs:
           sh Scripts/package.sh 0.0.0-ci
           APP=dist/Cellar.app/Contents
           test -f "$APP/Frameworks/Sparkle.framework/Sparkle"
+          test -f "$APP/Resources/sdl/libSDL2-2.0.0.dylib"
+          test -f "$APP/Resources/sdl/libSDL3.dylib"
+          test -f "$APP/Resources/nl.lproj/Localizable.strings"
+          plutil -lint "$APP/Resources/nl.lproj/Localizable.strings"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$APP/Info.plist" | grep -qx ' *nl'
           otool -l "$APP/MacOS/CellarApp" | grep -q '@executable_path/../Frameworks'
           "$APP/MacOS/cellar" --version
       # The rendered store marks, light and dark. A reviewer can look at the actual pixels a PR
@@ -113,6 +123,9 @@ jobs:
           swift build -c release --product cellar
           .build/release/cellar runner install
           .build/release/cellar runner list
+      # Tier A loads Cellar's SDL the way winebus does, as in the build job.
+      - name: Build Cellar's SDL (universal)
+        run: sh Scripts/build-sdl.sh
       - name: Wine tiers
         env:
           # The sandbox lands somewhere the log upload below can find it; a failed run keeps it.

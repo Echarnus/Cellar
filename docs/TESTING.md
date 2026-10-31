@@ -284,6 +284,64 @@ same way.
 
 ---
 
+## Game controllers
+
+Wine passes a pad to a Windows game through SDL and its winebus, not through macOS's
+GameController framework, so a pad `cellar doctor` lists is not proof a game will take it. This is a
+manual check on a Mac with the default runner, recorded per profile as `controller = "full" |
+"partial" | "none"` once seen:
+
+| Pad | Connection | Default runner | Result |
+|---|---|---|---|
+| Xbox Wireless Controller | Bluetooth | not yet tested | — |
+| DualSense | Bluetooth / USB | not yet tested | — |
+| Switch Pro Controller | Bluetooth | not yet tested | — |
+
+To test: connect the pad, check `cellar doctor` lists it, start a game whose profile has no
+`controller` yet, and note whether menus and gameplay respond. For a Steam game started through the
+client, say whether Steam Input was on, since it remaps the pad before the game sees it.
+
+What the unit and tier A tests already cover without hardware: the pad-family and wheel tables
+(`ControllersTests`, `WheelsTests`), every state of the Input Monitoring and runner-SDL rows, and on
+the CI Mac itself real GameController and HID enumeration through `cellar doctor`
+(`ControllerTests`). What they cannot cover is whether a device reaches a game, which is this table.
+
+### Racing wheels
+
+Wheels are found through the HID layer (`Wheels.connected()`), not GameController, which knows
+only a few Logitech models. Steering, pedals and buttons reach the game as a DirectInput device.
+Force feedback comes from Cellar's own SDL (`Scripts/build-sdl.sh`, see ARCHITECTURE →
+*Force feedback*), and only for the wheels in `CellarSDL.forceFeedbackWheels`; for the rest expect
+none yet.
+
+Tier A loads the real built SDL the way winebus does and starts its joystick and haptic subsystems
+(`CellarSDLIntegrationTests`), and `build-sdl.sh` starts both architecture slices. Cellar's Fanatec
+driver is tested by `build-sdl.sh` too (`Shim/sdl/tests/test_fanatec.c`): the init sequence, every
+slot's encoding, the strength cap, gain, durations, pause and stop-on-close, against a fake base that
+records every command. None of it can show a motor turning: that is this table.
+
+| Wheel | Mode / firmware | Listed by `cellar controllers` | Steering + pedals in game | Force feedback |
+|---|---|---|---|---|
+| Fanatec (CSL DD / GT DD Pro / ClubSport DD / CSL Elite) | PC mode, current firmware | not yet tested | — | — (expected: yes, Cellar's Fanatec driver, half strength) |
+| Logitech G29 / G27 / G25 | PS3 or PS4 position | not yet tested | — | — (expected: yes, via Cellar's SDL) |
+| Logitech G920 / G923 | — | not yet tested | — | — (expected: none yet) |
+| Thrustmaster (T300 / T248 / TX) | PC mode | not yet tested | — | — |
+
+To test a wheel:
+
+1. Do the vendor's set-up first (`cellar controllers` prints it): PC mode, firmware current.
+2. `cellar controllers` lists the base, and pedals or shifter if they connect separately.
+3. `cellar doctor` shows *Input Monitoring*; allow it when macOS asks, the first time a game looks.
+4. In a racing game's controls menu: does the wheel appear, do steering and each pedal move a
+   separate axis (Thrustmaster pedals arriving as buttons is a known failure), and is there any
+   force feedback at all? For a wheel Cellar drives, also: does it centre and resist, does a kerb
+   or crash shake it, and does all force stop the moment the game quits?
+5. If force feedback misbehaves, start the game once with the runner's own SDL —
+   `CELLAR_RUNNER_SDL=1 cellar launch <game>` — to tell Cellar's SDL apart from the rest of the path.
+   For a Fanatec base, also try `CELLAR_FFB_MAX_PERCENT=100` (is it only weak?) and
+   `CELLAR_FFB_DISABLE=1` (steering without Cellar's driver).
+6. Note the game, runner and backend, and record the result in the game's profile notes.
+
 ## Where this sits in the verification ladder
 
 `AGENTS.md` asks for the highest rung available before calling a change done. The suite maps onto it:

@@ -396,6 +396,80 @@ So Cellar owns the timing instead (`Sources/CellarKit/HomeFolders.swift`):
 
 There is no API for reading the privacy database, so *asking is the only way to find out*: reading
 the directory **is** the request. That is the whole reason the timing is Cellar's to choose.
+## Controllers and racing wheels
+
+A pad or wheel takes a different road into a Windows game than into a Mac one. Wine's `winebus`
+reads the device through macOS's HID layer (IOHID), or through SDL when the runner's Wine was built
+with it and can load it, and presents it to the game as XInput (Xbox-style pads) or DirectInput
+(everything else, wheels included). macOS's GameController framework is not on that road, so a pad
+the Mac sees is evidence, not proof. `Controllers` and `Wheels` (CellarKit) say what Cellar *can*
+check, and `cellar doctor` / `cellar controllers` / the game page show it, always as information:
+
+- **What is connected** — pads through GameController (family: Xbox, DualSense, DualShock, Switch
+  Pro), wheel bases, pedals and shifters through HID, sorted by vendor ID (Fanatec, Logitech,
+  Thrustmaster, MOZA). Logitech and Thrustmaster also make pads and flight sticks, so for them the
+  product name has to say "wheel" or name a wheel model.
+- **Input Monitoring** — `IOHIDManagerOpen` asks for every matching device, keyboards included,
+  and macOS refuses the lot until Input Monitoring is granted (Wine bug 50153). Cellar peeks at the
+  answer with `IOHIDCheckAccess` and never asks itself; Wine's first open is what puts the dialog up.
+- **The runner's SDL** — whether the runner carries an SDL dylib on the library path Cellar gives
+  Wine. A pointer, not proof: a Wine built without SDL support never tries to load it.
+- **What the profile recorded** — `controller = "full" | "partial" | "none"`.
+- **Steam Input** — a Steam game started through the client gets its pad remapped by Steam first.
+
+### Force feedback: Cellar's own SDL
+
+macOS drives a wheel's motor only through a vendor ForceFeedback plug-in, and Fanatec, Logitech,
+Thrustmaster and MOZA ship none for Apple Silicon. But the motor is reachable without one: the
+wheel takes its force-feedback commands as ordinary USB HID output reports, which any process can
+send. So Cellar does not wait for the vendors.
+
+The path a game's effect takes, measured on the default runner (WineForge 0.6.0.4):
+
+1. The game creates a DirectInput effect. Wine's `dinput` turns it into HID PID reports.
+2. `winebus` built the device with a *virtual PID descriptor* because SDL said it was haptic
+   (`descriptor_add_haptic` in `bus_sdl.c`); it turns the PID reports into `SDL_HapticNewEffect` /
+   `SDL_HapticRunEffect` calls. WineForge's `winebus.so` binds to SDL 2 by name
+   (`libSDL2-2.0.0.dylib`, found on `DYLD_FALLBACK_LIBRARY_PATH`).
+3. **Cellar puts its own SDL first on that path** (`CellarSDL`, `Wine.environment`): SDL 3.4 behind
+   sdl2-compat, built by `Scripts/build-sdl.sh` from pinned, checksummed release tarballs, universal.
+   SDL 3.4's HIDAPI layer has wheel drivers that write the vendor's reports itself.
+
+What that covers is exactly `CellarSDL.forceFeedbackWheels`: SDL 3.4's Logitech driver (G29, G27,
+G25, Driving Force GT/Pro), and Cellar's own Fanatec driver. Until a wheel is on that list the app,
+the CLI and the FAQ say "no force feedback yet" for it; a unit test keeps the FAQ and the list in step.
+
+**The Fanatec driver** is `Shim/sdl/0001-cellar-fanatec-force-feedback.patch`. A Fanatec base in PC
+mode has no ForceFeedback plug-in, so SDL's IOKit joystick driver opens it as a plain joystick and
+SDL would call it not haptic. The patch makes `src/haptic/darwin/SDL_syshaptic.c` recognise a Fanatec
+base by vendor and product ID, and hand it to `SDL_cellar_fanatec.c` instead of ForceFeedback.framework:
+
+- The base has five force slots (constant, spring, damper, inertia, friction), each set by one 7-byte
+  HID output report. It has no effect memory. So the engine keeps the game's effects itself and, on a
+  2 ms thread, sums what is playing into the five slots and sends only the slots that changed. Periodic
+  and ramp effects become constant force. The engine is SDL's lg4ff (zlib); the slot encoding and the
+  init sequence are ported from Linux's `hid-fanatecff` (GPL v2 or later). DD and CSL Elite bases get
+  16-bit constant force.
+- Reports go out with `IOHIDDeviceSetReport` on the base's first output report. On open the driver
+  sends hid-fanatecff's init sequence and sets the base's range to "auto", so the game sets it.
+- **Safety.** Every force and coefficient is scaled by the game's gain, then by Cellar's cap
+  (`CELLAR_FFB_MAX_PERCENT`, default 50, `CellarSDL.defaultStrengthPercent`). The sum of effects is
+  clamped before the cap, so stacking effects cannot pass it. Closing the haptic stops every slot and
+  sends the base's stop-all command. `CELLAR_FFB_DISABLE=1` turns the driver off.
+- Wine sees the base once: `winebus` drops the raw IOHID copy of a joystick whose `is_hidraw_enabled`
+  is false. Fanatec wheel bases are not on Wine's hidraw list (only the ClubSport pedals are), so the
+  game gets the SDL device, the one with force feedback.
+- `Shim/sdl/tests/test_fanatec.c` tests the engine against a fake base that records each command. It
+  covers the init sequence, the encoding against hid-fanatecff, the cap, gain, durations, pause and
+  stop-on-close. `build-sdl.sh` runs it on every build.
+
+Thrustmaster (T300 family, after `hid-tmff2`) and Logitech's HID++ wheels (G920/G923) are next, as
+patches of the same shape.
+`CELLAR_RUNNER_SDL=1` goes back to the runner's SDL, for comparing or when ours misbehaves.
+
+Everything a player must do outside Cellar (PC mode, firmware updates that need Windows) is in
+`Wheels.Vendor.setup` and the FAQ's *Controllers and racing wheels* section, which say the same thing.
+
 ## The rolling log
 
 Cellar drives Wine, a store client and a Windows game, and none of them report back. When a player
