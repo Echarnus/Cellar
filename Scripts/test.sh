@@ -146,10 +146,24 @@ set -e
 # numbers from a run that stopped early would read as a drop.
 if [ "$COVERAGE" = "1" ] && [ "$STATUS" = "0" ]; then
     echo
-    # Every export this run wrote: SwiftPM may write one per test bundle, and its directory is per
-    # triple, so they are found rather than assumed. `-H` follows the start points, which SwiftPM may
-    # make symlinks; the same file reached twice is counted once by coverage.py.
+    # SwiftPM exports coverage for one test binary only, so a library linked solely into another
+    # bundle (CellarUI) is missing from its report. Export every bundle against the merged profile
+    # ourselves, and count SwiftPM's own report too; coverage.py counts each source file once.
     reports="$(find -H .build/*/debug/codecov .build/debug/codecov -name '*.json' 2>/dev/null || true)"
+    profile="$(find -H .build/debug/codecov -name '*.profdata' 2>/dev/null | head -n 1)"
+    if [ -n "$profile" ]; then
+        for bundle in .build/debug/*.xctest; do
+            [ -d "$bundle" ] || continue
+            name="$(basename "$bundle" .xctest)"
+            out="$CELLAR_TEST_ROOT/coverage-$name.json"
+            if xcrun llvm-cov export -summary-only -instr-profile "$profile" \
+                "$bundle/Contents/MacOS/$name" > "$out" 2>/dev/null; then
+                reports="$reports $out"
+            else
+                echo "note: llvm-cov could not export coverage for $name" >&2
+            fi
+        done
+    fi
     if [ -z "$reports" ]; then
         echo "error: --coverage was given but SwiftPM wrote no coverage report under .build/" >&2
         STATUS=1
