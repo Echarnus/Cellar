@@ -11,17 +11,8 @@ struct GameDetailView: View {
     let onChange: () -> Void
     @AppStorage("showHUD") private var showHUD = false
     @State private var showDetails = false
-    /// True while a removal is being measured. Walking a 36 GB Steam library takes a few seconds,
-    /// and a menu item that appears to do nothing for that long reads as broken.
-    @State private var measuringRemoval = false
-    /// The game's language submenu, read when the page appears rather than from the body.
-    @State private var language = GameLanguageMenu.Selection()
-    /// The newest copy of this game's saves, read when the page appears and after a backup or restore.
-    @State private var latestBackup: SaveBackups.Backup?
-    /// The controllers macOS sees, kept current as pads come and go.
-    @State private var pads: [Controllers.Pad] = []
-    /// Wheels, pedals and shifters, read when the page appears (macOS posts no notice for them).
-    @State private var wheels: [Wheels.Device] = []
+    /// What the page read about this game from the machine, and the calls behind its buttons.
+    @State private var model = GameDetailViewModel()
 
     var body: some View {
         ScrollView {
@@ -55,13 +46,10 @@ struct GameDetailView: View {
         }
         .background(.background)
         .task(id: game.slug) {
-            language = .load(game)
-            latestBackup = SaveBackups.list(bottle: game.bottleName).first
-            pads = Controllers.connected()
-            wheels = Wheels.connected()
+            model.load(game)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidConnect)) { _ in pads = Controllers.connected() }
-        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in pads = Controllers.connected() }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidConnect)) { _ in model.refreshPads() }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in model.refreshPads() }
     }
 
     /// "Played 12 h · last played yesterday" — kept on this Mac only.
@@ -118,7 +106,7 @@ struct GameDetailView: View {
             // Green means "go" for Play; every other step is tinted by the store whose client is
             // about to appear, so the button and the window that opens belong to each other.
             .tint(game.nextStep == .play ? .green : game.store.tint)
-            .disabled(runner.busy || measuringRemoval)
+            .disabled(runner.busy || model.measuringRemoval)
             .keyboardShortcut(.defaultAction)
             .help(game.actionHint)
 
@@ -148,7 +136,7 @@ struct GameDetailView: View {
                     .buttonStyle(.link)
                     .help("Bring the launch window back.")
             }
-        } else if measuringRemoval {
+        } else if model.measuringRemoval {
             // Measuring runs before the uninstall sheet appears, and it touches the disk, so the
             // gap has to be accounted for rather than looking like a dead button.
             ProgressView().controlSize(.small)
@@ -195,7 +183,7 @@ struct GameDetailView: View {
             Button("Add \(game.name) to Applications") { act(.addToApplications(slug: game.slug), String(localized: "Adding to Applications")) }
             // The game's own language needs its bottle to live in; before set-up there is none.
             if game.bottleExists {
-                GameLanguageMenu(game: game, state: $language)
+                GameLanguageMenu(game: game, state: $model.language)
             }
             Divider()
             if game.isDraft {
@@ -356,7 +344,7 @@ struct GameDetailView: View {
                         .font(.caption.weight(.bold)).foregroundStyle(.secondary)
                     Text(setup).font(.callout).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if wheels.isEmpty {
+                    if model.wheels.isEmpty {
                         Link("Connecting a wheel to your Mac", destination: Links.controllersHelp)
                             .font(.caption)
                     }
@@ -388,23 +376,23 @@ struct GameDetailView: View {
     private func resetBackend() {
         // A link has nowhere to show an error; a write that failed leaves the row as it was, which
         // is the truth.
-        guard (try? BackendChoice.set(nil, in: BottleConfig.url(forBottle: game.bottleName))) != nil else { return }
+        guard model.resetBackend(of: game) else { return }
         onChange()
     }
 
     /// The pads connected now, next to what the profile recorded about this game and a controller.
     /// Said as two facts, never combined into a promise that the pad will work in the game.
     @ViewBuilder private var controllerLine: some View {
-        if !pads.isEmpty || !wheels.isEmpty {
+        if !model.pads.isEmpty || !model.wheels.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
-                if !pads.isEmpty {
-                    Label("Connected: \(pads.map(\.name).joined(separator: ", "))", systemImage: "gamecontroller")
+                if !model.pads.isEmpty {
+                    Label("Connected: \(model.pads.map(\.name).joined(separator: ", "))", systemImage: "gamecontroller")
                         .font(.callout)
                 }
-                if !wheels.isEmpty {
-                    Label("Connected: \(wheels.map(\.name).joined(separator: ", "))", systemImage: "steeringwheel")
+                if !model.wheels.isEmpty {
+                    Label("Connected: \(model.wheels.map(\.name).joined(separator: ", "))", systemImage: "steeringwheel")
                         .font(.callout)
-                    Text(Wheels.forceFeedbackNote(for: wheels, cellarSDL: CellarSDL.libraryDirectory != nil))
+                    Text(model.forceFeedbackNote)
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -418,7 +406,7 @@ struct GameDetailView: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            if !wheels.isEmpty {
+            if !model.wheels.isEmpty {
                 // A wheel's set-up happens outside Cellar (PC mode, firmware), so say where to read it.
                 Link("How to set up a racing wheel", destination: Links.controllersHelp)
                     .font(.caption)
@@ -438,39 +426,31 @@ struct GameDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Save games").font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 .kerning(0.5).textCase(.uppercase)
-            Text(backupSummary).font(.callout).foregroundStyle(.secondary)
+            Text(model.backupSummary).font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 10) {
                 Button("Back up now") {
                     runner.run(.backUpSaves(slug: game.slug), title: String(localized: "Backing up saves"), then: { refreshBackups() })
                 }
                 Button("Restore last backup…") { confirmRestore() }
-                    .disabled(latestBackup == nil)
+                    .disabled(model.latestBackup == nil)
                 Button("Show in Finder") {
-                    NSWorkspace.shared.open(SaveBackups.directory(forBottle: game.bottleName))
+                    NSWorkspace.shared.open(model.backupFolder(of: game))
                 }
-                .disabled(latestBackup == nil)
+                .disabled(model.latestBackup == nil)
             }
             .disabled(runner.busy)
         }
     }
 
-    private var backupSummary: String {
-        guard let backup = latestBackup else {
-            return String(localized: "No backup yet. Cellar takes one by itself before a reset, an update or removing the bottle.")
-        }
-        let when = RelativeDateTimeFormatter().localizedString(for: backup.manifest.created, relativeTo: Date())
-        return String(localized: "Last backed up \(when) — \(backup.manifest.reason.description.lowercased()), \(ByteSize.describe(backup.manifest.bytes)). Cellar keeps the last \(SaveBackups.keep).")
-    }
-
     private func refreshBackups() {
-        latestBackup = SaveBackups.list(bottle: game.bottleName).first
+        model.refreshBackups(of: game)
     }
 
     /// A restore replaces the saves the game has now, so it is asked first — with the one fact that
     /// makes it safe to say yes: the current saves are kept too.
     private func confirmRestore() {
-        guard let backup = latestBackup else { return }
+        guard let backup = model.latestBackup else { return }
         let alert = NSAlert()
         alert.messageText = String(localized: "Restore \(game.name)'s saves from \(backup.id)?")
         alert.informativeText = String(localized: "The saves the game has now are replaced by that backup (\(backup.manifest.reason.description.lowercased())). Cellar keeps a copy of the current ones first, so you can go back.")
@@ -523,13 +503,12 @@ struct GameDetailView: View {
 
     /// Copy a draft profile out, for contributing it once the game is known to run.
     private func exportProfile() {
-        guard let source = ProfileStore.find(game.slug)?.url else { return }
+        guard let source = model.profileFile(of: game) else { return }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = source.lastPathComponent
         panel.message = String(localized: "Cellar guessed this profile's settings. If \(game.name) runs, set status and notes to what you saw, then contribute it to Cellar's profiles.")
         guard panel.runModal() == .OK, let target = panel.url else { return }
-        try? FileManager.default.removeItem(at: target)
-        try? FileManager.default.copyItem(at: source, to: target)
+        model.exportProfile(from: source, to: target)
     }
 
     /// Pick a folder on another drive, then move the game there through the CLI.
@@ -552,8 +531,8 @@ struct GameDetailView: View {
     /// Show what removal would take, and only then run it — through the CLI, like every other
     /// side-effecting action, so the app inherits the same tested path (and its activity log).
     private func confirmRemoval(scope: RemovalScope) {
-        measuringRemoval = true
-        UninstallConfirmation.ask(for: game, scope: scope, measured: { measuringRemoval = false }) {
+        model.measuringRemoval = true
+        UninstallConfirmation.ask(for: game, scope: scope, measured: { model.measuringRemoval = false }) {
             act(.uninstall(slug: game.slug, scope: scope),
                 scope == .bottle ? String(localized: "Removing the bottle") : String(localized: "Uninstalling"))
         }
