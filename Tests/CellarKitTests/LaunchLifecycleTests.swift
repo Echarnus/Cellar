@@ -35,7 +35,7 @@ struct LaunchLifecycleTests {
         exe = "\(exeName)"
 
         [env]
-        CELLAR_FIXTURE_MARKER = "1"
+        FIXTURE_ENV_MARKER = "1"
         """, slug: "lifecycle")
         try TestHome.installFakeGame(into: plan, at: exeName)
         let exe = try #require(plan.directLaunchExe)
@@ -71,7 +71,8 @@ struct LaunchLifecycleTests {
         #expect(call.environment["LANG"] == plan.language.language.environment["LANG"],
                 "the game must start in the player's language, not the shell's")
         #expect(call.environment["LC_ALL"] == plan.language.language.environment["LC_ALL"])
-        #expect(call.environment["CELLAR_FIXTURE_MARKER"] == "1", "the profile's [env] must reach the game")
+        // Not a CELLAR_ name: a profile may not set Cellar's own variables (ProfileStore.deniedEnvPrefixes).
+        #expect(call.environment["FIXTURE_ENV_MARKER"] == "1", "the profile's [env] must reach the game")
         #expect(call.environment["WINEDEBUG"] == "-all")
     }
 

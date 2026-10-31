@@ -109,13 +109,13 @@ struct WindowsGameTests {
         exe = "\(source.relativeExe)"
 
         [env]
-        CELLAR_INTEGRATION_MARKER = "1"
+        FIXTURE_ENV_MARKER = "1"
         """, slug: "it-windows-game")
 
         let plan = try Game.plan(slug: slug)
         #expect(plan.store == .steam)
         #expect(plan.needsLiveSession == false)
-        #expect(plan.env["CELLAR_INTEGRATION_MARKER"] == "1", "the profile's env must reach the game")
+        #expect(plan.env["FIXTURE_ENV_MARKER"] == "1", "the profile's env must reach the game")
         defer {
             Game.wineRunner(plan)?.killServer()
             try? fm.removeItem(at: plan.prefix)
