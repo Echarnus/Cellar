@@ -14,7 +14,8 @@ struct LocalizationTests {
     /// The app, and the engine copy it shows: a game's next-step hint, launch and install steps,
     /// the library's verdicts. Engine copy is `String(localized:)` too; it resolves against
     /// `Bundle.main`, which is Cellar.app in the app and in the CLI bundled inside it.
-    static let sourceDirectories = ["CellarApp", "CellarData", "CellarDomain"]
+    /// CellarUI too: its views (the sidebar's account bar, a lockup's label) are the app's words.
+    static let sourceDirectories = ["CellarApp", "CellarData", "CellarDomain", "CellarUI"]
         .map { Repo.source($0) }
 
     /// Names and the debug placeholder: the same in every language, so they are not in the table.

@@ -30,6 +30,9 @@ struct DomainPortTests {
         #expect(snapshot.steam == SteamAccount.state)
         #expect(snapshot.hasConnectedStore == StoreLibrary.hasConnectedStore)
         #expect(snapshot.gogSignedIn == GOGAuth.isSignedIn)
+        // The account button and the empty library must never disagree about who is signed in.
+        #expect(snapshot.connectedStores == GameStore.allCases.filter(StoreLibrary.isConnected))
+        #expect(snapshot.hasConnectedStore == !snapshot.connectedStores.isEmpty)
     }
 
     @Test("A summary's verdict is the store library's, asked about its own store and ownership")

@@ -22,10 +22,25 @@ struct LibraryView: View {
             }.frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 880, minHeight: 580)
-        .onAppear { lib.refresh() }
+        // No Refresh button: the library reads itself whenever its answer can have changed —
+        // opening, coming back to Cellar (AppDelegate), anything Cellar ran finishing, an account
+        // change (LibraryViewModel.accountsChanged), and a quiet timer. `LibraryRefresh` decides.
+        .onAppear { lib.refreshIfDue(.opened) }
+        .onChange(of: runner.busy) { _, busy in if !busy { lib.refreshIfDue(.actionFinished) } }
+        .task { await keepLibraryCurrent() }
         .task { await keepGamesCurrent() }
         .onReceive(NotificationCenter.default.publisher(for: .cellarFocusSearch)) { _ in
             searchFocused = true
+        }
+    }
+
+    /// Re-reads the library on a timer while the window is open, so a game the in-bottle Steam
+    /// client finished downloading, or a folder moved in Finder, shows up without anyone asking.
+    /// Only a disk read: it never asks a store anything over the network.
+    private func keepLibraryCurrent() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(LibraryRefresh.interval))
+            lib.refreshIfDue(.timer)
         }
     }
 
@@ -77,8 +92,12 @@ struct LibraryView: View {
             if lib.presentStores.count > 1 { storeChips }
             stateFilter
             libraryList
+            status
             Divider()
-            footer
+            SidebarAccountBar(
+                account: lib.account,
+                openAccounts: { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) },
+                openSettings: { NotificationCenter.default.post(name: .cellarOpenSettings, object: nil) })
         }
         // The system's sidebar material, not a flat fill: it is translucent to the desktop behind
         // the window and follows light, dark and Increase Contrast by itself, as Finder's does.
@@ -90,19 +109,8 @@ struct LibraryView: View {
             KegMark(size: 18).foregroundStyle(.pink)
             Text("Cellar").font(.system(.title3, design: .rounded).weight(.bold))
             Spacer()
-            Button { lib.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                .buttonStyle(.borderless).help("Refresh the library (⌘R)")
-                .accessibilityLabel("Refresh the library")
-            // Accounts sits beside Settings because signing in is a thing you do once, for the
-            // whole library — not something to rediscover on each game's screen.
-            Button { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
-                label: { Image(systemName: "person.crop.circle") }
-                .buttonStyle(.borderless).help("Accounts — sign in to Steam, GOG and Battle.net (⌘⇧A)")
-                .accessibilityLabel("Accounts")
-            Button { NotificationCenter.default.post(name: .cellarOpenSettings, object: nil) }
-                label: { Image(systemName: "gearshape") }
-                .buttonStyle(.borderless).help("Settings (⌘,)")
-                .accessibilityLabel("Settings")
+            // Nothing else up here. The account and Settings live at the foot of the sidebar
+            // (`SidebarAccountBar`), and there is no Refresh: the library keeps itself current.
         }
         .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
     }
@@ -305,28 +313,21 @@ struct LibraryView: View {
         .controlSize(.small).disabled(runner.busy)
     }
 
-    private var footer: some View {
-        HStack {
-            // While the shared parts download, that is the news; the game count can wait.
-            if preparation.isWorking {
-                PreparationStatus(preparation: preparation)
-            } else {
-                Text(footerText).font(.caption).foregroundStyle(.secondary)
+    /// What is happening behind the library, shown only while it is: the shared runtime downloading,
+    /// or the command-line tool the app drives gone missing. Nothing at all otherwise — the store
+    /// headers already count the games, and the account bar below is the sidebar's foot.
+    @ViewBuilder private var status: some View {
+        if preparation.isWorking || !runner.binaryExists {
+            HStack {
+                if preparation.isWorking { PreparationStatus(preparation: preparation) }
+                Spacer()
+                if !runner.binaryExists {
+                    Label("CLI missing", systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                        .help("Cellar drives the `cellar` command-line tool. Install it with app/Scripts/install-app.sh.")
+                }
             }
-            Spacer()
-            if !runner.binaryExists {
-                Label("CLI missing", systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.orange)
-                    .help("Cellar drives the `cellar` command-line tool. Install it with app/Scripts/install-app.sh.")
-            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
-    }
-
-    private var footerText: String {
-        let games = lib.games.count
-        let stores = lib.presentStores.count
-        let gameCount = games == 1 ? String(localized: "1 game") : String(localized: "\(games) games")
-        return stores > 1 ? String(localized: "\(gameCount) · \(stores) stores") : gameCount
     }
 }
