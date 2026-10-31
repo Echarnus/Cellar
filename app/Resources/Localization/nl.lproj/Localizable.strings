@@ -12,7 +12,6 @@
 "%@ isn't installed, and Cellar has nothing of its own left on disk." = "%@ is niet geïnstalleerd en Cellar heeft er niets meer van op schijf.";
 "%@ isn't installed. Deletes %@ of leftovers:" = "%@ is niet geïnstalleerd. Verwijdert %@ aan restanten:";
 "%@ so far — Windows games take a minute or two to come up." = "Al %@ — Windows-games hebben een minuut of twee nodig om op te starten.";
-"%@ · %lld stores" = "%@ · %lld winkels";
 "%@ — your choice" = "%@ — jouw keuze";
 "%@'s DRM checks the %@ app, which keeps a sign-in of its own. Cellar usually signs it in with your sign-in from Settings, but can't right now. The first time you press Play, its window opens — the QR code with the mobile app is quickest. Every %@ game shares it." = "De DRM van %@ controleert de %@-app, die een eigen aanmelding bijhoudt. Meestal logt Cellar die in met je aanmelding uit Instellingen, maar nu lukt dat niet. De eerste keer dat je op Spelen drukt, opent het venster — de QR-code met de mobiele app is het snelst. Elke %@-game deelt die aanmelding.";
 "%@'s installer needs a few clicks" = "Het installatieprogramma van %@ vraagt een paar klikken";
