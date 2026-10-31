@@ -20,6 +20,11 @@ public struct RunnerArtifact {
     public let kind: Kind
     public let url: String
     public let payloadPath: String
+    /// The SHA-256 of the file at `url`, lowercase hex. Pinned because the file is somebody
+    /// else's GitHub release asset, which its owner can replace at any time, and what is inside runs
+    /// every game — so a download that does not match is refused before it is unpacked
+    /// (`Checksum.verify`). Bumping a pin is a deliberate change, made in a reviewed PR.
+    public let sha256: String
 }
 
 /// How a runner's own Mach-O binaries are built — which decides *what* translates the x86-64
@@ -80,11 +85,13 @@ public enum RunnerCatalog {
             RunnerArtifact(
                 kind: .wineDMG,
                 url: "https://github.com/Alien4042x/WineForge/releases/download/0.6.0.4/WineForge.dmg",
-                payloadPath: "WineForge.app/Contents/Resources/Engine/WineForgeCore"),
+                payloadPath: "WineForge.app/Contents/Resources/Engine/WineForgeCore",
+                sha256: "c3610289997966251975cf5b3dd091a881cfe31f09a226215b89df630d946398"),
             RunnerArtifact(
                 kind: .d3dmetalFromTemplate,
                 url: "https://github.com/Sikarugir-App/Wrapper/releases/download/v1.0/Template-1.0.15.tar.xz",
-                payloadPath: "Template-1.0.15.app/Contents/Frameworks/renderer/d3dmetal"),
+                payloadPath: "Template-1.0.15.app/Contents/Frameworks/renderer/d3dmetal",
+                sha256: "34273bcce885ce5a7fd6937af9ea344bb9961de7d55d6193f7413142e835c8c3"),
         ],
         wineBinaryName: "wine",
         hasD3DMetal: true,
@@ -99,11 +106,13 @@ public enum RunnerCatalog {
             RunnerArtifact(
                 kind: .wineEngine,
                 url: "https://github.com/Sikarugir-App/Engines/releases/download/v1.0/WS12WineSikarugir10.0_6.tar.xz",
-                payloadPath: "wswine.bundle"),
+                payloadPath: "wswine.bundle",
+                sha256: "9da7ee0cbf386522f3a9906943726d9c3c125dbbd9ab120e3cde80e88d6091b2"),
             RunnerArtifact(
                 kind: .wrapperFrameworks,
                 url: "https://github.com/Sikarugir-App/Wrapper/releases/download/v1.0/Template-1.0.15.tar.xz",
-                payloadPath: "Template-1.0.15.app/Contents/Frameworks"),
+                payloadPath: "Template-1.0.15.app/Contents/Frameworks",
+                sha256: "34273bcce885ce5a7fd6937af9ea344bb9961de7d55d6193f7413142e835c8c3"),
         ],
         wineBinaryName: "wine",
         hasD3DMetal: true,
@@ -120,7 +129,8 @@ public enum RunnerCatalog {
             RunnerArtifact(
                 kind: .gptkApp,
                 url: "https://github.com/Gcenx/game-porting-toolkit/releases/download/Game-Porting-Toolkit-3.0-3/game-porting-toolkit-3.0-3.tar.xz",
-                payloadPath: ""),
+                payloadPath: "",
+                sha256: "d377683937340f914823dbb2e1252b329cbf834ff58907d0293db8cebf0e392e"),
         ],
         wineBinaryName: "wine64",
         hasD3DMetal: true,
@@ -277,6 +287,8 @@ public enum RunnerManager {
             } else {
                 progress("Using cached \(archive.lastPathComponent)")
             }
+            // Fresh or cached, nothing is unpacked until it is the exact file this build pinned.
+            try Checksum.verify(archive, sha256: artifact.sha256, what: artifact.url)
 
             if artifact.kind == .wineDMG {
                 progress("Copying Wine out of \(archive.lastPathComponent)…")

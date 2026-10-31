@@ -48,6 +48,9 @@ public enum ProfileUpdates {
         case badSignature
         case unreadable(String)
         case olderThanApp(String)
+        /// A genuine, signed set — but published before the one already installed. Refused so an old
+        /// download served again cannot bring back a profile a later set fixed.
+        case olderThanInstalled
 
         public var description: String {
             switch self {
@@ -59,6 +62,8 @@ public enum ProfileUpdates {
                 return "The downloaded game database couldn't be read (\(why)). Nothing changed."
             case .olderThanApp(let version):
                 return "The published game database (from Cellar \(version)) is older than the one this app shipped with. Nothing changed."
+            case .olderThanInstalled:
+                return "The downloaded game database is older than the one Cellar already has. Nothing changed."
             }
         }
     }
@@ -85,9 +90,14 @@ public enum ProfileUpdates {
         return bundle
     }
 
+    /// A profile's file name is its slug, and the slug ends up in paths, bundle identifiers and the
+    /// launcher scripts `AppBundle` writes. So a downloaded one is held to the slug alphabet the
+    /// repository uses — lowercase letters, digits and `-` — rather than merely "no slashes".
     static func isSafeName(_ name: String) -> Bool {
-        name.hasSuffix(".toml") && !name.hasPrefix(".") && !name.contains("/") && !name.contains("\\")
-            && !name.contains("..") && name.count <= 128
+        guard name.hasSuffix(".toml"), name.count <= 128 else { return false }
+        let slug = name.dropLast(5)
+        guard let first = slug.first, first != "-" else { return false }
+        return slug.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "-" }
     }
 
     // MARK: - Installing it
@@ -98,6 +108,9 @@ public enum ProfileUpdates {
                                appVersion: String = CellarVersion.current) throws -> Installed {
         guard compare(bundle.cellarVersion, appVersion) != .orderedAscending else {
             throw Failure.olderThanApp(bundle.cellarVersion)
+        }
+        if let current = installed, bundle.published < current.published {
+            throw Failure.olderThanInstalled
         }
         let fm = FileManager.default
         let target = Paths.registryProfiles
