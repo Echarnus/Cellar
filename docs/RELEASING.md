@@ -92,7 +92,7 @@ A suffix makes a pre-release: `v0.5.0-beta.1` is published as one, and the in-ap
 
 ## Cutting a release
 
-First bump `CellarVersion.current` (`app/src/CellarKit/Core/CellarVersion.swift`) to the new
+First bump `CellarVersion.current` (`app/Packages/CellarKit/Sources/CellarKit/Core/CellarVersion.swift`) to the new
 version in a PR. The app, the CLI and every diagnostics report read it, and `release.yml` refuses a
 tag that disagrees with it. Then tag the merged commit:
 
