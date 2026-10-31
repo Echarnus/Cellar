@@ -113,7 +113,7 @@ struct ArchitectureTests {
 
     /// The targets already laid out one type per file, in feature folders. The rest follow in the
     /// next steps of the restructure (#133) and join this list as they land.
-    static let oneTypePerFileTargets = ["CellarDomain", "CellarInfrastructure", "CellarUI"]
+    static let oneTypePerFileTargets = ["CellarDomain", "CellarInfrastructure", "CellarUI", "CellarKit"]
 
     @Test("One top-level type per file, and the file is named after it", arguments: oneTypePerFileTargets)
     func oneTypePerFile(_ folder: String) throws {
