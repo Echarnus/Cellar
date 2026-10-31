@@ -724,8 +724,8 @@ FEATURES = [
      "Steam, Battle.net and GOG. Sign in once per store, not once per game, and Cellar shows the "
      "games you own there."),
     ("chip", "Apple's D3DMetal, or DXVK",
-     "Direct3D is translated to Metal on the Apple GPU. Every game names a fallback backend for "
-     "when the first choice misbehaves."),
+     "Direct3D is translated to Metal on the Apple GPU. Where a second backend can run a game, "
+     "its profile names it as the fallback for when the first choice misbehaves."),
     ("profile", "A profile for every game",
      "The fixes a game needs are written down once and reused forever, in an open database "
      "anyone can add to."),
@@ -1072,8 +1072,9 @@ FAQ_SECTIONS = [
          "<p>Two routes from Direct3D to Metal. <b>D3DMetal</b> is Apple's own translation layer "
          "(from the Game Porting Toolkit) and is usually the faster one. <b>DXVK</b> translates "
          "Direct3D to Vulkan, which MoltenVK then puts onto Metal — slower in most cases, but it "
-         "works in places D3DMetal does not. Each profile names a backend and a fallback, so a game "
-         "that misbehaves on one can be run on the other.</p>"),
+         "works in places D3DMetal does not. Each profile names a backend, and a fallback wherever "
+         "the other one can run the game, so a game that misbehaves on one can be run on the other. "
+         "DXVK stops at DirectX 11, so a game made only for DirectX 12 has D3DMetal alone.</p>"),
         ("Can I see an FPS counter?",
          "<p>Yes — <b>Settings → Show Metal performance overlay (FPS)</b> adds an FPS and frametime "
          "HUD to games launched from Cellar. To measure a whole session and see what limits it, run "

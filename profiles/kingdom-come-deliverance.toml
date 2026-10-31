@@ -1,0 +1,52 @@
+# Cellar game profile — Kingdom Come: Deliverance
+#
+# Warhorse Studios' open-world RPG set in 15th-century Bohemia, on CryEngine with DirectX 11 as its
+# only renderer. Steam installs it into steamapps/common/KingdomComeDeliverance, and the game binary
+# is Bin/Win64/KingdomCome.exe inside it (the path players quote on Steam's and Warhorse's forums).
+#
+# Not yet run on a Mac by Cellar; status says untested until Kenneth runs it.
+
+[game]
+slug          = "kingdom-come-deliverance"
+name          = "Kingdom Come: Deliverance"
+developer     = "Warhorse Studios"
+publisher     = "Deep Silver"
+steam_appid   = 379430
+engine        = "CryEngine"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2018-02-13"
+store         = "steam"
+
+[compatibility]
+# Warhorse said before launch that the game would ship without Denuvo, and it did. There is no
+# anti-cheat: it is single-player only.
+anticheat                   = "none (single-player only)"
+drm                         = "Steamworks (needs a running Steam client)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. CodeWeavers rates it Runs Great on CrossOver 26.1 for macOS. Older AppleGamingWiki reports (CrossOver 21, M1 Max and M1 MacBook Air) saw 15 to 35 FPS whatever the settings, from before D3DMetal existed. D3DMetal first, DXVK as the fallback."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal first, as for the other DX11 games Cellar ships (The Witcher 3, ACC); DXVK translates
+# DX11 too, so it is a real second route rather than a placeholder.
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 379430
+install_dir = "KingdomComeDeliverance"
+exe         = "Bin/Win64/KingdomCome.exe"
+
+[legal]
+# Steamworks runs untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"

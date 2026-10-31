@@ -1,0 +1,53 @@
+# Cellar game profile — Kingdom Come: Deliverance II
+#
+# The sequel, on Warhorse's CryEngine build with DirectX 12 (it requires Shader Model 6.0, which
+# only DX12 has). Steam installs it into steamapps/common/KingdomComeDeliverance2, and the Steam
+# build's binary sits in Bin/Win64MasterMasterSteamPGO (the GOG build uses ...GogPGO instead).
+#
+# Not yet run on a Mac by Cellar; status says untested until Kenneth runs it.
+
+[game]
+slug          = "kingdom-come-deliverance-2"
+name          = "Kingdom Come: Deliverance II"
+developer     = "Warhorse Studios"
+publisher     = "Deep Silver"
+steam_appid   = 1771300
+engine        = "CryEngine"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2025-02-04"
+store         = "steam"
+
+[compatibility]
+# Warhorse confirmed before launch that it ships with no Denuvo and no other third-party DRM. The
+# Steam build still talks to Steamworks, so Cellar keeps the client running beside it. No
+# anti-cheat: it is single-player only.
+anticheat                   = "none (single-player only)"
+drm                         = "Steamworks only (no Denuvo or other DRM)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. CodeWeavers rates it Runs Great on CrossOver 26.1 for macOS, and players reported that CrossOver 26 fixed it. DirectX 12 only, so D3DMetal is the one route that can run it."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal is the only DX12 translation Cellar can actually run: DXVK and DXMT stop at DX11, and no
+# VKD3D-Proton build ships with the runners. So there is deliberately no fallback_backend, rather
+# than one that would be offered to a player and could never start the game.
+backend           = "d3dmetal"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 1771300
+install_dir = "KingdomComeDeliverance2"
+exe         = "Bin/Win64MasterMasterSteamPGO/KingdomCome.exe"
+
+[legal]
+# Steamworks runs untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
