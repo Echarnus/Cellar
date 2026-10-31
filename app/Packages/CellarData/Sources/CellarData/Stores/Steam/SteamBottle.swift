@@ -421,8 +421,18 @@ public enum SteamBottle {
     /// This is what makes "quit the game → the Steam layer closes too".
     public static func shutdown(runner: WineRunner) {
         if isRunning {
-            runner.runExecutable(steamExecutable(in: runner.prefix).path, args: ["-shutdown"], inheritIO: false)
-            for _ in 0..<15 { if !isRunning { break }; Thread.sleep(forTimeInterval: 2) }
+            // Spawned, never waited on. `Shell.run` reads the pipes to their end, and any Wine
+            // process `steam.exe -shutdown` leaves running inherits them — so the session hung
+            // here after Planet Coaster 2 quit, and the app went on saying "Playing" for good.
+            // How long Steam takes is bounded below instead, and `shutDown` ends whatever is left.
+            let log = Paths.logs.appendingPathComponent("steam-\(runner.prefix.lastPathComponent)-shutdown.log")
+            do {
+                try runner.spawn([steamExecutable(in: runner.prefix).path, "-shutdown"], log: log)
+                for _ in 0..<15 { if !isRunning { break }; Thread.sleep(forTimeInterval: 2) }
+            } catch {
+                CellarLog.warn(.session, "Couldn't ask Steam to quit (\(CellarLog.describe(error))); "
+                    + "closing Wine under it instead.")
+            }
         }
         runner.shutDown()
     }

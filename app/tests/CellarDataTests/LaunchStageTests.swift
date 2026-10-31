@@ -39,10 +39,22 @@ struct LaunchStageTests {
                     let steps = LaunchStage.sequence(context)
                     #expect(steps.first == .preparing)
                     #expect(steps.last == .waiting)
-                    #expect(!steps.contains(.running) && !steps.contains(.playing) && !steps.contains(.closed))
+                    #expect(!steps.contains(.running) && !steps.contains(.playing) && !steps.contains(.closing)
+                            && !steps.contains(.closed))
                 }
             }
         }
+    }
+
+    @Test("Closing down says the game has quit, and names a client only where one was opened")
+    func closingSaysTheGameIsGone() {
+        let steam = LaunchContext(game: "Planet Coaster 2", store: .steam, throughClient: true)
+        #expect(LaunchStage.closing.detail(steam).contains("Planet Coaster 2 has quit"))
+        #expect(LaunchStage.closing.detail(steam).contains("Steam"))
+        #expect(LaunchStage.closing.title(steam) != LaunchStage.playing.title(steam),
+                "the app must stop saying Playing once the game is gone")
+        let bare = LaunchContext(game: "The Witcher 3", store: .gog, throughClient: false)
+        #expect(!LaunchStage.closing.detail(bare).contains("GOG"))
     }
 
     @Test("Every stage has a title and a one-sentence detail, for every store and route",

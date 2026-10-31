@@ -262,6 +262,12 @@ final class ActivityStore {
                     stage = reached
                     if reached == .starting { attempt += 1 }
                     if reached == .playing { phase = .playing }
+                    // The game is gone; what is left is Cellar closing up behind it. Still busy —
+                    // Play waits for the teardown — but no longer "Playing".
+                    if reached == .closing {
+                        phase = .working
+                        busyTitle = String(localized: "Closing down")
+                    }
                 }
             } else if readsStages, CommandEvent.isEvent(line) {
                 // From a newer CLI than this app knows: not for the player to read as JSON.
