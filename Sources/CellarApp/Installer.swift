@@ -53,7 +53,7 @@ final class RuntimePreparation {
         guard isEnabled, !isWorking, runner.binaryExists else { return }
         guard !Preparation.isComplete else { state = .ready; return }
         state = .working("Starting…")
-        runner.run(.prepare, title: "Getting Cellar ready", observe: { [weak self] line in
+        runner.run(.prepare, title: String(localized: "Getting Cellar ready"), observe: { [weak self] line in
             let text = line.trimmingCharacters(in: .whitespaces)
             // The CLI drops colour when its output is a pipe; strip escape codes anyway, so a
             // stray one never reaches the footer.
@@ -209,7 +209,7 @@ enum CellarUninstaller {
         // Deleting a games library takes a while; a window that says so beats an app that seems
         // to have done nothing.
         let progress = progressWindow(keepSaves: keepSaves)
-        runner.run(.uninstallCellar(keepSaves: keepSaves), title: "Uninstalling Cellar", then: {
+        runner.run(.uninstallCellar(keepSaves: keepSaves), title: String(localized: "Uninstalling Cellar"), then: {
             progress.close()
             let succeeded = runner.exitCode == 0
             let done = NSAlert()
@@ -247,15 +247,15 @@ enum CellarUninstaller {
     private static func progressWindow(keepSaves: Bool) -> NSWindow {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 380, height: 96),
                               styleMask: [.titled], backing: .buffered, defer: false)
-        window.title = "Uninstalling Cellar"
+        window.title = String(localized: "Uninstalling Cellar")
         window.isReleasedWhenClosed = false
         let spinner = NSProgressIndicator()
         spinner.style = .spinning
         spinner.controlSize = .regular
         spinner.startAnimation(nil)
         let label = NSTextField(wrappingLabelWithString: keepSaves
-            ? "Copying your save games, then removing Cellar and everything it downloaded…"
-            : "Removing Cellar and everything it downloaded…")
+            ? String(localized: "Copying your save games, then removing Cellar and everything it downloaded…")
+            : String(localized: "Removing Cellar and everything it downloaded…"))
         let stack = NSStackView(views: [spinner, label])
         stack.orientation = .horizontal
         stack.spacing = 12

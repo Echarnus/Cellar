@@ -28,6 +28,10 @@ struct AccountsSection: View {
     @State private var steamSignInProgress: String?
     @State private var gogSignInFailed: String?
 
+    /// The QR sign-in's activity title, and how the panel knows that sign-in is the one running —
+    /// one value, so the comparison holds in every language.
+    private static let qrTitle = String(localized: "Waiting for the QR scan")
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             steamRow
@@ -54,7 +58,7 @@ struct AccountsSection: View {
             store: .steam,
             title: "Steam",
             state: steamState,
-            detail: state.isLoaded ? state.steam.summary : "Checking…",
+            detail: state.isLoaded ? state.steam.summary : String(localized: "Checking…"),
             actionTitle: steamActionTitle,
             busy: runner.busy,
             action: steamAction)
@@ -70,17 +74,17 @@ struct AccountsSection: View {
     }
 
     private var steamActionTitle: String {
-        guard state.isLoaded else { return "Sign in" }
+        guard state.isLoaded else { return String(localized: "Sign in") }
         switch state.steam {
-        case .signedIn:  return "Sign out"
-        case .expired:   return "Sign in again"
-        case .signedOut: return "Sign in"
+        case .signedIn:  return String(localized: "Sign out")
+        case .expired:   return String(localized: "Sign in again")
+        case .signedOut: return String(localized: "Sign in")
         }
     }
 
     private func steamAction() {
         if case .signedIn = state.steam {
-            runner.run(.steamSignOut, title: "Signing out", then: {
+            runner.run(.steamSignOut, title: String(localized: "Signing out"), then: {
                 steamQRCode = nil
                 accountsChanged()
             })
@@ -89,7 +93,7 @@ struct AccountsSection: View {
         steamQRCode = nil
         steamSignInProgress = nil
         steamQRReader = SteamQRCodeReader()
-        runner.run(.steamSignIn, title: "Waiting for the QR scan", observe: { line in
+        runner.run(.steamSignIn, title: Self.qrTitle, observe: { line in
             // DepotDownloader only *draws* the challenge, as terminal ASCII sized for a monospace
             // font — unscannable in a GUI. Read it back into modules and draw it properly. Steam
             // rotates the code, so later blocks replace it.
@@ -102,13 +106,13 @@ struct AccountsSection: View {
             switch SteamAccount.signInPhase(after: line) {
             case .approved?:
                 steamQRCode = nil
-                if steamSignInProgress == nil { steamSignInProgress = "Approved. Finishing sign-in…" }
+                if steamSignInProgress == nil { steamSignInProgress = String(localized: "Approved. Finishing sign-in…") }
             case .signedIn?:
                 steamQRCode = nil
-                steamSignInProgress = "Signed in. Checking which games you own…"
+                steamSignInProgress = String(localized: "Signed in. Checking which games you own…")
                 accountsChanged()           // the row says so now, not after every game is checked
                 // …and the library says it is checking, not "sign in", while the answers come in.
-                library.beganChecking("Checking which games you own…")
+                library.beganChecking(String(localized: "Checking which games you own…"))
             case .checkingLibrary(let sentence)?:
                 steamSignInProgress = sentence
                 library.beganChecking(sentence)
@@ -125,12 +129,12 @@ struct AccountsSection: View {
     @ViewBuilder private var steamQRPanel: some View {
         if let steamQRCode {
             QRCodePanel(modules: steamQRCode)
-        } else if runner.busy, runner.busyTitle == "Waiting for the QR scan" {
+        } else if runner.busy, runner.busyTitle == Self.qrTitle {
             // The gap between launching the tool and its first output is real; name it. So is the
             // gap between approving on the phone and the command finishing.
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text(steamSignInProgress ?? "Asking Steam for a sign-in code…")
+                Text(steamSignInProgress ?? String(localized: "Asking Steam for a sign-in code…"))
                     .font(.callout).foregroundStyle(.secondary)
             }
             .padding(.leading, 46)
@@ -161,19 +165,19 @@ struct AccountsSection: View {
                     ? (state.gogAccount.map { AccountState.signedIn($0) } ?? .signedInUnnamed)
                     : .signedOut,
                 detail: state.gogSignedIn
-                    ? "Your whole GOG library — DRM-free, so nothing runs beside your game."
-                    : "Opens GOG in a window. One sign-in covers every GOG game.",
-                actionTitle: state.gogSignedIn ? "Sign out" : "Sign in",
+                    ? String(localized: "Your whole GOG library — DRM-free, so nothing runs beside your game.")
+                    : String(localized: "Opens GOG in a window. One sign-in covers every GOG game."),
+                actionTitle: state.gogSignedIn ? String(localized: "Sign out") : String(localized: "Sign in"),
                 busy: runner.busy) {
                     if state.gogSignedIn {
-                        runner.run(.gogSignOut, title: "Signing out", then: { accountsChanged() })
+                        runner.run(.gogSignOut, title: String(localized: "Signing out"), then: { accountsChanged() })
                     } else {
                         gogSignInFailed = nil
                         GOGSignInWindow.present { result in
                             switch result {
                             case .code(let code):
                                 runner.run(.gogSignIn(code: code),
-                                           title: "Signing in to GOG", then: { accountsChanged() })
+                                           title: String(localized: "Signing in to GOG"), then: { accountsChanged() })
                             case .cancelled:
                                 break   // no error: closing the window is a legitimate answer
                             case .failed(let why):
@@ -199,12 +203,12 @@ struct AccountsSection: View {
             title: "Battle.net",
             state: state.battleNetAdded ? .addedByYou : .notAdded,
             detail: state.battleNetAdded
-                ? "Added by you, so Blizzard's games are in your library. Cellar can't check this one — you sign in inside Battle.net when it opens."
-                : "Blizzard doesn't publish who is signed in, so Cellar has to ask. Add it and its games appear; you sign in inside Battle.net itself.",
-            actionTitle: state.battleNetAdded ? "Remove" : "Add",
+                ? String(localized: "Added by you, so Blizzard's games are in your library. Cellar can't check this one — you sign in inside Battle.net when it opens.")
+                : String(localized: "Blizzard doesn't publish who is signed in, so Cellar has to ask. Add it and its games appear; you sign in inside Battle.net itself."),
+            actionTitle: state.battleNetAdded ? String(localized: "Remove") : String(localized: "Add"),
             busy: runner.busy) {
                 runner.run(state.battleNetAdded ? .battleNetForget : .battleNetAdd,
-                           title: state.battleNetAdded ? "Removing Battle.net" : "Adding Battle.net",
+                           title: state.battleNetAdded ? String(localized: "Removing Battle.net") : String(localized: "Adding Battle.net"),
                            then: { accountsChanged() })
             }
     }
@@ -325,12 +329,12 @@ struct AccountRow: View {
 
     private var accessibilityState: String {
         switch state {
-        case .signedIn(let name):  return "signed in as \(name)"
-        case .signedInUnnamed:     return "signed in"
-        case .signedOut:           return "not signed in"
-        case .unknowable:          return "sign-in state not published by this store"
-        case .addedByYou:          return "added by you, not verified by the store"
-        case .notAdded:            return "not added, so its games are not listed"
+        case .signedIn(let name):  return String(localized: "signed in as \(name)")
+        case .signedInUnnamed:     return String(localized: "signed in")
+        case .signedOut:           return String(localized: "not signed in")
+        case .unknowable:          return String(localized: "sign-in state not published by this store")
+        case .addedByYou:          return String(localized: "added by you, not verified by the store")
+        case .notAdded:            return String(localized: "not added, so its games are not listed")
         }
     }
 }
