@@ -14,7 +14,7 @@ import AppKit
 public enum Snapshot {
 
     /// A rendered view, as pixels that can be measured.
-    public struct Bitmap: Sendable {
+    nonisolated public struct Bitmap: Sendable {
         public let width: Int
         public let height: Int
         /// Opaque sRGB, 4 bytes per pixel, row-major from the top-left.
@@ -26,7 +26,7 @@ public enum Snapshot {
             self.rgba = rgba
         }
 
-        public struct Pixel: Equatable, Sendable {
+        nonisolated public struct Pixel: Equatable, Sendable {
             public let r: Double, g: Double, b: Double, a: Double
 
             /// Rough perceptual lightness, 0…1 — enough to tell a mark's white ink from its disc.
