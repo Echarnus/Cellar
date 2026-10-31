@@ -58,7 +58,7 @@ struct AccountsSection: View {
             store: .steam,
             title: "Steam",
             state: steamState,
-            detail: state.isLoaded ? state.steam.summary : "Checking…",
+            detail: state.isLoaded ? state.steam.summary : String(localized: "Checking…"),
             actionTitle: steamActionTitle,
             busy: runner.busy,
             action: steamAction)
@@ -205,7 +205,7 @@ struct AccountsSection: View {
             detail: state.battleNetAdded
                 ? String(localized: "Added by you, so Blizzard's games are in your library. Cellar can't check this one — you sign in inside Battle.net when it opens.")
                 : String(localized: "Blizzard doesn't publish who is signed in, so Cellar has to ask. Add it and its games appear; you sign in inside Battle.net itself."),
-            actionTitle: state.battleNetAdded ? "Remove" : "Add",
+            actionTitle: state.battleNetAdded ? String(localized: "Remove") : String(localized: "Add"),
             busy: runner.busy) {
                 runner.run(state.battleNetAdded ? .battleNetForget : .battleNetAdd,
                            title: state.battleNetAdded ? String(localized: "Removing Battle.net") : String(localized: "Adding Battle.net"),

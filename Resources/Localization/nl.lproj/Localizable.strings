@@ -42,6 +42,7 @@
 "Accounts…" = "Accounts…";
 "Activity" = "Activiteit";
 "Activity log" = "Activiteitenlog";
+"Add" = "Voeg toe";
 "Add %@ to Applications" = "Zet %@ in Apps";
 "Add Installed Games Without a Profile" = "Voeg geïnstalleerde games zonder profiel toe";
 "Add to Steam library" = "Voeg toe aan Steam-bibliotheek";
@@ -52,11 +53,14 @@
 "Adding Battle.net" = "Battle.net toevoegen";
 "Adding to Applications" = "Toevoegen aan Apps";
 "All stores" = "Alle winkels";
+"Allowed" = "Toegestaan";
+"allowed" = "toegestaan";
 "Anything Cellar runs shows up here." = "Alles wat Cellar uitvoert, verschijnt hier.";
 "Appears as DLSS in the game's own settings: renders smaller and upscales. Faster, slightly softer." = "Verschijnt als DLSS in de instellingen van de game zelf: rendert kleiner en schaalt op. Sneller, iets zachter.";
 "AppID %@" = "AppID %@";
 "Applies from a game's next launch. A direct-drive base is strong: raise it a step at a time. The base's own force-feedback setting still applies on top." = "Geldt vanaf de volgende keer dat een game start. Een direct-drive-base is sterk: verhoog de sterkte stap voor stap. De force-feedbackinstelling van de base zelf geldt daar nog bovenop.";
 "Approved. Finishing sign-in…" = "Goedgekeurd. Inloggen wordt afgerond…";
+"asking" = "bezig met vragen";
 "Asking Steam for a sign-in code…" = "Steam om een inlogcode vragen…";
 "Asking your stores which games you own…" = "Je winkels vragen welke games je bezit…";
 "Asking…" = "Vragen…";
@@ -69,6 +73,7 @@
 "Bring All to Front" = "Alles op voorgrond";
 "Bring the launch window back." = "Haal het startvenster terug.";
 "Built on Wine" = "Gebouwd op Wine";
+"Built on Wine." = "Gebouwd op Wine.";
 "Busy, %@" = "Bezig, %@";
 "Cancel" = "Annuleer";
 "Cancel launch" = "Annuleer starten";
@@ -106,6 +111,7 @@
 "Checking %@ for updates" = "%@ controleren op updates";
 "Checking which games you own…" = "Nagaan welke games je bezit…";
 "Checking your library" = "Je bibliotheek wordt gecontroleerd";
+"Checking…" = "Controleren…";
 "Checks every graphics call. Slower, but it stops some games crashing on D3DMetal." = "Controleert elke grafische aanroep. Trager, maar sommige games crashen dan niet op D3DMetal.";
 "Choose a folder on the drive to move %@ to. Cellar puts it in a “Cellar Games” folder there, and the game plays and updates from it while the drive is connected." = "Kies een map op de schijf om %@ naartoe te verplaatsen. Cellar zet hem daar in een map “Cellar Games”, en de game speelt en werkt bij vanaf daar zolang de schijf aangesloten is.";
 "Choose a game" = "Kies een game";
@@ -145,6 +151,7 @@
 "Edit" = "Wijzig";
 "Enter Full Screen" = "Schakel schermvullende weergave in";
 "Every wheel Cellar drives pushes at most the strength chosen above." = "Elk stuur dat Cellar aanstuurt, duwt hoogstens met de sterkte die je hierboven kiest.";
+"Everyone else Cellar stands on: Settings › About." = "Iedereen op wie Cellar verder steunt: Instellingen › Over.";
 "Everything every game shares is on this Mac." = "Alles wat elke game deelt, staat op deze Mac.";
 "Everything installs from your own Steam, Battle.net or GOG account. Cellar doesn't host, sell or unlock anything." = "Alles installeert vanuit je eigen Steam-, Battle.net- of GOG-account. Cellar host, verkoopt of ontgrendelt niets.";
 "Export diagnostics…" = "Exporteer diagnose…";
@@ -183,6 +190,7 @@
 "In use" = "In gebruik";
 "Install" = "Installeer";
 "Install through the Steam client" = "Installeer via de Steam-client";
+"Installed" = "Geïnstalleerd";
 "Installing" = "Installeren";
 "installs on first download" = "installeert bij de eerste download";
 "It had problems" = "Er waren problemen";
@@ -243,6 +251,8 @@
 "nothing logged yet" = "nog niets gelogd";
 "Nothing of it is left on this Mac. Cellar will now quit." = "Er staat er niets meer van op deze Mac. Cellar stopt nu.";
 "Nothing to remove" = "Niets te verwijderen";
+"Off" = "Uit";
+"off" = "uit";
 "Off: the Windows runtime and Steam client download when you set up your first game." = "Uit: de Windows-runtime en Steam-client downloaden wanneer je je eerste game instelt.";
 "OK" = "OK";
 "One button. Cellar gets the Windows runtime, builds the game its own bottle and downloads it — with a progress bar. The first game takes a few extra minutes; the ones after are quick." = "Eén knop. Cellar haalt de Windows-runtime op, bouwt de game een eigen bottle en downloadt hem — met een voortgangsbalk. De eerste game duurt een paar minuten langer; de volgende gaan snel.";
@@ -348,6 +358,7 @@
 "Sort by name" = "Sorteer op naam";
 "Sort, currently by most recently played" = "Sorteer, nu op laatst gespeeld";
 "Sort, currently by name" = "Sorteer, nu op naam";
+"source" = "broncode";
 "Start %@ again on %@. %@" = "Start %@ opnieuw op %@. %@";
 "Start playing" = "Begin met spelen";
 "Start using Cellar" = "Begin met Cellar";

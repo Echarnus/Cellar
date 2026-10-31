@@ -401,12 +401,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let out = NSMutableAttributedString(string: Credits.tagline + "\n\n", attributes: body)
-        out.append(NSAttributedString(string: "Built on Wine. ", attributes: heading))
+        out.append(NSAttributedString(string: String(localized: "Built on Wine.") + " ", attributes: heading))
         out.append(NSAttributedString(string: Credits.wine.role + " ", attributes: body))
         out.append(link("winehq.org", Credits.wine.url))
         out.append(NSAttributedString(string: " · ", attributes: body))
-        out.append(link("source", Credits.wine.sourceURL!))
-        out.append(NSAttributedString(string: "\n\nEveryone else Cellar stands on: Settings › About.", attributes: body))
+        out.append(link(String(localized: "source"), Credits.wine.sourceURL!))
+        out.append(NSAttributedString(string: "\n\n" + String(localized: "Everyone else Cellar stands on: Settings › About."), attributes: body))
         return out
     }
 }

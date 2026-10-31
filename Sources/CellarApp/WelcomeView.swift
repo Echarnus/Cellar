@@ -112,7 +112,7 @@ struct WelcomeView: View {
             HStack(spacing: 5) {
                 Image(systemName: access == .granted ? "checkmark.circle.fill" : "slash.circle")
                     .foregroundStyle(access == .granted ? Color.green : Color.secondary)
-                Text(access == .granted ? "Allowed" : "Off")
+                Text(access == .granted ? String(localized: "Allowed") : String(localized: "Off"))
                     .font(.caption).foregroundStyle(access == .granted ? .primary : .secondary)
             }
         } else {
@@ -124,9 +124,9 @@ struct WelcomeView: View {
     }
 
     private func accessibilityState(_ folder: HomeFolder) -> String {
-        if asking == folder { return "asking" }
+        if asking == folder { return String(localized: "asking") }
         guard let access = answers[folder] else { return String(localized: "not asked yet") }
-        return access == .granted ? "allowed" : "off"
+        return access == .granted ? String(localized: "allowed") : String(localized: "off")
     }
 
     private var footer: some View {

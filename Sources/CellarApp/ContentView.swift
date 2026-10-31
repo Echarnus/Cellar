@@ -435,7 +435,7 @@ extension GameSummary {
         switch nextStep {
         case .setup:   return String(localized: "Needs repair")
         case .install: return String(localized: "Not installed")
-        case .play:    return "Installed"
+        case .play:    return String(localized: "Installed")
         }
     }
 

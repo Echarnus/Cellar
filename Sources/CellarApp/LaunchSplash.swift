@@ -394,7 +394,7 @@ struct LaunchStepRow: View {
 
     private var spokenState: String {
         switch state {
-        case .done:    return "Done"
+        case .done:    return String(localized: "Done")
         case .current: return String(localized: "In progress")
         case .pending: return String(localized: "Not started")
         }
