@@ -13,7 +13,7 @@ self-test, lint), `codeql.yml`, `dependency-review.yml` and `scorecard.yml` guar
 `pages.yml` publishes the site; `labels.yml` applies `.github/labels.yml`;
 `dependabot-auto-merge.yml` merges patch and minor dependency bumps once they are green.
 
-The runners are **pinned to `macos-15`/`macos-26`** and `ubuntu-24.04`, not `-latest`. Keep it that way —
+The runners are **pinned to `xcode-27`** (macOS 27, Cellar's minimum) and `ubuntu-24.04`, not `-latest`. Keep it that way —
 `-latest` moves and takes the Xcode/Swift toolchain with it, which is exactly the variable this
 project cannot afford to have drift silently. Bumping it is a deliberate change, verified by a
 green build.
@@ -58,7 +58,7 @@ CI is the softest target in any repo — it holds a write-capable token and runs
 - **`concurrency` is right for CI, wrong for deploys.** CI cancels superseded runs of a ref; Pages
   and Release use `cancel-in-progress: false`, so a half-finished deploy or release is never cut off.
 - **Required check names are an interface.** `.github/rulesets/main.json` requires the jobs by name
-  (`Build & self-test (macos-15)`, `(macos-26)`, `Lint (workflows, shell, Python)`, `Analyze (swift)`, …). Renaming a
+  (`Build & self-test (macos-27)`, `Lint (workflows, shell, Python)`, `Analyze (swift)`, …). Renaming a
   job without updating the ruleset leaves every PR waiting for a check that will never report.
 
 ## What CI does *not* check (and should)

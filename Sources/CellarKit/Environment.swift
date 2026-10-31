@@ -152,11 +152,11 @@ public enum SystemEnvironment {
 
         // macOS version
         let version = macOSVersion
-        if version.majorVersion >= 14 {
+        if version.majorVersion >= 27 {
             checks.append(.init("macOS", .ok, "macOS \(macOSVersionString)"))
         } else {
             checks.append(.init("macOS", .warn, "macOS \(macOSVersionString)",
-                hint: "Apple's Game Porting Toolkit (D3DMetal) needs macOS 14 (Sonoma) or later."))
+                hint: "Cellar needs macOS 27 or later. Every Apple Silicon Mac can run it: Software Update has it."))
         }
 
         // Rosetta 2 (with the Intel-app/Rosetta-sunset horizon surfaced)

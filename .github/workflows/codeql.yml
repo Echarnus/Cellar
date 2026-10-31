@@ -29,7 +29,7 @@ jobs:
       matrix:
         include:
           - language: swift
-            os: macos-15
+            os: xcode-27
             build-mode: manual
           - language: python
             os: ubuntu-24.04

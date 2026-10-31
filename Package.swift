@@ -3,7 +3,9 @@ import PackageDescription
 
 let package = Package(
     name: "Cellar",
-    platforms: [.macOS(.v14)],
+    // The newest macOS every M1 Mac can run (Apple's compatibility list, issue #113). Spelled as a
+    // string so the manifest does not need a tools version that knows `.v27`.
+    platforms: [.macOS("27.0")],
     products: [
         .executable(name: "cellar", targets: ["cellar"]),
         .executable(name: "CellarApp", targets: ["CellarApp"]),

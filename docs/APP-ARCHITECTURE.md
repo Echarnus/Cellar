@@ -235,7 +235,7 @@ just `ObservableObject`s owned by the wrong thing. Testing is direct: construct 
 dependencies, call an intent, assert on state.
 *Costs:* the discipline that TCA enforces (state changes only through intents, effects only in
 intents) is convention here, so it has to be written down and reviewed. It requires raising the
-minimum to macOS 14 — which the README already states.
+minimum to macOS 14; Cellar now requires macOS 27 (#113), so this costs nothing.
 
 **C. The Composable Architecture (TCA).**
 Point-Free's library is the most complete unidirectional architecture for Swift: a single state
@@ -442,7 +442,7 @@ packaging guidance. What matches, and what does not yet:
 | Start on the main actor; UI and model classes stay main-actor, not `Sendable` (WWDC25 268) | Every store is `@MainActor final class`, none is `Sendable` | Matches |
 | Value types are the safest thing to share; make them `Sendable` (WWDC25 268) | Domain types are `Sendable` structs and enums; `LaunchRoute` was not and now is | Fixed in #100 |
 | Adopt Swift 6 one module at a time (`swiftLanguageMode` per target, SE-0435; Swift 6 migration guide) | `CellarDomain` in Swift 6 mode; the rest still Swift 5 | Partly: rest of #77 |
-| Turn on *Approachable Concurrency*, and default main-actor isolation for UI modules (WWDC25 268, SE-0466, SE-0461, SE-0470) | Not on: needs `swift-tools-version: 6.2`, and CI's macOS 15 image still builds with Swift 6.1 | Gap: do with #77 once CI builds with Swift 6.2 everywhere; `CellarApp` and `CellarUI` get `.defaultIsolation(MainActor.self)`, CellarKit stays nonisolated as a library should |
+| Turn on *Approachable Concurrency*, and default main-actor isolation for UI modules (WWDC25 268, SE-0466, SE-0461, SE-0470) | Not on yet: needs `swift-tools-version: 6.2`. CI now builds on Xcode 27 only (#113), so the toolchain is no longer the blocker | Gap: do with #77; `CellarApp` and `CellarUI` get `.defaultIsolation(MainActor.self)`, CellarKit stays nonisolated as a library should |
 | Work that blocks the main thread moves off it (`@concurrent`), after profiling (WWDC25 268) | `LibraryStore.refresh()` runs `LoadLibrary` (profiles, icons, bottle state) on the main actor | Gap: profile it in Instruments, then move `LoadLibrary` into a `@concurrent` function if it shows |
 | Narrowest access that works; `package` for what only the package uses (SE-0386, SE-0409) | `StoreDescriptor.components(fromHex:)` and `GameStore.sortIndex` were `public` for tests and the CLI | Fixed in #100: now `package` |
 | Re-exporting a module is not an official Swift feature (`@_exported` is underscored; SE-0409 left it unspecified) | CellarKit re-exports `CellarDomain` with `@_exported import` | Gap, deliberate for now: lets the split land without touching every file. Replace with explicit `import CellarDomain` when #77 adds `CellarInfrastructure` |

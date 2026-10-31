@@ -42,7 +42,7 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 
 ## Build, run, verify
 
-Swift 6 toolchain, Apple Silicon, macOS 14+.
+Swift 6 toolchain (Xcode 27), Apple Silicon, macOS 27+.
 
 ```sh
 swift build                       # debug build

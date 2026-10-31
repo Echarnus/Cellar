@@ -65,7 +65,7 @@ public enum GameApp {
             "LSApplicationCategoryType": "public.app-category.games",
             "LSSupportsGameMode": true,
             "NSHighResolutionCapable": true,
-            "LSMinimumSystemVersion": "13.0",
+            "LSMinimumSystemVersion": "27.0",
         ]
         if hasIcon { info["CFBundleIconFile"] = "app" }
         return info

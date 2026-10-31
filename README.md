@@ -130,7 +130,7 @@ Detailed rules: [docs/LEGAL.md](docs/LEGAL.md).
 ## Requirements
 
 - **Apple Silicon** Mac (M1 or newer; developed/tested on **M5**)
-- **macOS 14 (Sonoma)** or later — recommended **macOS 26 (Tahoe)**
+- **macOS 27** or later — the newest macOS every M1 Mac can run
 - **Rosetta 2** (`softwareupdate --install-rosetta --agree-to-license`)
 - **Swift 6** to build from source. The Command Line Tools build the `cellar` CLI; the **app needs
   Xcode** (the Command Line Tools have no SwiftUI macros). `Scripts/install-app.sh` picks an

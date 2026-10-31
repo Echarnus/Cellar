@@ -61,7 +61,7 @@ update waits for a person.
 
 | Workflow | Runs on | Does |
 |---|---|---|
-| `ci.yml` | every PR, `main`, merge queue | On macOS 15 and 26: release build, test suite, Dock shim, `cellar selftest`, site generation; actionlint, ShellCheck, Python compile. |
+| `ci.yml` | every PR, `main`, merge queue | On macOS 27 (Xcode 27, Cellar's minimum): release build, test suite, Dock shim, `cellar selftest`, site generation; actionlint, ShellCheck, Python compile. |
 | `codeql.yml` | every PR, `main`, weekly | CodeQL security-and-quality queries for Swift, Python and the workflows. |
 | `dependency-review.yml` | every PR | Blocks a new dependency with a known vulnerability or a licence that can't ship under GPL-3.0. |
 | `scorecard.yml` | `main`, weekly | OpenSSF Scorecard for the repository's supply-chain practices. |
