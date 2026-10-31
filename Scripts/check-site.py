@@ -10,8 +10,11 @@ Fails (exit 1) on:
     id, an <input> without a label, a <button> without a type or an accessible name, a missing
     lang or <title>, template text that leaked into the page ({…}), or copy implying a game
     can come from no store
+  - a game card whose cover has no <img> (every game ships real cover art; the generated
+    placeholder is only what shows if the image fails to load)
   - any palette pair in gen-site.py's CONTRAST table under its WCAG 2.2 AA ratio
-With --external, also every other http(s) <a href>, failing on 404/410 only: a network error or a
+With --external, also every other http(s) <a href> and every game card's cover image, failing on
+404/410 only: a network error or a
 rate limit says nothing about the link, so it is reported and not failed.
 
 Standard library only, Python 3.9 floor, like the generator (skills/python.md).
@@ -49,6 +52,8 @@ class Page(html.parser.HTMLParser):
         self._in = []          # open element stack
         self._button = None    # [attrs, text] of the button being read
         self._raw = 0          # inside <script>/<style>
+        self.covers = []       # [line, cover src or None] per game card's .art
+        self._art = None       # stack depth of the .art being read
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -65,7 +70,12 @@ class Page(html.parser.HTMLParser):
             self.links.append((a["href"], line, "a"))
         if tag == "link" and a.get("rel") in ("icon", "apple-touch-icon", "stylesheet"):
             self.links.append((a.get("href", ""), line, "link"))
+        if tag == "div" and "art" in (a.get("class") or "").split():
+            self.covers.append([line, None])
+            self._art = len(self._in)
         if tag == "img":
+            if self._art is not None and self.covers[-1][1] is None:
+                self.covers[-1][1] = a.get("src", "")
             if "alt" not in a:
                 self.problems.append(f"line {line}: <img src={a.get('src')!r}> has no alt (use alt=\"\" if decorative)")
             self.links.append((a.get("src", ""), line, "img"))
@@ -96,6 +106,8 @@ class Page(html.parser.HTMLParser):
         if tag in self._in:
             while self._in and self._in.pop() != tag:
                 pass
+        if self._art is not None and len(self._in) <= self._art:
+            self._art = None
 
     def handle_data(self, data):
         if self._raw:
@@ -163,7 +175,7 @@ def main():
     if not pages:
         sys.exit(f"error: no pages in {site} — run Scripts/gen-site.py first")
 
-    parsed, problems, external = {}, [], set()
+    parsed, problems, external, covers = {}, [], set(), set()
     for path in pages:
         p = Page()
         with open(path, encoding="utf-8") as f:
@@ -191,6 +203,11 @@ def main():
             if ident in seen:
                 problems.append(f"{where}: line {line}: duplicate id {ident!r} (first on line {seen[ident]})")
             seen.setdefault(ident, line)
+        for line, src in p.covers:
+            if not src:
+                problems.append(f"{where}: line {line}: a game card has no cover image")
+            elif urllib.parse.urlsplit(src).scheme in ("http", "https"):
+                covers.add(src)
         for a, line in p.inputs:
             if a.get("id") not in p.labels_for and not a.get("aria-label") and not a.get("aria-labelledby"):
                 problems.append(f"{where}: line {line}: <input> has no label")
@@ -208,8 +225,7 @@ def main():
                     if not os.path.exists(os.path.join(ROOT, rel)):
                         problems.append(f"{where}: line {line}: {href} — {rel} is not in this repository")
                 elif kind == "a":
-                    # Remote images are not checked: cover art comes from a CDN that is not ours,
-                    # and the page already falls back to a generated cover when it 404s.
+                    # Other remote images are covers, checked below from p.covers.
                     external.add(href.split("#")[0])
                 continue
             # Relative, or rooted at the site's own path (404.html links that way).
@@ -235,7 +251,7 @@ def main():
 
     notes = []
     if args.external:
-        ext_problems, notes = check_external(external)
+        ext_problems, notes = check_external(external | covers)
         problems += ext_problems
 
     for note in notes:

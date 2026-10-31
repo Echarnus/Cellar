@@ -504,6 +504,12 @@ def load_games():
         portrait = art.get("art_portrait") or (
             f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg"
             if appid and storekey == "steam" else "")
+        # Every game gets a real cover; the generated placeholder is a fallback for a CDN outage,
+        # not a design for a whole store. A Steam game gets one from its AppID; any other store's
+        # profile has to bring art_portrait (diablo-4 and witcher-3 show how).
+        if not portrait:
+            fail(path, "no cover art: add art_portrait under [art] "
+                       "(a Steam game gets one from steam_appid)")
         # `needs_live_steam` is the original spelling of `needs_live_session`; both still read.
         needs_client = comp.get("needs_live_session", comp.get("needs_live_steam", True))
         drm = str(comp.get("drm", "")).strip()

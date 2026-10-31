@@ -48,5 +48,13 @@ gog_product_id  = 1207664643
 # Relative to the install directory. The DX11 build; the next-gen DX12 one is bin/x64_dx12/witcher3.exe.
 exe = "bin/x64/witcher3.exe"
 
+[art]
+# GOG publishes no cover art addressable by product id without signing in, so a non-Steam profile
+# supplies its own. The Witcher 3 is *also* sold on Steam (AppID 292030), and Valve's CDN serves that
+# key art publicly and unauthenticated, the same images the Steam profiles and diablo-4 use. Cellar
+# still installs and launches this from GOG; only the pictures come from here.
+art_portrait = "https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900.jpg"
+art_hero     = "https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_hero.jpg"
+
 [legal]
 drm_circumvention = "never"
