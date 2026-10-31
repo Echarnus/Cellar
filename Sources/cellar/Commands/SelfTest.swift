@@ -171,6 +171,13 @@ struct SelfTest: ParsableCommand {
         // A marker that came back through something that rewrote line endings still parses.
         try check(LaunchMarker.stage(in: LaunchMarker.line(.client) + "\r") == .client,
                   "a marker survives a CRLF line ending")
+        // The JSON events `--events` prints, which the app reads in place of the markers above.
+        for stage in LaunchStage.allCases {
+            let event = CommandEvent.stage(stage)
+            try check(CommandEvent.parse(event.line) == event, "launch event round-trips: \(stage.rawValue)")
+        }
+        let download = CommandEvent.install(InstallProgress(.downloading, fraction: 0.25))
+        try check(CommandEvent.parse(download.line) == download, "install event round-trips with its fraction")
 
         // A game that runs bare must never be shown a step about opening a store client.
         let bare = LaunchContext(game: "The Witcher 3", store: .gog, throughClient: false)

@@ -309,10 +309,10 @@ struct LaunchSplashView: View {
     ///
     /// The app and the `cellar` tool are installed together but can drift apart on a machine where
     /// only one was updated, and the tool then rejects the flag the launch window listens to. That
-    /// comes back as `Unknown option '--machine-progress'`, which is true and useless — so it is
+    /// comes back as `Unknown option '--events'`, which is true and useless — so it is
     /// translated into the thing that actually needs doing.
     private var failureDetail: String {
-        if runner.log.contains("Unknown option '--machine-progress'") {
+        if runner.log.contains("Unknown option '--events'") || runner.log.contains("Unknown option '--machine-progress'") {
             return "Cellar's command-line tool on this Mac is older than the app, so it doesn't understand this launch. Reinstalling Cellar updates both."
         }
         return lastError.isEmpty

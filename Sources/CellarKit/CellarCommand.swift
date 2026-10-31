@@ -30,9 +30,10 @@ public enum CellarCommand: Equatable, Sendable {
 
     // One game
     case setUp(slug: String)
-    /// `machineProgress` asks the CLI for the markers the app's progress bar reads.
+    /// `machineProgress` asks the CLI for the events (`--events`, `CommandEvent`) the app's progress
+    /// bar reads.
     case install(slug: String, machineProgress: Bool)
-    /// Start a game. The markers are always asked for: the launch window follows them.
+    /// Start a game. The events are always asked for: the launch window follows them.
     case launch(slug: String, showHUD: Bool, backend: GraphicsBackend?)
     case update(slug: String)
     case checkForUpdate(slug: String)
@@ -73,12 +74,12 @@ public enum CellarCommand: Equatable, Sendable {
 
         case .setUp(let slug): return ["setup", "--profile", slug]
         case .install(let slug, let machineProgress):
-            return ["install", slug] + (machineProgress ? ["--machine-progress"] : [])
+            return ["install", slug] + (machineProgress ? ["--events"] : [])
         case .launch(let slug, let showHUD, let backend):
-            return ["launch", slug, "--machine-progress"]
+            return ["launch", slug, "--events"]
                 + (showHUD ? ["--hud"] : [])
                 + (backend.map { ["--backend", $0.rawValue] } ?? [])
-        case .update(let slug): return ["update", slug, "--machine-progress"]
+        case .update(let slug): return ["update", slug, "--events"]
         case .checkForUpdate(let slug): return ["update", slug, "--check"]
         case .uninstall(let slug, let scope):
             return ["uninstall", slug, "--yes"] + (scope == .bottle ? ["--bottle"] : [])
@@ -98,7 +99,7 @@ public enum CellarCommand: Equatable, Sendable {
         }
     }
 
-    /// Whether the CLI prints the launch and install markers for this command, so the runner knows
+    /// Whether the CLI prints progress events (`CommandEvent`) for this command, so the runner knows
     /// to read them out of the output rather than show them.
     public var reportsStages: Bool {
         switch self {

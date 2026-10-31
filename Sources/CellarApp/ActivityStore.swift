@@ -29,7 +29,7 @@ final class ActivityStore {
     /// out of the CLI's prose, so the launch window can say "second try" in its own words instead
     /// of quoting a line about the D3DMetal startup race at someone who wants to play a game.
     private(set) var attempt: Int = 0
-    /// Where an install stands, when the running command is `install --machine-progress`. Nil for
+    /// Where an install stands, when the running command is `install --events`. Nil for
     /// every other command, and until the install has said which phase it is in.
     private(set) var installProgress: InstallProgress?
     /// The game being installed, so only its page draws the bar.
@@ -67,7 +67,7 @@ final class ActivityStore {
     /// (DepotDownloader's) would look like a stall.
     @ObservationIgnored private var pending: String = ""
     @ObservationIgnored private var committed: String = ""
-    /// Whether the running command reports stage markers (only `launch --machine-progress` does).
+    /// Whether the running command reports progress events (`CellarCommand.reportsStages`).
     @ObservationIgnored private var readsStages = false
     /// The running command's line observer, if it asked for one.
     @ObservationIgnored private var lineObserver: (@MainActor (String) -> Void)?
@@ -247,18 +247,24 @@ final class ActivityStore {
 
     // MARK: - Reading the output
 
-    /// Split output into lines, lift the stage markers out, and leave the rest for the player.
+    /// Split output into lines, lift the progress events out (`CommandEvent`), and leave the rest for the player.
     private func absorb(_ chunk: String) {
         pending += chunk
         while let newline = pending.firstIndex(of: "\n") {
             let line = String(pending[pending.startIndex..<newline])
             pending = String(pending[pending.index(after: newline)...])
-            if readsStages, let progress = InstallMarker.progress(in: line) {
-                installProgress = progress
-            } else if readsStages, let reached = LaunchMarker.stage(in: line) {
-                stage = reached
-                if reached == .starting { attempt += 1 }
-                if reached == .playing { phase = .playing }
+            if readsStages, let event = CommandEvent.parse(line) {
+                switch event {
+                case .install(let progress):
+                    installProgress = progress
+                case .stage(let reached):
+                    stage = reached
+                    if reached == .starting { attempt += 1 }
+                    if reached == .playing { phase = .playing }
+                }
+            } else if readsStages, CommandEvent.isEvent(line) {
+                // From a newer CLI than this app knows: not for the player to read as JSON.
+                continue
             } else {
                 committed += line + "\n"
                 lineObserver?(line)

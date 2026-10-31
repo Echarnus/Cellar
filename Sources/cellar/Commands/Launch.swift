@@ -32,26 +32,32 @@ struct Launch: ParsableCommand {
     var printEnv = false
 
     @Flag(name: .customLong("machine-progress"),
-          help: "Also print a marker line each time the launch reaches a new step, for the Cellar app's launch window.")
+          help: "Also print a marker line each time the launch reaches a new step, for the Cellar app's launch window. Superseded by --events.")
     var machineProgress = false
+
+    @Flag(name: .customLong("events"),
+          help: "Also print each progress step as a versioned JSON line, for the Cellar app.")
+    var events = false
+
+    private var output: EventOutput { EventOutput(json: events, markers: machineProgress) }
 
     /// Announce a step. Prose stays as it is for whoever is reading the terminal; the marker is an
     /// extra line the app parses and hides, so neither audience is served a compromise.
     private func report(_ stage: LaunchStage) {
-        guard machineProgress else { return }
-        print(LaunchMarker.line(stage))
+        output.emit(.stage(stage))
     }
 
     /// Work a launch has to do before the game can start — Steam's first update — reported the way
     /// `install` reports its phases, so the launch window can draw the same bar.
     private func updateReporter() -> (InstallProgress) -> Void {
         var last: InstallProgress?
+        let sink = self.output
         return { progress in
-            guard machineProgress else { return }
+            guard sink.isOn else { return }
             if let was = last?.fraction, let now = progress.fraction, last?.phase == progress.phase,
                abs(now - was) < 0.001 { return }
             last = progress
-            print(InstallMarker.line(progress))
+            sink.emit(.install(progress))
         }
     }
 

@@ -24,8 +24,14 @@ struct Install: ParsableCommand {
     var force = false
 
     @Flag(name: .customLong("machine-progress"),
-          help: "Also print a marker line as the install moves through its steps, for the Cellar app's progress bar.")
+          help: "Also print a marker line as the install moves through its steps, for the Cellar app's progress bar. Superseded by --events.")
     var machineProgress = false
+
+    @Flag(name: .customLong("events"),
+          help: "Also print each progress step as a versioned JSON line, for the Cellar app.")
+    var events = false
+
+    private var output: EventOutput { EventOutput(json: events, markers: machineProgress) }
 
     func run() throws {
         let plan = try Game.plan(slug: slug)
@@ -62,11 +68,11 @@ struct Install: ParsableCommand {
         // about a change it could draw.
         var lastReported: InstallProgress?
         func report(_ progress: InstallProgress) {
-            guard machineProgress else { return }
+            guard output.isOn else { return }
             if let last = lastReported, last.phase == progress.phase,
                let was = last.fraction, let now = progress.fraction, abs(now - was) < 0.001 { return }
             lastReported = progress
-            print(InstallMarker.line(progress))
+            output.emit(.install(progress))
         }
         func show(_ event: GameEvent) {
             event.deliver(progress: { print("  " + Term.dim($0)) }, install: report)
