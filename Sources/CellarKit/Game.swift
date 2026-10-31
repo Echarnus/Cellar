@@ -600,44 +600,26 @@ public enum Game {
 
     // MARK: - Store-aware state
 
-    /// Whether the store's client is present in the bottle. A store with no client in the bottle is
-    /// "installed" by definition and never asks the player to set one up.
+    // The questions every store answers differently live in its `StoreAdapter`; these are the
+    // façade every caller already uses.
+
     public static func storeClientInstalled(_ plan: GamePlan) -> Bool {
-        switch plan.store {
-        case .steam:      return SteamBottle.isInstalled(in: plan.prefix)
-        case .battlenet:  return BattleNetBottle.isInstalled(in: plan.prefix)
-        // GOG needs no client in the bottle at all, so there is never one to set up.
-        case .gog:        return true
-        }
+        plan.store.adapter.isClientInstalled(plan)
     }
 
     public static func storeClientRunning(_ plan: GamePlan) -> Bool {
-        switch plan.store {
-        case .steam:      return SteamBottle.isRunning
-        case .battlenet:  return BattleNetBottle.isRunning
-        case .gog:        return false
-        }
+        plan.store.adapter.isClientRunning
     }
 
-    /// The signed-in account, or nil when the store doesn't say (see `GameSummary.account`).
     public static func signedInAccount(_ plan: GamePlan) -> String? {
-        switch plan.store {
-        case .steam:      return SteamBottle.loggedInAccount(in: plan.prefix)
-        case .battlenet:  return BattleNetBottle.rememberedAccount(in: plan.prefix)
-        // Cellar holds the GOG token itself, so this is a fact, not a guess — but read it from the
-        // cache: `summaries()` runs on every library refresh and must not make a network call.
-        case .gog:        return GOGAuth.isSignedIn ? (GOGAuth.cachedUsername ?? "your GOG account") : nil
-        }
+        plan.store.adapter.signedInAccount(plan)
     }
 
-    /// Whether the game's files are on disk. Steam has an authoritative answer in its appmanifest;
-    /// the other stores are checked by looking for the exe the profile names.
+    /// Whether the game's files are on disk. A store that keeps a record of its own (Steam's
+    /// appmanifest) is authoritative; otherwise the profile's exe is the answer.
     public static func isGameInstalled(_ plan: GamePlan) -> Bool {
         if plan.directLaunchExe != nil { return true }
-        if plan.store == .steam, let appID = plan.appID {
-            return SteamBottle.isGameInstalled(in: plan.prefix, appID: appID)
-        }
-        return false
+        return plan.store.adapter.recordsGameInstalled(plan) ?? false
     }
 
     // MARK: - Setup
