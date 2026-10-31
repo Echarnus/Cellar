@@ -73,6 +73,7 @@ public struct LoadLibrary {
         summary.profileBackend = plan.profileBackend
         summary.fallbackBackend = plan.fallbackBackend
         summary.isDraft = plan.isDraft
+        summary.installInterrupted = UnfinishedInstall.isPending(plan)
         summary.missingDrive = GameStorage.missingDrive(plan)
         summary.isOnOtherDrive = GameStorage.movedLocation(slug: plan.slug) != nil
         return summary
