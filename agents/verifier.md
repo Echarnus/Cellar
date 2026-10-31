@@ -20,6 +20,9 @@ The diff (or list of changed files) and a one-line statement of intent.
 - `sh app/Scripts/test.sh` passes. Headless and under a second, so there is never an excuse to skip it —
   and a change to a store mark, a profile or the store descriptors is *expected* to be covered by it.
   If the change is user-visible and no test moved, ask why not before accepting it.
+- **A change to `app/src/**` or `app/Packages/*/Sources/**` comes with a test that fails without it** (or a `No tests needed:` line
+  in the PR that holds up). Check that the test asserts the behaviour, not that the code merely ran.
+- Coverage did not drop: `sh app/Scripts/test.sh --coverage` passes against `app/tests/coverage-baseline.json`.
 - `swift run cellar selftest` passes when `app/src/**` changed.
 
 **2. It matches the verification ladder for the kind of change** (see [`../AGENTS.md`](../AGENTS.md)):

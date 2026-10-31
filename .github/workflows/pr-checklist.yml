@@ -1,0 +1,42 @@
+name: PR checklist
+
+# Holds every pull request to the bar in AGENTS.md before it can merge: an issue it closes, a
+# description of how it was verified, and tests for the Swift it changes (app/Scripts/check-pr.py).
+# Runs again whenever the description is edited, so fixing the text is enough to turn it green.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checklist-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checklist:
+    name: PR checklist
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The merge commit and its first parent, the base: their difference is exactly this PR.
+          fetch-depth: 2
+      # The gate's own tests first: a broken checker must fail loudly, not wave PRs through.
+      - name: Test the checker
+        run: python3 -m unittest discover -s app/tests/Scripts -v
+      - name: Check the description and the changed files
+        if: github.event_name == 'pull_request'
+        env:
+          # Handed over as data, never interpolated into the script: a PR body is untrusted text.
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/body.md"
+          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/files.txt"
+          python3 app/Scripts/check-pr.py --body "$RUNNER_TEMP/body.md" --files "$RUNNER_TEMP/files.txt" \
+            --author "$PR_AUTHOR"

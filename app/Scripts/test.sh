@@ -4,6 +4,7 @@
 #   sh Scripts/test.sh                 # unit + hermetic tiers — fast, what CI runs
 #   sh Scripts/test.sh --integration   # + the Wine tiers: real runner, real prefix, real Windows exe
 #   sh Scripts/test.sh --steam         # + tier D: download a real Steam game and run it
+#   sh Scripts/test.sh --coverage      # also measure line coverage and hold it to the ratchet
 #   sh Scripts/test.sh --filter Store  # anything else is passed straight through to `swift test`
 #
 # Three environment problems this exists to solve:
@@ -75,9 +76,11 @@ INTEROP="$DEVELOPER_DIR/Library/Developer/usr/lib"
 
 INTEGRATION=0
 STEAM=0
+COVERAGE=0
 ARGS=""
 for arg in "$@"; do
     case "$arg" in
+        --coverage) COVERAGE=1 ;;
         --integration) INTEGRATION=1 ;;
         # Tier D implies the Wine tiers: it cannot run a game without a runner and a prefix.
         --steam) INTEGRATION=1; STEAM=1 ;;
@@ -122,6 +125,12 @@ echo
 
 # --no-parallel: the suites share one sandboxed Cellar home, and a few of them set an environment
 # variable to prove Cellar scrubs it. Serial is also plenty fast — the whole run is about a second.
+if [ "$COVERAGE" = "1" ]; then
+    ARGS="$ARGS --enable-code-coverage"
+    # A report left by an older build would be counted as this run's, so none survive to it.
+    rm -f .build/*/debug/codecov/*.json .build/debug/codecov/*.json
+fi
+
 set +e
 # shellcheck disable=SC2086
 swift test --no-parallel \
@@ -132,6 +141,38 @@ swift test --no-parallel \
     $ARGS
 STATUS=$?
 set -e
+
+# Coverage is judged only on a green run: a failing suite already says what is wrong, and the
+# numbers from a run that stopped early would read as a drop.
+if [ "$COVERAGE" = "1" ] && [ "$STATUS" = "0" ]; then
+    echo
+    # SwiftPM exports coverage for one test binary only, so a library linked solely into another
+    # bundle (CellarUI) is missing from its report. Export every bundle against the merged profile
+    # ourselves, and count SwiftPM's own report too; coverage.py counts each source file once.
+    reports="$(find -H .build/*/debug/codecov .build/debug/codecov -name '*.json' 2>/dev/null || true)"
+    profile="$(find -H .build/debug/codecov -name '*.profdata' 2>/dev/null | head -n 1)"
+    if [ -n "$profile" ]; then
+        for bundle in .build/debug/*.xctest; do
+            [ -d "$bundle" ] || continue
+            name="$(basename "$bundle" .xctest)"
+            out="$CELLAR_TEST_ROOT/coverage-$name.json"
+            if xcrun llvm-cov export -summary-only -instr-profile "$profile" \
+                "$bundle/Contents/MacOS/$name" > "$out" 2>/dev/null; then
+                reports="$reports $out"
+            else
+                echo "note: llvm-cov could not export coverage for $name" >&2
+            fi
+        done
+    fi
+    if [ -z "$reports" ]; then
+        echo "error: --coverage was given but SwiftPM wrote no coverage report under .build/" >&2
+        STATUS=1
+    else
+        # One path per line, none with a space: SwiftPM names them after the package.
+        # shellcheck disable=SC2086
+        python3 Scripts/coverage.py $reports || STATUS=1
+    fi
+fi
 
 sheet_dir=".build/ui-snapshots"
 if [ -d "$sheet_dir" ]; then

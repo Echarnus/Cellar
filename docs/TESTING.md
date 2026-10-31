@@ -6,6 +6,7 @@ every push, and an opt-in layer that actually translates Windows.
 
 ```sh
 sh app/Scripts/test.sh                  # unit tests — fast, hermetic, no network. What CI runs.
+sh app/Scripts/test.sh --coverage       # + line coverage, held to app/tests/coverage-baseline.json.
 sh app/Scripts/test.sh --integration    # + the Wine tiers: real runner, real prefix, real Windows game.
 sh app/Scripts/test.sh --steam          # + tier D: download a real Steam game and run it.
 sh app/Scripts/test.sh --filter Store   # anything else is passed straight to `swift test`.
@@ -18,6 +19,87 @@ sh app/Scripts/test.sh --filter Store   # anything else is passed straight to `s
 > a developer directory that actually has it. If it can't, it says so rather than failing obscurely.
 >
 > First time on a machine: `sudo xcodebuild -license accept`.
+
+---
+
+## The strategy
+
+The shape is the test pyramid every mature team converges on — many fast tests at the bottom, a few
+expensive ones at the top — adapted to a product whose hardest dependency (Wine translating a
+Windows game on a Mac) cannot run in a unit test:
+
+| Layer | Where | Runs | Proves |
+|---|---|---|---|
+| **Unit** | `app/tests/CellarKitTests` | every PR, seconds | decisions: parsing, routes, readiness, copy, the store table |
+| **Rendered UI** | `app/tests/CellarUITests` | every PR | store marks and views, drawn offscreen and measured |
+| **Hermetic integration** | tier A + `FakeWine` | every PR | what Cellar writes to disk and hands to Wine; launch → watch → shut down |
+| **Wine tiers** | tiers B and C | every PR (*Wine tiers* job) | a real runner, a real prefix, a real Windows exe |
+| **A real game** | tier D | before a release | a real Steam depot downloaded and started |
+| **Behaviour** | the installed app | before a release | the window, the click, the frame rate |
+
+Three rules carry it, the same ones that make testing stick at teams that ship:
+
+1. **Tests ride with the change.** No PR changes behaviour without a test that would catch the
+   change breaking — enforced by a check, not by memory or goodwill. Reviewers (and the verifier
+   agent) read the test before the code.
+2. **The bar is the same for every author.** An AI agent's PR is held to exactly the human bar: it
+   says which rungs it ran and shows the output. An agent that cannot run a rung (no Mac, no Steam
+   account) says so, and that rung stays unticked for someone who can.
+3. **The safety net only grows.** Coverage is ratcheted: it may rise and never fall. Not because a
+   percentage proves correctness — it does not — but because a fall means new code arrived with no
+   test at all, which is the one thing this policy exists to stop.
+
+### Test doubles
+
+Cellar's external world is processes and files, so its doubles sit at those boundaries rather than
+behind protocols written only for tests:
+
+- **The sandbox** (`TestHome`, `app/Scripts/test.sh`) — `CELLAR_HOME`, `CELLAR_PROFILES_DIR` and
+  `CELLAR_APPLICATIONS_DIR` move every byte Cellar writes into a throwaway directory.
+- **Profile fixtures** (`TestHome.writeProfile`/`plan`) — a game is a TOML string, resolved through
+  the same `Game.plan` the app uses.
+- **A fake game on disk** (`TestHome.installFakeGame`) — the bytes of a PE header where the profile
+  says the exe lives, so "installed" is a fact Cellar finds rather than a flag a test sets.
+- **The fake Wine** (`Support/FakeWine.swift`) — the stub runner's `wine` and `wineserver` become
+  scripts that log their arguments and the Wine-relevant environment, and keep a fake game alive for
+  as long as `<exe>.lifetime` says. `LaunchLifecycleTests` drives `Game.launch` and
+  `Game.waitForExitThenShutDown` through it.
+- **Recorded store state** — `loginusers.vdf`, `appmanifest_*.acf`, Battle.net's config and DepotDownloader
+  output are tested as captured text, so a store parser is tested on what the store actually writes.
+
+### Coverage and the ratchet
+
+```sh
+sh app/Scripts/test.sh --coverage
+```
+
+runs the suite with `--enable-code-coverage` and hands SwiftPM's report to `app/Scripts/coverage.py`,
+which measures `CellarDomain`, `CellarKit` and `CellarUI` (the executables cannot be imported by a test, so they are
+not counted — keep logic out of them) and compares each with `app/tests/coverage-baseline.json`. More
+than 0.3 points below the baseline fails the run and names the least-covered files. CI writes the
+table to the job summary on every run.
+
+When a change raises coverage, lock it in within the same PR:
+
+```sh
+python3 app/Scripts/coverage.py --update app/.build/*/debug/codecov/*.json
+```
+
+`--update` only ever raises a number, so it cannot paper over a drop.
+
+### What CI enforces on a PR
+
+| Check | Job | Fails when |
+|---|---|---|
+| Build, tests, coverage | *Build & self-test* (macOS 27) | the build breaks, a test fails, coverage drops |
+| The layer | *Wine tiers* | a real runner can't start and stop a Windows exe under Cellar |
+| The description | *PR checklist* | no `Closes #N`, nothing ticked under *How it was verified*, or Swift changed without a test |
+| Hygiene | *Lint*, CodeQL, dependency review | see `docs/RELEASING.md` |
+
+*Wine tiers* is reported on every PR but is not yet a required check: it downloads its runner from
+upstream on every run, and a required check has to be one that only fails for a real reason. It
+becomes required once it has run green across a week of PRs. The required set lives in
+`.github/rulesets/main.json`, which is imported into the repository settings by hand.
 
 ---
 
@@ -289,13 +371,20 @@ which the game page shows; check that those steps match the menus you actually s
 `cellar selftest` stays: it is a check an *installed* binary can run on a player's machine, which a
 test target cannot. The unit suite is the superset a developer runs.
 
-CI runs rungs 1, 2 and 2b on every push. The Wine tiers are not run in CI — a GitHub runner has no
-GPU worth translating to and no reason to download a Wine build — so **they are the rung a human has
-to climb before a release**.
+CI runs rungs 1, 2 and 2b on every push, with coverage, on Cellar's minimum macOS, and rung 2c (the
+*Wine tiers* job: Rosetta, the default runner, then tiers B and C) on every PR. A hosted runner has
+no GPU worth translating to, so the Wine job proves that a Windows program starts and stops under
+Cellar, not that a game is fast — rung 2d and rung 3 remain **the rungs a human climbs before a
+release**.
 
 ---
 
 ## Adding tests
+
+**Every PR that changes Swift under `app/src/` or `app/Packages/*/Sources/` changes a test**, and the test is one
+that would fail without the change. A bug fix starts with the test that reproduces it. The *PR
+checklist* check enforces this (a `No tests needed: <reason>` line in the PR body is the only way
+past it, and the reason has to be about the change). Where the test goes:
 
 - A change to how a game is *decided* about — profiles, stores, routes, readiness, copy — belongs in
   the unit suite, and needs no Wine.

@@ -43,9 +43,9 @@ both use them.
 | `pages/` | The GitHub Pages site: `gen-site.py` builds it from `profiles/` into `pages/dist/` (not committed), `check-site.py` checks it. Deployed by `.github/workflows/pages.yml`. |
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
 | `app/Shim/` | `cellar-dock-shim.c` — the one piece of C in the repo. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts. Built by `app/Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
-| `app/Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `release-notes.py` (a release's notes, from the issues it closed), `test.sh` (the test runner). |
-| `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`. |
-| `.github/` | Workflows (`ci`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
+| `app/Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `release-notes.py` (a release's notes, from the issues it closed), `test.sh` (the test runner), `coverage.py` (the coverage ratchet), `check-pr.py` (the PR checklist). |
+| `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`, `TESTING.md`. |
+| `.github/` | Workflows (`ci`, `pr-checklist`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
 
 ## Build, run, verify
@@ -103,8 +103,8 @@ verifying, and if you cannot verify, say so and name what needs manual checking.
    expected to be *covered* here, not merely to leave it green. See *Testing* below.
 3. **Self-test** — `swift run cellar selftest` passes.
 4. **Wine tiers** — `sh app/Scripts/test.sh --integration` for anything touching runners, prefixes or
-   launching. Installs a real runner and starts a real Windows executable, so it is a local rung,
-   not a CI one — and it is the rung to climb before a release.
+   launching. Installs a real runner and starts a real Windows executable. CI runs it on every PR
+   (the *Wine tiers* job), but run it yourself first for a change in this area — and before a release.
 5. **A real game** — `sh app/Scripts/test.sh --steam` for anything touching depots, ownership or store
    credentials. Downloads Fallout Shelter (free, ~2 GB, Windows-only) from a real Steam depot and
    starts it. Needs `cellar steam login`; without it the tier skips and says so, which is not a pass.
@@ -115,11 +115,31 @@ verifying, and if you cannot verify, say so and name what needs manual checking.
 Full map, including how to point tiers C and D at a specific game: [`docs/TESTING.md`](docs/TESTING.md).
 The [verifier agent](agents/verifier.md) codifies these demands per kind of change.
 
+### Every change arrives tested — no exceptions for AI authors
+
+"It compiles" and a confident description are not verification. The author of a change, a person or
+an AI agent, is the one who proves it works, in the PR, before anyone else spends time on it:
+
+- **A PR that changes Swift under `app/src/` or `app/Packages/*/Sources/` changes a test** — one that would fail
+  without the change. A bug fix starts with a test that reproduces the bug. The only way out is a
+  line in the PR body, `No tests needed: <reason>`, and the reason has to be about this change.
+- **Say what you ran, and show it.** The PR template's *How it was verified* section lists the
+  ladder; tick only the rungs you actually climbed and paste the evidence (test count, command
+  output, screenshot). A rung you could not climb stays unticked, with who has to climb it. An agent
+  without a Mac says so — CI then is the build, and the PR says that too.
+- **Coverage only goes up.** `sh app/Scripts/test.sh --coverage` measures CellarDomain, CellarKit and CellarUI and
+  fails below `app/tests/coverage-baseline.json`. When a change raises it, raise the baseline in the same
+  PR (`python3 app/Scripts/coverage.py --update <report>`).
+- **The gates are checks, not trust.** CI runs the unit and hermetic integration tiers with coverage
+  on Cellar's minimum macOS, the Wine tiers on a real runner, and *PR checklist*
+  (`app/Scripts/check-pr.py`) on the description. None of them replaces climbing the ladder.
+
 ### Testing
 
 ```sh
 sh app/Scripts/test.sh                    # the whole suite, ~0.5s
 sh app/Scripts/test.sh --filter Profile   # one part of it
+sh app/Scripts/test.sh --coverage         # + line coverage, held to app/tests/coverage-baseline.json
 ```
 
 Use the script rather than a bare `swift test`: swift-testing ships as a framework inside the
@@ -147,6 +167,12 @@ Every run also writes `app/.build/ui-snapshots/store-marks-{light,dark}.png` —
 every size it is used at, in one image. **Open that instead of launching the app** for a first look;
 CI uploads it as an artifact on every PR. It does not replace rung 4 — a snapshot cannot show you
 that a window resizes or a click lands — but it catches the wrong-looking before it reaches anyone.
+
+**Launches are tested against a fake Wine.** `app/tests/CellarKitTests/Support/FakeWine.swift` turns the
+sandbox's stub runner into scripts that record every call — the exe, the prefix, the locale, the
+profile's `[env]` — and keep a fake game alive for as long as a test asks. That is how the launch →
+watch → shut-down path runs on every PR without a runner. Reach for it before adding a protocol or
+a mock: a test double at the process boundary tests the code that actually ships.
 
 ## Stores are a first-class concept
 
@@ -248,8 +274,9 @@ Cellar is delivered through GitHub, end to end. Full strategy: [`docs/RELEASING.
   body says `Closes #N`, and turn on auto-merge (squash). It merges by itself once the required
   checks are green: CI, lint, CodeQL and dependency review. Nobody pushes to `main` directly; the
   ruleset in `.github/rulesets/main.json` enforces it.
-- **The checks are a floor, not the ladder.** CI cannot launch the app or a game. Climb the
-  verification ladder above before enabling auto-merge, and say in the PR which rung you reached.
+- **The checks are a floor, not the ladder.** CI cannot launch the app or play a real game. Climb the
+  verification ladder above before enabling auto-merge, and say in the PR which rung you reached —
+  *PR checklist* fails a PR that doesn't, or that changes Swift without touching a test.
 - **Releases are SemVer tags (`vMAJOR.MINOR.PATCH`) we push ourselves.** The tag runs
   `release.yml`, which builds the downloads, writes the notes from the issues the release closed
   (`app/Scripts/release-notes.py`) and publishes the GitHub Release.
