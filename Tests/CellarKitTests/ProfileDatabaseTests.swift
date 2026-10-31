@@ -176,6 +176,17 @@ struct ProfileDatabaseTests {
         }
     }
 
+    @Test("Every game has real cover art, whatever store it comes from",
+          arguments: ProfileDatabaseTests.slugs)
+    func everyGameHasCoverArt(_ slug: String) throws {
+        // The same chain the app's Artwork.portrait walks: art the profile declares, then the
+        // Steam CDN keyed on the AppID. The generated cover is a fallback for a failed fetch, not
+        // what a whole store's games should look like (the Witcher 3 card did, until #107).
+        let summary = try #require(Game.summaries().first { $0.slug == slug })
+        #expect(summary.artPortraitURL != nil || summary.artworkAppID != nil,
+                "'\(slug)' has no cover: add art_portrait under [art] (a Steam game gets one from steam_appid)")
+    }
+
     @Test("Bottles are only shared deliberately")
     func sharedBottlesAreIntentional() throws {
         var byBottle: [String: [String]] = [:]
