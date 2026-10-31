@@ -1,0 +1,64 @@
+# Cellar game profile — Assetto Corsa
+#
+# Kunos' 2014 driving simulator, and the first race sim in the database. Two programs matter: the
+# launcher Steam starts (AssettoCorsa.exe, an embedded-browser front end where cars, tracks and
+# controls are picked) and the simulator it then spawns (acs.exe, DirectX 11). Both sit in the
+# install folder's root, so the install_dir needle below catches either as "the game is running".
+#
+# Not yet run on a Mac by Cellar. Everything here comes from public reports, named inline, and the
+# status says untested until Kenneth runs it (docs/TESTING.md, Racing wheels).
+
+[game]
+slug          = "assetto-corsa"
+name          = "Assetto Corsa"
+developer     = "Kunos Simulazioni"
+publisher     = "505 Games"
+steam_appid   = 244210
+engine        = "Kunos in-house engine"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2014-12-19"
+store         = "steam"
+
+[compatibility]
+# Online races run on community dedicated servers with no client-side anti-cheat, so nothing
+# kernel-level has to be translated.
+anticheat                   = "none"
+drm                         = "Steamworks (needs a running Steam client)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player + online races on dedicated servers"
+status                      = "untested"
+# Racing wheel: what Cellar has seen a wheel do here. untested until a wheel has been tried in it.
+wheel                       = "untested"
+# Shown on the game page as the in-game steps. Only menus the game really has.
+wheel_setup                 = "Start the game, open Options, then Controls, and choose Wheel as the input method. Pick your wheel in the list, then assign steering, throttle, brake and clutch by moving each one when asked, and set the degrees of rotation to match your wheel base. If the launcher crashes or shows a black window, turn off GPU-accelerated game launcher in Options, General."
+notes                       = "Not yet launched under Cellar. CrossOver reports (AppleGamingWiki) rate it playable on Apple Silicon through DXVK, about 60 to 70 FPS at 1080p, and say the launcher can crash until GPU-accelerated game launcher is turned off in Options, General. A CrossOver user reported that D3DMetal did not work for it, so DXVK is the default here and D3DMetal the fallback. Content Manager and Custom Shaders Patch are third-party add-ons Cellar does not install or test; reports say Content Manager needs .NET Framework 4.5.2 and core fonts in the bottle."
+
+# WineForge, as for every Steam title: the current Steam client needs a modern Wine, and the
+# Steam-in-bottle route is what this game's DRM needs.
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DXVK first: the one route CrossOver users document as working for acs.exe on Apple Silicon. A
+# 2023 report says D3DMetal did not run it; D3DMetal 3.0 is newer than that report, so it stays as
+# the fallback the launch window offers once if DXVK never brings the game up.
+backend           = "dxvk"
+fallback_backend  = "d3dmetal"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 244210
+# Steam's install folder for 244210 is lowercase "assettocorsa" (the path Linux guides cite:
+# steamapps/common/assettocorsa/AssettoCorsa.exe). AssettoCorsa.exe is Steam's launch target, the
+# launcher; it starts acs.exe from the same folder.
+install_dir = "assettocorsa"
+exe         = "AssettoCorsa.exe"
+
+[legal]
+# Steamworks runs untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"

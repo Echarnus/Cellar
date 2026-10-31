@@ -9,9 +9,9 @@ import Foundation
 /// Settings. Everything Cellar does with Steam afterwards — checking what you own, downloading it,
 /// installing it — reuses that one session silently.
 ///
-/// The token itself is never Cellar's to hold: DepotDownloader obtains it from Steam and keeps it
-/// in its own account store. Cellar records only *who* signed in and *when*, so the Accounts screen
-/// can say something true without keeping a second copy of a credential.
+/// DepotDownloader obtains the token from Steam and keeps it in its own account store, which
+/// `SteamTokenVault` moves into the keychain whenever the tool is not running. Cellar records only
+/// *who* signed in and *when*, so the Accounts screen can say something true without reading it.
 public enum SteamAccount {
 
     // MARK: - What Cellar knows
@@ -149,7 +149,9 @@ public enum SteamAccount {
         // account's token — say so, or that case reads exactly like a missing file.
         let holdsAccount = record.map { DepotTool.storedAccountNames.contains($0.accountName.lowercased()) }
         let found = stores.isEmpty
-            ? "no token store under " + DepotTool.sessionSearchRoots.map(\.path).joined(separator: ", ")
+            ? (SteamTokenVault.sealedAccounts != nil
+                ? "token sealed in the keychain"
+                : "no token store under " + DepotTool.sessionSearchRoots.map(\.path).joined(separator: ", "))
             : "token store at " + stores.map(\.path).joined(separator: ", ")
                 + (holdsAccount.map { $0 ? " (holds this account)" : " (does NOT hold this account)" } ?? "")
         return "Steam \(verdict) — record: \(record == nil ? "none" : "present"), \(found)"
