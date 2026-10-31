@@ -124,7 +124,7 @@ public enum SteamClientSession {
 
 public extension SteamClientSession {
     /// Whether a bottle's client can sign in without its login window.
-    package enum Readiness: Equatable, Sendable {
+    public enum Readiness: Equatable, Sendable {
         /// This bottle's client already remembers a session for the account Cellar is signed in to.
         case remembered
         /// Cellar can hand the client the session it holds, before the client starts.
@@ -147,7 +147,7 @@ public extension SteamClientSession {
         }
     }
 
-    package enum Unavailable: String, Equatable, Sendable {
+    public enum Unavailable: String, Equatable, Sendable {
         /// Cellar holds no usable Steam session.
         case notSignedIn
         /// Cellar's session is not one the client accepts, or it is about to expire.

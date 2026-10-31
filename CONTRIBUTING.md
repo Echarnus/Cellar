@@ -32,7 +32,7 @@ Cite sources for non-obvious claims in the PR description.
 
 ## 2. Work on the engine (Swift)
 
-- `app/src/CellarKit` — the core library (environment, bottles, runners, profiles, the store
+- `app/Packages/CellarKit/Sources/CellarKit` — the core library (environment, bottles, runners, profiles, the store
   clients). The CLI and the SwiftUI app both import this; **all logic belongs here**.
 - `app/src/cellar` — the CLI (one file per command group under `Commands/`).
 - `app/src/CellarApp` — the SwiftUI app. Anything a player sees is held to

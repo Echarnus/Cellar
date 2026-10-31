@@ -12,7 +12,7 @@ struct ArchitectureTests {
 
     /// Every `import` line in a source folder, as (file, module) pairs.
     static func imports(in folder: String) throws -> [(file: String, module: String)] {
-        let root = Repo.app.appendingPathComponent("src/\(folder)", isDirectory: true)
+        let root = Repo.source(folder)
         let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
             .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
         var found: [(file: String, module: String)] = []
@@ -32,7 +32,7 @@ struct ArchitectureTests {
 
     /// The source text of every Swift file in a folder.
     static func sources(in folder: String) throws -> [(file: String, text: String)] {
-        let root = Repo.app.appendingPathComponent("src/\(folder)", isDirectory: true)
+        let root = Repo.source(folder)
         let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
             .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
         return try files.map { (file: $0.lastPathComponent, text: try String(contentsOf: $0, encoding: .utf8)) }
@@ -81,7 +81,7 @@ struct ArchitectureTests {
     /// headless test can see, because none of them starts the app.
     @Test("Every entry point wires the store adapters in", arguments: ["cellar/Cellar.swift", "CellarApp/main.swift"])
     func entryPointsInstallInfrastructure(_ path: String) throws {
-        let text = try String(contentsOf: Repo.app.appendingPathComponent("src/\(path)"), encoding: .utf8)
+        let text = try String(contentsOf: Repo.source(path), encoding: .utf8)
         #expect(text.contains("CellarInfrastructure.install()"), "\(path) never calls CellarInfrastructure.install()")
     }
 
@@ -142,7 +142,7 @@ struct ArchitectureTests {
     @Test("Sources are grouped into feature folders, not left flat at the target root",
           arguments: oneTypePerFileTargets)
     func featureFolders(_ folder: String) throws {
-        let root = Repo.app.appendingPathComponent("src/\(folder)", isDirectory: true)
+        let root = Repo.source(folder)
         let loose = try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".swift") }
         // Only the entry point (main.swift, or the module's own namespace file) may sit at the root.
         for file in loose {
@@ -151,13 +151,58 @@ struct ArchitectureTests {
         }
     }
 
+    /// A script that reads a source file by path breaks silently when the file moves: the install
+    /// script once read the version from a path that no longer existed and got an empty string.
+    @Test("Every Swift source a build script reads by path exists", arguments: ["install-app.sh", "package.sh"])
+    func scriptSourcePathsExist(_ script: String) throws {
+        let text = try String(contentsOf: Repo.app.appendingPathComponent("Scripts/\(script)"), encoding: .utf8)
+        let paths = text.split(whereSeparator: { " \t\n\"'()".contains($0) })
+            .map(String.init)
+            .filter { $0.hasSuffix(".swift") && $0.contains("/") && !$0.hasPrefix("$") }
+        for path in paths {
+            #expect(FileManager.default.fileExists(atPath: Repo.app.appendingPathComponent(path).path),
+                    "Scripts/\(script) reads \(path), which does not exist")
+        }
+    }
+
     @Test("Every target is checked in Swift 6 mode, and UI modules start on the main actor")
     func swift6Everywhere() throws {
         let manifest = try String(contentsOf: Repo.app.appendingPathComponent("Package.swift"), encoding: .utf8)
-        #expect(manifest.contains("swiftLanguageModes: [.v6]"))
-        #expect(!manifest.contains(".swiftLanguageMode(.v5)"), "a target opted back out of Swift 6")
         #expect(manifest.contains(".defaultIsolation(MainActor.self)"))
-        #expect(manifest.contains("NonisolatedNonsendingByDefault"))
-        #expect(manifest.contains("InferIsolatedConformances"))
+        for (name, text) in try Self.manifests() {
+            #expect(text.contains("swiftLanguageModes: [.v6]"), "\(name) is not in Swift 6 mode")
+            #expect(!text.contains(".swiftLanguageMode(.v5)"), "a target in \(name) opted back out of Swift 6")
+            #expect(text.contains("NonisolatedNonsendingByDefault"), "\(name) lacks Approachable Concurrency")
+            #expect(text.contains("InferIsolatedConformances"), "\(name) lacks Approachable Concurrency")
+        }
+        let ui = try #require(try Self.manifests().first { $0.name == "CellarUI" })
+        #expect(ui.text.contains(".defaultIsolation(MainActor.self)"), "CellarUI no longer starts on the main actor")
+    }
+
+    /// The app shell's manifest and every local package's, by package name.
+    static func manifests() throws -> [(name: String, text: String)] {
+        var found = [(name: "Cellar", text: try String(contentsOf: Repo.app.appendingPathComponent("Package.swift"), encoding: .utf8))]
+        for package in Set(Repo.packageOfLibrary.values).sorted() {
+            let url = Repo.app.appendingPathComponent("Packages/\(package)/Package.swift")
+            found.append((name: package, text: try String(contentsOf: url, encoding: .utf8)))
+        }
+        return found
+    }
+
+    /// The layers are local packages, so a dependency a package does not declare cannot be imported
+    /// at all. This pins what each one may declare: the domain nothing, the engine only the domain,
+    /// the UI library the domain and the engine. A new arrow has to change this test on purpose.
+    @Test("Each local package depends only on the layers below it",
+          arguments: [("CellarDomain", [String]()), ("CellarKit", ["CellarDomain"]),
+                      ("CellarUI", ["CellarDomain", "CellarKit"])])
+    func packageDependencies(_ package: String, _ allowed: [String]) throws {
+        let text = try #require(try Self.manifests().first { $0.name == package }).text
+        let declared = text.split(separator: "\n")
+            .filter { $0.contains(".package(") }
+            .compactMap { line -> String? in
+                guard let range = line.range(of: "path: \"../") else { return "remote: \(line)" }
+                return String(line[range.upperBound...].prefix { $0 != "\"" })
+            }
+        #expect(declared.sorted() == allowed.sorted(), "\(package) declares \(declared)")
     }
 }
