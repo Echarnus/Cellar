@@ -1,6 +1,5 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
 
 /// The store's mark and name, side by side — the canonical lockup. Used in section headers and
 /// under a game's title so the same pairing is learned once and recognised everywhere.

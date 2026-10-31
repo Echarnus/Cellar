@@ -1,6 +1,5 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
 
 /// The bar itself: a filled share when there is one, a sweep when there isn't.
 ///

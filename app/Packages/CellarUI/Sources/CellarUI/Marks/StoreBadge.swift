@@ -1,6 +1,5 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
 
 /// The store's mark alone, as a badge pinned to a cover. Sized to stay legible at 34pt art without
 /// swallowing it, and ringed so it survives whatever the artwork is doing underneath.

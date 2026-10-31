@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// A type-erased `InsettableShape`, so `outline(of:size:)` can hand back either a circle or a tile
 /// and callers can still `strokeBorder` it. SwiftUI's own `AnyShape` loses insettability.

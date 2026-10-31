@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// A disc whose centre and radius are fractions of the mark's box.
 nonisolated struct MarkDisc: Shape {

@@ -219,10 +219,11 @@ struct ArchitectureTests {
 
     /// The layers are local packages, so a dependency a package does not declare cannot be imported
     /// at all. This pins what each one may declare: the domain nothing, the engine only the domain,
-    /// the UI library the domain and the engine. A new arrow has to change this test on purpose.
+    /// the UI library only the domain (it learns where store icons are through `StoreArtworkSource`).
+    /// A new arrow has to change this test on purpose.
     @Test("Each local package depends only on the layers below it",
           arguments: [("CellarDomain", [String]()), ("CellarKit", ["CellarDomain"]),
-                      ("CellarUI", ["CellarDomain", "CellarKit"])])
+                      ("CellarUI", ["CellarDomain"])])
     func packageDependencies(_ package: String, _ allowed: [String]) throws {
         let text = try #require(try Self.manifests().first { $0.name == package }).text
         let declared = text.split(separator: "\n")

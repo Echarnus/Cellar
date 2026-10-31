@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// Blizzard's mark: the Battle.net orb — three tapered orbits crossing around an open centre, on
 /// its flat blue.

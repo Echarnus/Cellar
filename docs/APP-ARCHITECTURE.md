@@ -402,7 +402,7 @@ app/                  the Mac app
   Packages/           the libraries, each a local Swift package with its own Package.swift
     CellarDomain/     depends on nothing
     CellarKit/        depends on CellarDomain (CellarKit + CellarInfrastructure)
-    CellarUI/         depends on CellarDomain and CellarKit
+    CellarUI/         depends on CellarDomain only
   src/                CellarApp, cellar
   tests/              CellarKitTests, CellarUITests, CellarIntegrationTests
   Resources/          icon, localizations, the update key
@@ -414,8 +414,10 @@ docs/  .github/  licenses/  README, LICENSE, NOTICE …
 ```
 
 **Boundaries are compile errors.** A layer can import only what its package's `Package.swift`
-declares, so CellarDomain cannot reach the engine and CellarUI cannot reach the adapters however a
-file is written. `ArchitectureTests.packageDependencies` pins each package's declared dependencies,
+declares, so CellarDomain cannot reach the engine and CellarUI cannot reach the engine or the adapters
+however a file is written. What the UI needs from the machine comes in through a domain port that
+the composition root fills: `StoreIcons.use(InstalledStoreArtwork())` in `main.swift` tells the
+store marks where the stores' own icons are (`StoreArtworkSource`). `ArchitectureTests.packageDependencies` pins each package's declared dependencies,
 so adding an arrow is a deliberate change to that test. Within a package, `public` is the only way
 out: everything else is `internal` to it.
 

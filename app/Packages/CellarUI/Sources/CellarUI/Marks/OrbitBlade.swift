@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// One of the orb's three orbits: an arc of a flattened ellipse, drawn as a filled outline so it
 /// can taper — a stroked path cannot change width along its length.
