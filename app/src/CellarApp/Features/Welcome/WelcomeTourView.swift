@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 
 /// The first thing a new player sees: what Cellar is, how a game gets running, and — the one step
 /// that actually does something — signing in to their stores.

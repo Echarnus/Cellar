@@ -1,7 +1,7 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
+import CellarData
 import CellarUI
 
 /// What the launch window shows: the game, the step Cellar has actually reached, and the way out.

@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 
 /// Fetch what every game shares, before the first game asks for it.
 struct PrepareCommand: ParsableCommand {

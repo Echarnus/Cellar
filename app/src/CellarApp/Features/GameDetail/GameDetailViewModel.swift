@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Observation
-import CellarKit
+import CellarData
 
 /// The game page's state: what it read about one game from this Mac (its language, its newest save
 /// backup, the controllers plugged in) and the engine calls behind the page's own buttons.

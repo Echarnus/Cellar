@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 import Foundation
 
 /// Hidden self-checks for the byte-exact / round-trip logic (binary VDF, CRC32, shortcut writing).

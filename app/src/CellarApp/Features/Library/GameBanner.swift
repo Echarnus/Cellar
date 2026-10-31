@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 import CellarUI
 
 /// The wide banner behind a game's title. Falls back to a store-tinted wash of the generated

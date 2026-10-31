@@ -1,7 +1,7 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
+import CellarData
 import CellarUI
 
 /// A borderless window that can still take the keyboard — AppKit refuses that by default, and

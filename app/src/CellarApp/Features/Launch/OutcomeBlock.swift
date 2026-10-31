@@ -1,7 +1,7 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
+import CellarData
 import CellarUI
 
 /// How a launch ended, said in one block: a mark, a headline, and a sentence.

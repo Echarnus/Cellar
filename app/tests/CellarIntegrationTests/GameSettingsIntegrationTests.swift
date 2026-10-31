@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// The game page's Retina switch, from the bottle it is saved in to the registry Wine reads it from.
 @Suite(.serialized)

@@ -2,7 +2,7 @@ import CellarDomain
 import SwiftUI
 import AppKit
 import GameController
-import CellarKit
+import CellarData
 import CellarUI
 
 /// A titled label/value list. Values wrap; labels stay a fixed column so two lists line up.

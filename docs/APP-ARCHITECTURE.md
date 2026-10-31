@@ -23,7 +23,7 @@
 ## Summary
 
 - **Cellar already has the most important clean-architecture property:** all logic lives in one
-  UI-free core (`CellarKit`), and both front-ends (the `cellar` CLI and `CellarApp`) depend on it,
+  UI-free core (`CellarData`), and both front-ends (the `cellar` CLI and `CellarApp`) depend on it,
   never the other way round. That is worth keeping exactly as it is.
 - **What it lacks is seams.** The core is a set of caseless `enum`s with `static func`s that touch the
   file system, processes, network and Keychain directly. There are no protocols, so nothing can be
@@ -52,7 +52,7 @@ flowchart TD
     App["CellarApp<br/>SwiftUI + AppKit, ~4.3k lines"]
     CLI["cellar<br/>ArgumentParser, ~3.2k lines"]
     UI["CellarUI<br/>marks, lockups, Snapshot"]
-    Kit["CellarKit<br/>the engine, ~12.5k lines, 58 files"]
+    Kit["CellarData<br/>the engine, ~12.5k lines, 58 files"]
     AP[(swift-argument-parser)]
     SP[(Sparkle)]
     App --> Kit
@@ -66,16 +66,16 @@ flowchart TD
 
 | Target | Role today | Clean-architecture equivalent |
 |---|---|---|
-| `CellarKit` | Everything: domain types (`GameSummary`, `Ownership`, `LaunchStage`), policies (`StoreLibrary.verdict`, `BackendChoice`), orchestration (`Game.setUp`, `Game.launch`), and every adapter to the outside world (`Wine`, `DepotTool`, `Keychain`, `Downloader`). | domain + application + infrastructure, in one module |
+| `CellarData` | Everything: domain types (`GameSummary`, `Ownership`, `LaunchStage`), policies (`StoreLibrary.verdict`, `BackendChoice`), orchestration (`Game.setUp`, `Game.launch`), and every adapter to the outside world (`Wine`, `DepotTool`, `Keychain`, `Downloader`). | domain + application + infrastructure, in one module |
 | `cellar` | One `ParsableCommand` per command group; formats output for a terminal. | presentation (CLI) + composition root |
 | `CellarUI` | Store marks, lockups, the generated cover, `Snapshot`. A library so tests can import it. | presentation primitives |
 | `CellarApp` | Windows, menus, views, `Library` and `CellarRunner` view models, the Sparkle updater. | presentation (GUI) + composition root |
 
-The dependency direction is correct: nothing in `CellarKit` imports SwiftUI, AppKit or
+The dependency direction is correct: nothing in `CellarData` imports SwiftUI, AppKit or
 ArgumentParser, and nothing points back at a front-end. This is the "dependency rule" of clean
 architecture, already met at the module level.
 
-### Inside CellarKit
+### Inside CellarData
 
 Almost every type is a namespace:
 
@@ -85,7 +85,7 @@ public enum SaveBackups {
 }
 ```
 
-- **No protocols.** A `grep` for `protocol` in `app/Packages/CellarKit/Sources/CellarKit` finds none. Side effects —
+- **No protocols.** A `grep` for `protocol` in `app/Packages/CellarData/Sources/CellarData` finds none. Side effects —
   `FileManager`, `Process` (6 sites), `URLSession` (5), Keychain, `ProcessInfo.environment` — are
   called where they are needed.
 - **Configuration is ambient.** `Paths.appSupport` reads `CELLAR_HOME` from the process environment,
@@ -113,7 +113,7 @@ flowchart LR
     S1[[RuntimePreparation.shared]]
     S2[[AppUpdater.shared]]
     NC{{NotificationCenter<br/>9 names}}
-    Kit[(CellarKit statics<br/>Game.summaries, SteamAccount.state,<br/>GOGAuth, SaveBackups…)]
+    Kit[(CellarData statics<br/>Game.summaries, SteamAccount.state,<br/>GOGAuth, SaveBackups…)]
     CLI[[cellar subprocess]]
     Disk[(~/Library/Application Support/Cellar)]
 
@@ -131,7 +131,7 @@ flowchart LR
 ```
 
 The rule in [`skills/swift.md`](../skills/swift.md) is: *actions go through the CLI subprocess,
-read-only state comes from CellarKit in-process*. That is, in effect, **CQRS**: commands travel one
+read-only state comes from CellarData in-process*. That is, in effect, **CQRS**: commands travel one
 path, queries another, and the file system under `Paths.appSupport` is the shared store between
 them. After a command finishes, the app re-queries.
 
@@ -264,7 +264,7 @@ boilerplate than B and none of TCA's tooling.
   This is the unidirectional part — *view → intent → (use case / command) → state → view* — without
   a framework.
 - Stores receive their dependencies in `init`. They never reach for `.shared`, `NotificationCenter`
-  or a CellarKit static that does I/O.
+  or a CellarData static that does I/O.
 - One `AppModel` in `main.swift` creates every store once and hands the same instances to each
   window's root view through its initializer. Separate windows no longer need notifications to stay
   in step: they observe the same objects. Apple's guidance (WWDC23, *Discover Observation*) allows
@@ -341,7 +341,7 @@ flowchart LR
     AS --> CC{{CommandClient}}
     CC -- live --> Sub[cellar subprocess]
     CC -. tests .-> Fake[FakeCommandClient]
-    LS -- LoadLibrary --> Kit[(CellarKit)]
+    LS -- LoadLibrary --> Kit[(CellarData)]
     ACS --> AS
     W1[Library window] & W2[Settings window] & W3[Accounts window] -->|"init(store)"| LS & AS & ACS
 ```
@@ -361,7 +361,7 @@ flowchart LR
 
 Keep the subprocess. Give it a contract:
 
-- **`CellarCommand`** in CellarKit — an enum with one case per command the app issues, rendering its
+- **`CellarCommand`** in CellarData — an enum with one case per command the app issues, rendering its
   own argument list. A test parses every case with the CLI's ArgumentParser types, so a renamed flag
   fails `app/Scripts/test.sh` instead of a player's click.
 - **Typed progress events** — the use cases already know their stages; the CLI emits them as
@@ -376,7 +376,7 @@ The final step lets SwiftPM enforce the layers:
 ```mermaid
 flowchart TD
     App[CellarApp] --> Infra[CellarInfrastructure]
-    App --> Kit[CellarKit<br/>use cases + ports]
+    App --> Kit[CellarData<br/>use cases + ports]
     App --> UI[CellarUI]
     CLI[cellar] --> Infra
     CLI --> Kit
@@ -387,7 +387,7 @@ flowchart TD
 
 Only composition roots import `CellarInfrastructure`: the CLI's `main`, the app's `main.swift` and
 the tests' set-up. Each calls `CellarInfrastructure.install()` to register the store adapters with
-CellarKit's `StoreAdapters` before anything runs. The app needs it too: its actions go through the
+CellarData's `StoreAdapters` before anything runs. The app needs it too: its actions go through the
 CLI, but it still reads the library and the store clients' state in-process. No other file in the
 app imports it, and `ArchitectureTests` fails the build if a view or store does, or if an entry
 point forgets to call `install()`. Every target is in Swift 6 language mode.
@@ -401,10 +401,10 @@ app/                  the Mac app
   Package.swift       the app shell: the two executables and the tests
   Packages/           the libraries, each a local Swift package with its own Package.swift
     CellarDomain/     depends on nothing
-    CellarKit/        depends on CellarDomain (CellarKit + CellarInfrastructure)
+    CellarData/        depends on CellarDomain (CellarData + CellarInfrastructure)
     CellarUI/         depends on CellarDomain only
   src/                CellarApp, cellar
-  tests/              CellarKitTests, CellarUITests, CellarIntegrationTests
+  tests/              CellarDataTests, CellarUITests, CellarIntegrationTests
   Resources/          icon, localizations, the update key
   Shim/               the Dock shim and Cellar's SDL patches (C)
   Scripts/            build, test, package, sign, release
@@ -432,7 +432,7 @@ Packages/CellarDomain/Sources/CellarDomain/      pure types, Foundation only, no
   Store/  Install/  Launch/  Events/  Core/  Commands/  About/  Checks/
   Diagnostics/  Game/  Library/  Runners/  Settings/  Storage/
   Repositories/        the ports a view model asks (LibraryRepository); the engine implements them
-Packages/CellarKit/Sources/CellarKit/            the engine
+Packages/CellarData/Sources/CellarData/            the engine
   Core/                environment, paths, version, credits
   Game/                plans, facts, summaries, updates, play time
   UseCases/            LoadLibrary, SetUpGame, InstallGame, LaunchGame, UninstallGame
@@ -446,7 +446,7 @@ Packages/CellarKit/Sources/CellarKit/            the engine
   Diagnostics/         log, diagnostics report, frame stats
   System/              shell, processes, downloads, environment checks
   Codecs/              VDF, protobuf, PE, CRC32, archives
-Packages/CellarKit/Sources/CellarInfrastructure/ the concrete store adapters
+Packages/CellarData/Sources/CellarInfrastructure/ the concrete store adapters
   Adapters/
 Packages/CellarUI/Sources/CellarUI/              presentation primitives a test can import
   Marks/  Progress/  Snapshot/
@@ -478,8 +478,12 @@ that used to be nested in engine types (`GameUpdates.State`, `Playtime.Record`,
 `StoreLibrary.Verdict`, `SteamAccount.State`) are domain types now, kept under their old names as
 typealiases so no caller had to change.
 
-Next steps (#133): the repository protocols and the use cases move into CellarDomain, and the I/O
-into a CellarData package (absorbing CellarKit and CellarInfrastructure).
+The packages map one to one onto the target layout (#133). **CellarDomain** is the domain: models
+and repository protocols, depending on nothing. **CellarData** is the data layer: the engine and the
+implementations of those protocols (`DiskLibraryRepository`, `InstalledStoreArtwork`), with the
+store adapters in its `CellarInfrastructure` target; it depends only on CellarDomain. **CellarUI**
+holds the presentation primitives a test has to render, on CellarDomain alone. The app depends on
+all of them, and only its composition roots name an implementation.
 
 ## Migration plan
 
@@ -491,11 +495,11 @@ them.
 | # | Step | Issue | Status |
 |---|---|---|---|
 | 1 | Raise the minimum macOS to 14 | #68 | Done (#97) |
-| 2 | Typed `CellarCommand` between the app and the CLI, checked by `cellar selftest` | #69 | Done (#100). `CommandClient` left out: a test can't import the app executable, so the testable rules moved into CellarKit instead |
+| 2 | Typed `CellarCommand` between the app and the CLI, checked by `cellar selftest` | #69 | Done (#100). `CommandClient` left out: a test can't import the app executable, so the testable rules moved into CellarData instead |
 | 3 | One shared `ActivityStore` for every window, created by `AppModel` | #70 | Done (#100) |
-| 4 | `LibraryViewModel` as `@Observable`, its rules in CellarKit's `LibraryQuery`; library notifications become store calls | #71 | Done (#100) |
+| 4 | `LibraryViewModel` as `@Observable`, its rules in CellarData's `LibraryQuery`; library notifications become store calls | #71 | Done (#100) |
 | 5 | `AccountsViewModel`, `RuntimePreparation`, `AppUpdater` as `@Observable` stores; no app singletons | #72 | Done (#100) |
-| 6 | `CellarEnvironment` (home + clock) in CellarKit, proven on save backups | #73 | Done (#100) |
+| 6 | `CellarEnvironment` (home + clock) in CellarData, proven on save backups | #73 | Done (#100) |
 | 7 | One `StoreAdapter` per store; no `switch plan.store` left in set-up, install, open or launch | #74 | Done (#100) |
 | 8 | `Game.swift` split into domain types and use cases (`LoadLibrary`, `SetUpGame`, `InstallGame`, `LaunchGame`, `UninstallGame`) reporting `GameEvent`s | #75 | Done (#100) |
 | 9 | Versioned JSON-line events (`cellar … --events`, `CommandEvent`); the old markers still read | #76 | Done (#100) |
@@ -536,7 +540,7 @@ packaging guidance. What matches, and what does not yet:
 | Start on the main actor; UI and model classes stay main-actor, not `Sendable` (WWDC25 268) | Every store is `@MainActor final class`, none is `Sendable` | Matches |
 | Value types are the safest thing to share; make them `Sendable` (WWDC25 268) | Domain types are `Sendable` structs and enums; `LaunchRoute` was not and now is | Fixed in #100 |
 | Adopt Swift 6 one module at a time (`swiftLanguageMode` per target, SE-0435; Swift 6 migration guide) | Every target sets its own `swiftLanguageMode` | Done in #77 (see `Package.swift` for each target's mode) |
-| Turn on *Approachable Concurrency*, and default main-actor isolation for UI modules (WWDC25 268, SE-0466, SE-0461, SE-0470) | `swift-tools-version: 6.2`; `CellarApp` and `CellarUI` use `.defaultIsolation(MainActor.self)` with Approachable Concurrency; CellarKit stays nonisolated, as a library should | Done in #77 |
+| Turn on *Approachable Concurrency*, and default main-actor isolation for UI modules (WWDC25 268, SE-0466, SE-0461, SE-0470) | `swift-tools-version: 6.2`; `CellarApp` and `CellarUI` use `.defaultIsolation(MainActor.self)` with Approachable Concurrency; CellarData stays nonisolated, as a library should | Done in #77 |
 | Work that blocks the main thread moves off it (`@concurrent`), after profiling (WWDC25 268) | `LibraryViewModel.refresh()` runs `LoadLibrary` (profiles, icons, bottle state) on the main actor | Gap: profile it in Instruments, then move `LoadLibrary` into a `@concurrent` function if it shows |
 | Narrowest access that works; `package` for what only the package uses (SE-0386, SE-0409) | `StoreDescriptor.components(fromHex:)` and `GameStore.sortIndex` were `public` for tests and the CLI | Fixed in #100: now `package` |
 | Re-exporting a module is not an official Swift feature (`@_exported` is underscored; SE-0409 left it unspecified) | Every file that uses a domain type writes `import CellarDomain`; nothing is re-exported | Fixed in #77 |
@@ -549,11 +553,11 @@ test fails the build when the rule breaks, not that a reviewer has to notice.
 
 | Criterion | Cellar | Status |
 |---|---|---|
-| Dependencies point inward: domain ← engine ← infrastructure ← composition roots | Local Swift packages: `CellarDomain` (no dependencies) ← `CellarKit` (engine + adapters) ← `CellarUI`; the app shell depends on all three. A package can only import what its manifest declares | Pass, enforced by the compiler (`app/Packages/*/Package.swift`) and pinned (`ArchitectureTests.packageDependencies`) |
+| Dependencies point inward: domain ← engine ← infrastructure ← composition roots | Local Swift packages: `CellarDomain` (no dependencies) ← `CellarData` (engine + adapters) ← `CellarUI`; the app shell depends on all three. A package can only import what its manifest declares | Pass, enforced by the compiler (`app/Packages/*/Package.swift`) and pinned (`ArchitectureTests.packageDependencies`) |
 | The domain is pure: no I/O, no framework | `CellarDomain` imports Foundation only | Pass, enforced (`ArchitectureTests.domainIsPure`) |
-| Ports and adapters: the core depends on interfaces, not implementations | `StoreAdapter` port in CellarKit; Steam, Battle.net and GOG adapters in `CellarInfrastructure`; CellarKit never names one | Pass, enforced (`engineNamesNoConcreteAdapter`, `useCasesDoNotSwitchOnStore`) |
+| Ports and adapters: the core depends on interfaces, not implementations | `StoreAdapter` port in CellarData; Steam, Battle.net and GOG adapters in `CellarInfrastructure`; CellarData never names one | Pass, enforced (`engineNamesNoConcreteAdapter`, `useCasesDoNotSwitchOnStore`) |
 | Composition root: wiring happens once, at the edge | `CellarInfrastructure.install()` in the CLI's `main`, the app's `main.swift` and the test homes; nowhere else in the app | Pass, enforced (`entryPointsInstallInfrastructure`, `onlyTheAppsRootImportsInfrastructure`) |
-| The UI layer holds no business logic | Library rules live in CellarKit's `LibraryQuery`; actions are `CellarCommand`s run by the CLI; views read `@Observable` stores | Pass, by structure (CellarKit has no UI import: `engineHasNoUI`) |
+| The UI layer holds no business logic | Library rules live in CellarData's `LibraryQuery`; actions are `CellarCommand`s run by the CLI; views read `@Observable` stores | Pass, by structure (CellarData has no UI import: `engineHasNoUI`) |
 | Use cases are explicit and testable without I/O | `LoadLibrary`, `SetUpGame`, `InstallGame`, `LaunchGame`, `UninstallGame` take their dependencies in `init` | Pass, tested (`UseCaseTests` with a recording adapter) |
 | State management: one owner, unidirectional updates | `AppModel` owns every `@Observable @MainActor` store; no singletons, no notification wiring | Pass, tested (`LibraryQueryTests`, store tests) |
 | Contract between processes is typed and versioned | `CellarCommand` (checked by `cellar selftest` against the CLI's parser), `--events` JSON lines with `v` | Pass, tested (`CellarCommandTests`, `CommandEventTests`, `cellar selftest`) |

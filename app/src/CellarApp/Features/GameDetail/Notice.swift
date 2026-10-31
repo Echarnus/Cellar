@@ -2,7 +2,7 @@ import CellarDomain
 import SwiftUI
 import AppKit
 import GameController
-import CellarKit
+import CellarData
 import CellarUI
 
 /// A short, calm heads-up. Not an alert: nothing here is wrong, it just isn't obvious.

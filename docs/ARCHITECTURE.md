@@ -85,13 +85,13 @@ fork of Wine.
 
 | Layer | Module | Responsibility |
 |---|---|---|
-| Engine core | `CellarKit` | environment detection, bottles (prefixes), runners, profile discovery |
-| CLI | `cellar` | thin ArgumentParser front-end over `CellarKit` |
+| Engine core | `CellarData` | environment detection, bottles (prefixes), runners, profile discovery |
+| CLI | `cellar` | thin ArgumentParser front-end over `CellarData` |
 | Runner | `Runner.swift` | download/pin prebuilt LGPL Wine; graft D3DMetal; assemble backend env |
 | GPTK import | `Gptk.swift` | copy user-supplied D3DMetal from Apple's `.dmg` into the local cache |
 | **Store layer** | `GameStore.swift` + `Steam.swift` / `BattleNet.swift` | stand the game's own storefront client up inside the bottle |
 | Profile DB | `profiles/` + (Phase 2) registry sync | per-game config, generality |
-| GUI | `CellarApp` | native SwiftUI app over the same `CellarKit` core |
+| GUI | `CellarApp` | native SwiftUI app over the same `CellarData` core |
 
 ## The store layer
 
@@ -142,7 +142,7 @@ Three consequences worth stating plainly, because they shape the UI as much as t
 
 All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
 about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a `StoreAdapter`
-(`app/Packages/CellarKit/Sources/CellarInfrastructure/Adapters/`: client set-up, install, opening the client,
+(`app/Packages/CellarData/Sources/CellarInfrastructure/Adapters/`: client set-up, install, opening the client,
 launching through it, registered in `CellarInfrastructure.install()`), and a CLI command group.
 
 ### One Steam, every bottle
@@ -381,7 +381,7 @@ save then lands where Finder and Time Machine can see it. Those three are exactl
 gates behind a privacy prompt, so left alone the player meets *"Cellar.app would like to access files
 in your Documents folder"* halfway through an install, with nothing on screen explaining it.
 
-So Cellar owns the timing instead (`app/Packages/CellarKit/Sources/CellarKit/System/HomeFolderAccess.swift`):
+So Cellar owns the timing instead (`app/Packages/CellarData/Sources/CellarData/System/HomeFolderAccess.swift`):
 
 - **The app asks on first launch** (`WelcomeView`) — the same three dialogs macOS would have shown,
   together, before anything is at stake, under a sentence saying what each folder is for. The
@@ -403,7 +403,7 @@ A pad or wheel takes a different road into a Windows game than into a Mac one. W
 reads the device through macOS's HID layer (IOHID), or through SDL when the runner's Wine was built
 with it and can load it, and presents it to the game as XInput (Xbox-style pads) or DirectInput
 (everything else, wheels included). macOS's GameController framework is not on that road, so a pad
-the Mac sees is evidence, not proof. `Controllers` and `Wheels` (CellarKit) say what Cellar *can*
+the Mac sees is evidence, not proof. `Controllers` and `Wheels` (CellarData) say what Cellar *can*
 check, and `cellar doctor` / `cellar controllers` / the game page show it, always as information:
 
 - **What is connected** — pads through GameController (family: Xbox, DualSense, DualShock, Switch
@@ -506,8 +506,8 @@ the app, into one file.
 
 | Piece | Where | What it does |
 |---|---|---|
-| `CellarLog` | `app/Packages/CellarKit/Sources/CellarKit/Diagnostics/CellarLog.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
-| `Diagnostics` | `app/Packages/CellarKit/Sources/CellarKit/Diagnostics/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
+| `CellarLog` | `app/Packages/CellarData/Sources/CellarData/Diagnostics/CellarLog.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
+| `Diagnostics` | `app/Packages/CellarData/Sources/CellarData/Diagnostics/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
 | `cellar logs` | `app/src/cellar/Commands/Maintenance/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
 | Settings → Diagnostics | `app/src/CellarApp/Features/Settings/SettingsView.swift` | The same export, one button, saved to the Desktop. |
 

@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 
 /// Whether the first-run tour is owed, and the record that it has been seen.
 ///

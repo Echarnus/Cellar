@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 
 /// Back to "Cellar has never run here".
 struct ResetCommand: ParsableCommand {

@@ -1,6 +1,6 @@
 import CellarDomain
 import AppKit
-import CellarKit
+import CellarData
 import SwiftUI
 
 /// Where the app sends a player for help. One table, so Settings and the Help menu never point at

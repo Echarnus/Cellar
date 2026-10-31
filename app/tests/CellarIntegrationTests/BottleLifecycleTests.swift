@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// Tier A: real files, no Wine, no network. Everything Cellar writes to disk before a game is ever
 /// involved — bottles, launcher apps, Steam shortcuts — round-tripped through the code that

@@ -1,6 +1,6 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
+import CellarData
 import CellarUI
 
 // MARK: - Pieces

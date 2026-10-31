@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 
 /// Your games — not Cellar's catalogue.
 struct LibraryCommand: ParsableCommand {

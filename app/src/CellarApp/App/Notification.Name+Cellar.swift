@@ -1,6 +1,6 @@
 import CellarDomain
 import AppKit
-import CellarKit
+import CellarData
 import SwiftUI
 
 /// What is left of the app's notifications: windows asking `AppDelegate` to open other windows,

@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// Tier A: Cellar only runs games installed through a store. These run the real profile database
 /// and a storeless profile through discovery, planning and the library together, on real files —

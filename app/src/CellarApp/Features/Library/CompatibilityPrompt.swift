@@ -1,6 +1,6 @@
 import CellarDomain
 import AppKit
-import CellarKit
+import CellarData
 
 /// "How did it run?" — asked once per game and setup, after a session ends, and only ever turned
 /// into a GitHub issue the player reads first and files themselves (`CompatibilityReport`).
