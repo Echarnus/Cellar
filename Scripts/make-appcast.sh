@@ -4,7 +4,7 @@
 # The release workflow uploads the feed as a release asset; installed copies of Cellar read it at
 # https://github.com/Echarnus/Cellar/releases/latest/download/appcast.xml.
 #
-# The EdDSA private key comes from the environment (SPARKLE_ED_PRIVATE_KEY, a repository secret)
+# The EdDSA private key comes from the environment (SPARKLE_ED_PRIVATE_KEY, a secret of the `release` environment)
 # and is handed to sign_update on stdin — never on a command line, never written to disk.
 # Usage: SPARKLE_ED_PRIVATE_KEY=… Scripts/make-appcast.sh <version> <release-notes.md>
 set -eu

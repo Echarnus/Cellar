@@ -1,0 +1,6 @@
+# Every change is owned by the maintainer. Workflows and release tooling are called out so a
+# ruleset can require their review even if the default rule is ever relaxed.
+*                       @Echarnus
+/.github/               @Echarnus
+/Scripts/package.sh     @Echarnus
+/Scripts/release-notes.py @Echarnus

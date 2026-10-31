@@ -54,8 +54,8 @@ done
 iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns"
 
 # Self-update (Sparkle), only once the release signing key exists: Resources/sparkle-public-key holds
-# its public half (Scripts/sparkle-keys.sh writes it), the private half is a repository secret. Without
-# it the app is built with updates switched off rather than with a feed it could never verify.
+# its public half (Scripts/sparkle-keys.sh writes it), the private half is a secret of the `release`
+# environment. Without it the app is built with updates switched off rather than with a feed it could never verify.
 # SUAllowsAutomaticUpdates is off: an update is always shown and installed on the player's say-so,
 # never swapped in on quit — Cellar may be the parent of a game that is still running.
 UPDATE_KEYS=""
@@ -82,7 +82,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <!-- What Sparkle compares against the appcast's sparkle:version. -->
   <key>CFBundleVersion</key><string>$VERSION</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- Shown inside macOS's own permission dialog. Cellar asks for all three on first launch
        (WelcomeView) rather than letting a game trigger them mid-install; without these keys the

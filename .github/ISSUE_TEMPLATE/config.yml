@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Echarnus/Cellar/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.
+  - name: Supported games
+    url: https://echarnus.github.io/Cellar/
+    about: Check whether a game is already supported and how well it runs.
