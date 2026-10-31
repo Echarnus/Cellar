@@ -131,7 +131,7 @@ actual `WINEPREFIX`) and a `bottle.toml` recording `backend`, `runner` and `wind
 ## Store clients live inside the bottle
 
 A game needs the client it was bought from, running in the same bottle. That is the store layer's
-job, not Wine's — `Store.swift` + `Steam.swift` / `BattleNet.swift`, keyed off the profile's `store`
+job, not Wine's — `GameStore.swift` + `Steam.swift` / `BattleNet.swift`, keyed off the profile's `store`
 field. The differences that bite (silent install, observable sign-in, how a launch is issued) are
 tabulated in [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) → *The store layer*, and their UI
 consequences are non-negotiable — see [`ux.md`](ux.md).

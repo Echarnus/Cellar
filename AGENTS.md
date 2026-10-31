@@ -25,7 +25,7 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 
 | Path | What lives there |
 |---|---|
-| `Sources/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store.swift`), launch stages, install phases, `GameEvent`/`CommandEvent`. Imported explicitly (`import CellarDomain`); nothing re-exports it. |
+| `Sources/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store/`), launch stages, install phases, `GameEvent`/`CommandEvent`. Imported explicitly (`import CellarDomain`); nothing re-exports it. |
 | `Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the use cases (`UseCases/`), the `StoreAdapter` port and its registry (`StoreAdapter.swift`), the store plugins (`Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
 | `Sources/CellarInfrastructure/` | The concrete store adapters (`SteamAdapter`, `BattleNetAdapter`, `GOGAdapter`) behind CellarKit's `StoreAdapter` port. Only composition roots import it: the CLI's `main`, the app's `main.swift` and the tests' set-up call `CellarInfrastructure.install()`. No view or store may (`ArchitectureTests`). |
 | `Sources/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
@@ -197,9 +197,9 @@ The differences are real, not cosmetic — the three that bite hardest:
   a store that can never answer (Battle.net) shows its games saying so. Adding a claim about the
   player's library without a store behind it is the one bug class `cellar selftest` covers directly.
 
-Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarDomain/Store.swift`), never as a
+Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarDomain/Store/StoreDescriptor.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
-`StoreAdapter` (`Sources/CellarInfrastructure/StoreAdapters.swift`, registered in
+`StoreAdapter` (`Sources/CellarInfrastructure/Adapters/`, registered in
 `CellarInfrastructure.install()`), and a CLI command group. Nothing else should
 need to know: the use cases (`SetUpGame`, `InstallGame`, `LaunchGame`) ask the adapter.
 
