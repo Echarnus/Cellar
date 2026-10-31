@@ -57,7 +57,7 @@ public struct StoreDescriptor: Sendable {
         StoreDescriptor.components(fromHex: accentHex)
     }
 
-    package static func components(fromHex hex: String) -> (red: Double, green: Double, blue: Double) {
+    public static func components(fromHex hex: String) -> (red: Double, green: Double, blue: Double) {
         var value = UInt64(0)
         let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
         Scanner(string: digits).scanHexInt64(&value)
