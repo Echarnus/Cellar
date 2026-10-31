@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// "Can the game get online from inside its bottle?" — asked of the same Windows network stack the

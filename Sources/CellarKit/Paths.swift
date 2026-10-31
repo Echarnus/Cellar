@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Canonical on-disk locations for Cellar's state.

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 #if canImport(Darwin)
 import Darwin   // libproc: proc_listallpids, proc_pidpath

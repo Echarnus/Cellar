@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Getting the parts every game shares onto the Mac before the player picks one.

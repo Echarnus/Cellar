@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// **Your games, not Cellar's catalogue.**
@@ -50,8 +51,8 @@ public extension GameStore {
     /// to sign in to from Cellar's side.
     var libraryFix: String {
         switch self {
-        case .steam, .gog: return "Sign in to \(displayName)"
-        case .battlenet:   return "Add Battle.net in Accounts"
+        case .steam, .gog: return String(localized: "Sign in to \(displayName)")
+        case .battlenet:   return String(localized: "Add Battle.net in Accounts")
         }
     }
 
@@ -90,7 +91,7 @@ public enum StoreLibrary {
     public static func verdict(store: GameStore, ownership: Ownership, isConnected: Bool) -> Verdict {
         guard isConnected else {
             return Verdict(ownership: ownership, isVisible: false,
-                           note: "Cellar isn't connected to \(store.displayName) yet.",
+                           note: String(localized: "Cellar isn't connected to \(store.displayName) yet."),
                            fix: store.libraryFix)
         }
         switch ownership {
@@ -98,14 +99,14 @@ public enum StoreLibrary {
             return Verdict(ownership: .owned, isVisible: true, note: nil, fix: nil)
         case .notOwned:
             return Verdict(ownership: .notOwned, isVisible: false,
-                           note: "Not in your \(store.displayName) library.", fix: nil)
+                           note: String(localized: "Not in your \(store.displayName) library."), fix: nil)
         case .unknown(let why):
             // A store that *can* answer but hasn't been asked hides its games, and the section
             // carries the fix — showing them with a caveat underneath reads fine and is a lie by
             // arrangement, because a list presented as yours is a claim no caption undoes.
             guard store.canAnswerOwnership else {
                 return Verdict(ownership: ownership, isVisible: true,
-                               note: "Cellar can't check whether you own this — \(store.displayName) doesn't publish it.",
+                               note: String(localized: "Cellar can't check whether you own this — \(store.displayName) doesn't publish it."),
                                fix: nil)
             }
             return Verdict(ownership: ownership, isVisible: false, note: why, fix: store.libraryFix)

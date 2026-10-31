@@ -31,6 +31,9 @@ Every piece of work starts as an issue, because the issues are what a release's 
   | `skip-changelog` | left out |
 
   An issue with several labels lands in the first matching section in that order.
+- **Label it `needs-mac-testing`** when the code is in but it still needs checking on a real Mac
+  or real hardware (a wheel, a game's frame rate, a VoiceOver pass). It stays open, it does not
+  hold a release back, and every release lists it under *Known open items* until it closes.
 - **Close it as "not planned" or "duplicate"** when it won't be done. Only issues closed as
   completed appear in the notes.
 

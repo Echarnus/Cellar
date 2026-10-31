@@ -1,3 +1,4 @@
+import CellarDomain
 import SwiftUI
 import CellarKit
 
@@ -45,13 +46,13 @@ struct StoreSignInPanel: View {
         VStack(spacing: 0) {
             HStack(spacing: 7) {
                 ProgressView().controlSize(.small).opacity(runner.busy ? 1 : 0)
-                Text(runner.busy ? runner.busyTitle : "Anything Cellar runs shows up here.")
+                Text(runner.busy ? runner.busyTitle : String(localized: "Anything Cellar runs shows up here."))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 9).padding(.vertical, 5)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(runner.busy ? "Busy, \(runner.busyTitle)" : "Activity")
+            .accessibilityLabel(runner.busy ? String(localized: "Busy, \(runner.busyTitle)") : String(localized: "Activity"))
             ScrollView {
                 Text(runner.log.isEmpty ? " " : runner.log)
                     .font(.system(.caption, design: .monospaced))

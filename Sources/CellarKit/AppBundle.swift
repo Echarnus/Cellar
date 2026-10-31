@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Generates minimal double-clickable macOS .apps in ~/Applications whose launcher calls `cellar`:
@@ -99,12 +100,53 @@ public enum AppBundle {
         try generateStoreClient(store: .steam, bottle: bottle, slug: slug, cellarBinary: cellarBinary)
     }
 
+    // MARK: - Writing a launcher safely
+    //
+    // A launcher's name comes from a profile's `name`, its arguments from a profile's slug, and both
+    // can arrive in a downloaded game database. They are data, so they are quoted as data: a game
+    // called `Tom's Game` must not end the shell string early, and one called `$(…)` or `</string>`
+    // must not become a command or a plist key.
+
+    /// The two-line `sh` script a launcher runs: `exec <cellar> <arguments…>`, every word
+    /// single-quoted so the shell expands nothing in it.
+    static func launcherScript(cellarBinary: String, arguments: [String]) -> String {
+        let words = ([cellarBinary] + arguments).map(shellQuoted).joined(separator: " ")
+        return "#!/bin/sh\nexec \(words)\n"
+    }
+
+    /// `value` as one POSIX shell word: single quotes, each embedded `'` closed, escaped, reopened.
+    static func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// `value` safe inside an XML text node or attribute.
+    static func xmlEscaped(_ value: String) -> String {
+        value.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+    }
+
+    /// A game's name as a `.app` file name: no path separators (`/` would put the bundle in another
+    /// folder, `:` is `/` to Finder), no control characters, no leading dot (hidden, or `..`).
+    static func bundleName(_ name: String) -> String {
+        let cleaned = String(name.unicodeScalars.map { scalar -> Character in
+            if scalar == "/" || scalar == ":" || CharacterSet.controlCharacters.contains(scalar) { return "-" }
+            return Character(scalar)
+        })
+        var trimmed = Substring(cleaned.trimmingCharacters(in: .whitespaces))
+        while trimmed.hasPrefix(".") { trimmed = trimmed.dropFirst() }
+        return trimmed.isEmpty ? "Game" : String(trimmed.prefix(200))
+    }
+
     static func generate(name: String, identifier: String, cellarBinary: String,
                          arguments: [String], icon: URL?) throws -> Generated {
         let fm = FileManager.default
         let apps = applicationsDirectory
         try fm.createDirectory(at: apps, withIntermediateDirectories: true)
 
+        let name = bundleName(name)
         let app = apps.appendingPathComponent("\(name).app", isDirectory: true)
         let contents = app.appendingPathComponent("Contents", isDirectory: true)
         let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
@@ -114,11 +156,7 @@ public enum AppBundle {
 
         // Launcher script — double-clicked apps don't inherit the shell PATH, so use an absolute cellar path.
         let launcher = macOS.appendingPathComponent("launcher")
-        let quoted = arguments.map { "'\($0)'" }.joined(separator: " ")
-        let script = """
-        #!/bin/sh
-        exec "\(cellarBinary)" \(quoted)
-        """
+        let script = launcherScript(cellarBinary: cellarBinary, arguments: arguments)
         try script.write(to: launcher, atomically: true, encoding: .utf8)
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: launcher.path)
 
@@ -142,10 +180,10 @@ public enum AppBundle {
         <plist version="1.0">
         <dict>
             <key>CFBundleExecutable</key><string>launcher</string>
-            <key>CFBundleIdentifier</key><string>\(identifier)</string>
+            <key>CFBundleIdentifier</key><string>\(xmlEscaped(identifier))</string>
             <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleName</key><string>\(name)</string>
-            <key>CFBundleDisplayName</key><string>\(name)</string>
+            <key>CFBundleName</key><string>\(xmlEscaped(name))</string>
+            <key>CFBundleDisplayName</key><string>\(xmlEscaped(name))</string>
             <key>CFBundleShortVersionString</key><string>1.0</string>
             <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
             <key>LSMinimumSystemVersion</key><string>27.0</string>

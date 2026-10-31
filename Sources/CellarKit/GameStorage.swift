@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Where Cellar's disk space goes, what can safely be given back, and games moved to another drive.

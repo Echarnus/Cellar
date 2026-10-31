@@ -1,3 +1,4 @@
+import CellarDomain
 import AppKit
 import SwiftUI
 import CellarKit
@@ -191,16 +192,16 @@ struct LaunchSplashView: View {
 
     private var arrived: some View {
         OutcomeBlock(symbol: "checkmark.circle.fill", tint: .green,
-                title: "\(game.name) is running",
+                title: String(localized: "\(game.name) is running"),
                 detail: game.needsClientAtRuntime
-                    ? "Cellar closes \(game.store.displayName) and the whole layer when you quit."
-                    : "Cellar closes the layer when you quit.")
+                    ? String(localized: "Cellar closes \(game.store.displayName) and the whole layer when you quit.")
+                    : String(localized: "Cellar closes the layer when you quit."))
     }
 
     private var failure: some View {
         VStack(alignment: .leading, spacing: 12) {
             OutcomeBlock(symbol: "exclamationmark.triangle.fill", tint: .orange,
-                    title: "\(game.name) didn't start",
+                    title: String(localized: "\(game.name) didn't start"),
                     detail: failureDetail)
             if let retry = offeredBackend {
                 Text("Its profile names \(retry.displayName) as the one to try when \(currentBackendName) doesn't work. \(retry.summary) If \(game.name) comes up, Cellar keeps using it; you can switch back on the game's page.")
@@ -223,8 +224,8 @@ struct LaunchSplashView: View {
 
     private var stopped: some View {
         OutcomeBlock(symbol: "stop.circle.fill", tint: .secondary,
-                title: "Launch stopped",
-                detail: "Cellar stopped waiting. Anything already open stays open.")
+                title: String(localized: "Launch stopped"),
+                detail: String(localized: "Cellar stopped waiting. Anything already open stays open."))
     }
 
     // MARK: - Footer
@@ -266,8 +267,8 @@ struct LaunchSplashView: View {
     private var waitingText: String {
         let clock = String(format: "%d:%02d", elapsed / 60, elapsed % 60)
         return elapsed < 20
-            ? "Windows games take a minute or two to come up."
-            : "\(clock) so far — Windows games take a minute or two to come up."
+            ? String(localized: "Windows games take a minute or two to come up.")
+            : String(localized: "\(clock) so far — Windows games take a minute or two to come up.")
     }
 
     // MARK: - State
@@ -313,10 +314,10 @@ struct LaunchSplashView: View {
     /// translated into the thing that actually needs doing.
     private var failureDetail: String {
         if runner.log.contains("Unknown option '--events'") || runner.log.contains("Unknown option '--machine-progress'") {
-            return "Cellar's command-line tool on this Mac is older than the app, so it doesn't understand this launch. Reinstalling Cellar updates both."
+            return String(localized: "Cellar's command-line tool on this Mac is older than the app, so it doesn't understand this launch. Reinstalling Cellar updates both.")
         }
         return lastError.isEmpty
-            ? "Cellar stopped before the game came up. The activity log on the game's page has the detail."
+            ? String(localized: "Cellar stopped before the game came up. The activity log on the game's page has the detail.")
             : lastError
     }
 
@@ -394,9 +395,9 @@ struct LaunchStepRow: View {
 
     private var spokenState: String {
         switch state {
-        case .done:    return "Done"
-        case .current: return "In progress"
-        case .pending: return "Not started"
+        case .done:    return String(localized: "Done")
+        case .current: return String(localized: "In progress")
+        case .pending: return String(localized: "Not started")
         }
     }
 }

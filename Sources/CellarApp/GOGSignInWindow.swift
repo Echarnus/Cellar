@@ -1,3 +1,4 @@
+import CellarDomain
 import AppKit
 import WebKit
 import CellarKit
@@ -56,7 +57,7 @@ final class GOGSignInWindow: NSObject, WKNavigationDelegate {
         let window = NSWindow(contentRect: webView.frame,
                               styleMask: [.titled, .closable, .resizable],
                               backing: .buffered, defer: false)
-        window.title = "Sign in to GOG"
+        window.title = String(localized: "Sign in to GOG")
         window.isReleasedWhenClosed = false
         window.center()
         window.contentView = webView
@@ -95,7 +96,7 @@ final class GOGSignInWindow: NSObject, WKNavigationDelegate {
         // A cancelled navigation is how the redirect above is stopped; it is not a failure.
         let nsError = error as NSError
         guard !(nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled) else { return }
-        finish(.failed("Couldn't load GOG's sign-in page: \(error.localizedDescription)"))
+        finish(.failed(String(localized: "Couldn't load GOG's sign-in page: \(error.localizedDescription)")))
     }
 
     private func finish(_ result: Result) {

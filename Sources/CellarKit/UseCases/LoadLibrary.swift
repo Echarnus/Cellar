@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Read every profile and say how ready each game is — the app's library and `cellar library`.

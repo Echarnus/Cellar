@@ -146,8 +146,8 @@ are the external standard here; this is what it means for Cellar specifically.
 
 ## Localization — English and Dutch
 
-**The app is translated into Dutch — its screens, alerts and menu bar; the CLI and the copy CellarKit
-computes are still English.** The tables live in `Resources/Localization/<lang>.lproj/Localizable.strings`,
+**The app is translated into Dutch — its screens, alerts, menu bar, and the engine copy it shows
+(a game's next-step hint, launch and install steps, library verdicts, the Steam sign-in line).** The tables live in `Resources/Localization/<lang>.lproj/Localizable.strings`,
 the install scripts copy them into the bundle, and SwiftUI looks every `Text("…")`, `Button("…")`,
 `Label("…", …)`, `Toggle`, `Section`, `Picker`, `Link`, `LabeledContent`, `.help` and
 `.accessibility{Label,Value,Hint}` literal up by its English text. Anything that is not a SwiftUI
@@ -162,9 +162,13 @@ view — an `NSAlert`, a menu item — wraps its literal in `String(localized: "
 - **A long caption stays one literal.** Use a multi-line `"""` literal with `\` line continuations,
   not `"…" + "…"`: concatenation turns it into a `String` and it silently stays English.
 - **Text held in a `String` variable is not looked up.** A custom view that takes `title: String`
-  shows it verbatim, and so does copy computed in CellarKit (readiness lines, hints, errors): those
-  are the next step, and need the parameter to become a `LocalizedStringKey`, or the copy to come
-  from `String(localized:)` with a bundle CellarKit can find.
+  shows it verbatim, so the caller passes `String(localized: "…")`. The same goes for copy computed
+  in CellarKit or CellarDomain: `String(localized:)` there resolves against `Bundle.main`, which is
+  Cellar.app both in the app and in the CLI `bundle-app.sh` puts inside it. A `cellar` run from
+  `~/.local/bin` or `swift run` has no table beside it, so it prints English — and so do the tests.
+- **Never translate what is stored or parsed.** A reason cached on disk (`Ownership.unknown`), a
+  wire value, a marker the app matches on: these stay English literals, or a Dutch Mac would write
+  Dutch into a file an English one reads back.
 - **Dutch runs about a third longer than English.** Check the minimum window width with the Mac set
   to Nederlands (System Settings → General → Language & Region, or per app under Applications).
 

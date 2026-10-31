@@ -1,3 +1,4 @@
+import CellarDomain
 import Testing
 import SwiftUI
 import CellarKit
@@ -22,7 +23,7 @@ struct StoreMarkTests {
     /// The sizes the marks are actually used at: a filter chip, a library row, a section header,
     /// and the Accounts screen. Every claim below has to hold at all of them — a mark that only
     /// works large is a mark the player mostly sees broken.
-    static let sizes: [CGFloat] = [11, 14, 22, 32]
+    nonisolated static let sizes: [CGFloat] = [11, 14, 22, 32]
 
     static func render(_ store: GameStore, size: CGFloat) -> Snapshot.Bitmap {
         Snapshot.render(StoreMark(store: store, size: size, artwork: false),

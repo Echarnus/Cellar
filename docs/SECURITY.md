@@ -51,3 +51,31 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
   binary that created it; a true shared item needs the data-protection keychain and a
   `keychain-access-groups` entitlement on both, signed with one Team ID. Until the Developer ID
   exists, the CLI is the only reader of secrets and the app only asks whether one exists.
+
+# The whole app: threat model
+
+Reviewed 2026-10-31 against Apple's *Platform Security Guide* (Gatekeeper, notarization, hardened
+runtime, App Sandbox, Keychain) and the parts of [OWASP MASVS v2](https://mas.owasp.org/MASVS/)
+that apply to a Mac app: STORAGE, CRYPTO, AUTH, NETWORK, PLATFORM, CODE, RESILIENCE.
+
+**What Cellar defends:** the player's store accounts, their Mac account (files, keychain), and the
+integrity of the code Cellar puts on the Mac. **What it does not claim to defend:** a Windows game
+from itself. Wine is a compatibility layer, not a sandbox; a game the player installed runs with
+the player's rights, the way it would on Windows.
+
+| Area | Status | How |
+|---|---|---|
+| Downloaded runners + DepotDownloader | ✅ | Pinned SHA-256 per file (`RunnerArtifact.sha256`, `DepotTool.downloadSHA256`), checked fresh *and* cached, before anything is unpacked or made executable (`Checksum`). Bumping a pin is a reviewed PR. SDL is pinned the same way in `Scripts/build-sdl.sh`. (#120) |
+| Steam / Battle.net installers | Accepted risk | The vendors' own moving "latest" files on their HTTPS CDNs; they cannot be pinned. They run inside the bottle, not on the Mac side. |
+| Transport | ✅ | Every `curl` is HTTPS-only, redirects included (`Downloader.httpsOnly`). (#121) |
+| Secrets on command lines | ✅ | Tokens and refresh tokens go to curl on stdin (`--config -`), never argv, which every process can read. DepotDownloader never gets a password on argv. Cellar's own command lines are logged redacted, fail-closed. (#121) |
+| Game database (#32) | ✅, off until keyed | Ed25519-signed bundle, key compiled in, refused without one; file names held to the slug alphabet; an older set can't replace a newer one. (#122, #124, #128) |
+| What a profile may do | ✅ | `[env]` cannot set `DYLD_*`, `LD_*`, `WINELOADER`, `WINEDLLPATH*`, `PATH`, `HOME` and the like (`ProfileStore.isAllowedEnvKey`), so a profile can't load native code into Wine. (#123) |
+| Generated launchers | ✅ | Every shell word single-quoted, plist values XML-escaped, the name a safe file name (`AppBundle.launcherScript`, `bundleName`). (#122) |
+| Self-update (Sparkle 2.10) | ✅, off until keyed | EdDSA-signed zip, checked before extraction (`SUVerifyUpdateBeforeExtraction`); never installs on its own (`SUAllowsAutomaticUpdates` off). Signed feed (`SURequireSignedFeed`) once the key exists. (#125, #128) |
+| URL schemes, XPC, sockets | ✅ none | Cellar registers no URL scheme and listens on nothing. The app drives the CLI it carries in its own bundle (`Contents/MacOS/cellar`, preferred over anything on `PATH`) as a child process, so there is no IPC surface another program can reach. |
+| Files and logs | ✅ | See the inventory above: `0600`/`0700`, out of backups, redacted at write time. |
+| Wine's view of the Mac | ⚠️ open | Drive Z: maps `/`, so Windows programs can browse the whole file system. (#126) |
+| App Sandbox | ❌ not feasible | Sandbox restrictions are inherited by child processes, and Wine has to exec unsigned code, share memory with `wineserver` and write arbitrary prefixes. Isolation is done per bottle instead (#126). |
+| Hardened runtime, Developer ID, notarization | Accepted risk (deferred) | Kenneth decided on 2026-10-31 not to sign with a Developer ID for now; Cellar is distributed only from the site and GitHub Releases. What this costs: Gatekeeper can't vouch for the publisher, players have to click **Open Anyway** once, the hardened runtime stays off, the CLI re-asks for keychain access after updates, and Sparkle has no Developer ID fallback if the EdDSA key changes. What stands in for it: every release publishes `SHA256SUMS.txt` and a build-provenance attestation, the site shows the DMG's SHA-256 under the Download button, and the FAQ walks through checking it and through Open Anyway on macOS 27 (never via removing the quarantine flag). Updates stay EdDSA-signed. The scripts stay ready (`sign-app.sh`, `notarize.sh`, `make-dmg.sh`); Cellar needs **no** entitlements, and must never get `allow-dyld-environment-variables` or `disable-library-validation`. (#127) |
+| Repository + CI | ✅ | CodeQL, dependency review, Scorecard, pinned actions, least-privilege `permissions:`, rulesets on `main` and tags (`docs/RELEASING.md`). |

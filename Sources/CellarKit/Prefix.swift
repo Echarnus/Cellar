@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Graphics translation backend selected per bottle/profile.

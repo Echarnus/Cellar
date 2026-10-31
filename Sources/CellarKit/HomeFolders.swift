@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// The macOS folders a Windows game reaches into, and the one-time permission grant they need.

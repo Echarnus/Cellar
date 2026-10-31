@@ -1,3 +1,4 @@
+import CellarDomain
 import CommonCrypto
 import Foundation
 

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// A reference to a game profile TOML on disk. Structured decoding of the full schema
@@ -52,10 +53,35 @@ public enum ProfileStore {
             guard parts.count == 2 else { continue }
             var value = parts[1]
             if let hash = value.range(of: " #") { value = String(value[..<hash.lowerBound]) }
-            dict[parts[0]] = value.trimmingCharacters(in: .whitespaces)
+            let key = parts[0]
+            guard isAllowedEnvKey(key) else {
+                CellarLog.warn(.app, "Ignored \(key) in \(url.lastPathComponent): a game file may not set "
+                    + "variables that change which code macOS or Wine loads.")
+                continue
+            }
+            dict[key] = value.trimmingCharacters(in: .whitespaces)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
         }
         return dict
+    }
+
+    /// Variables an `[env]` block may never set, because they decide *which code runs* rather than
+    /// how a game behaves: the dynamic loader's injection and search paths (`DYLD_INSERT_LIBRARIES`
+    /// would load any dylib into Wine, which is not hardened), the Wine binaries and prefix Cellar
+    /// chose, and the shell basics. A profile arrives from the signed game database, so this is
+    /// defence in depth: a compromised key or a bad merge still cannot turn a profile into code
+    /// execution on the Mac. Cellar sets these itself in `WineRunner.environment`.
+    static let deniedEnvPrefixes = ["DYLD_", "LD_", "WINEDLLPATH", "CELLAR_"]
+    static let deniedEnvKeys: Set<String> = [
+        "WINELOADER", "WINESERVER", "WINEPREFIX", "WINEARCH",
+        "PATH", "HOME", "TMPDIR", "SHELL", "USER", "LOGNAME",
+        "GST_PLUGIN_PATH", "D3DMETAL_RUNTIME_DIR", "DXMT_RUNTIME_DIR",
+    ]
+
+    /// Whether an `[env]` block may set `key`. Case-sensitive, like the environment itself.
+    public static func isAllowedEnvKey(_ key: String) -> Bool {
+        guard !key.isEmpty, !deniedEnvKeys.contains(key) else { return false }
+        return !deniedEnvPrefixes.contains { key.hasPrefix($0) }
     }
 
     /// Flat scan of a profile's scalar `key = "value"` pairs (section headers ignored, last wins).

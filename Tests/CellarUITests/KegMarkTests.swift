@@ -11,7 +11,7 @@ import CellarUI
 struct KegMarkTests {
 
     /// The sizes the app draws it at: the sidebar and welcome headers, and the empty detail pane.
-    static let glyphSizes: [CGFloat] = [14, 18, 24]
+    nonisolated static let glyphSizes: [CGFloat] = [14, 18, 24]
 
     static func render(_ style: KegMark.Style, size: CGFloat, scale: CGFloat = 8) -> Snapshot.Bitmap {
         Snapshot.render(KegMark(size: size, style: style).foregroundStyle(.white),

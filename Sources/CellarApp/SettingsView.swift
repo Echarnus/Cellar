@@ -1,3 +1,4 @@
+import CellarDomain
 import SwiftUI
 import AppKit
 import CellarKit
@@ -37,19 +38,19 @@ struct SettingsView: View {
     /// Measured off the main thread when the pane opens: walking a 100 GB game takes seconds.
     @State private var storageUsage: [GameStorage.Usage] = []
 
-    private var runnerName: String { RunnerManager.installed().first?.spec.displayName ?? "not installed" }
-    private var depot: String { DepotTool.isInstalled ? "installed" : "installs on first download" }
+    private var runnerName: String { RunnerManager.installed().first?.spec.displayName ?? String(localized: "not installed") }
+    private var depot: String { DepotTool.isInstalled ? "installed" : String(localized: "installs on first download") }
 
     /// Every state of the background download, said plainly — including "off".
     private var preparationNote: String {
         switch preparation.state {
-        case .working(let line): return "Downloading now: \(line)"
-        case .ready:             return "Everything every game shares is on this Mac."
-        case .incomplete:        return "Stopped before it finished. Whatever is missing downloads when a game first needs it, or when Cellar next opens."
+        case .working(let line): return String(localized: "Downloading now: \(line)")
+        case .ready:             return String(localized: "Everything every game shares is on this Mac.")
+        case .incomplete:        return String(localized: "Stopped before it finished. Whatever is missing downloads when a game first needs it, or when Cellar next opens.")
         case .idle:
             return preparation.isEnabled
-                ? "The Windows runtime and Steam client download when Cellar opens, so a first game doesn't wait for them."
-                : "Off: the Windows runtime and Steam client download when you set up your first game."
+                ? String(localized: "The Windows runtime and Steam client download when Cellar opens, so a first game doesn't wait for them.")
+                : String(localized: "Off: the Windows runtime and Steam client download when you set up your first game.")
         }
     }
 
@@ -192,7 +193,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 12).padding(.top, 8)
             ScrollView {
-                Text(runner.log.isEmpty ? "Anything Cellar runs shows up here." : runner.log)
+                Text(runner.log.isEmpty ? String(localized: "Anything Cellar runs shows up here.") : runner.log)
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(runner.log.isEmpty ? .secondary : .primary)
                     .textSelection(.enabled)
@@ -235,8 +236,8 @@ struct SettingsView: View {
     }
 
     private var lastChecked: String {
-        guard let date = updater.lastChecked else { return "Not checked yet" }
-        return "Last checked " + date.formatted(.relative(presentation: .named))
+        guard let date = updater.lastChecked else { return String(localized: "Not checked yet") }
+        return String(localized: "Last checked \(date.formatted(.relative(presentation: .named)))")
     }
 
     // MARK: - Game database
@@ -251,7 +252,7 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 Button("Check for new games now") {
-                    runner.run(.updateProfiles(quiet: false), title: "Updating the game database",
+                    runner.run(.updateProfiles(quiet: false), title: String(localized: "Updating the game database"),
                                then: { databaseVersion = Self.describeDatabase() })
                 }
                 .disabled(runner.busy)
@@ -263,9 +264,9 @@ struct SettingsView: View {
     }
 
     static func describeDatabase() -> String {
-        guard let installed = ProfileUpdates.installed else { return "The one Cellar \(CellarVersion.current) shipped with" }
-        return "\(installed.count) profiles from Cellar \(installed.cellarVersion), fetched "
-            + installed.fetched.formatted(.relative(presentation: .named))
+        guard let installed = ProfileUpdates.installed else { return String(localized: "The one Cellar \(CellarVersion.current) shipped with") }
+        let fetched = installed.fetched.formatted(.relative(presentation: .named))
+        return String(localized: "\(installed.count) profiles from Cellar \(installed.cellarVersion), fetched \(fetched)")
     }
 
     // MARK: - Storage
@@ -281,7 +282,7 @@ struct SettingsView: View {
                 }
             }
             Button("Clean Up Installers and Scratch Files") {
-                runner.run(.cleanStorage, title: "Cleaning up", then: { measureStorage() })
+                runner.run(.cleanStorage, title: String(localized: "Cleaning up"), then: { measureStorage() })
             }
             .disabled(runner.busy)
             Text("Removes downloaded installers and temporary files Cellar fetches again when it needs them. Games, bottles, save games and sign-ins stay. To move a game to an external drive, use the ••• menu on its page.")
@@ -346,8 +347,8 @@ struct SettingsView: View {
 
     private var logSize: String {
         let bytes = CellarLog.historySize
-        if bytes == 0 { return "nothing logged yet" }
-        return bytes < 1024 ? "\(bytes) bytes" : "\(bytes / 1024) KB"
+        if bytes == 0 { return String(localized: "nothing logged yet") }
+        return bytes < 1024 ? String(localized: "\(bytes) bytes") : String(localized: "\(bytes / 1024) KB")
     }
 
     /// Off the main thread: the report shells out to `sysctl`, `arch` and `gh`, and a Settings

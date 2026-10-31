@@ -384,8 +384,12 @@ flowchart TD
     UI --> Domain
 ```
 
-Only the two composition roots import `CellarInfrastructure`. Each target then moves to Swift 6
-language mode on its own, `CellarDomain` first.
+Only composition roots import `CellarInfrastructure`: the CLI's `main`, the app's `main.swift` and
+the tests' set-up. Each calls `CellarInfrastructure.install()` to register the store adapters with
+CellarKit's `StoreAdapters` before anything runs. The app needs it too: its actions go through the
+CLI, but it still reads the library and the store clients' state in-process. No other file in the
+app imports it, and `ArchitectureTests` fails the build if a view or store does, or if an entry
+point forgets to call `install()`. Every target is in Swift 6 language mode.
 
 ## Migration plan
 
@@ -405,7 +409,7 @@ them.
 | 7 | One `StoreAdapter` per store; no `switch plan.store` left in set-up, install, open or launch | #74 | Done (#100) |
 | 8 | `Game.swift` split into domain types and use cases (`LoadLibrary`, `SetUpGame`, `InstallGame`, `LaunchGame`, `UninstallGame`) reporting `GameEvent`s | #75 | Done (#100) |
 | 9 | Versioned JSON-line events (`cellar … --events`, `CommandEvent`); the old markers still read | #76 | Done (#100) |
-| 10 | SwiftPM targets for the layers; Swift 6 mode per target | #77 | First slice done (#100): `CellarDomain` in Swift 6 mode. Still to do: `CellarInfrastructure`, and Swift 6 for CellarKit, the CLI and the app |
+| 10 | SwiftPM targets for the layers; Swift 6 mode per target | #77 | Done (#100, #115): `CellarDomain`, then `CellarInfrastructure` holding the store adapters behind `StoreAdapters`, explicit imports, Swift 6 and Approachable Concurrency per target |
 
 **How to know it worked:** after step 5, a store test can say "a sign-in finishing refreshes the
 library" with a fake command client and no Wine. After step 7, adding a store is a `GameStore` case,
@@ -441,12 +445,30 @@ packaging guidance. What matches, and what does not yet:
 | `@Observable` models; read as plain properties, `@Bindable` for bindings, `@Environment` for app-wide models (WWDC23 10149) | `@Observable @MainActor` stores, plain-property injection, `@Bindable` for the library's controls | Matches (environment not used, reason above) |
 | Start on the main actor; UI and model classes stay main-actor, not `Sendable` (WWDC25 268) | Every store is `@MainActor final class`, none is `Sendable` | Matches |
 | Value types are the safest thing to share; make them `Sendable` (WWDC25 268) | Domain types are `Sendable` structs and enums; `LaunchRoute` was not and now is | Fixed in #100 |
-| Adopt Swift 6 one module at a time (`swiftLanguageMode` per target, SE-0435; Swift 6 migration guide) | `CellarDomain` in Swift 6 mode; the rest still Swift 5 | Partly: rest of #77 |
-| Turn on *Approachable Concurrency*, and default main-actor isolation for UI modules (WWDC25 268, SE-0466, SE-0461, SE-0470) | Not on yet: needs `swift-tools-version: 6.2`. CI now builds on Xcode 27 only (#113), so the toolchain is no longer the blocker | Gap: do with #77; `CellarApp` and `CellarUI` get `.defaultIsolation(MainActor.self)`, CellarKit stays nonisolated as a library should |
+| Adopt Swift 6 one module at a time (`swiftLanguageMode` per target, SE-0435; Swift 6 migration guide) | Every target sets its own `swiftLanguageMode` | Done in #77 (see `Package.swift` for each target's mode) |
+| Turn on *Approachable Concurrency*, and default main-actor isolation for UI modules (WWDC25 268, SE-0466, SE-0461, SE-0470) | `swift-tools-version: 6.2`; `CellarApp` and `CellarUI` use `.defaultIsolation(MainActor.self)` with Approachable Concurrency; CellarKit stays nonisolated, as a library should | Done in #77 |
 | Work that blocks the main thread moves off it (`@concurrent`), after profiling (WWDC25 268) | `LibraryStore.refresh()` runs `LoadLibrary` (profiles, icons, bottle state) on the main actor | Gap: profile it in Instruments, then move `LoadLibrary` into a `@concurrent` function if it shows |
 | Narrowest access that works; `package` for what only the package uses (SE-0386, SE-0409) | `StoreDescriptor.components(fromHex:)` and `GameStore.sortIndex` were `public` for tests and the CLI | Fixed in #100: now `package` |
-| Re-exporting a module is not an official Swift feature (`@_exported` is underscored; SE-0409 left it unspecified) | CellarKit re-exports `CellarDomain` with `@_exported import` | Gap, deliberate for now: lets the split land without touching every file. Replace with explicit `import CellarDomain` when #77 adds `CellarInfrastructure` |
+| Re-exporting a module is not an official Swift feature (`@_exported` is underscored; SE-0409 left it unspecified) | Every file that uses a domain type writes `import CellarDomain`; nothing is re-exported | Fixed in #77 |
 | Organise app code into local packages and library targets (Apple, *Organizing your code with local packages*) | One SwiftPM package, library targets per layer | Matches |
+
+## Checked against enterprise architecture criteria (2026-10-31)
+
+The same pass, against the rules clean and hexagonal architecture are judged by. "Enforced" means a
+test fails the build when the rule breaks, not that a reviewer has to notice.
+
+| Criterion | Cellar | Status |
+|---|---|---|
+| Dependencies point inward: domain ← engine ← infrastructure ← composition roots | SwiftPM targets `CellarDomain` → `CellarKit` → `CellarInfrastructure`; SwiftPM refuses an undeclared import | Pass, enforced (`Package.swift`, `ArchitectureTests`) |
+| The domain is pure: no I/O, no framework | `CellarDomain` imports Foundation only | Pass, enforced (`ArchitectureTests.domainIsPure`) |
+| Ports and adapters: the core depends on interfaces, not implementations | `StoreAdapter` port in CellarKit; Steam, Battle.net and GOG adapters in `CellarInfrastructure`; CellarKit never names one | Pass, enforced (`engineNamesNoConcreteAdapter`, `useCasesDoNotSwitchOnStore`) |
+| Composition root: wiring happens once, at the edge | `CellarInfrastructure.install()` in the CLI's `main`, the app's `main.swift` and the test homes; nowhere else in the app | Pass, enforced (`entryPointsInstallInfrastructure`, `onlyTheAppsRootImportsInfrastructure`) |
+| The UI layer holds no business logic | Library rules live in CellarKit's `LibraryQuery`; actions are `CellarCommand`s run by the CLI; views read `@Observable` stores | Pass, by structure (CellarKit has no UI import: `engineHasNoUI`) |
+| Use cases are explicit and testable without I/O | `LoadLibrary`, `SetUpGame`, `InstallGame`, `LaunchGame`, `UninstallGame` take their dependencies in `init` | Pass, tested (`UseCaseTests` with a recording adapter) |
+| State management: one owner, unidirectional updates | `AppModel` owns every `@Observable @MainActor` store; no singletons, no notification wiring | Pass, tested (`LibraryQueryTests`, store tests) |
+| Contract between processes is typed and versioned | `CellarCommand` (checked by `cellar selftest` against the CLI's parser), `--events` JSON lines with `v` | Pass, tested (`CellarCommandTests`, `CommandEventTests`, `cellar selftest`) |
+| Compile-time data-race safety | Swift 6 language mode in every target, tests included | Pass, enforced (`swift6Everywhere`, and the compiler) |
+| Main thread kept free of blocking work | `LibraryStore.refresh()` still runs `LoadLibrary` on the main actor | Open: needs an Instruments trace on a real library before moving it (Apple's own advice, WWDC25 268). Not measurable from CI |
 
 ## Sources
 

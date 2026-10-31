@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// DepotDownloader (SteamRE, GPL-2.0): downloads the files of a game you own directly from Steam's
@@ -12,6 +13,9 @@ public enum DepotTool {
     /// Pinned native-arm64 release. (A newer pin is a one-line change; the API is stable.)
     static let downloadURL =
         "https://github.com/SteamRE/DepotDownloader/releases/download/DepotDownloader_3.4.0/DepotDownloader-macos-arm64.zip"
+    /// SHA-256 of that zip. DepotDownloader holds the player's Steam sign-in, so a replaced release
+    /// asset must never reach the disk as an executable: the download is checked before unzipping.
+    static let downloadSHA256 = "60e80c7c496f3f9a079cd3c62036b35d088c27bc0149baf38f009eb57a52f6a5"
 
     public static var root: URL { Paths.appSupport.appendingPathComponent("tools/depotdownloader", isDirectory: true) }
     public static var binary: URL { root.appendingPathComponent("DepotDownloader") }
@@ -35,7 +39,7 @@ public enum DepotTool {
     ///
     /// `session` is every run after that: the token stored under the account name is reused with no
     /// prompt at all. `password` stays for scripted use and for accounts without the mobile app.
-    public enum Credentials {
+    public enum Credentials: Sendable {
         case qr
         case session(username: String)
         case password(username: String)
@@ -64,6 +68,7 @@ public enum DepotTool {
         let zip = Paths.cache.appendingPathComponent("depotdownloader-macos-arm64.zip")
         progress("Downloading DepotDownloader (native arm64)…")
         try Downloader.fetch(downloadURL, to: zip)
+        try Checksum.verify(zip, sha256: downloadSHA256, what: "DepotDownloader")
         progress("Unpacking…")
         try Archive.unzip(zip, to: root)
         try? FileManager.default.removeItem(at: zip)

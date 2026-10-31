@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Resolving a profile into a `GamePlan`, the questions every caller asks of one, and the façades

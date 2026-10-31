@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Handing the Windows Steam client in a bottle the session the player already approved in Cellar,
@@ -123,7 +124,7 @@ public enum SteamClientSession {
 
 public extension SteamClientSession {
     /// Whether a bottle's client can sign in without its login window.
-    enum Readiness: Equatable, Sendable {
+    package enum Readiness: Equatable, Sendable {
         /// This bottle's client already remembers a session for the account Cellar is signed in to.
         case remembered
         /// Cellar can hand the client the session it holds, before the client starts.
@@ -146,7 +147,7 @@ public extension SteamClientSession {
         }
     }
 
-    enum Unavailable: String, Equatable, Sendable {
+    package enum Unavailable: String, Equatable, Sendable {
         /// Cellar holds no usable Steam session.
         case notSignedIn
         /// Cellar's session is not one the client accepts, or it is about to expire.

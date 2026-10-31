@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Keeps a bottle's storefront client out of the Dock, and gives the game its own name in it.

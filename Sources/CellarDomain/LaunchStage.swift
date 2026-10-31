@@ -63,14 +63,14 @@ public enum LaunchStage: String, Sendable, CaseIterable {
     /// Battle.net puts a window on screen, and a bare game opens nothing at all.
     public func title(_ context: LaunchContext) -> String {
         switch self {
-        case .preparing: return "Preparing the bottle"
-        case .signIn:    return "Sign in to \(context.store.displayName)"
-        case .client:    return "Opening \(context.store.displayName)"
-        case .starting:  return "Starting \(context.game)"
-        case .waiting:   return "Waiting for \(context.game) to appear"
-        case .running:   return "\(context.game) is running"
-        case .playing:   return "Playing"
-        case .closed:    return "\(context.game) closed"
+        case .preparing: return String(localized: "Preparing the bottle")
+        case .signIn:    return String(localized: "Sign in to \(context.store.displayName)")
+        case .client:    return String(localized: "Opening \(context.store.displayName)")
+        case .starting:  return String(localized: "Starting \(context.game)")
+        case .waiting:   return String(localized: "Waiting for \(context.game) to appear")
+        case .running:   return String(localized: "\(context.game) is running")
+        case .playing:   return String(localized: "Playing")
+        case .closed:    return String(localized: "\(context.game) closed")
         }
     }
 
@@ -79,31 +79,31 @@ public enum LaunchStage: String, Sendable, CaseIterable {
         let game = context.game
         switch self {
         case .preparing:
-            return "Checking the Windows runtime and this game's bottle."
+            return String(localized: "Checking the Windows runtime and this game's bottle.")
         case .signIn:
             let store = context.store.displayName
-            return "\(store)'s window is open. Sign in there — the QR code with the \(store) mobile app is quickest. It's once, for every \(store) game, and \(game) starts as soon as you're in."
+            return String(localized: "\(store)'s window is open. Sign in there — the QR code with the \(store) mobile app is quickest. It's once, for every \(store) game, and \(game) starts as soon as you're in.")
         case .client:
             switch context.store {
             case .steam:
-                return "Steam starts in the background with no window. \(game) will not start reliably until it is ready, so Cellar waits."
+                return String(localized: "Steam starts in the background with no window. \(game) will not start reliably until it is ready, so Cellar waits.")
             case .battlenet:
-                return "Blizzard's app has to be running before it can be told to launch \(game). Its window may appear — leave it open."
+                return String(localized: "Blizzard's app has to be running before it can be told to launch \(game). Its window may appear — leave it open.")
             case .gog:
-                return "Opening \(context.store.displayName)."
+                return String(localized: "Opening \(context.store.displayName).")
             }
         case .starting:
             return context.throughClient
-                ? "Cellar is handing \(context.store.displayName) the command to launch \(game)."
-                : "Cellar is running the game's own program through Wine."
+                ? String(localized: "Cellar is handing \(context.store.displayName) the command to launch \(game).")
+                : String(localized: "Cellar is running the game's own program through Wine.")
         case .waiting:
-            return "Apple's graphics layer sometimes drops a game a few seconds in. Cellar watches for that and quietly starts it again, so this can take a couple of tries."
+            return String(localized: "Apple's graphics layer sometimes drops a game a few seconds in. Cellar watches for that and quietly starts it again, so this can take a couple of tries.")
         case .running:
-            return "Cellar closes everything it opened as soon as you quit."
+            return String(localized: "Cellar closes everything it opened as soon as you quit.")
         case .playing:
-            return "Have fun. Cellar shuts the layer down when you quit the game."
+            return String(localized: "Have fun. Cellar shuts the layer down when you quit the game.")
         case .closed:
-            return "The layer is shut down."
+            return String(localized: "The layer is shut down.")
         }
     }
 }

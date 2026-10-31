@@ -1,9 +1,10 @@
+import CellarDomain
 import Foundation
 
 /// The performance switches a player can flip per game without editing a profile. Each is a plain
 /// scalar key, so it reads the same in a profile (the game's default) and in a bottle's
 /// `bottle.toml` (the player's choice, which wins). See `PerformanceSettings.resolve`.
-public enum PerformanceSetting: String, CaseIterable {
+public enum PerformanceSetting: String, CaseIterable, Sendable {
     /// Wine's debug channels. `off` (`WINEDEBUG=-all`) for play; a channel spec such as
     /// `err+all,warn+crypt` only while chasing a bug — tracing costs CPU on every call it logs.
     case wineDebug = "wine_debug"

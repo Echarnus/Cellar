@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// How long and how recently each game was played — kept on this Mac, in Cellar's own folder, and

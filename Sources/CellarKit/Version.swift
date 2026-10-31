@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Cellar's version, in one place. The CLI's `--version`, the diagnostics report and the app's

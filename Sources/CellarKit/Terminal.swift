@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Minimal ANSI styling that disables itself when output isn't a TTY or NO_COLOR is set.

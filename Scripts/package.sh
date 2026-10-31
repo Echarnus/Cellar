@@ -58,10 +58,14 @@ iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns"
 # environment. Without it the app is built with updates switched off rather than with a feed it could never verify.
 # SUAllowsAutomaticUpdates is off: an update is always shown and installed on the player's say-so,
 # never swapped in on quit — Cellar may be the parent of a game that is still running.
+# SUVerifyUpdateBeforeExtraction (Sparkle 2.7.3+): the EdDSA signature is checked on the downloaded
+# archive *before* it is unpacked, so a tampered zip never reaches the archive extractor. The cost is
+# that losing the EdDSA key means only a Developer ID-signed DMG can change it — keep the key backed up.
 UPDATE_KEYS=""
 if [ -s Resources/sparkle-public-key ]; then
   UPDATE_KEYS="  <key>SUFeedURL</key><string>https://github.com/Echarnus/Cellar/releases/latest/download/appcast.xml</string>
   <key>SUPublicEDKey</key><string>$(tr -d '[:space:]' < Resources/sparkle-public-key)</string>
+  <key>SUVerifyUpdateBeforeExtraction</key><true/>
   <key>SUAllowsAutomaticUpdates</key><false/>"
 else
   echo "warning: Resources/sparkle-public-key missing — this build will not update itself"

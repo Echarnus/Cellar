@@ -1,5 +1,7 @@
+import CellarDomain
 import AppKit
 import CellarKit
+import CellarInfrastructure
 import SwiftUI
 
 /// What is left of the app's notifications: windows asking `AppDelegate` to open other windows,
@@ -43,7 +45,7 @@ final class AppModel {
     /// then show what turned up.
     func draftProfiles() {
         guard !activity.busy else { return }
-        activity.run(.draftProfiles, title: "Finding games without a profile",
+        activity.run(.draftProfiles, title: String(localized: "Finding games without a profile"),
                      then: { [library] in library.refresh() })
     }
 }
@@ -341,7 +343,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // SwiftUI root frame lets layout feed back into the view graph, and this app aborts in
             // AttributeGraph when it does (skills/swift.md).
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        w.title = isReview ? "Folder access" : "Welcome to Cellar"
+        w.title = isReview ? String(localized: "Folder access") : String(localized: "Welcome to Cellar")
         w.isReleasedWhenClosed = false
         w.center()
         w.contentView = NSHostingView(rootView: WelcomeView(isReview: isReview) { [weak self] in
@@ -361,7 +363,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let w = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 620, height: 580),
                 styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = "Welcome to Cellar"
+            w.title = String(localized: "Welcome to Cellar")
             w.isReleasedWhenClosed = false
             w.center()
             w.contentView = NSHostingView(rootView: WelcomeTourView(runner: model.activity, library: model.library, accounts: model.accounts,
@@ -401,18 +403,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let out = NSMutableAttributedString(string: Credits.tagline + "\n\n", attributes: body)
-        out.append(NSAttributedString(string: "Built on Wine. ", attributes: heading))
+        out.append(NSAttributedString(string: String(localized: "Built on Wine.") + " ", attributes: heading))
         out.append(NSAttributedString(string: Credits.wine.role + " ", attributes: body))
         out.append(link("winehq.org", Credits.wine.url))
         out.append(NSAttributedString(string: " · ", attributes: body))
-        out.append(link("source", Credits.wine.sourceURL!))
-        out.append(NSAttributedString(string: "\n\nEveryone else Cellar stands on: Settings › About.", attributes: body))
+        out.append(link(String(localized: "source"), Credits.wine.sourceURL!))
+        out.append(NSAttributedString(string: "\n\n" + String(localized: "Everyone else Cellar stands on: Settings › About."), attributes: body))
         return out
     }
 }
 
 // Top-level code is not main-actor isolated in the Swift 5 language mode, though it does run on the
 // main thread; say so, so the main-actor AppDelegate can be made here.
+// The app is a composition root, like the CLI's `main`: it reads the library, the bottles and the
+// store clients' state in-process, and that goes through CellarKit's `StoreAdapter` port, so the
+// real adapters are wired in before anything can ask. This file is the only one in the app that
+// imports CellarInfrastructure (ArchitectureTests holds it to that).
+CellarInfrastructure.install()
+
 MainActor.assumeIsolated {
     let app = NSApplication.shared
     let delegate = AppDelegate()

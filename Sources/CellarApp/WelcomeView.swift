@@ -1,3 +1,4 @@
+import CellarDomain
 import SwiftUI
 import AppKit
 import CellarKit
@@ -57,7 +58,7 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 KegMark(size: 18).foregroundStyle(.pink)
-                Text(isReview ? "Folder access" : "Welcome to Cellar")
+                Text(isReview ? String(localized: "Folder access") : String(localized: "Welcome to Cellar"))
                     .font(.title2.weight(.semibold))
             }
             Text(headline)
@@ -70,14 +71,14 @@ struct WelcomeView: View {
 
     private var headline: String {
         if isReview {
-            return "What macOS currently lets Cellar reach. Windows games save into these folders, so a game whose folder is off keeps its saves inside its bottle instead."
+            return String(localized: "What macOS currently lets Cellar reach. Windows games save into these folders, so a game whose folder is off keeps its saves inside its bottle instead.")
         }
         if finished {
             return deniedFolders.isEmpty
-                ? "That is everything Cellar needs. No further permission prompts while you are installing or playing."
-                : "Cellar will not ask again. The folders you turned down stay off, and games use their bottle instead."
+                ? String(localized: "That is everything Cellar needs. No further permission prompts while you are installing or playing.")
+                : String(localized: "Cellar will not ask again. The folders you turned down stay off, and games use their bottle instead.")
         }
-        return "Cellar runs Windows games, and Windows games save into your Documents, Desktop and Downloads folders. macOS will ask about all three now — so it does not interrupt you halfway through installing a game."
+        return String(localized: "Cellar runs Windows games, and Windows games save into your Documents, Desktop and Downloads folders. macOS will ask about all three now — so it does not interrupt you halfway through installing a game.")
     }
 
     private func row(_ folder: HomeFolder) -> some View {
@@ -112,7 +113,7 @@ struct WelcomeView: View {
             HStack(spacing: 5) {
                 Image(systemName: access == .granted ? "checkmark.circle.fill" : "slash.circle")
                     .foregroundStyle(access == .granted ? Color.green : Color.secondary)
-                Text(access == .granted ? "Allowed" : "Off")
+                Text(access == .granted ? String(localized: "Allowed") : String(localized: "Off"))
                     .font(.caption).foregroundStyle(access == .granted ? .primary : .secondary)
             }
         } else {
@@ -124,9 +125,9 @@ struct WelcomeView: View {
     }
 
     private func accessibilityState(_ folder: HomeFolder) -> String {
-        if asking == folder { return "asking" }
-        guard let access = answers[folder] else { return "not asked yet" }
-        return access == .granted ? "allowed" : "off"
+        if asking == folder { return String(localized: "asking") }
+        guard let access = answers[folder] else { return String(localized: "not asked yet") }
+        return access == .granted ? String(localized: "allowed") : String(localized: "off")
     }
 
     private var footer: some View {
@@ -144,7 +145,7 @@ struct WelcomeView: View {
                 }
                 Spacer()
                 if finished || isReview {
-                    Button(isReview ? "Done" : "Start playing", action: onClose)
+                    Button(isReview ? String(localized: "Done") : String(localized: "Start playing"), action: onClose)
                         .keyboardShortcut(.defaultAction)
                 } else {
                     Button("Not now", action: skip)
@@ -159,11 +160,18 @@ struct WelcomeView: View {
 
     private var deniedSentence: String {
         let names = deniedFolders.map(\.displayName)
-        let list = names.count == 1 ? names[0]
-            : names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
-        return "Games that would have used \(list) keep those files inside their bottle, so nothing breaks — "
-            + "but a save will not show up in Finder where you would expect it. You can turn "
-            + "\(names.count == 1 ? "it" : "them") on later in System Settings → Privacy & Security → Files and Folders."
+        let list = names.formatted(.list(type: .and))
+        return names.count == 1
+            ? String(localized: """
+                Games that would have used \(list) keep those files inside their bottle, so nothing breaks — \
+                but a save will not show up in Finder where you would expect it. You can turn it on later \
+                in System Settings → Privacy & Security → Files and Folders.
+                """)
+            : String(localized: """
+                Games that would have used \(list) keep those files inside their bottle, so nothing breaks — \
+                but a save will not show up in Finder where you would expect it. You can turn them on later \
+                in System Settings → Privacy & Security → Files and Folders.
+                """)
     }
 
     private var deniedFolders: [HomeFolder] {

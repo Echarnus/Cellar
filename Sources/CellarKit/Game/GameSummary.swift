@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// A game's readiness, for the GUI to decide what to show (and which button to offer next).
@@ -98,14 +99,14 @@ public struct GameSummary: Identifiable, Sendable {
     /// in a client that installs games for you than in one Cellar drives itself.
     public var actionTitle: String {
         switch nextStep {
-        case .setup:   return "Set up"
+        case .setup:   return String(localized: "Set up")
         case .install:
             switch store {
-            case .steam:      return "Install"
-            case .battlenet:  return "Open Battle.net"
-            case .gog:        return "Download"
+            case .steam:      return String(localized: "Install")
+            case .battlenet:  return String(localized: "Open Battle.net")
+            case .gog:        return String(localized: "Download")
             }
-        case .play:    return "Play"
+        case .play:    return String(localized: "Play")
         }
     }
 
@@ -124,31 +125,36 @@ public struct GameSummary: Identifiable, Sendable {
         switch nextStep {
         case .setup:
             return store.descriptor.hasSilentInstaller
-                ? "Cellar installs the Windows runtime and \(store.displayName) for this game. One click, a few minutes."
-                : "Cellar installs the Windows runtime, then opens Blizzard's installer — that one needs a few clicks from you, because Battle.net ships no silent install."
+                ? String(localized: "Cellar installs the Windows runtime and \(store.displayName) for this game. One click, a few minutes.")
+                : String(localized: "Cellar installs the Windows runtime, then opens Blizzard's installer — that one needs a few clicks from you, because Battle.net ships no silent install.")
         case .install:
             // The first game on a Mac also fetches the Windows runtime. Saying so up front is what
-            // keeps a few extra minutes from reading as a stall.
-            let first = setupPending
-                ? " The first time, Cellar also sets up the Windows runtime — a few extra minutes." : ""
-            switch store {
-            case .steam:      return "Cellar downloads it from your Steam library with the sign-in you already gave it. No Steam window, nothing to click." + first
-            case .battlenet:
-                return setupPending
-                    ? "Cellar sets up the Windows runtime, then Blizzard's installer opens — it needs a few clicks from you, because Battle.net ships no silent install. Then install the game from Battle.net."
-                    : "Battle.net opens. Sign in if you haven't, then install the game from there. Cellar takes over once the files are down."
-            case .gog:        return "Cellar downloads it from your GOG library and installs it. No client, and nothing runs alongside the game." + first
+            // keeps a few extra minutes from reading as a stall. Whole sentences either way, so a
+            // translation never has to glue a clause onto another.
+            switch (store, setupPending) {
+            case (.steam, false):
+                return String(localized: "Cellar downloads it from your Steam library with the sign-in you already gave it. No Steam window, nothing to click.")
+            case (.steam, true):
+                return String(localized: "Cellar downloads it from your Steam library with the sign-in you already gave it. No Steam window, nothing to click. The first time, Cellar also sets up the Windows runtime — a few extra minutes.")
+            case (.battlenet, true):
+                return String(localized: "Cellar sets up the Windows runtime, then Blizzard's installer opens — it needs a few clicks from you, because Battle.net ships no silent install. Then install the game from Battle.net.")
+            case (.battlenet, false):
+                return String(localized: "Battle.net opens. Sign in if you haven't, then install the game from there. Cellar takes over once the files are down.")
+            case (.gog, false):
+                return String(localized: "Cellar downloads it from your GOG library and installs it. No client, and nothing runs alongside the game.")
+            case (.gog, true):
+                return String(localized: "Cellar downloads it from your GOG library and installs it. No client, and nothing runs alongside the game. The first time, Cellar also sets up the Windows runtime — a few extra minutes.")
             }
         case .play:
             if updatePending {
-                return "A newer version is out. Play downloads only what changed, then starts the game."
+                return String(localized: "A newer version is out. Play downloads only what changed, then starts the game.")
             }
             if clientSignInPending {
-                return "Installed. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game."
+                return String(localized: "Installed. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game.")
             }
             return needsClientAtRuntime
-                ? "Installed. Play starts \(store.displayName) quietly in the background and closes the whole layer when you quit."
-                : "Installed. Play starts the game directly, without opening \(store.displayName)'s client, and closes the layer when you quit."
+                ? String(localized: "Installed. Play starts \(store.displayName) quietly in the background and closes the whole layer when you quit.")
+                : String(localized: "Installed. Play starts the game directly, without opening \(store.displayName)'s client, and closes the layer when you quit.")
         }
     }
 

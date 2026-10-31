@@ -1,3 +1,4 @@
+import CellarDomain
 import AppKit
 import SwiftUI
 import CellarKit
@@ -23,16 +24,16 @@ struct GameSettingsSection: View {
 
     private var rows: [Row] {
         var rows = [
-            Row(setting: .retina, title: "Retina resolution",
-                tradeOff: "Renders at your display's full pixel density. Sharper, and up to four times the work for the GPU."),
-            Row(setting: .metalHUD, title: "Show frame rate",
-                tradeOff: "Metal's overlay with frames per second and frame time. Costs next to nothing."),
-            Row(setting: .metalValidation, title: "Metal validation",
-                tradeOff: "Checks every graphics call. Slower, but it stops some games crashing on D3DMetal."),
+            Row(setting: .retina, title: String(localized: "Retina resolution"),
+                tradeOff: String(localized: "Renders at your display's full pixel density. Sharper, and up to four times the work for the GPU.")),
+            Row(setting: .metalHUD, title: String(localized: "Show frame rate"),
+                tradeOff: String(localized: "Metal's overlay with frames per second and frame time. Costs next to nothing.")),
+            Row(setting: .metalValidation, title: String(localized: "Metal validation"),
+                tradeOff: String(localized: "Checks every graphics call. Slower, but it stops some games crashing on D3DMetal.")),
         ]
         if game.backend == GraphicsBackend.d3dmetal.rawValue {
-            rows.insert(Row(setting: .metalFXUpscaling, title: "MetalFX upscaling",
-                            tradeOff: "Appears as DLSS in the game's own settings: renders smaller and upscales. Faster, slightly softer."),
+            rows.insert(Row(setting: .metalFXUpscaling, title: String(localized: "MetalFX upscaling"),
+                            tradeOff: String(localized: "Appears as DLSS in the game's own settings: renders smaller and upscales. Faster, slightly softer.")),
                         at: 1)
         }
         return rows
@@ -92,7 +93,7 @@ struct GameLogSection: View {
         DisclosureGroup(isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 8) {
                 ScrollView {
-                    Text(text.isEmpty ? "Nothing logged for \(game.name) yet." : text)
+                    Text(text.isEmpty ? String(localized: "Nothing logged for \(game.name) yet.") : text)
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(6)

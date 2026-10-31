@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// How much of a game's footprint to remove.
@@ -432,13 +433,13 @@ public enum Uninstall {
     /// after the bundle itself is gone.
     static func generatedLauncherPath(for name: String) -> String {
         AppBundle.applicationsDirectory
-            .appendingPathComponent("\(name).app/Contents/MacOS/launcher").path
+            .appendingPathComponent("\(AppBundle.bundleName(name)).app/Contents/MacOS/launcher").path
     }
 
     /// A `.app` in `~/Applications` **that Cellar generated** — matched on the bundle identifier it
     /// writes, so a game's own app of the same name is never mistaken for ours and deleted.
     static func generatedApp(named name: String, identifier: String) -> URL? {
-        let app = AppBundle.applicationsDirectory.appendingPathComponent("\(name).app", isDirectory: true)
+        let app = AppBundle.applicationsDirectory.appendingPathComponent("\(AppBundle.bundleName(name)).app", isDirectory: true)
         let plist = app.appendingPathComponent("Contents/Info.plist")
         guard let data = try? Data(contentsOf: plist),
               let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],

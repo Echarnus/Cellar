@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// Resolved launch plan for a game profile.

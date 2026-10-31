@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 import Testing
 @testable import CellarKit
@@ -20,7 +21,7 @@ struct SteamClientUpdateTests {
 
     @Test("A download line gives the pass's share, whatever language Steam writes it in",
           arguments: downloadLines)
-    func downloadLines(_ line: String, _ expected: Double) throws {
+    func downloadLineFraction(_ line: String, _ expected: Double) throws {
         let fraction = try #require(SteamClientUpdate.fraction(in: line))
         #expect(abs(fraction - expected) < 0.000_01)
     }

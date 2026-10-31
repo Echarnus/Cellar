@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 import Observation
 import CellarKit
@@ -185,7 +186,7 @@ final class ActivityStore {
     func launch(slug: String, showHUD: Bool, backend: GraphicsBackend? = nil,
                 then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(.launch(slug: slug, showHUD: showHUD, backend: backend), title: "Launching", then: then)
+        run(.launch(slug: slug, showHUD: showHUD, backend: backend), title: String(localized: "Launching"), then: then)
         launchingSlug = slug
         launchShowsHUD = showHUD
     }
@@ -226,7 +227,7 @@ final class ActivityStore {
     /// a patch can be gigabytes, and a spinner is no answer to "how long".
     func update(slug: String, name: String, then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(.update(slug: slug), title: "Updating \(name)", then: then)
+        run(.update(slug: slug), title: String(localized: "Updating \(name)"), then: then)
         installingSlug = slug
     }
 

@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// GOG.com — the store where OAuth actually buys something.

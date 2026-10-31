@@ -1,3 +1,4 @@
+import CellarDomain
 import Foundation
 
 /// `cellar install`: the game through its store — a depot download for Steam, the client for
