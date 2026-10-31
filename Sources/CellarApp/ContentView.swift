@@ -347,8 +347,8 @@ struct ContentView: View {
                 Image(systemName: "arrow.up.arrow.down")
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-            .help("Sort by \(lib.sort == .name ? "name" : "most recently played")")
-            .accessibilityLabel("Sort, currently by \(lib.sort.rawValue.lowercased())")
+            .help(lib.sort == .name ? Text("Sort by name") : Text("Sort by most recently played"))
+            .accessibilityLabel(lib.sort == .name ? Text("Sort, currently by name") : Text("Sort, currently by most recently played"))
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
     }
@@ -398,7 +398,8 @@ struct ContentView: View {
         if !lib.withheld.isEmpty, !lib.games.isEmpty, !lib.hasConnectedStore {
             VStack(alignment: .leading, spacing: 6) {
                 Divider().padding(.vertical, 4)
-                Text("\(lib.withheld.count) more \(lib.withheld.count == 1 ? "game" : "games") once you sign in")
+                (lib.withheld.count == 1 ? Text("1 more game once you sign in")
+                    : Text("\(lib.withheld.count) more games once you sign in"))
                     .font(.caption.weight(.semibold))
                 // The same sentence the empty state uses, so a player who sees both is told the
                 // same thing twice rather than two different things once.
@@ -456,7 +457,8 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent).controlSize(.small)
                 if !lib.withheld.isEmpty {
-                    Text("\(lib.withheld.count) supported \(lib.withheld.count == 1 ? "game is" : "games are") waiting behind it.")
+                    (lib.withheld.count == 1 ? Text("1 supported game is waiting behind it.")
+                        : Text("\(lib.withheld.count) supported games are waiting behind it."))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }

@@ -471,10 +471,10 @@ struct GameDetailView: View {
     private func confirmRestore() {
         guard let backup = latestBackup else { return }
         let alert = NSAlert()
-        alert.messageText = "Restore \(game.name)'s saves from \(backup.id)?"
-        alert.informativeText = "The saves the game has now are replaced by that backup (\(backup.manifest.reason.description.lowercased())). Cellar keeps a copy of the current ones first, so you can go back."
-        alert.addButton(withTitle: "Restore")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = String(localized: "Restore \(game.name)'s saves from \(backup.id)?")
+        alert.informativeText = String(localized: "The saves the game has now are replaced by that backup (\(backup.manifest.reason.description.lowercased())). Cellar keeps a copy of the current ones first, so you can go back.")
+        alert.addButton(withTitle: String(localized: "Restore"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         runner.run(["saves", "restore", game.slug, "--backup", backup.id], title: "Restoring saves", then: { refreshBackups() })
     }

@@ -41,26 +41,26 @@ enum UninstallConfirmation {
         // Blockers first: a plan can be empty *because* something stopped it being made, and
         // "nothing to remove" in place of "that bottle belongs to two other games" is a lie.
         if let blocker = removal.blockers.first {
-            alert.messageText = "Cellar can't remove \(game.name) yet"
+            alert.messageText = String(localized: "Cellar can't remove \(game.name) yet")
             alert.informativeText = blocker
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: String(localized: "OK"))
             alert.runModal()
             return
         }
 
         if removal.isEmpty {
             alert.alertStyle = .informational
-            alert.messageText = "Nothing to remove"
-            alert.informativeText = "\(game.name) isn't installed, and Cellar has nothing of its own left on disk."
-            alert.addButton(withTitle: "OK")
+            alert.messageText = String(localized: "Nothing to remove")
+            alert.informativeText = String(localized: "\(game.name) isn't installed, and Cellar has nothing of its own left on disk.")
+            alert.addButton(withTitle: String(localized: "OK"))
             alert.runModal()
             return
         }
 
         alert.messageText = title(for: removal, game: game)
         alert.informativeText = body(for: removal)
-        alert.addButton(withTitle: removal.scope == .bottle ? "Remove" : "Uninstall")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: removal.scope == .bottle ? String(localized: "Remove") : String(localized: "Uninstall"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons[0].hasDestructiveAction = true
         // Return picks Cancel, not the delete. The destructive button stays first, where macOS puts
         // it, but it has to be aimed at deliberately.
@@ -73,11 +73,11 @@ enum UninstallConfirmation {
     private static func title(for removal: RemovalPlan, game: GameSummary) -> String {
         switch removal.scope {
         case .bottle:
-            return "Remove \(game.name) and its bottle?"
+            return String(localized: "Remove \(game.name) and its bottle?")
         case .game:
             return removal.removesGameFiles
-                ? "Uninstall \(game.name)?"
-                : "Clean up what's left of \(game.name)?"
+                ? String(localized: "Uninstall \(game.name)?")
+                : String(localized: "Clean up what's left of \(game.name)?")
         }
     }
 
@@ -86,19 +86,19 @@ enum UninstallConfirmation {
     private static func body(for removal: RemovalPlan) -> String {
         var lines: [String] = []
         lines.append(removal.removesGameFiles || removal.scope == .bottle
-            ? "Deletes \(removal.totalSizeDescription):"
-            : "\(removal.name) isn't installed. Deletes \(removal.totalSizeDescription) of leftovers:")
+            ? String(localized: "Deletes \(removal.totalSizeDescription):")
+            : String(localized: "\(removal.name) isn't installed. Deletes \(removal.totalSizeDescription) of leftovers:"))
         for item in removal.items.prefix(5) {
             lines.append(item.kind == .steamShortcut
                 ? "• \(item.label)"
                 : "• \(item.label) — \(ByteSize.describe(item.bytes))")
         }
         if removal.items.count > 5 {
-            lines.append("• and \(removal.items.count - 5) more")
+            lines.append(String(localized: "• and \(removal.items.count - 5) more"))
         }
         if !removal.kept.isEmpty {
             lines.append("")
-            lines.append("Keeps:")
+            lines.append(String(localized: "Keeps:"))
             for line in removal.kept { lines.append("• \(line)") }
         }
         for warning in removal.warnings {

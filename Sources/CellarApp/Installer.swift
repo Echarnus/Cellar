@@ -105,12 +105,14 @@ enum MoveToApplications {
 
         let destination = InstallLocation.moveDestination()
         let alert = NSAlert()
-        alert.messageText = "Move Cellar to your Applications folder?"
-        alert.informativeText = "Cellar is running from the disk image, so it would disappear when "
-            + "the image is ejected and could not update itself. Moving it copies Cellar to "
-            + "\(destination.deletingLastPathComponent().path) and opens it from there."
-        alert.addButton(withTitle: "Move to Applications")
-        alert.addButton(withTitle: "Not Now")
+        alert.messageText = String(localized: "Move Cellar to your Applications folder?")
+        let folder = destination.deletingLastPathComponent().path
+        alert.informativeText = String(localized: """
+            Cellar is running from the disk image, so it would disappear when the image is ejected \
+            and could not update itself. Moving it copies Cellar to \(folder) and opens it from there.
+            """)
+        alert.addButton(withTitle: String(localized: "Move to Applications"))
+        alert.addButton(withTitle: String(localized: "Not Now"))
         NSApp.bringToFront()
         guard alert.runModal() == .alertFirstButtonReturn else { return false }
 
@@ -130,9 +132,11 @@ enum MoveToApplications {
             }
         } catch {
             let failure = NSAlert()
-            failure.messageText = "Cellar couldn't be moved"
-            failure.informativeText = "\(error.localizedDescription)\n\nDrag Cellar from the disk image onto "
-                + "the Applications folder instead. For now it keeps running from here."
+            failure.messageText = String(localized: "Cellar couldn't be moved")
+            failure.informativeText = error.localizedDescription + "\n\n" + String(localized: """
+                Drag Cellar from the disk image onto the Applications folder instead. \
+                For now it keeps running from here.
+                """)
             failure.runModal()
             return false
         }
@@ -143,8 +147,8 @@ enum MoveToApplications {
             Task { @MainActor in
                 if let error {
                     let failure = NSAlert()
-                    failure.messageText = "Cellar was moved but couldn't be opened"
-                    failure.informativeText = "Open it from \(destination.path). (\(error.localizedDescription))"
+                    failure.messageText = String(localized: "Cellar was moved but couldn't be opened")
+                    failure.informativeText = String(localized: "Open it from \(destination.path). (\(error.localizedDescription))")
                     failure.runModal()
                 }
                 NSApp.terminate(nil)
@@ -175,20 +179,22 @@ enum CellarUninstaller {
     private static func confirm(totalBytes: Int64, saveBytes: Int64, saveCount: Int) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Uninstall Cellar?"
-        alert.informativeText = "This removes Cellar, its command-line tool, every bottle, the Wine "
-            + "runtime, the Windows Steam client and the games installed in it — "
-            + "\(Reset.humanSize(totalBytes)) in all. Games you own stay yours: reinstall Cellar and "
-            + "they download again from their store."
+        alert.messageText = String(localized: "Uninstall Cellar?")
+        let total = Reset.humanSize(totalBytes)
+        alert.informativeText = String(localized: """
+            This removes Cellar, its command-line tool, every bottle, the Wine runtime, the Windows \
+            Steam client and the games installed in it — \(total) in all. Games you own stay yours: \
+            reinstall Cellar and they download again from their store.
+            """)
         let keep = NSButton(checkboxWithTitle: saveCount == 0
-                            ? "Keep my save games (none found inside Cellar)"
-                            : "Keep my save games (\(Reset.humanSize(saveBytes))) — copied to Documents first",
+                            ? String(localized: "Keep my save games (none found inside Cellar)")
+                            : String(localized: "Keep my save games (\(Reset.humanSize(saveBytes))) — copied to Documents first"),
                             target: nil, action: nil)
         keep.state = .on
         keep.isEnabled = saveCount > 0
         alert.accessoryView = keep
-        alert.addButton(withTitle: "Uninstall")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Uninstall"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons.first?.hasDestructiveAction = true
         NSApp.bringToFront()
         guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -208,19 +214,18 @@ enum CellarUninstaller {
             let succeeded = runner.exitCode == 0
             let done = NSAlert()
             if succeeded {
-                done.messageText = "Cellar is uninstalled"
+                done.messageText = String(localized: "Cellar is uninstalled")
                 done.informativeText = keepSaves
-                    ? "Your save games are in Documents › Cellar Saved Games. Cellar will now quit."
-                    : "Nothing of it is left on this Mac. Cellar will now quit."
-                if keepSaves { done.addButton(withTitle: "Show Save Games") }
-                done.addButton(withTitle: "Quit")
+                    ? String(localized: "Your save games are in Documents › Cellar Saved Games. Cellar will now quit.")
+                    : String(localized: "Nothing of it is left on this Mac. Cellar will now quit.")
+                if keepSaves { done.addButton(withTitle: String(localized: "Show Save Games")) }
+                done.addButton(withTitle: String(localized: "Quit"))
             } else {
                 done.alertStyle = .warning
-                done.messageText = "Cellar couldn't remove everything"
-                done.informativeText = "A running game holds some files open. Quit it, then choose "
-                    + "Uninstall Cellar… again. What happened:\n\n"
-                    + runner.log.split(separator: "\n").suffix(6).joined(separator: "\n")
-                done.addButton(withTitle: "OK")
+                done.messageText = String(localized: "Cellar couldn't remove everything")
+                done.informativeText = String(localized: "A running game holds some files open. Quit it, then choose Uninstall Cellar… again. What happened:")
+                    + "\n\n" + runner.log.split(separator: "\n").suffix(6).joined(separator: "\n")
+                done.addButton(withTitle: String(localized: "OK"))
             }
             let answer = done.runModal()
             guard succeeded else { return }

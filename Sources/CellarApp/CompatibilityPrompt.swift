@@ -18,11 +18,11 @@ enum CompatibilityPrompt {
         CompatibilityReport.markAsked(slug: game.slug, setup: setup)
 
         let alert = NSAlert()
-        alert.messageText = "How did \(game.name) run?"
-        alert.informativeText = "A short report helps the next person with this game. You'll see exactly what it says before anything leaves your Mac, and you file it yourself on GitHub."
-        alert.addButton(withTitle: "It worked")
-        alert.addButton(withTitle: "It had problems")
-        alert.addButton(withTitle: "Not now")
+        alert.messageText = String(localized: "How did \(game.name) run?")
+        alert.informativeText = String(localized: "A short report helps the next person with this game. You'll see exactly what it says before anything leaves your Mac, and you file it yourself on GitHub.")
+        alert.addButton(withTitle: String(localized: "It worked"))
+        alert.addButton(withTitle: String(localized: "It had problems"))
+        alert.addButton(withTitle: String(localized: "Not now"))
         switch alert.runModal() {
         case .alertFirstButtonReturn:  preview(game, outcome: .works)
         case .alertSecondButtonReturn: preview(game, outcome: .issues)
@@ -35,7 +35,7 @@ enum CompatibilityPrompt {
         let facts = CompatibilityReport.Facts(game, outcome: outcome)
         let alert = NSAlert()
         alert.messageText = CompatibilityReport.title(facts)
-        alert.informativeText = "This is everything the report says. Opening it shows GitHub's form in your browser with this filled in, and space for what happened. Nothing is sent until you submit it there."
+        alert.informativeText = String(localized: "This is everything the report says. Opening it shows GitHub's form in your browser with this filled in, and space for what happened. Nothing is sent until you submit it there.")
         let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 380, height: 130))
         text.string = CompatibilityReport.environment(facts)
         text.isEditable = false
@@ -46,8 +46,8 @@ enum CompatibilityPrompt {
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
         alert.accessoryView = scroll
-        alert.addButton(withTitle: "Open on GitHub")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Open on GitHub"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         NSWorkspace.shared.open(CompatibilityReport.issueURL(facts))
     }
