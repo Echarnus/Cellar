@@ -1,0 +1,57 @@
+# Cellar game profile — Assetto Corsa Competizione
+#
+# Kunos' GT World Challenge simulator, built on Unreal Engine 4 with DirectX 11. Steam starts a small
+# bootstrap (acc.exe) in the install folder's root, which starts the real game binary,
+# AC2/Binaries/Win64/AC2-Win64-Shipping.exe. Cellar names the real binary so the process it watches
+# is the game itself; that a direct start beside Steam works without the bootstrap is expected, not
+# yet tested.
+#
+# Not yet run on a Mac by Cellar; status says untested until Kenneth runs it.
+
+[game]
+slug          = "assetto-corsa-competizione"
+name          = "Assetto Corsa Competizione"
+developer     = "Kunos Simulazioni"
+publisher     = "505 Games"
+steam_appid   = 805550
+engine        = "Unreal Engine 4"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2019-05-29"
+store         = "steam"
+
+[compatibility]
+# No Easy Anti-Cheat or BattlEye ships with ACC; multiplayer integrity is server-side (Safety and
+# Racecraft ratings). Recorded as none known rather than none, since Kunos publishes no statement.
+anticheat                   = "none known (no EasyAntiCheat or BattlEye)"
+drm                         = "Steamworks (needs a running Steam client)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player + online multiplayer on Kunos and community servers"
+status                      = "untested"
+wheel                       = "untested"
+wheel_setup                 = "Start the game, open Options, then Controls, and pick the preset closest to your wheel, or New for a custom one. Run the calibration wizard so steering rotation and each pedal are measured, then set Steer Lock to the rotation your wheel base is set to."
+notes                       = "Not yet launched under Cellar. A CrossOver report (AppleGamingWiki, M1 Max, macOS 12.7.1, 2560x1440) rates it playable through D3DMetal at about 70 FPS on Epic, with one known bug: the game can stop on some tracks when racing against opponents, at any graphics setting. DXVK is the fallback."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal first: the route CrossOver users report working for this UE4 / DX11 title.
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 805550
+# Steam's install folder (steamapps/common/Assetto Corsa Competizione), and the UE4 game binary
+# inside it, as players quote the path on Steam's own forum.
+install_dir = "Assetto Corsa Competizione"
+exe         = "AC2/Binaries/Win64/AC2-Win64-Shipping.exe"
+
+[legal]
+# Steamworks runs untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
