@@ -111,7 +111,7 @@ struct PerfCommand: ParsableCommand {
         @Argument(help: "Profile slug, e.g. 'planet-coaster-2'.")
         var slug: String
 
-        @Argument(help: "Switch: wine_debug, metal_validation, metalfx_upscaling, metal_hud.")
+        @Argument(help: "Switch: wine_debug, metal_validation, metalfx_upscaling, metal_hud, retina.")
         var key: String
 
         @Argument(help: "on/off, or for wine_debug: off or Wine channels such as err+all.")

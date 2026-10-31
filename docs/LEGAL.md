@@ -99,6 +99,48 @@ Points worth being explicit about:
   publish no such thing. If a rights-holder objected to a flow, the fallback is to remove that store's
   plugin — the store layer is built so that costs one `GameStore` case.
 
+## Epic Games Store: decided, not yet built
+
+Recorded before any code, as issue #39 asks. **Decision: Epic is acceptable only through Epic's own
+Windows launcher, installed in the bottle and signed in by the player — the Steam and Battle.net
+model. Cellar will not talk to Epic's services with the launcher's credentials.**
+
+The two ways a Mac launcher reaches an Epic library, and why only one fits Cellar's rules:
+
+| Route | What it is | Verdict |
+|---|---|---|
+| **The Epic Games Launcher in the bottle** | Epic's own unmodified Windows client. The player signs in inside its window; Cellar installs it, keeps it quiet, and asks it to start a game with the same `com.epicgames.launcher://apps/<id>?action=launch` link a desktop shortcut uses. | **Acceptable** — rule 3 exactly as it applies to Steam and Battle.net. Epic's own DRM and Epic Online Services run untouched. |
+| **Legendary-style direct API** | A reverse-engineered client that authenticates to Epic's account and download services *as the Epic Games Launcher*, using that launcher's OAuth client id and secret, then downloads and launches games itself. | **Not acceptable for Cellar.** |
+
+Why the second route is a different case from GOG, though both reuse a vendor's client id:
+
+- **Epic offers third parties a real registration path; GOG offers none.** Epic Account Services lets an
+  application register its own client and sign players in under its own name. It grants no library or
+  download scopes, so a launcher cannot use it — but the fact that a sanctioned path exists means
+  presenting as Epic's launcher is a choice to impersonate, not the only way in. For GOG it is the only
+  way in, and GOG's catalogue carries no DRM.
+- **It is a confidential client's secret, not a public id.** The launcher authenticates with a client
+  id *and secret*. Reusing a secret embedded in another company's binary sits further into the gray
+  area than rule 3's tolerated depot tools, and Epic's terms forbid accessing its services by means
+  other than the interfaces it provides.
+- **Many Epic titles carry Epic's own DRM or Easy Anti-Cheat** with a live session to the launcher. A
+  client-less route would need to stand in for that session — the line rule 2 draws.
+
+So the build, when a game needs it, mirrors Battle.net rather than GOG:
+
+- `GameStore.epic` with `installsClientInBottle = true`, `authStyle = .inClientWindow`, and
+  `canDetectSignIn = false` until Cellar finds a file the launcher writes that says who is signed in
+  (it is not known to write one).
+- **Ownership is unverifiable**, as with Battle.net: Accounts asks once ("Add"), never claims a sign-in,
+  and `StoreLibrary.verdict` withholds Epic's games until it is given.
+- Installed games are read from the manifests the launcher writes for every install
+  (`ProgramData/Epic/EpicGamesLauncher/Data/Manifests/*.item` in the bottle); Cellar never writes them.
+- The store mark follows rule 4: the launcher's own icon from the bottle, or a drawn mark.
+
+Not started until a game the player owns needs it, and verified on a real Mac before any Epic
+profile leaves `untested` — the launcher's embedded browser is the part of it most likely to need
+work under Wine.
+
 ## License hygiene
 
 - Cellar's own code: **GPL-3.0**.

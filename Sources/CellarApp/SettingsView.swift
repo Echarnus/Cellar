@@ -27,6 +27,8 @@ struct SettingsView: View {
     @StateObject private var runner = CellarRunner()
     /// Read after the first layout, never from the body (skills/swift.md).
     @State private var databaseVersion = ""
+    /// Measured off the main thread when the pane opens: walking a 100 GB game takes seconds.
+    @State private var storageUsage: [GameStorage.Usage] = []
     @ObservedObject private var updater = AppUpdater.shared
     @ObservedObject private var preparation = RuntimePreparation.shared
     /// Read once per refresh, never from a view body — see `StoreAccountState`.
@@ -115,6 +117,7 @@ struct SettingsView: View {
                         Button("Open Cellar folder") { NSWorkspace.shared.open(Paths.appSupport) }
                     }
                     gameDatabase
+                    storage
                     diagnostics
                     Section("Uninstall") {
                         Button("Uninstall Cellar…") {
@@ -203,10 +206,14 @@ struct SettingsView: View {
     /// over the network. Doing it inline in `onAppear` meant blocking the main thread and then
     /// mutating `@State` in the middle of `NSHostingView`'s first layout pass, which re-enters the
     /// view graph and aborts in AttributeGraph.
+    ///
+    /// The GOG name is the CLI's to learn, because the CLI is what holds the token: `cellar gog
+    /// status` asks GOG and writes the name both binaries read. The app never reads the token itself.
     private func refresh() {
+        let runner = runner
         Task.detached {
             if GOGAuth.isSignedIn, GOGAuth.cachedUsername == nil {
-                GOGAuth.cacheUsername(try? GOGAuth.username())
+                _ = await runner.runBeside(["gog", "status"])
             }
             let snapshot = StoreAccountState.current()
             await MainActor.run { accounts = snapshot }
@@ -227,12 +234,16 @@ struct SettingsView: View {
                     Spacer()
                     Text(lastChecked).font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Cellar looks for a new version once a day and shows you what changed. "
-                    + "Nothing is installed until you choose Install, and your games and bottles stay as they are.")
+                Text("""
+                    Cellar looks for a new version once a day and shows you what changed. \
+                    Nothing is installed until you choose Install, and your games and bottles stay as they are.
+                    """)
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-                Text("This copy of Cellar was built from source, so it doesn't update itself. "
-                    + "Pull the latest code and run Scripts/install-app.sh, or install a release from GitHub.")
+                Text("""
+                    This copy of Cellar was built from source, so it doesn't update itself. \
+                    Pull the latest code and run Scripts/install-app.sh, or install a release from GitHub.
+                    """)
                     .font(.caption).foregroundStyle(.secondary)
                 Link("Cellar releases", destination: Links.releases)
             }
@@ -273,6 +284,35 @@ struct SettingsView: View {
             + installed.fetched.formatted(.relative(presentation: .named))
     }
 
+    // MARK: - Storage
+
+    /// What Cellar takes on disk, measured when the pane opens, with the one safe clean-up.
+    @ViewBuilder private var storage: some View {
+        Section("Storage") {
+            if storageUsage.isEmpty {
+                Text("Measuring…").font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(storageUsage.prefix(8), id: \.label) { item in
+                    LabeledContent(item.label, value: ByteSize.describe(item.bytes))
+                }
+            }
+            Button("Clean Up Installers and Scratch Files") {
+                runner.run(["storage", "clean"], title: "Cleaning up", then: { measureStorage() })
+            }
+            .disabled(runner.busy)
+            Text("Removes downloaded installers and temporary files Cellar fetches again when it needs them. Games, bottles, save games and sign-ins stay. To move a game to an external drive, use the ••• menu on its page.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .task { measureStorage() }
+    }
+
+    private func measureStorage() {
+        Task.detached(priority: .utility) {
+            let usage = GameStorage.usage()
+            await MainActor.run { storageUsage = usage }
+        }
+    }
+
     // MARK: - Diagnostics
 
     /// Cellar keeps a rolling record of set-ups, launches and failures. This is where a player
@@ -285,9 +325,11 @@ struct SettingsView: View {
                     .disabled(export == .working)
                 Button("Open logs folder") { NSWorkspace.shared.open(Paths.logs) }
             }
-            Text("Writes one text file — your Mac's details, Cellar's log of what it did, and the "
-                + "tail of each Wine log — to your Desktop. Account names, your home folder path "
-                + "and anything token-shaped are left out.")
+            Text("""
+                Writes one text file — your Mac's details, Cellar's log of what it did, and the \
+                tail of each Wine log — to your Desktop. Account names, your home folder path \
+                and anything token-shaped are left out.
+                """)
                 .font(.caption).foregroundStyle(.secondary)
 
             switch export {

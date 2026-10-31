@@ -142,6 +142,12 @@ and that one field decides the whole pipeline: which client `cellar setup` insta
 "installed" and "signed in" mean, how a launch is issued, and the words the player reads. Read
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → *The store layer* for the comparison table.
 
+**Every game comes through a store — there is no other way in.** Cellar does not run games the
+player downloaded or installed by hand, and it has no "no store" option anywhere: not in a
+profile (`store` is required, and `Game.plan` refuses a profile without one), not in the CLI, not
+in the app. A DRM-free game that launches without its client running is still a store's game,
+installed from the player's own account. Don't add a storeless path back.
+
 The differences are real, not cosmetic — the three that bite hardest:
 
 - **Battle.net has no silent installer.** Steam's takes `/S`; Blizzard's does not exist. Setup must
@@ -241,6 +247,9 @@ These are correctness *and* legality constraints. They override any convenience.
 - **Never bundle Apple's D3DMetal** or any proprietary runtime in Cellar's source or release
   artifacts — it is grafted from community runners at runtime under Apple's non-commercial grant.
 - **Never commit game files, bottles, runners, downloaded depots, or logs.**
+- **Credentials stay in the keychain or a `0600` file, and never reach a log or a report.** Read
+  [`docs/SECURITY.md`](docs/SECURITY.md) before touching a sign-in; a new place a credential can go
+  needs a row there and a test in `CredentialStorageTests`.
 - **Never add DRM or anti-cheat circumvention.** Cellar runs DRM *through* the layer, untouched.
 - **Owned games only** — game data comes from the user's own authenticated Steam account.
 - **Trademark-safe** — not affiliated with Apple, Valve, Blizzard, CodeWeavers, or Frontier. Store
