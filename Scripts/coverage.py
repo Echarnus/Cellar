@@ -4,7 +4,7 @@
 Run by `sh Scripts/test.sh --coverage`, which hands it the report SwiftPM wrote:
 
     python3 Scripts/coverage.py .build/arm64-apple-macosx/debug/codecov/Cellar.json
-    python3 Scripts/coverage.py --update REPORT      # raise the baseline to what REPORT measured
+    python3 Scripts/coverage.py --update REPORT...   # raise the baseline to what the reports measured
 
 Measures the libraries the tests can import, CellarDomain, CellarKit and CellarUI, and compares each with
 Tests/coverage-baseline.json. Fails (exit 1) when a target falls more than TOLERANCE points below
@@ -44,23 +44,34 @@ def target_of(filename):
     return None
 
 
-def measure(report):
-    """{target: {"covered": n, "count": n, "files": [(percent, path, covered, count)]}}."""
-    with open(report, encoding="utf-8") as handle:
-        data = json.load(handle)
+def measure(*reports):
+    """{target: {"covered": n, "count": n, "files": [(percent, path, covered, count)]}}.
+
+    SwiftPM can write one report per test bundle, and a library linked into several bundles appears
+    in each. A file is counted once, at the best coverage any report saw for it: a summary carries
+    no per-line detail to union, so this is a lower bound on the truth, never an overstatement.
+    """
+    best = {}
+    for report in reports:
+        with open(report, encoding="utf-8") as handle:
+            data = json.load(handle)
+        for export in data.get("data", []):
+            for entry in export.get("files", []):
+                name = entry.get("filename", "")
+                if target_of(name) is None:
+                    continue
+                lines = entry.get("summary", {}).get("lines", {})
+                count, covered = int(lines.get("count", 0)), int(lines.get("covered", 0))
+                if name not in best or covered > best[name][1]:
+                    best[name] = (count, covered)
     totals = {t: {"covered": 0, "count": 0, "files": []} for t in TARGETS}
-    for export in data.get("data", []):
-        for entry in export.get("files", []):
-            target = target_of(entry.get("filename", ""))
-            if target is None:
-                continue
-            lines = entry.get("summary", {}).get("lines", {})
-            count, covered = int(lines.get("count", 0)), int(lines.get("covered", 0))
-            totals[target]["count"] += count
-            totals[target]["covered"] += covered
-            if count:
-                rel = os.path.relpath(entry["filename"], ROOT) if os.path.isabs(entry["filename"]) else entry["filename"]
-                totals[target]["files"].append((100.0 * covered / count, rel, covered, count))
+    for name, (count, covered) in best.items():
+        target = target_of(name)
+        totals[target]["count"] += count
+        totals[target]["covered"] += covered
+        if count:
+            rel = os.path.relpath(name, ROOT) if os.path.isabs(name) else name
+            totals[target]["files"].append((100.0 * covered / count, rel, covered, count))
     return totals
 
 
@@ -112,11 +123,11 @@ def summary(totals, measured, baseline, failures):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("report", help="the JSON SwiftPM writes with --enable-code-coverage")
+    parser.add_argument("reports", nargs="+", help="the JSON SwiftPM writes with --enable-code-coverage, one per test bundle")
     parser.add_argument("--update", action="store_true", help="raise the baseline to this report")
     args = parser.parse_args(argv)
 
-    totals = measure(args.report)
+    totals = measure(*args.reports)
     measured = {t: round(percent(v), 1) for t, v in totals.items() if v["count"]}
     baseline = load_baseline()
 
@@ -138,7 +149,7 @@ def main(argv=None):
     for target in TARGETS:
         if measured.get(target, 0.0) >= baseline.get(target, 0.0) + 1.0:
             print(f"note: {target} is a point or more above its baseline. Lock that in: "
-                  f"python3 Scripts/coverage.py --update {args.report}")
+                  f"python3 Scripts/coverage.py --update {' '.join(args.reports)}")
     return 1 if failures else 0
 
 

@@ -129,6 +129,7 @@ if [ "$COVERAGE" = "1" ]; then
     ARGS="$ARGS --enable-code-coverage"
 fi
 
+touch "$CELLAR_TEST_ROOT/started"
 set +e
 # shellcheck disable=SC2086
 swift test --no-parallel \
@@ -144,13 +145,15 @@ set -e
 # numbers from a run that stopped early would read as a drop.
 if [ "$COVERAGE" = "1" ] && [ "$STATUS" = "0" ]; then
     echo
-    # The newest export SwiftPM wrote — its directory is per triple, so it is found, not assumed.
-    # shellcheck disable=SC2012
-    report="$(ls -t .build/*/debug/codecov/*.json .build/debug/codecov/*.json 2>/dev/null | head -n 1)"
-    if [ -z "$report" ]; then
+    # Every export this run wrote: SwiftPM may write one per test bundle, and its directory is per
+    # triple, so they are found rather than assumed. The marker keeps a stale report from an older
+    # build out of the count.
+    reports="$(find .build -path '*/debug/codecov/*.json' -newer "$CELLAR_TEST_ROOT/started" 2>/dev/null)"
+    if [ -z "$reports" ]; then
         echo "error: --coverage was given but SwiftPM wrote no coverage report under .build/" >&2
         STATUS=1
-    elif ! python3 Scripts/coverage.py "$report"; then
+    # shellcheck disable=SC2086
+    elif ! python3 Scripts/coverage.py $reports; then
         STATUS=1
     fi
 fi
