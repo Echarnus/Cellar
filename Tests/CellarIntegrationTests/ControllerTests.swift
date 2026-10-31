@@ -48,6 +48,26 @@ struct ControllerTests {
                 "an unrecorded answer is not a guess")
     }
 
+    @Test("The shipped race sims reach the library with their wheel answer and set-up steps")
+    func raceSimsReachTheLibrary() throws {
+        #expect(IT.shippedProfilesStaged)
+        let summaries = Game.summaries()
+        for slug in ["assetto-corsa", "assetto-corsa-competizione"] {
+            let summary = try #require(summaries.first { $0.slug == slug },
+                                       "'\(slug)' is in profiles/ but not among the games Cellar knows")
+            #expect(summary.store == .steam)
+            #expect(summary.facts.compatibility.contains {
+                $0.label == "Racing wheel" && $0.value.hasPrefix("Made for a wheel")
+            })
+            #expect(summary.facts.wheelSetup?.contains("Controls") == true)
+            // The plan the launch would use agrees with what the library shows.
+            let plan = try Game.plan(slug: slug)
+            #expect(plan.needsLiveSession)
+            #expect(GraphicsBackend(rawValue: plan.backend) != nil)
+            #expect(plan.fallbackBackend.flatMap(GraphicsBackend.init(rawValue:)) != nil)
+        }
+    }
+
     @Test("`cellar doctor` always says where Input Monitoring stands, and lists only real wheels")
     func doctorReportsInputAccessAndWheels() {
         let checks = SystemEnvironment.diagnostics()

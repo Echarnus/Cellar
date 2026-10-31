@@ -27,6 +27,7 @@
 "Close" = "Sluit";
 "Collecting…" = "Verzamelen…";
 "Connected: %@" = "Verbonden: %@";
+"Connecting a wheel to your Mac" = "Een racestuur op je Mac aansluiten";
 "Continue" = "Ga door";
 "Copy" = "Kopieer";
 "Diagnostics" = "Diagnose";
@@ -86,6 +87,7 @@
 "Save Profile As…" = "Bewaar profiel als…";
 "Scan with the Steam mobile app" = "Scan met de mobiele Steam-app";
 "Set up bottle" = "Stel bottle in";
+"Setting up a racing wheel" = "Een racestuur instellen";
 "Show in Finder" = "Toon in Finder";
 "Show logs" = "Toon logs";
 "Show logs in Finder" = "Toon logs in Finder";

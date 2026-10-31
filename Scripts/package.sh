@@ -54,8 +54,8 @@ done
 iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns"
 
 # Self-update (Sparkle), only once the release signing key exists: Resources/sparkle-public-key holds
-# its public half (Scripts/sparkle-keys.sh writes it), the private half is a repository secret. Without
-# it the app is built with updates switched off rather than with a feed it could never verify.
+# its public half (Scripts/sparkle-keys.sh writes it), the private half is a secret of the `release`
+# environment. Without it the app is built with updates switched off rather than with a feed it could never verify.
 # SUAllowsAutomaticUpdates is off: an update is always shown and installed on the player's say-so,
 # never swapped in on quit — Cellar may be the parent of a game that is still running.
 UPDATE_KEYS=""
