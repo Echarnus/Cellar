@@ -97,15 +97,24 @@ A suffix makes a pre-release: `v0.5.0-beta.1` is published as one, and the in-ap
 
 First bump `CellarVersion.current` (`app/Packages/CellarKit/Sources/CellarKit/Core/CellarVersion.swift`) to the new
 version in a PR. The app, the CLI and every diagnostics report read it, and `release.yml` refuses a
-tag that disagrees with it. Then tag the merged commit:
+tag that disagrees with it. Then release the merged commit, either way:
 
 ```sh
+# From GitHub (no local tag push; what Claude uses): Actions → Release → Run workflow on main,
+# version 0.4.0, publish ticked. Or from a terminal:
+gh workflow run release.yml --ref main -f version=0.4.0 -f publish=true
+
+# Or by pushing the tag yourself:
 git switch main && git pull
 git tag -a v0.4.0 -m "Cellar 0.4.0"
 git push origin v0.4.0
 ```
 
-The tag runs [`release.yml`](../.github/workflows/release.yml):
+A manual run with `publish` builds and tests main first, then creates the `v0.4.0` tag on exactly
+that commit and publishes. It refuses a run that isn't on `main`, a version that disagrees with
+`CellarVersion.current`, and a tag that already exists (the tags ruleset forbids moving one).
+
+Either way, [`release.yml`](../.github/workflows/release.yml) runs:
 
 1. **Build** (macOS, read-only token): runs the test suite, `app/Scripts/package.sh` and
    `app/Scripts/make-dmg.sh`, and writes `SHA256SUMS.txt`.
@@ -119,8 +128,8 @@ The tag runs [`release.yml`](../.github/workflows/release.yml):
    - publishes the GitHub Release with the DMG, both zips, the checksums and the feed.
 
 To preview the notes before tagging: `GH_TOKEN=… python3 app/Scripts/release-notes.py --repo
-Echarnus/Cellar --tag HEAD --out /tmp/notes.md`. `workflow_dispatch` builds the downloads for any
-version without publishing anything.
+Echarnus/Cellar --tag HEAD --out /tmp/notes.md`. A manual run without `publish` builds the downloads for
+any version, from any branch, and publishes nothing.
 
 Artifacts are **ad-hoc signed but not notarised** until a Developer ID is supplied (below).
 `package.sh` seals the bundle through `app/Scripts/sign-app.sh`, because an unsealed bundle (an
@@ -213,7 +222,9 @@ These are settings, not files, so the maintainer applies them once:
    [`.github/rulesets/main.json`](../.github/rulesets/main.json) (protects `main`) and
    [`.github/rulesets/tags.json`](../.github/rulesets/tags.json) (release tags can't be moved or
    deleted).
-3. **Settings → Environments → release**: add a deployment rule allowing only tags matching `v*`.
+3. **Settings → Environments → release**: add deployment rules allowing only tags matching `v*`
+   and the `main` branch (a manual release runs on `main`; the workflow refuses to publish from any
+   other branch).
    `sh app/Scripts/sparkle-keys.sh` creates the environment if needed and stores `SPARKLE_ED_PRIVATE_KEY`
    in it; the Developer ID secrets (below) go there too.
 4. **Settings → Code security**: turn on Dependabot alerts and security updates, secret scanning
