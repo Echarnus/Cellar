@@ -143,7 +143,7 @@ def check_external(urls):
     for url in sorted(urls):
         req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "cellar-check-site"})
         status = None
-        for attempt in (1, 2):
+        for _ in range(2):  # a retry, or the GET after a refused HEAD
             try:
                 with urllib.request.urlopen(req, timeout=20) as r:
                     status = r.status
