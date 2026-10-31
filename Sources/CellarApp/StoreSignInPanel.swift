@@ -74,7 +74,7 @@ struct StoreSignInPanel: View {
         let runner = runner
         Task.detached {
             if GOGAuth.isSignedIn, GOGAuth.cachedUsername == nil {
-                _ = await runner.runBeside(["gog", "status"])
+                _ = await runner.runBeside(.gogStatus)
             }
             let snapshot = StoreAccountState.current()
             await MainActor.run { state = snapshot }

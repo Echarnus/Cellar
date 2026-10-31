@@ -330,6 +330,14 @@ struct SelfTest: ParsableCommand {
                     .clientSignInPending == false,
                   "Readiness: Battle.net is never asked for a sign-in Cellar cannot check")
 
+        // The app reaches the CLI only through `CellarCommand`, so every command it can issue has to
+        // parse here — a renamed flag fails CI rather than a player's button.
+        for command in CellarCommand.examples {
+            let line = command.arguments.joined(separator: " ")
+            let parses = (try? Cellar.parseAsRoot(command.arguments)) != nil
+            try check(parses, "The app's command parses: cellar \(line)")
+        }
+
         print(Term.green("All selftests passed."))
     }
 }

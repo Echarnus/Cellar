@@ -74,12 +74,19 @@ final class CellarRunner: ObservableObject {
     /// meant a QR row straddling a read arrived as two short rows and the matrix never squared up.
     /// `absorb` already assembles lines for the activity log, so the observer rides along with it.
     ///
-    /// `stages` says this command was asked to report its steps. Only then is the output read for
-    /// markers: every other command's output belongs to the player verbatim, and a line that
+    /// Only a command that reports its steps (`CellarCommand.reportsStages`) has its output read
+    /// for markers: every other command's output belongs to the player verbatim, and a line that
     /// happened to start with the marker prefix should not vanish from the activity log.
-    func run(_ args: [String], title: String, stages: Bool = false,
+    func run(_ command: CellarCommand, title: String,
              observe: (@MainActor (String) -> Void)? = nil,
              then: (@MainActor () -> Void)? = nil) {
+        run(arguments: command.arguments, title: title, stages: command.reportsStages,
+            observe: observe, then: then)
+    }
+
+    private func run(arguments args: [String], title: String, stages: Bool,
+                     observe: (@MainActor (String) -> Void)?,
+                     then: (@MainActor () -> Void)?) {
         guard !busy else { return }
         busy = true; busyTitle = title; phase = .working
         stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
@@ -161,9 +168,7 @@ final class CellarRunner: ObservableObject {
     func launch(slug: String, showHUD: Bool, backend: GraphicsBackend? = nil,
                 then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(["launch", slug, "--machine-progress"] + (showHUD ? ["--hud"] : [])
-                + (backend.map { ["--backend", $0.rawValue] } ?? []),
-            title: "Launching", stages: true, then: then)
+        run(.launch(slug: slug, showHUD: showHUD, backend: backend), title: "Launching", then: then)
         launchingSlug = slug
         launchShowsHUD = showHUD
     }
@@ -176,7 +181,7 @@ final class CellarRunner: ObservableObject {
     /// something a call site has to remember.
     func install(slug: String, title: String, then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(["install", slug, "--machine-progress"], title: title, stages: true, then: then)
+        run(.install(slug: slug, machineProgress: true), title: title, then: then)
         installingSlug = slug
     }
 
@@ -184,8 +189,9 @@ final class CellarRunner: ObservableObject {
     /// wait for it. For the background update check only: it must not take the one runner (and every
     /// Play button with it) away from the player, yet it talks to Steam, so it still goes through
     /// the CLI like every other networked action instead of running inside the app.
-    func runBeside(_ args: [String]) async -> Int32 {
+    func runBeside(_ command: CellarCommand) async -> Int32 {
         let path = binary
+        let args = command.arguments
         return await Task.detached(priority: .utility) {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: path)
@@ -203,7 +209,7 @@ final class CellarRunner: ObservableObject {
     /// a patch can be gigabytes, and a spinner is no answer to "how long".
     func update(slug: String, name: String, then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(["update", slug, "--machine-progress"], title: "Updating \(name)", stages: true, then: then)
+        run(.update(slug: slug), title: "Updating \(name)", then: then)
         installingSlug = slug
     }
 

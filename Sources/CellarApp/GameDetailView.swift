@@ -158,7 +158,7 @@ struct GameDetailView: View {
 
     private var overflowMenu: some View {
         Menu {
-            Button("Set up bottle") { act(["setup", "--profile", game.slug], "Setting up") }
+            Button("Set up bottle") { act(.setUp(slug: game.slug), "Setting up") }
             Divider()
             switch game.store {
             case .steam:
@@ -166,18 +166,18 @@ struct GameDetailView: View {
                 // client's own actions are only offered where there is (or will be) one.
                 let hasClient = game.needsLiveSession || game.clientInstalled
                 if hasClient {
-                    Button("Open Steam") { act(["steam", "open", game.slug], "Opening Steam") }
+                    Button("Open Steam") { act(.steamOpen(slug: game.slug), "Opening Steam") }
                 }
-                Button("Download game") { act(["install", game.slug], "Downloading \(game.name)") }
+                Button("Download game") { act(.install(slug: game.slug, machineProgress: false), "Downloading \(game.name)") }
                 if hasClient {
-                    Button("Install through the Steam client") { act(["steam", "install", game.slug], "Installing") }
+                    Button("Install through the Steam client") { act(.steamInstall(slug: game.slug), "Installing") }
                 }
-                Button("Add to Steam library") { act(["steam", "add", game.slug], "Adding") }
+                Button("Add to Steam library") { act(.steamAddShortcut(slug: game.slug), "Adding") }
             case .battlenet:
-                Button("Open Battle.net") { act(["battlenet", "open", game.slug], "Opening Battle.net") }
-                Button("Re-apply Battle.net settings") { act(["battlenet", "configure", game.slug], "Configuring") }
+                Button("Open Battle.net") { act(.battleNetOpen(slug: game.slug), "Opening Battle.net") }
+                Button("Re-apply Battle.net settings") { act(.battleNetConfigure(slug: game.slug), "Configuring") }
             case .gog:
-                Button("Download and install from GOG") { act(["gog", "install", game.slug], "Installing") }
+                Button("Download and install from GOG") { act(.gogInstall(slug: game.slug), "Installing") }
                 Button("GOG accounts…") { NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil) }
             }
             // Any game whose files Cellar fetched from a Steam depot — with or without a live session.
@@ -186,12 +186,12 @@ struct GameDetailView: View {
                     Button("Update now") { runner.update(slug: game.slug, name: game.name) { onChange() } }
                 }
                 Button("Check for updates") {
-                    act(["update", game.slug, "--check"], "Checking \(game.name) for updates")
+                    act(.checkForUpdate(slug: game.slug), "Checking \(game.name) for updates")
                 }
             }
             // The game's own app — its name, its icon — whatever store it came from. A wrapper for
             // the store client is not offered on a game's page: there it read as the game's app.
-            Button("Add \(game.name) to Applications") { act(["app", game.slug], "Adding to Applications") }
+            Button("Add \(game.name) to Applications") { act(.addToApplications(slug: game.slug), "Adding to Applications") }
             // The game's own language needs its bottle to live in; before set-up there is none.
             if game.bottleExists {
                 GameLanguageMenu(game: game, state: $language)
@@ -202,7 +202,7 @@ struct GameDetailView: View {
                 Button("Save Profile As…") { exportProfile() }
             }
             if game.isOnOtherDrive {
-                Button("Move Back to This Mac") { act(["storage", "move-back", game.slug], "Moving \(game.name) back") }
+                Button("Move Back to This Mac") { act(.moveBack(slug: game.slug), "Moving \(game.name) back") }
                     .disabled(game.missingDrive != nil)
             } else if game.gameInstalled, game.store != .battlenet {
                 Button("Move to Another Drive…") { chooseDrive() }
@@ -425,7 +425,7 @@ struct GameDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 10) {
                 Button("Back up now") {
-                    runner.run(["saves", "backup", game.slug], title: "Backing up saves", then: { refreshBackups() })
+                    runner.run(.backUpSaves(slug: game.slug), title: "Backing up saves", then: { refreshBackups() })
                 }
                 Button("Restore last backup…") { confirmRestore() }
                     .disabled(latestBackup == nil)
@@ -460,7 +460,7 @@ struct GameDetailView: View {
         alert.addButton(withTitle: "Restore")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        runner.run(["saves", "restore", game.slug, "--backup", backup.id], title: "Restoring saves", then: { refreshBackups() })
+        runner.run(.restoreSaves(slug: game.slug, backupID: backup.id), title: "Restoring saves", then: { refreshBackups() })
     }
 
     private var activityLog: some View {
@@ -493,7 +493,7 @@ struct GameDetailView: View {
             }
             LaunchSplashWindow.present(game: game, runner: runner, onFinished: { onChange() })
         case .setup:
-            act(["setup", "--profile", game.slug], "Setting up")
+            act(.setUp(slug: game.slug), "Setting up")
         case .install:
             // One verb for every store. The route still differs — Cellar downloads a Steam or GOG
             // game itself and opens Blizzard's client for a Battle.net one — but that is a fact
@@ -525,11 +525,11 @@ struct GameDetailView: View {
         panel.message = "Choose a folder on the drive to move \(game.name) to. Cellar puts it in a “Cellar Games” folder there, and the game plays and updates from it while the drive is connected."
         panel.directoryURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
         guard panel.runModal() == .OK, let folder = panel.url else { return }
-        act(["storage", "move", game.slug, "--to", folder.path], "Moving \(game.name)")
+        act(.moveToDrive(slug: game.slug, folder: folder.path), "Moving \(game.name)")
     }
 
-    private func act(_ args: [String], _ title: String) {
-        runner.run(args, title: title, then: { onChange() })
+    private func act(_ command: CellarCommand, _ title: String) {
+        runner.run(command, title: title, then: { onChange() })
     }
 
     /// Show what removal would take, and only then run it — through the CLI, like every other
@@ -537,7 +537,7 @@ struct GameDetailView: View {
     private func confirmRemoval(scope: RemovalScope) {
         measuringRemoval = true
         UninstallConfirmation.ask(for: game, scope: scope, measured: { measuringRemoval = false }) {
-            act(["uninstall", game.slug, "--yes"] + (scope == .bottle ? ["--bottle"] : []),
+            act(.uninstall(slug: game.slug, scope: scope),
                 scope == .bottle ? "Removing the bottle" : "Uninstalling")
         }
     }

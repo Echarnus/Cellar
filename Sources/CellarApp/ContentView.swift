@@ -193,7 +193,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .cellarDraftProfiles)) { _ in
             guard !runner.busy else { return }
-            runner.run(["profiles", "draft", "--all"], title: "Finding games without a profile",
+            runner.run(.draftProfiles, title: "Finding games without a profile",
                        then: { lib.refresh() })
         }
         .onReceive(NotificationCenter.default.publisher(for: .cellarRefreshLibrary)) { _ in
@@ -234,7 +234,7 @@ struct ContentView: View {
                 .map(\.slug)
             if !due.isEmpty, !runner.busy {
                 for slug in due {
-                    _ = await runner.runBeside(["update", slug, "--check"])
+                    _ = await runner.runBeside(.checkForUpdate(slug: slug))
                 }
                 lib.refresh()
             }
@@ -243,7 +243,7 @@ struct ContentView: View {
             if !ProfileUpdates.publicKey.isEmpty, !runner.busy,
                Date().timeIntervalSince(lastDatabaseCheck) > 24 * 60 * 60 {
                 lastDatabaseCheck = Date()
-                if await runner.runBeside(["profiles", "update", "--quiet"]) == 0 { lib.refresh() }
+                if await runner.runBeside(.updateProfiles(quiet: true)) == 0 { lib.refresh() }
             }
             try? await Task.sleep(for: .seconds(30 * 60))
         }
@@ -479,7 +479,7 @@ struct ContentView: View {
 
     private func checkLibraryButton(_ title: String) -> some View {
         Button(title) {
-            runner.run(["library", "--refresh"], title: Self.checkingTitle, then: { lib.refresh() })
+            runner.run(.refreshLibrary, title: Self.checkingTitle, then: { lib.refresh() })
         }
         .controlSize(.small).disabled(runner.busy)
     }

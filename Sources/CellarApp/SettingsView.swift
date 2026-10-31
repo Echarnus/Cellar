@@ -213,7 +213,7 @@ struct SettingsView: View {
         let runner = runner
         Task.detached {
             if GOGAuth.isSignedIn, GOGAuth.cachedUsername == nil {
-                _ = await runner.runBeside(["gog", "status"])
+                _ = await runner.runBeside(.gogStatus)
             }
             let snapshot = StoreAccountState.current()
             await MainActor.run { accounts = snapshot }
@@ -267,7 +267,7 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 Button("Check for new games now") {
-                    runner.run(["profiles", "update"], title: "Updating the game database",
+                    runner.run(.updateProfiles(quiet: false), title: "Updating the game database",
                                then: { databaseVersion = Self.describeDatabase() })
                 }
                 .disabled(runner.busy)
@@ -297,7 +297,7 @@ struct SettingsView: View {
                 }
             }
             Button("Clean Up Installers and Scratch Files") {
-                runner.run(["storage", "clean"], title: "Cleaning up", then: { measureStorage() })
+                runner.run(.cleanStorage, title: "Cleaning up", then: { measureStorage() })
             }
             .disabled(runner.busy)
             Text("Removes downloaded installers and temporary files Cellar fetches again when it needs them. Games, bottles, save games and sign-ins stay. To move a game to an external drive, use the ••• menu on its page.")
