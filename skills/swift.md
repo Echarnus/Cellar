@@ -1,6 +1,6 @@
 # Skill: Swift, SwiftUI & AppKit in Cellar
 
-Best practices for `Sources/**`. Portable guide; Claude's auto-discovered copy is
+Best practices for `app/src/**`. Portable guide; Claude's auto-discovered copy is
 `.claude/skills/cellar-swift/SKILL.md`. Read [`../AGENTS.md`](../AGENTS.md) first — and
 [`ux.md`](ux.md) before touching anything a player sees. This file covers the *mechanics*; `ux.md`
 sets the bar the result is judged against.
@@ -22,12 +22,12 @@ machinery unless a target genuinely needs it.
 - **Per-store behaviour belongs in `GameStore.descriptor`** (`GameStore.swift`), not in a `switch` inside
   a view or a command. If a view needs to know that Battle.net's installer isn't silent, that fact
   should reach it as data.
-- **All logic lives in `CellarKit`.** The CLI (`Sources/cellar`) and the app (`Sources/CellarApp`)
+- **All logic lives in `CellarKit`.** The CLI (`app/src/cellar`) and the app (`app/src/CellarApp`)
   are thin. Never duplicate engine logic in a command or a view — add it to CellarKit and call it.
 - **The GUI drives the CLI as a subprocess** for side-effecting actions (setup, install, launch), so
   it inherits every tested path (silent Steam, the launch auto-retry, close-on-exit). Read-only state
   comes from `LoadLibrary`. Don't reimplement an action inside the app.
-- **An engine action is a use case** (`Sources/CellarKit/UseCases/`: `LoadLibrary`, `SetUpGame`,
+- **An engine action is a use case** (`app/src/CellarKit/UseCases/`: `LoadLibrary`, `SetUpGame`,
   `InstallGame`, `LaunchGame`, `UninstallGame`): a small struct, its dependencies passed to `init`,
   one `run` that reports `GameEvent`s. CLI commands call the use case; `Game.setUp`/`Game.launch`
   are façades kept for older callers. Per-store behaviour goes in the store's `StoreAdapter`, never
@@ -163,7 +163,7 @@ When you add tests (and new pure logic should come with them):
 
 1. `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` clean.
 2. `swift run cellar selftest` passes (and `swift test`, once a test target exists).
-3. Behaviour: run the CLI command, or `sh Scripts/install-app.sh` and launch the app and exercise the
+3. Behaviour: run the CLI command, or `sh app/Scripts/install-app.sh` and launch the app and exercise the
    path. GUI changes are **not** verified by reading the diff.
 
 Related: [`ux.md`](ux.md) · [`wine-and-runners.md`](wine-and-runners.md) · [`profiles.md`](profiles.md)

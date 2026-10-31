@@ -29,5 +29,6 @@ DerivedData/
 
 # CI/build artifacts
 /dist/
-/site/
+/app/dist/
+/pages/dist/
 __pycache__/

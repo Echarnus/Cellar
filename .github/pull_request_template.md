@@ -9,9 +9,9 @@ Closes #
 <!-- The highest rung of the verification ladder (AGENTS.md) this reached. -->
 
 - [ ] Builds (`swift build -c release`)
-- [ ] Tests pass (`sh Scripts/test.sh`)
+- [ ] Tests pass (`sh app/Scripts/test.sh`)
 - [ ] Self-test passes (`swift run cellar selftest`)
-- [ ] Wine tiers (`sh Scripts/test.sh --integration`) — for runners, prefixes, launching
+- [ ] Wine tiers (`sh app/Scripts/test.sh --integration`) — for runners, prefixes, launching
 - [ ] Ran it: the CLI command or the installed app — for anything a player sees
 
 ## Notes for the release
