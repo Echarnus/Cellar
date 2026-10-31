@@ -2,18 +2,15 @@ import AppKit
 import CellarKit
 import SwiftUI
 
+/// What is left of the app's notifications: windows asking `AppDelegate` to open other windows,
+/// and ⌘F reaching a view's focus. State changes are not here — they are calls on the stores
+/// `AppModel` owns (docs/APP-ARCHITECTURE.md).
 extension Notification.Name {
     /// Posted by the "Settings…" menu item; ContentView opens its settings sheet on receipt.
     static let cellarOpenSettings = Notification.Name("cellar.openSettings")
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.
     static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
-    /// Posted when a store is signed in, signed out, added or removed, so the library re-reads
-    /// which games are the player's.
-    static let cellarAccountsChanged = Notification.Name("cellar.accountsChanged")
-    /// Posted while a sign-in goes on to ask the store which games are owned; `object` is the
-    /// progress sentence. The next `cellarAccountsChanged` after the command ends clears it.
-    static let cellarLibraryChecking = Notification.Name("cellar.libraryChecking")
     /// Posted by Settings' "Review folder access…" button — the same window first run shows, in its
     /// status-board form.
     static let cellarOpenFolderAccess = Notification.Name("cellar.openFolderAccess")
@@ -21,14 +18,34 @@ extension Notification.Name {
     /// Named for the *tour* specifically, because the folder-access screen above is the other
     /// first-run window and the two coexist rather than fight for the name.
     static let cellarOpenWelcomeTour = Notification.Name("cellar.openWelcomeTour")
-    /// Posted by View › Refresh Library (⌘R) — the same reload as the sidebar's button.
-    static let cellarRefreshLibrary = Notification.Name("cellar.refreshLibrary")
     /// Posted by Edit › Find… (⌘F), so the keyboard reaches the library search like any Mac app's.
     static let cellarFocusSearch = Notification.Name("cellar.focusSearch")
-    /// View › Add Installed Games Without a Profile: write draft profiles for them (`DraftProfile`).
-    static let cellarDraftProfiles = Notification.Name("cellar.draftProfiles")
-    /// The Dock menu's recently played games: select one in the library. The object is its slug.
-    static let cellarShowGame = Notification.Name("cellar.showGame")
+}
+
+/// The app's composition root: the state every window shares, made once and handed to each window
+/// as it is built (docs/APP-ARCHITECTURE.md). Settings, Accounts and the welcome tour are separate
+/// `NSWindow`s — a sheet under `NSHostingView` is a fatal AttributeGraph cycle — so they share no
+/// view tree, and this is how they still see the same Cellar.
+@MainActor
+final class AppModel {
+    /// The player's actions — one at a time, for the whole app.
+    let activity = ActivityStore()
+    /// The games, the selection and the sidebar's filters.
+    let library = LibraryStore()
+    /// Where the player is signed in.
+    lazy var accounts = AccountsStore(activity: activity)
+    /// The shared runtime downloading in the background — on its own runner, so it never holds Play.
+    let preparation = RuntimePreparation()
+    /// Sparkle, started the first time the menu bar asks for it.
+    lazy var updater = AppUpdater()
+
+    /// View › Add Installed Games Without a Profile: write draft profiles for them (`DraftProfile`),
+    /// then show what turned up.
+    func draftProfiles() {
+        guard !activity.busy else { return }
+        activity.run(.draftProfiles, title: "Finding games without a profile",
+                     then: { [library] in library.refresh() })
+    }
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -37,7 +54,9 @@ extension Notification.Name {
 //
 // Because there is no App scene, AppKit installs no default menu bar — so we build one ourselves
 // (⌘Q to quit, About, Settings…, and the Edit menu that text fields need for cut/copy/paste).
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    let model = AppModel()
     var window: NSWindow!
     var settingsWindow: NSWindow?
     var accountsWindow: NSWindow?
@@ -67,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showRecentGame(_ sender: NSMenuItem) {
         window?.makeKeyAndOrderFront(nil)
         NSApp.bringToFront()
-        NotificationCenter.default.post(name: .cellarShowGame, object: sender.representedObject)
+        if let slug = sender.representedObject as? String { model.library.show(slug) }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -121,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let useDiagnostic = ProcessInfo.processInfo.environment["CELLAR_DIAG"] != nil
         window.contentView = useDiagnostic
             ? NSHostingView(rootView: AnyView(Text("Cellar GUI works").padding()))
-            : NSHostingView(rootView: ContentView())
+            : NSHostingView(rootView: ContentView(lib: model.library, runner: model.activity, preparation: model.preparation))
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.bringToFront()
@@ -146,11 +165,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The parts every game shares start downloading now, behind the tour, so the first
         // Install press is a game download and nothing else. A no-op once they are here.
         if !useDiagnostic {
-            DispatchQueue.main.async { RuntimePreparation.shared.startIfNeeded() }
+            DispatchQueue.main.async { [model] in model.preparation.startIfNeeded() }
         }
     }
 
-    @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin() }
+    @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin(preparation: model.preparation) }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
@@ -184,7 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .target = self
         // Left out of a build from source: it has no feed to check, and a disabled item would only
         // raise a question it cannot answer. Settings › Updates says why.
-        if let updates = AppUpdater.shared.makeMenuItem() { appMenu.addItem(updates) }
+        if let updates = model.updater.makeMenuItem() { appMenu.addItem(updates) }
         appMenu.addItem(withTitle: String(localized: "Welcome to \(appName)…"), action: #selector(showWelcomeTour), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
@@ -264,11 +283,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func refreshLibrary() {
-        NotificationCenter.default.post(name: .cellarRefreshLibrary, object: nil)
+        model.library.refresh()
     }
 
     @objc private func draftProfiles() {
-        NotificationCenter.default.post(name: .cellarDraftProfiles, object: nil)
+        model.draftProfiles()
     }
 
     @objc private func focusSearch() {
@@ -292,7 +311,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.title = "Settings"
             w.isReleasedWhenClosed = false
             w.center()
-            w.contentView = NSHostingView(rootView: SettingsView(onClose: { [weak self] in
+            w.contentView = NSHostingView(rootView: SettingsView(runner: model.activity, library: model.library, accounts: model.accounts,
+                                                                updater: model.updater, preparation: model.preparation, onClose: { [weak self] in
                 self?.settingsWindow?.close()
             }))
             settingsWindow = w
@@ -344,7 +364,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.title = "Welcome to Cellar"
             w.isReleasedWhenClosed = false
             w.center()
-            w.contentView = NSHostingView(rootView: WelcomeTourView(onFinish: { [weak self] in
+            w.contentView = NSHostingView(rootView: WelcomeTourView(runner: model.activity, library: model.library, accounts: model.accounts,
+                                                                   preparation: model.preparation, onFinish: { [weak self] in
                 WelcomeTour.markSeen()
                 self?.welcomeTourWindow?.close()
             }))
@@ -390,11 +411,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-app.setActivationPolicy(.regular)
-app.run()
+// Top-level code is not main-actor isolated in the Swift 5 language mode, though it does run on the
+// main thread; say so, so the main-actor AppDelegate can be made here.
+MainActor.assumeIsolated {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.setActivationPolicy(.regular)
+    app.run()
+}
 
 /// Where the app sends a player for help. One table, so Settings and the Help menu never point at
 /// two different pages.

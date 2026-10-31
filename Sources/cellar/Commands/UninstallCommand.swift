@@ -34,7 +34,8 @@ struct UninstallCommand: ParsableCommand {
     func run() throws {
         let game = try Game.plan(slug: profile)
         let scope: RemovalScope = removeBottle ? .bottle : .game
-        let removal = Uninstall.plan(for: game, scope: scope)
+        let uninstall = UninstallGame(game, scope: scope)
+        let removal = uninstall.preview()
 
         print(Term.bold("Uninstall \(game.name)")
             + Term.dim("  (store: \(game.store.displayName), bottle: \(game.bottleName))"))
@@ -94,7 +95,7 @@ struct UninstallCommand: ParsableCommand {
             print("")
         }
 
-        let freed = try Uninstall.perform(removal, for: game) { print("  " + Term.dim($0)) }
+        let freed = try uninstall.run(removal) { if let line = $0.sentence { print("  " + Term.dim(line)) } }
         print("")
         print(Term.green(removal.removesGameFiles || scope == .bottle
                          ? "Removed \(game.name)." : "Cleaned up after \(game.name).")

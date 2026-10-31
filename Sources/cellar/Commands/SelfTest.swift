@@ -171,6 +171,13 @@ struct SelfTest: ParsableCommand {
         // A marker that came back through something that rewrote line endings still parses.
         try check(LaunchMarker.stage(in: LaunchMarker.line(.client) + "\r") == .client,
                   "a marker survives a CRLF line ending")
+        // The JSON events `--events` prints, which the app reads in place of the markers above.
+        for stage in LaunchStage.allCases {
+            let event = CommandEvent.stage(stage)
+            try check(CommandEvent.parse(event.line) == event, "launch event round-trips: \(stage.rawValue)")
+        }
+        let download = CommandEvent.install(InstallProgress(.downloading, fraction: 0.25))
+        try check(CommandEvent.parse(download.line) == download, "install event round-trips with its fraction")
 
         // A game that runs bare must never be shown a step about opening a store client.
         let bare = LaunchContext(game: "The Witcher 3", store: .gog, throughClient: false)
@@ -329,6 +336,14 @@ struct SelfTest: ParsableCommand {
         try check(summary(store: .battlenet, live: true, client: true, account: nil, installed: true)
                     .clientSignInPending == false,
                   "Readiness: Battle.net is never asked for a sign-in Cellar cannot check")
+
+        // The app reaches the CLI only through `CellarCommand`, so every command it can issue has to
+        // parse here — a renamed flag fails CI rather than a player's button.
+        for command in CellarCommand.examples {
+            let line = command.arguments.joined(separator: " ")
+            let parses = (try? Cellar.parseAsRoot(command.arguments)) != nil
+            try check(parses, "The app's command parses: cellar \(line)")
+        }
 
         print(Term.green("All selftests passed."))
     }

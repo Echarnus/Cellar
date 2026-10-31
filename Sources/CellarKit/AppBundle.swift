@@ -148,7 +148,7 @@ public enum AppBundle {
             <key>CFBundleDisplayName</key><string>\(name)</string>
             <key>CFBundleShortVersionString</key><string>1.0</string>
             <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-            <key>LSMinimumSystemVersion</key><string>14.0</string>
+            <key>LSMinimumSystemVersion</key><string>27.0</string>
             \(iconEntry)
         </dict>
         </plist>

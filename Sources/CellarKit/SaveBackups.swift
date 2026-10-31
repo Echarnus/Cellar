@@ -60,8 +60,8 @@ public enum SaveBackups {
     static let manifestName = "backup.json"
 
     /// Where one bottle's backups live.
-    public static func directory(forBottle name: String) -> URL {
-        Paths.saveBackups.appendingPathComponent(name, isDirectory: true)
+    public static func directory(forBottle name: String, in environment: CellarEnvironment = .live) -> URL {
+        environment.saveBackups.appendingPathComponent(name, isDirectory: true)
     }
 
     // MARK: - What to copy
@@ -125,13 +125,15 @@ public enum SaveBackups {
     /// Throws on the first failure and leaves no half-written backup behind, so a caller about to
     /// delete something can stop instead.
     @discardableResult
-    public static func backUp(bottle: URL, reason: Reason, now: Date = Date(), prune: Bool = true) throws -> Backup? {
+    public static func backUp(bottle: URL, reason: Reason, now: Date? = nil, prune: Bool = true,
+                              in environment: CellarEnvironment = .live) throws -> Backup? {
+        let now = now ?? environment.now()
         let name = bottle.lastPathComponent
         let found = locations(inBottle: bottle, declared: declaredPaths(forBottle: name))
         guard !found.isEmpty else { return nil }
 
         let fm = FileManager.default
-        let target = uniqueFolder(in: directory(forBottle: name), for: now)
+        let target = uniqueFolder(in: directory(forBottle: name, in: environment), for: now)
         let files = target.appendingPathComponent("files", isDirectory: true)
         do {
             var bytes: Int64 = 0
@@ -148,7 +150,7 @@ public enum SaveBackups {
             try encoder.encode(manifest).write(to: target.appendingPathComponent(manifestName))
             CellarLog.info(.prefix, "Backed up \(found.count) save folder(s), \(ByteSize.describe(bytes)) — "
                 + reason.description.lowercased() + ".", subject: name)
-            if prune { self.prune(bottle: name) }
+            if prune { self.prune(bottle: name, in: environment) }
             return Backup(url: target, manifest: manifest)
         } catch {
             try? fm.removeItem(at: target)
@@ -187,9 +189,10 @@ public enum SaveBackups {
     // MARK: - Reading them back
 
     /// A bottle's backups, newest first. Folders without a readable manifest are not backups.
-    public static func list(bottle name: String) -> [Backup] {
+    public static func list(bottle name: String, in environment: CellarEnvironment = .live) -> [Backup] {
         let fm = FileManager.default
-        let folders = (try? fm.contentsOfDirectory(at: directory(forBottle: name), includingPropertiesForKeys: nil)) ?? []
+        let folders = (try? fm.contentsOfDirectory(at: directory(forBottle: name, in: environment),
+                                                   includingPropertiesForKeys: nil)) ?? []
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return folders.compactMap { url in
@@ -201,14 +204,15 @@ public enum SaveBackups {
 
     /// Put a backup's folders back where they came from. The bottle's current saves are backed up
     /// first, so a restore is itself undoable. Folders the backup doesn't hold are left alone.
-    public static func restore(_ backup: Backup, into bottle: URL, progress: (String) -> Void = { _ in }) throws {
+    public static func restore(_ backup: Backup, into bottle: URL, in environment: CellarEnvironment = .live,
+                               progress: (String) -> Void = { _ in }) throws {
         let fm = FileManager.default
         let users = bottle.appendingPathComponent("drive_c/users", isDirectory: true)
         guard SaveGames.isDirectory(users) else {
             throw CellarError.invalidArgument("The bottle '\(bottle.lastPathComponent)' has no Windows user folder yet. Set the game up first.")
         }
         // Not pruned until the restore is done: the backup being restored may be the oldest one.
-        if try backUp(bottle: bottle, reason: .beforeRestore, prune: false) != nil {
+        if try backUp(bottle: bottle, reason: .beforeRestore, prune: false, in: environment) != nil {
             progress("Kept a copy of the saves as they are now, in case you want them back.")
         }
         for path in backup.manifest.paths {
@@ -223,12 +227,12 @@ public enum SaveBackups {
             try fm.copyItem(at: source, to: target)
         }
         CellarLog.info(.prefix, "Restored the save games from \(backup.id).", subject: bottle.lastPathComponent)
-        prune(bottle: bottle.lastPathComponent, sparing: backup.id)
+        prune(bottle: bottle.lastPathComponent, sparing: backup.id, in: environment)
     }
 
     /// Keep the newest `keep` backups. `sparing` survives even when it is older.
-    static func prune(bottle name: String, sparing: String? = nil) {
-        for old in list(bottle: name).dropFirst(keep) where old.id != sparing {
+    static func prune(bottle name: String, sparing: String? = nil, in environment: CellarEnvironment = .live) {
+        for old in list(bottle: name, in: environment).dropFirst(keep) where old.id != sparing {
             try? FileManager.default.removeItem(at: old.url)
         }
     }

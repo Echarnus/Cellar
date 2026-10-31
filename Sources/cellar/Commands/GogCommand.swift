@@ -157,8 +157,9 @@ struct GogCommand: ParsableCommand {
             }
             // Setup is idempotent, so running it here means "install" works from a cold start.
             print(Term.bold("Installing \(plan.name) from GOG"))
-            _ = try Game.setUp(plan) { print("  " + Term.dim($0)) }
-            try Game.installGame(plan) { print("  " + Term.dim($0)) }
+            func show(_ event: GameEvent) { if let line = event.sentence { print("  " + Term.dim(line)) } }
+            try SetUpGame(plan).run(show)
+            try InstallGame(plan).run(show)
             print(Term.green("Installed.") + " Play with: cellar launch \(slug)  (straight from your GOG library, no client to open)")
         }
     }

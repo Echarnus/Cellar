@@ -10,7 +10,7 @@ The full guide is [`skills/ci.md`](../../../skills/ci.md); read it. Key rules:
 - **Delivery flow:** issue → branch → PR with `Closes #N` → auto-merge (squash) once the required
   checks pass → `v*` tag → `release.yml` publishes with notes built from the closed issues
   (`Scripts/release-notes.py`). Full table in `docs/RELEASING.md` → *Checks*. Runners are pinned to
-  `macos-15` / `ubuntu-24.04`, not `-latest`.
+  `xcode-27` / `ubuntu-24.04`, not `-latest`.
 - **Least-privilege `permissions:`**: `contents: read` at the top of every workflow, elevated per
   job. Only the release publish job holds `contents: write`.
 - **Pin every action to a full commit SHA** with the version in a trailing comment; Dependabot

@@ -15,19 +15,20 @@ import CellarKit
 /// Everything AttributeGraph-sensitive lives here rather than in the hosts: no work in `init`, no
 /// disk read from a view body, no view tree that changes shape mid-run (see `skills/swift.md`).
 struct StoreSignInPanel: View {
+    /// The app's one activity (`AppModel`).
+    let runner: ActivityStore
+    /// The app's one library, told directly when an account changes.
+    let library: LibraryStore
+    let accounts: AccountsStore
     /// Height of the activity strip, or `nil` to leave it out entirely. Constant per instance —
     /// the tour is tighter for space than the Accounts window, but neither changes its mind
     /// half-way through a run, so the view tree's shape stays fixed.
     var activityHeight: CGFloat? = 108
 
-    @StateObject private var runner = CellarRunner()
-    /// Read once per refresh, never from a view body — see `StoreAccountState`.
-    @State private var state = StoreAccountState.unknown
-
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                AccountsSection(runner: runner, state: state, refresh: refresh)
+                AccountsSection(runner: runner, library: library, state: accounts.state, refresh: { accounts.refresh() })
                     .padding(16)
             }
             if let activityHeight {
@@ -35,7 +36,7 @@ struct StoreSignInPanel: View {
                 activity(height: activityHeight)
             }
         }
-        .onAppear(perform: refresh)
+        .onAppear { accounts.refresh() }
     }
 
     /// What Cellar is doing, in the player's view rather than a hidden terminal. A sign-in runs the
@@ -61,23 +62,5 @@ struct StoreSignInPanel: View {
         }
         .frame(height: height)
         .background(Color.primary.opacity(0.04))
-    }
-
-    /// This work is not cheap — it stats bottles, reads the keychain, and asks GOG for a username
-    /// over the network. Doing it inline in `onAppear` meant blocking the main thread and then
-    /// mutating `@State` in the middle of `NSHostingView`'s first layout pass, which re-enters the
-    /// view graph and aborts in AttributeGraph.
-    ///
-    /// The GOG name is the CLI's to learn, because the CLI is what holds the token: `cellar gog
-    /// status` asks GOG and writes the name both binaries read. The app never reads the token itself.
-    private func refresh() {
-        let runner = runner
-        Task.detached {
-            if GOGAuth.isSignedIn, GOGAuth.cachedUsername == nil {
-                _ = await runner.runBeside(["gog", "status"])
-            }
-            let snapshot = StoreAccountState.current()
-            await MainActor.run { state = snapshot }
-        }
     }
 }

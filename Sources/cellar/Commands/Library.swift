@@ -28,7 +28,7 @@ struct LibraryCommand: ParsableCommand {
             StoreLibrary.refreshAll { print("  " + Term.dim($0)) }
         }
 
-        let games = Game.summaries()
+        let games = LoadLibrary().summaries()
         let visible = all ? games : games.filter(\.isVisible)
 
         if visible.isEmpty {

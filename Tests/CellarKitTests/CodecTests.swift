@@ -220,7 +220,7 @@ struct CodecTests {
             var reader = SteamQRCodeReader()
             var pending = ""
             var decoded: [[Bool]]?
-            for chunk in chunks {                       // exactly what CellarRunner.absorb does
+            for chunk in chunks {                       // exactly what ActivityStore.absorb does
                 pending += chunk
                 while let newline = pending.firstIndex(of: "\n") {
                     let line = String(pending[pending.startIndex..<newline])

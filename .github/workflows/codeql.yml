@@ -29,7 +29,7 @@ jobs:
       matrix:
         include:
           - language: swift
-            os: macos-15
+            os: xcode-27
             build-mode: manual
           - language: python
             os: ubuntu-24.04
@@ -46,9 +46,12 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
+      # CodeQL's build tracer cannot spawn macOS 27's /usr/bin/sandbox-exec ("Bad CPU type in
+      # executable"), which SwiftPM uses to sandbox the manifest. This job only reads the repo, so
+      # build without that sandbox here; ci.yml still builds with it.
       - name: Build (Swift)
         if: matrix.language == 'swift'
-        run: swift build -c release
+        run: swift build -c release --disable-sandbox
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: /language:${{ matrix.language }}

@@ -9,7 +9,7 @@ import Foundation
 /// app all read their vocabulary from here so the three never drift apart.
 ///
 /// Adding a store means: a case here, a `*Bottle` type beside `SteamBottle` / `BattleNetBottle`,
-/// a branch in `Game.setUp` / `Game.launch`, and a CLI command group. Nothing else should need to know.
+/// a `StoreAdapter`, and a CLI command group. Nothing else should need to know.
 public enum GameStore: String, CaseIterable, Sendable {
     /// Valve's Windows Steam client, installed inside the bottle.
     case steam
@@ -104,7 +104,7 @@ public struct StoreDescriptor: Sendable {
         StoreDescriptor.components(fromHex: accentHex)
     }
 
-    static func components(fromHex hex: String) -> (red: Double, green: Double, blue: Double) {
+    package static func components(fromHex hex: String) -> (red: Double, green: Double, blue: Double) {
         var value = UInt64(0)
         let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
         Scanner(string: digits).scanHexInt64(&value)
@@ -133,7 +133,20 @@ public extension GameStore {
                 // matters at launch. Honest answer: the client window.
                 authStyle: .inClientWindow,
                 installsClientInBottle: true,
-                clientProcessNames: SteamBottle.clientProcesses,
+                // The client itself, never the game: `steamwebhelper.exe` is the one that takes the
+                // Dock icon (verified with `lsappinfo`), the rest are helpers Steam runs at startup.
+                clientProcessNames: [
+                    "steam.exe",
+                    "steamwebhelper.exe",
+                    "steamservice.exe",
+                    "steamsysinfo.exe",
+                    "steamerrorreporter.exe",
+                    "steamerrorreporter64.exe",
+                    "gldriverquery.exe",
+                    "gldriverquery64.exe",
+                    "vulkandriverquery.exe",
+                    "vulkandriverquery64.exe",
+                ],
                 // The one thing that must never be collateral damage: the shared install holds the
                 // sign-in and every other Steam game's files.
                 uninstallKeepsNote: "Your Steam sign-in and the shared Steam install, so every other Steam game keeps working.",
@@ -152,7 +165,14 @@ public extension GameStore {
                 installLocation: "the Battle.net app",
                 authStyle: .inClientWindow,
                 installsClientInBottle: true,
-                clientProcessNames: BattleNetBottle.clientProcesses,
+                // `Agent.exe` is the update agent and `Battle.net Helper.exe` its browser
+                // subprocesses — both outlive the client and both go when the bottle shuts down.
+                clientProcessNames: [
+                    "Battle.net.exe",
+                    "Battle.net Launcher.exe",
+                    "Battle.net Helper.exe",
+                    "Agent.exe",
+                ],
                 uninstallKeepsNote: "Battle.net itself, your sign-in, and anything else installed in this bottle.",
                 uninstallClientNote: "Battle.net offers the game as an install again next time it starts. That is it noticing the files are gone, not a failed uninstall.",
                 requiresClientClosedToUninstall: true)
@@ -182,23 +202,12 @@ public extension GameStore {
     var displayName: String { descriptor.displayName }
 
     /// Library ordering: stores appear in a stable, meaningful order rather than alphabetically.
-    var sortIndex: Int {
+    /// Package-wide, not public: `GameStore.inLibraryOrder` is the API.
+    package var sortIndex: Int {
         switch self {
         case .steam: return 0
         case .battlenet: return 1
         case .gog: return 2
         }
-    }
-}
-
-/// Shared helper for the Windows installers the stores hand us.
-public enum WindowsInstaller {
-    /// Whether a downloaded file really is a Windows executable. A CDN answers an outage with a
-    /// perfectly valid HTML error page; feeding that to Wine fails in a baffling way, so every
-    /// store installer is checked for the `MZ` magic before it is executed.
-    public static func isPortableExecutable(_ file: URL) -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: file) else { return false }
-        defer { try? handle.close() }
-        return handle.readData(ofLength: 2) == Data([0x4D, 0x5A])   // "MZ"
     }
 }

@@ -78,7 +78,7 @@ SITE_URL = "https://echarnus.github.io/Cellar/"
 # Where the site lives on its host. Only 404.html needs it: GitHub Pages serves that page for any
 # missing path, at any depth, so its links cannot be relative.
 SITE_PATH = "/Cellar/"
-MIN_MACOS = "13"  # LSMinimumSystemVersion in Scripts/package.sh
+MIN_MACOS = "27"  # LSMinimumSystemVersion in Scripts/package.sh and Package.swift
 
 STORES = {  # profile store → how the site labels it
     "steam": "Steam",
@@ -856,7 +856,7 @@ def render_index(games, release):
       anything fails.</p></div>
     <ul class="reqs">
       <li><b>Apple Silicon</b><span>M1 or later. Intel Macs are not supported.</span></li>
-      <li><b>macOS {MIN_MACOS} or later</b><span>Tested most on macOS 26 Tahoe.</span></li>
+      <li><b>macOS {MIN_MACOS} or later</b><span>Every M1 Mac can run it; Software Update has it.</span></li>
       <li><b>Rosetta 2</b><span>Wine runs as an Intel app under Rosetta; macOS installs it on request.</span></li>
       <li><b>A game you own</b><span>On Steam, Battle.net or GOG, from your own account.</span></li>
     </ul>
@@ -902,8 +902,8 @@ FAQ_SECTIONS = [
          "Windows API calls a game makes, as it makes them. There is no Windows install to "
          "maintain and no licence to buy.</p>"),
         ("Which Macs does it work on?",
-         f"<p><b>Apple Silicon only</b> (M1 and later), on macOS {MIN_MACOS} or newer; it is tested "
-         "most on macOS 26 Tahoe. Cellar's Wine runners are x86 builds that run under Rosetta 2, "
+         f"<p><b>Apple Silicon only</b> (M1 and later), on macOS {MIN_MACOS} or newer — the newest "
+         "macOS every M1 Mac can run, so no Apple Silicon Mac is left out. Cellar's Wine runners are x86 builds that run under Rosetta 2, "
          "with the graphics work handed to Metal on the Apple GPU — so an Intel Mac is out of "
          "scope.</p>"
          "<p>Open the app, or run <code>cellar doctor</code>, and it will tell you what your "

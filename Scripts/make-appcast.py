@@ -148,7 +148,7 @@ def main():
     p.add_argument("--signature", required=True, help="sparkle:edSignature value")
     p.add_argument("--public-key", required=True, help="the SUPublicEDKey the app ships with")
     p.add_argument("--length", required=True, type=int, help="size of the zip in bytes")
-    p.add_argument("--min-system", default="13.0")
+    p.add_argument("--min-system", default="27.0")  # = LSMinimumSystemVersion (#113): older Macs are never offered it
     p.add_argument("--out", required=True)
     a = p.parse_args()
 

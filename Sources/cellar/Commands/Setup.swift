@@ -33,7 +33,7 @@ struct Setup: ParsableCommand {
         }
         print("")
 
-        let wine = try Game.setUp(plan) { print("  " + Term.dim($0)) }
+        let wine = try SetUpGame(plan).run { if let line = $0.sentence { print("  " + Term.dim(line)) } }
 
         // A Steam game that runs without a live session has no client in its bottle to wrap.
         if store != .steam || plan.needsLiveSession {
