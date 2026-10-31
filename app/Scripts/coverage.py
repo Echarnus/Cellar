@@ -114,9 +114,12 @@ def summary(totals, measured, baseline, failures):
         t = totals[target]
         rows.append(f"| {target} | {t['covered']} / {t['count']} | {measured.get(target, 0.0):.1f}% "
                     f"| {baseline.get(target, 0.0):.1f}% |")
-    rows += ["", "**Least covered in CellarKit** — the place to start:", ""]
-    for pct, path, covered, count in sorted(totals["CellarKit"]["files"])[:WORST]:
-        rows.append(f"- `{path}` — {pct:.0f}% ({covered} of {count} lines)")
+    # The targets that failed, or CellarKit when none did: the least covered files are where to start.
+    focus = [t for t in TARGETS if any(f.startswith(f"{t}:") for f in failures)] or ["CellarKit"]
+    for target in focus:
+        rows += ["", f"**Least covered in {target}** — the place to start:", ""]
+        for pct, path, covered, count in sorted(totals[target]["files"])[:WORST]:
+            rows.append(f"- `{path}` — {pct:.0f}% ({covered} of {count} lines)")
     rows.append("")
     rows += [f"- ❌ {f}" for f in failures] or ["Coverage is at or above the baseline."]
     return "\n".join(rows) + "\n"
