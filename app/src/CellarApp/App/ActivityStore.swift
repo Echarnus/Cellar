@@ -16,8 +16,10 @@ import CellarData
 @MainActor
 @Observable
 final class ActivityStore {
-    /// Everything the CLI has printed, markers removed.
-    var log: String = ""
+    /// The end of what the CLI has printed, markers removed (`LogTail`). Published a few times a
+    /// second at most: a download prints faster than anyone reads, and every change to this is a
+    /// layout of the text on screen.
+    private(set) var log: String = ""
     var busy: Bool = false
     var busyTitle: String = ""
     /// How far a launch has got, when the running command is one that reports it. Kept after the
@@ -63,11 +65,20 @@ final class ActivityStore {
 
     /// The running command, so it can be called off.
     @ObservationIgnored private var process: Process?
-    /// Output received but not yet ended by a newline — held back so a marker split across two
-    /// reads is still recognised. Shown in the log regardless, or a `\r`-only progress line
-    /// (DepotDownloader's) would look like a stall.
-    @ObservationIgnored private var pending: String = ""
-    @ObservationIgnored private var committed: String = ""
+    /// The running command's output, assembled into lines. What has not ended in a newline yet is
+    /// held back, so a marker split across two reads is still recognised, and shown as it stands.
+    @ObservationIgnored private var lines = OutputLines()
+    /// The lines the log shows: the last thousand, with a count of the rest.
+    @ObservationIgnored private var tail = LogTail(limit: 1_000)
+    /// Whether a publish of `log` and `installProgress` is already on its way.
+    @ObservationIgnored private var publishPending = false
+    /// The newest install progress, waiting for the next publish.
+    @ObservationIgnored private var latestProgress: InstallProgress?
+    /// How often, at most, the log and the bar are redrawn while a command runs.
+    static let publishInterval: Duration = .milliseconds(250)
+    /// Called each time a command ends and the runner is free, after the command's own `then`. The
+    /// downloads queue starts its next game from here (`DownloadsViewModel`).
+    @ObservationIgnored var whenIdle: (@MainActor () -> Void)?
     /// Whether the running command reports progress events (`CellarCommand.reportsStages`).
     @ObservationIgnored private var readsStages = false
     /// The running command's line observer, if it asked for one.
@@ -80,8 +91,9 @@ final class ActivityStore {
     /// Put a line in the activity log without running anything — for the steps Cellar hands back
     /// to the player (a download that needs a real terminal for its Steam Guard prompt).
     func note(_ message: String) {
-        committed += "\n\(message)\n"
-        log = committed + pending
+        tail.append("")
+        tail.append(message)
+        publish()
     }
 
     /// `observe` sees the output **one complete line at a time**, as it arrives, for a caller that
@@ -108,7 +120,8 @@ final class ActivityStore {
         guard !busy else { return }
         busy = true; busyTitle = title; phase = .working
         stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
-        installProgress = nil; installingSlug = nil
+        installProgress = nil; installingSlug = nil; latestProgress = nil
+        lines = OutputLines()
         readsStages = stages
         lineObserver = observe
 
@@ -118,8 +131,10 @@ final class ActivityStore {
         // rolling log (which `cellar logs export` ships). The subprocess redacts its own
         // invocation; this is the app's separate copy of the same command line.
         let shown = "cellar " + Diagnostics.redactCommandLine(args).text
-        committed += "\n$ \(shown)\n"
-        log = committed + pending
+        tail.append("")
+        tail.append("$ \(shown)")
+        publish()
+        let inbox = OutputInbox()
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
@@ -133,8 +148,8 @@ final class ActivityStore {
             process.standardError = pipe
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
-                guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
-                Task { @MainActor in self.absorb(s) }
+                guard !data.isEmpty, inbox.put(data) else { return }
+                Task { @MainActor in self.drain(inbox) }
             }
             do {
                 try process.run()
@@ -147,10 +162,13 @@ final class ActivityStore {
                 CellarLog.error(.app, "Could not run the cellar CLI at "
                     + "\(helperPath): \(CellarLog.describe(error))")
                 await MainActor.run {
-                    self.absorb("\nCellar's command-line helper isn't at \(helperPath).\n"
-                        + "Reinstall Cellar, or run: sh app/Scripts/install-app.sh\n")
+                    self.absorb(["", "Cellar's command-line helper isn't at \(helperPath).",
+                                 "Reinstall Cellar, or run: sh app/Scripts/install-app.sh"])
+                    self.publish()
                     self.busy = false
+                    self.phase = .idle
                     then?()
+                    self.whenIdle?()
                 }
                 return
             }
@@ -163,15 +181,20 @@ final class ActivityStore {
             await MainActor.run {
                 // Absorb first — that flushes any last line without a newline through the observer
                 // — then let the observer go, so it cannot outlive the command that installed it.
-                self.absorb("\n(exit \(process.terminationStatus))\n")
+                self.drain(inbox)
+                if let last = self.lines.finish() { self.absorb([last]) }
+                self.absorb(["", "(exit \(status))"])
                 self.lineObserver = nil
                 self.process = nil
                 self.busy = false
                 self.phase = .idle
+                self.latestProgress = nil
+                self.publish()
                 self.installProgress = nil
                 self.installingSlug = nil
-                self.exitCode = process.terminationStatus
+                self.exitCode = status
                 then?()
+                self.whenIdle?()
             }
         }
     }
@@ -248,16 +271,18 @@ final class ActivityStore {
 
     // MARK: - Reading the output
 
-    /// Split output into lines, lift the progress events out (`CommandEvent`), and leave the rest for the player.
-    private func absorb(_ chunk: String) {
-        pending += chunk
-        while let newline = pending.firstIndex(of: "\n") {
-            let line = String(pending[pending.startIndex..<newline])
-            pending = String(pending[pending.index(after: newline)...])
+    /// Take what the pipe has delivered, as whole lines.
+    private func drain(_ inbox: OutputInbox) {
+        absorb(lines.lines(in: inbox.take()))
+    }
+
+    /// Lift the progress events out of `newLines` (`CommandEvent`), and keep the rest for the player.
+    private func absorb(_ newLines: [String]) {
+        for line in newLines {
             if readsStages, let event = CommandEvent.parse(line) {
                 switch event {
                 case .install(let progress):
-                    installProgress = progress
+                    latestProgress = progress
                 case .stage(let reached):
                     stage = reached
                     if reached == .starting { attempt += 1 }
@@ -267,10 +292,28 @@ final class ActivityStore {
                 // From a newer CLI than this app knows: not for the player to read as JSON.
                 continue
             } else {
-                committed += line + "\n"
+                tail.append(line)
                 lineObserver?(line)
             }
         }
-        log = committed + pending
+        schedulePublish()
+    }
+
+    /// Redraw the log and the bar soon, once, however many reads arrive before then.
+    private func schedulePublish() {
+        guard !publishPending else { return }
+        publishPending = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.publishInterval)
+            self?.publish()
+        }
+    }
+
+    /// Hand the views the log and the progress as they stand now.
+    private func publish() {
+        publishPending = false
+        let text = tail.text(partial: lines.partial)
+        if text != log { log = text }
+        if busy, installProgress != latestProgress { installProgress = latestProgress }
     }
 }

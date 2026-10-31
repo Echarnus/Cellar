@@ -72,7 +72,8 @@ public extension GameStore {
                 // sign-in and every other Steam game's files.
                 uninstallKeepsNote: "Your Steam sign-in and the shared Steam install, so every other Steam game keeps working.",
                 uninstallClientNote: "Steam shows the game as not installed the next time it opens — the files are gone, the licence isn't.",
-                requiresClientClosedToUninstall: true)
+                requiresClientClosedToUninstall: true,
+                queuesInstalls: true)
         case .battlenet:
             return StoreDescriptor(
                 store: .battlenet,
@@ -96,7 +97,8 @@ public extension GameStore {
                 ],
                 uninstallKeepsNote: "Battle.net itself, your sign-in, and anything else installed in this bottle.",
                 uninstallClientNote: "Battle.net offers the game as an install again next time it starts. That is it noticing the files are gone, not a failed uninstall.",
-                requiresClientClosedToUninstall: true)
+                requiresClientClosedToUninstall: true,
+                queuesInstalls: false)
         case .gog:
             return StoreDescriptor(
                 store: .gog,
@@ -116,7 +118,8 @@ public extension GameStore {
                 // GOG ships an Inno Setup installer, so it ships an uninstaller too — running it is
                 // what takes the registry entries with the files.
                 uninstallClientNote: "Cellar runs the game's own GOG uninstaller first, silently, so nothing is left in the bottle's registry.",
-                requiresClientClosedToUninstall: false)
+                requiresClientClosedToUninstall: false,
+                queuesInstalls: true)
         }
     }
 

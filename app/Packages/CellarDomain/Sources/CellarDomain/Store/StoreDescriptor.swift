@@ -48,6 +48,11 @@ public struct StoreDescriptor: Sendable {
     /// holds the files open and rewrites its manifests as it exits, which is how a half-deleted
     /// library happens — so Cellar closes it first, and says so beforehand.
     public let requiresClientClosedToUninstall: Bool
+    /// Whether an install can wait its turn in the downloads queue (`InstallQueue`). True where
+    /// Cellar fetches the game itself, start to finish, with nothing for the player to do. False for
+    /// Battle.net, whose install opens Blizzard's client for the player. That is not something to
+    /// spring on them an hour later, when the download before it happens to finish.
+    public let queuesInstalls: Bool
 
     /// Whether one sign-in covers the whole account rather than one bottle. Drives the Accounts
     /// screen: a store that is signed in once is listed once, not once per game.

@@ -163,7 +163,8 @@ struct ArchitectureTests {
                       ("Accounts", "AccountsViewModel", "AccountsView"),
                       ("GameDetail", "GameDetailViewModel", "GameDetailView"),
                       ("Settings", "SettingsViewModel", "SettingsView"),
-                      ("Welcome", "WelcomeViewModel", "WelcomeView")])
+                      ("Welcome", "WelcomeViewModel", "WelcomeView"),
+                      ("Downloads", "DownloadsViewModel", "DownloadsView")])
     func featureHasViewModel(_ feature: String, _ model: String, _ view: String) throws {
         let folder = Repo.source("CellarApp/Features/\(feature)")
         for name in [model, view] {

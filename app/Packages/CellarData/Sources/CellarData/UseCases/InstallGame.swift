@@ -28,6 +28,10 @@ public struct InstallGame {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
         }
+        // Until the store's install returns, whatever is on disk is not the game (`UnfinishedInstall`).
+        // A throw — a failure, or the player cancelling — leaves the note in place.
+        UnfinishedInstall.begin(plan)
         try adapter.installGame(plan, wine: wine, step: step, progress: output, phase: phase)
+        UnfinishedInstall.finish(plan)
     }
 }
