@@ -5,7 +5,7 @@ import CellarKit
 /// The game page's language submenu: this game's own language, or the one every game uses. Kept in
 /// the game's bottle (`bottle.toml`), so it needs one — a game not set up yet has nowhere to keep it.
 ///
-/// Its state lives in `GameDetailView` (`GameLanguageMenu.Selection`), loaded with the page: lifecycle
+/// Its state lives in `GameDetailViewModel` (`GameLanguageMenu.Selection`), loaded with the page: lifecycle
 /// modifiers inside a menu's content are not dependable once AppKit has turned it into menu items.
 struct GameLanguageMenu: View {
     struct Selection: Equatable {
