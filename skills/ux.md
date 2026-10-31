@@ -144,22 +144,27 @@ are the external standard here; this is what it means for Cellar specifically.
   library, a game page and a launch with VoiceOver on (⌘F5). Nobody has done that pass yet; record
   what it finds here.
 
-## Localization — know where we stand
+## Localization — English and Dutch
 
-**Cellar is not localized. Every string in the app and the CLI is a hard-coded English literal** —
-there is no `String(localized:)`, no `LocalizedStringKey`, no String Catalog anywhere in `Sources/`.
+**The app's screens are translated into Dutch; the CLI, alerts and CellarKit's copy are still
+English.** The tables live in `Resources/Localization/<lang>.lproj/Localizable.strings`, the install
+scripts copy them into the bundle, and SwiftUI looks every `Text("…")`, `Button("…")`, `Label("…", …)`,
+`Toggle`, `Section`, `Picker`, `Link`, `LabeledContent` and `.help` literal up by its English text.
 
-That is a legitimate stage for a project at this point, but it should be a decision, not a surprise.
-Two consequences to work with today:
+- **A new literal on a screen needs a Dutch entry.** `LocalizationTests` fails until it has one, and
+  fails again when a reworded literal leaves its old key behind — the key *is* the English text.
+- **Write whole sentences with the variable interpolated in one piece.** `Text("Connected: \(names)")`
+  becomes the key `Connected: %@`; `Text("Needs " + store)` is a `String`, which SwiftUI shows verbatim
+  and never translates — and word order differs per language anyway.
+- **A long caption stays one literal.** Use a multi-line `"""` literal with `\` line continuations,
+  not `"…" + "…"`: concatenation turns it into a `String` and it silently stays English.
+- **Text held in a `String` variable is not looked up.** Copy computed in CellarKit (readiness lines,
+  hints, errors) and `NSAlert` text are the next step, and need `String(localized:)` first.
+- **Dutch runs about a third longer than English.** Check the minimum window width with the Mac set
+  to Nederlands (System Settings → General → Language & Region, or per app under Applications).
 
-- **Don't make it harder to fix later.** Never assemble a sentence from fragments
-  (`"Needs " + storeName + " to be running"`). Concatenated sentences cannot be translated — word
-  order differs per language — and they read badly to VoiceOver. Write whole sentences with the
-  variable interpolated in one piece.
-- **When it is time, the modern path is String Catalogs** (`Localizable.xcstrings`) with
-  `String(localized:)` / `LocalizedStringKey`, which is compiler-integrated and keeps every
-  translation in one file. Adopting it is its own change, and it touches every player-facing string
-  in both front-ends — including the release notes and the site.
+To add a language: copy `nl.lproj` to `<code>.lproj`, translate the values (never the keys), and add
+the code to `CFBundleLocalizations` in both `Scripts/install-app.sh` and `Scripts/package.sh`.
 
 ## Craft details that separate this from a tool
 

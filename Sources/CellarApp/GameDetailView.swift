@@ -381,11 +381,11 @@ struct GameDetailView: View {
         if !pads.isEmpty || !wheels.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
                 if !pads.isEmpty {
-                    Label("Connected: " + pads.map(\.name).joined(separator: ", "), systemImage: "gamecontroller")
+                    Label("Connected: \(pads.map(\.name).joined(separator: ", "))", systemImage: "gamecontroller")
                         .font(.callout)
                 }
                 if !wheels.isEmpty {
-                    Label("Connected: " + wheels.map(\.name).joined(separator: ", "), systemImage: "steeringwheel")
+                    Label("Connected: \(wheels.map(\.name).joined(separator: ", "))", systemImage: "steeringwheel")
                         .font(.callout)
                     Text(Wheels.forceFeedbackNote(for: wheels, cellarSDL: CellarSDL.libraryDirectory != nil))
                         .font(.caption).foregroundStyle(.secondary)
