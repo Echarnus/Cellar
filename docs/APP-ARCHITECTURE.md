@@ -258,13 +258,18 @@ boilerplate than B and none of TCA's tooling.
 - One store per feature: `LibraryStore`, `ActivityStore` (the single command runner), `AccountsStore`,
   `PreparationStore`, `UpdaterStore`. Each is `@Observable @MainActor final class`.
 - State is `private(set)`. Views read state and call intent methods; they never assign to a store.
+  The one exception is state that *is* a control's value (the library's search text, filters, sort
+  and selection): those are settable and bound with `@Bindable`, as Apple's WWDC23 guidance shows.
   This is the unidirectional part — *view → intent → (use case / command) → state → view* — without
   a framework.
 - Stores receive their dependencies in `init`. They never reach for `.shared`, `NotificationCenter`
   or a CellarKit static that does I/O.
-- One `AppModel` in `main.swift` creates every store once and passes the same instances into each
-  window's `NSHostingView` with `.environment(…)`. Separate windows no longer need notifications to
-  stay in step: they observe the same objects.
+- One `AppModel` in `main.swift` creates every store once and hands the same instances to each
+  window's root view through its initializer. Separate windows no longer need notifications to stay
+  in step: they observe the same objects. Apple's guidance (WWDC23, *Discover Observation*) allows
+  either a plain property or `@Environment(Type.self)`; Cellar uses plain properties because every
+  window is a hand-built `NSHostingView`, and an initializer parameter is checked by the compiler,
+  where a missing `.environment(…)` only fails when that window opens.
 - Per-view ephemeral state (hover, a disclosure, a text field being edited) stays in `@State`.
 
 Revisit TCA only if the app grows into deep navigation, many concurrent in-app effects, or several
@@ -425,6 +430,24 @@ ladder, and the fact that every game is installed through its store.
 - **No big-bang rewrite.** Every step keeps static façades over the new code until the last caller
   has moved.
 
+## Checked against Apple's guidance (2026-10-31)
+
+The first version of this document leaned on Apple's Observation documentation and WWDC23 only.
+After the migration landed in #100 it was checked again against Apple's concurrency, Swift 6 and
+packaging guidance. What matches, and what does not yet:
+
+| Apple's guidance | Cellar | Status |
+|---|---|---|
+| `@Observable` models; read as plain properties, `@Bindable` for bindings, `@Environment` for app-wide models (WWDC23 10149) | `@Observable @MainActor` stores, plain-property injection, `@Bindable` for the library's controls | Matches (environment not used, reason above) |
+| Start on the main actor; UI and model classes stay main-actor, not `Sendable` (WWDC25 268) | Every store is `@MainActor final class`, none is `Sendable` | Matches |
+| Value types are the safest thing to share; make them `Sendable` (WWDC25 268) | Domain types are `Sendable` structs and enums; `LaunchRoute` was not and now is | Fixed in #100 |
+| Adopt Swift 6 one module at a time (`swiftLanguageMode` per target, SE-0435; Swift 6 migration guide) | `CellarDomain` in Swift 6 mode; the rest still Swift 5 | Partly: rest of #77 |
+| Turn on *Approachable Concurrency*, and default main-actor isolation for UI modules (WWDC25 268, SE-0466, SE-0461, SE-0470) | Not on: needs `swift-tools-version: 6.2`, and CI's macOS 15 image still builds with Swift 6.1 | Gap: do with #77 once CI builds with Swift 6.2 everywhere; `CellarApp` and `CellarUI` get `.defaultIsolation(MainActor.self)`, CellarKit stays nonisolated as a library should |
+| Work that blocks the main thread moves off it (`@concurrent`), after profiling (WWDC25 268) | `LibraryStore.refresh()` runs `LoadLibrary` (profiles, icons, bottle state) on the main actor | Gap: profile it in Instruments, then move `LoadLibrary` into a `@concurrent` function if it shows |
+| Narrowest access that works; `package` for what only the package uses (SE-0386, SE-0409) | `StoreDescriptor.components(fromHex:)` and `GameStore.sortIndex` were `public` for tests and the CLI | Fixed in #100: now `package` |
+| Re-exporting a module is not an official Swift feature (`@_exported` is underscored; SE-0409 left it unspecified) | CellarKit re-exports `CellarDomain` with `@_exported import` | Gap, deliberate for now: lets the split land without touching every file. Replace with explicit `import CellarDomain` when #77 adds `CellarInfrastructure` |
+| Organise app code into local packages and library targets (Apple, *Organizing your code with local packages*) | One SwiftPM package, library targets per layer | Matches |
+
 ## Sources
 
 - Robert C. Martin, *The Clean Architecture* (2012) —
@@ -437,6 +460,14 @@ ladder, and the fact that every game is installed through its store.
 - Apple, *Managing model data in your app* —
   <https://developer.apple.com/documentation/swiftui/managing-model-data-in-your-app>
 - WWDC23, *Discover Observation in SwiftUI* — <https://developer.apple.com/videos/play/wwdc2023/10149/>
+- WWDC25, *Embracing Swift concurrency* — <https://developer.apple.com/videos/play/wwdc2025/268/>
+- Apple, *Organizing your code with local packages* —
+  <https://developer.apple.com/documentation/xcode/organizing-your-code-with-local-packages>
+- SE-0435, *Swift language version per target* — <https://forums.swift.org/t/se-0435-swift-language-version-per-target/71546>
+- SE-0409, *Access-level modifiers on import declarations* —
+  <https://forums.swift.org/t/accepted-with-modifications-se-0409-access-level-modifiers-on-import-declarations/67666>
+- Approachable concurrency in Swift packages (SE-0466, SE-0461, SE-0470 settings) —
+  <https://useyourloaf.com/blog/approachable-concurrency-in-swift-packages/>
 - Point-Free, *The Composable Architecture* —
   <https://github.com/pointfreeco/swift-composable-architecture>
 - Point-Free, *swift-dependencies* — <https://github.com/pointfreeco/swift-dependencies>

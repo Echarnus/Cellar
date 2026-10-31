@@ -2,7 +2,7 @@ import Foundation
 
 /// How a launch was actually carried out — the CLI needs this to say the right thing afterwards
 /// and to know what to wait on.
-public enum LaunchRoute {
+public enum LaunchRoute: Equatable, Sendable {
     case direct(exeName: String)
     /// The exe started by Cellar with the bottle's Steam client up beside it for the game's DRM —
     /// a Steam game Cellar downloaded itself. Started like `direct`, but there is a client to close.
