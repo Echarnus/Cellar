@@ -195,9 +195,17 @@ struct SupplyChainTests {
     func signingKeysScript() throws {
         let script = try String(contentsOf: Repo.app.appendingPathComponent("Scripts/signing-keys.sh"), encoding: .utf8)
         #expect(script.contains("sh Scripts/sparkle-keys.sh"))
+        #expect(script.contains(". Scripts/select-xcode.sh"), "a Nix SDKROOT must not reach `swift`")
         #expect(script.contains("gh secret set PROFILES_SIGNING_KEY --repo \"$REPO\" --env release"))
         #expect(script.contains("security add-generic-password -s \"$SERVICE\""), "the keychain copy is the backup")
-        #expect(!script.contains("> \"$"), "a private key is never redirected into a file")
+        // A file is written only from the public key: no line that redirects into a file mentions $KEY
+        // or $OUT (the private key and the generator's output that carries it).
+        let redirects = script.split(separator: "\n").filter { $0.contains("> \"$") }
+        #expect(redirects.allSatisfy { !$0.contains("$KEY") && !$0.contains("$OUT") },
+                "a private key is never redirected into a file")
+        #expect(script.contains("sed \"s|public static let publicKey"), "the public key is written without sed -i")
+        let commands = script.split(separator: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("#") }
+        #expect(!commands.contains { $0.contains("sed -i") }, "BSD and GNU sed disagree on -i")
         #expect(script.contains("ProfileUpdates.swift"))
     }
 }
