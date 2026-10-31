@@ -389,18 +389,18 @@ behaviour. Steps 1–5 touch only the app, so they barely collide with engine wo
 parallel. Steps 6–10 touch hot engine files and should be scheduled when no other stream is editing
 them.
 
-| # | Step | Issue | Touches |
+| # | Step | Issue | Status |
 |---|---|---|---|
-| 1 | Raise the minimum macOS to 14 (README already says so; `Package.swift` and the Info.plists say 13) | #68 | `Package.swift`, two scripts |
-| 2 | Typed `CellarCommand` + `CommandClient` between the app and the CLI | #69 | CellarKit (new file), `CellarRunner`, call sites |
-| 3 | One shared `ActivityStore` for every window, created by `AppModel` | #70 | `CellarApp` |
-| 4 | `LibraryStore` as `@Observable`; library notifications become store calls | #71 | `CellarApp` |
-| 5 | `AccountsStore`, `PreparationStore`, `UpdaterStore`; no view calls an I/O static | #72 | `CellarApp` |
-| 6 | Ports + `CellarEnvironment` in CellarKit, proven on save backups | #73 | CellarKit (new files), `SaveBackups` |
-| 7 | One `StoreAdapter` per store; remove the `switch`es one capability per PR | #74 | `Game.swift`, store files |
-| 8 | Split `Game.swift` into domain types and use cases | #75 | `Game.swift`, CLI commands |
-| 9 | Versioned JSON-lines progress events between the CLI and the app | #76 | CLI, `CommandClient` |
-| 10 | SwiftPM targets for the layers; Swift 6 mode per target | #77 | `Package.swift`, file moves |
+| 1 | Raise the minimum macOS to 14 | #68 | Done (#97) |
+| 2 | Typed `CellarCommand` between the app and the CLI, checked by `cellar selftest` | #69 | Done (#100). `CommandClient` left out: a test can't import the app executable, so the testable rules moved into CellarKit instead |
+| 3 | One shared `ActivityStore` for every window, created by `AppModel` | #70 | Done (#100) |
+| 4 | `LibraryStore` as `@Observable`, its rules in CellarKit's `LibraryQuery`; library notifications become store calls | #71 | Done (#100) |
+| 5 | `AccountsStore`, `RuntimePreparation`, `AppUpdater` as `@Observable` stores; no app singletons | #72 | Done (#100) |
+| 6 | `CellarEnvironment` (home + clock) in CellarKit, proven on save backups | #73 | Done (#100) |
+| 7 | One `StoreAdapter` per store; no `switch plan.store` left in set-up, install, open or launch | #74 | Done (#100) |
+| 8 | `Game.swift` split into domain types and use cases (`LoadLibrary`, `SetUpGame`, `InstallGame`, `LaunchGame`, `UninstallGame`) reporting `GameEvent`s | #75 | Done (#100) |
+| 9 | Versioned JSON-line events (`cellar … --events`, `CommandEvent`); the old markers still read | #76 | Done (#100) |
+| 10 | SwiftPM targets for the layers; Swift 6 mode per target | #77 | First slice done (#100): `CellarDomain` in Swift 6 mode. Still to do: `CellarInfrastructure`, and Swift 6 for CellarKit, the CLI and the app |
 
 **How to know it worked:** after step 5, a store test can say "a sign-in finishing refreshes the
 library" with a fake command client and no Wine. After step 7, adding a store is a `GameStore` case,
