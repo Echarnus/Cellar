@@ -1,6 +1,17 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
+/// Approachable Concurrency (WWDC25 268): nonisolated async functions run on the caller's actor
+/// (SE-0461), and a conformance can take its type's isolation (SE-0470). Every target has it.
+let approachable: [SwiftSetting] = [
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+]
+
+/// UI modules start on the main actor (SE-0466): a view, a store or a window controller is
+/// main-actor code unless it says otherwise. CellarKit stays nonisolated, as a library should.
+let mainActorByDefault: [SwiftSetting] = approachable + [.defaultIsolation(MainActor.self)]
+
 let package = Package(
     name: "Cellar",
     // The newest macOS every M1 Mac can run (Apple's compatibility list, issue #113). Spelled as a
@@ -25,17 +36,18 @@ let package = Package(
         // phases, the events a command reports. Foundation value types only, no I/O, so it is the
         // first target in Swift 6 language mode (docs/APP-ARCHITECTURE.md, step 10). Nothing here
         // may import CellarKit; the compiler is what keeps it that way.
-        .target(name: "CellarDomain", swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(name: "CellarDomain", swiftSettings: approachable),
 
         // Core engine: environment detection, bottles, runners, profiles, the use cases and the
         // ports they talk through (`StoreAdapter`). Files import CellarDomain themselves; nothing
         // is re-exported.
-        .target(name: "CellarKit", dependencies: ["CellarDomain"]),
+        .target(name: "CellarKit", dependencies: ["CellarDomain"], swiftSettings: approachable),
 
         // Infrastructure: the concrete store adapters behind CellarKit's `StoreAdapter` port. Only
         // a composition root imports it — the CLI's `main` and the tests' set-up. The app never
         // does: it reaches the stores through the CLI subprocess, so a view cannot call one.
-        .target(name: "CellarInfrastructure", dependencies: ["CellarKit", "CellarDomain"]),
+        .target(name: "CellarInfrastructure", dependencies: ["CellarKit", "CellarDomain"],
+                swiftSettings: approachable),
 
         // Thin CLI over CellarKit.
         .executableTarget(
@@ -45,13 +57,14 @@ let package = Package(
                 "CellarDomain",
                 "CellarInfrastructure",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ]
+            ],
+            swiftSettings: approachable
         ),
 
         // The app's presentation primitives — the store marks, the lockups, the generated cover —
         // in a library rather than in the executable, because a test cannot import an executable.
         // This is what makes a user-visible change verifiable without launching the app.
-        .target(name: "CellarUI", dependencies: ["CellarKit", "CellarDomain"]),
+        .target(name: "CellarUI", dependencies: ["CellarKit", "CellarDomain"], swiftSettings: mainActorByDefault),
 
         // Phase 3: a native SwiftUI "Steam-like" front-end over the same CellarKit core. Drives the
         // `cellar` CLI as a subprocess for actions, so it reuses every tested path.
@@ -60,6 +73,7 @@ let package = Package(
             dependencies: ["CellarKit", "CellarDomain", "CellarUI", .product(name: "Sparkle", package: "Sparkle")],
             // Inside Cellar.app the framework sits in Contents/Frameworks (Scripts/bundle-app.sh);
             // SwiftPM's own @loader_path rpath still finds it beside the binary in .build.
+            swiftSettings: mainActorByDefault,
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
 
@@ -74,7 +88,7 @@ let package = Package(
         // variables so the default run stays fast and CI stays green. See docs/TESTING.md.
         .testTarget(name: "CellarIntegrationTests", dependencies: ["CellarKit", "CellarDomain", "CellarInfrastructure"]),
     ],
-    // The default for every target that hasn't moved yet. Targets move to Swift 6 one at a time,
-    // with their own `swiftLanguageMode` setting, starting with CellarDomain.
-    swiftLanguageModes: [.v5]
+    // Every target, tests included, is checked in Swift 6 mode: data-race safety is a compile error,
+    // not a warning (#77). CellarDomain moved first; the rest followed once CI built with Swift 6.2.
+    swiftLanguageModes: [.v6]
 )
