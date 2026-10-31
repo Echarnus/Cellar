@@ -5,16 +5,16 @@ compiles" says almost nothing. The suite is arranged around that: a fast hermeti
 every push, and an opt-in layer that actually translates Windows.
 
 ```sh
-sh Scripts/test.sh                  # unit tests — fast, hermetic, no network. What CI runs.
-sh Scripts/test.sh --integration    # + the Wine tiers: real runner, real prefix, real Windows game.
-sh Scripts/test.sh --steam          # + tier D: download a real Steam game and run it.
-sh Scripts/test.sh --filter Store   # anything else is passed straight to `swift test`.
+sh app/Scripts/test.sh                  # unit tests — fast, hermetic, no network. What CI runs.
+sh app/Scripts/test.sh --integration    # + the Wine tiers: real runner, real prefix, real Windows game.
+sh app/Scripts/test.sh --steam          # + tier D: download a real Steam game and run it.
+sh app/Scripts/test.sh --filter Store   # anything else is passed straight to `swift test`.
 ```
 
 > **Why a script and not `swift test`.** Two reasons. A Nix/devenv shell exports
 > `DEVELOPER_DIR`/`SDKROOT` pointing at a non-macOS SDK — the same trap the rest of the repo works
 > around by unsetting them. But tests need more than an SDK: `Testing.framework` ships only with a
-> full **Xcode**, not with the Command Line Tools and not with the Nix SDK. `Scripts/test.sh` finds
+> full **Xcode**, not with the Command Line Tools and not with the Nix SDK. `app/Scripts/test.sh` finds
 > a developer directory that actually has it. If it can't, it says so rather than failing obscurely.
 >
 > First time on a machine: `sudo xcodebuild -license accept`.
@@ -107,7 +107,7 @@ To run a real title instead, point the test at one:
 ```sh
 CELLAR_IT_GAME_URL='https://example.com/SomeSmallGame.zip' \
 CELLAR_IT_GAME_EXE='SomeSmallGame/game.exe' \
-sh Scripts/test.sh --integration --filter WindowsGameTests
+sh app/Scripts/test.sh --integration --filter WindowsGameTests
 ```
 
 | Variable | Meaning |
@@ -148,7 +148,7 @@ Cellar finds out here rather than in a bug report.
 
 ```sh
 cellar steam login              # once — a QR scan in the Steam mobile app, no password
-sh Scripts/test.sh --steam
+sh app/Scripts/test.sh --steam
 ```
 
 ### It skips loudly
@@ -228,13 +228,13 @@ the CI Mac itself real GameController and HID enumeration through `cellar doctor
 
 Wheels are found through the HID layer (`Wheels.connected()`), not GameController, which knows
 only a few Logitech models. Steering, pedals and buttons reach the game as a DirectInput device.
-Force feedback comes from Cellar's own SDL (`Scripts/build-sdl.sh`, see ARCHITECTURE →
+Force feedback comes from Cellar's own SDL (`app/Scripts/build-sdl.sh`, see ARCHITECTURE →
 *Force feedback*), and only for the wheels in `CellarSDL.forceFeedbackWheels`; for the rest expect
 none yet.
 
 Tier A loads the real built SDL the way winebus does and starts its joystick and haptic subsystems
 (`CellarSDLIntegrationTests`), and `build-sdl.sh` starts both architecture slices. Cellar's Fanatec
-and Thrustmaster drivers are tested by `build-sdl.sh` too (`Shim/sdl/tests/test_fanatec.c`,
+and Thrustmaster drivers are tested by `build-sdl.sh` too (`app/Shim/sdl/tests/test_fanatec.c`,
 `test_thrustmaster.c`): the init sequence, every effect's encoding, the strength cap, gain,
 durations and stop-on-close, against a fake wheel that records every command, plus the Thrustmaster
 model table behind the mode switch. None of it can show a motor turning: that is this table.
@@ -281,10 +281,10 @@ which the game page shows; check that those steps match the menus you actually s
 |---|---|
 | 1. Builds | `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` |
 | 2. Self-test | `swift run cellar selftest` |
-| 2b. **Unit + tier A** | `sh Scripts/test.sh` |
-| 2c. **Wine tiers** | `sh Scripts/test.sh --integration` |
-| 2d. **A real game** | `sh Scripts/test.sh --steam` |
-| 3. Behaviour | the CLI command, or `sh Scripts/install-app.sh` and launch the app |
+| 2b. **Unit + tier A** | `sh app/Scripts/test.sh` |
+| 2c. **Wine tiers** | `sh app/Scripts/test.sh --integration` |
+| 2d. **A real game** | `sh app/Scripts/test.sh --steam` |
+| 3. Behaviour | the CLI command, or `sh app/Scripts/install-app.sh` and launch the app |
 
 `cellar selftest` stays: it is a check an *installed* binary can run on a player's machine, which a
 test target cannot. The unit suite is the superset a developer runs.

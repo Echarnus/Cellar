@@ -1,8 +1,8 @@
-# Skill: Python in Cellar (`Scripts/gen-site.py`)
+# Skill: Python in Cellar (`pages/gen-site.py`)
 
 There are three Python programs in this repo: the static-site generator, its checker
-(`Scripts/check-site.py`, which CI runs on every site change), and the small
-`Scripts/make-appcast.py` that writes the update feed (same rules: stdlib only, 3.9 floor, escape
+(`pages/check-site.py`, which CI runs on every site change), and the small
+`app/Scripts/make-appcast.py` that writes the update feed (same rules: stdlib only, 3.9 floor, escape
 every interpolation). Most of this file is about the generator. Best practices
 for changing it. Portable guide; Claude's auto-discovered copy is
 `.claude/skills/cellar-python/SKILL.md`. Read [`../AGENTS.md`](../AGENTS.md) first, and
@@ -12,7 +12,7 @@ for changing it. Portable guide; Claude's auto-discovered copy is
 ## Two hard constraints
 
 - **Standard library only. No dependencies, ever.** The site has no build step, no `requirements.txt`
-  and no virtualenv; CI and the Pages workflow just run `python3 Scripts/gen-site.py`. Adding a
+  and no virtualenv; CI and the Pages workflow just run `python3 pages/gen-site.py`. Adding a
   dependency means adding an install step to two workflows and a toolchain to every contributor's
   machine, to save a few lines of stdlib.
 - **Python 3.9 is the floor, and it is not hypothetical.** The system `python3` on this Mac is
@@ -60,12 +60,12 @@ so it doesn't suggest 3.10+ rewrites:
 target-version = "py39"
 ```
 
-Run `ruff check Scripts/` and `ruff format --diff Scripts/`. Wiring it into `ci.yml` belongs with
+Run `ruff check app/Scripts/` and `ruff format --diff app/Scripts/`. Wiring it into `ci.yml` belongs with
 [`ci.md`](ci.md) — as a real gate, not an `|| true` step.
 
 ## Don't
 
-- **Don't hand-edit `site/index.html`.** It is generated; your change will be overwritten on the next
+- **Don't hand-edit `pages/dist/index.html`.** It is generated; your change will be overwritten on the next
   push that touches a profile. Change the generator.
 - **Don't hard-code a game.** The grid is data-driven from `profiles/*.toml` precisely so the page
   cannot drift from what Cellar supports.
@@ -74,9 +74,9 @@ Run `ruff check Scripts/` and `ruff format --diff Scripts/`. Wiring it into `ci.
 
 ## Verify
 
-1. `python3 Scripts/gen-site.py` succeeds — note which parser you just exercised (3.9 here → the
+1. `python3 pages/gen-site.py` succeeds — note which parser you just exercised (3.9 here → the
    fallback; CI → `tomllib`).
-2. Open `site/index.html`: correct title, working Download CTA, one card per profile, the icon
+2. Open `pages/dist/index.html`: correct title, working Download CTA, one card per profile, the icon
    present, no unrendered `{`/`}` markers.
 3. Check it in light *and* dark and at a narrow width ([`web.md`](web.md)).
 4. If you touched parsing, verify a profile with an awkward value — a `#`, an apostrophe, a

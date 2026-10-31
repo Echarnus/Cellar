@@ -1,5 +1,5 @@
 # How GitHub lists merged pull requests under "Pull requests" in a release's notes. The issues
-# above that list come from Scripts/release-notes.py.
+# above that list come from app/Scripts/release-notes.py.
 changelog:
   exclude:
     labels: [skip-changelog]

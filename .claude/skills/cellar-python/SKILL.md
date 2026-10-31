@@ -1,15 +1,15 @@
 ---
 name: cellar-python
-description: Best practices for the one Python program in Cellar, Scripts/gen-site.py (the static-site generator). Use when editing the generator, its TOML parsing, or how it emits HTML. Covers the stdlib-only and Python-3.9 constraints, why the local and CI parsers differ, escaping every interpolation, encoding and file-handle hygiene, determinism, and Ruff.
+description: Best practices for the one Python program in Cellar, pages/gen-site.py (the static-site generator). Use when editing the generator, its TOML parsing, or how it emits HTML. Covers the stdlib-only and Python-3.9 constraints, why the local and CI parsers differ, escaping every interpolation, encoding and file-handle hygiene, determinism, and Ruff.
 ---
 
-# Cellar — Python (`Scripts/gen-site.py`)
+# Cellar — Python (`pages/gen-site.py`)
 
 The full guide is [`skills/python.md`](../../../skills/python.md); read it. This covers the
 *generator*; the page it emits is [`cellar-web`](../cellar-web/SKILL.md). Key rules:
 
 - **Standard library only, forever.** No dependencies, no build step, no virtualenv — CI and Pages
-  just run `python3 Scripts/gen-site.py`.
+  just run `python3 pages/gen-site.py`.
 - **Python 3.9 is the floor and it is live:** this machine's `python3` is 3.9.6, so the hand-rolled
   TOML fallback is the local path while CI (3.12+) uses `tomllib`. No `match`, no `X | Y`
   annotations. The same profile can parse differently in the two ([`cellar-profiles`](../cellar-profiles/SKILL.md)).
@@ -17,12 +17,12 @@ The full guide is [`skills/python.md`](../../../skills/python.md); read it. This
   status fails the build with the filename.
 - **Pass `encoding="utf-8"` to `open()`** and close what you open. `CELLAR_TOML_FALLBACK=1` forces
   the fallback parser; CI diffs the site built both ways.
-- `Scripts/check-site.py` (the site's checker) follows the same rules.
+- `pages/check-site.py` (the site's checker) follows the same rules.
 - **Stay deterministic:** `sorted(glob(...))` and the explicit sort are why the page has a stable
   diff. Never iterate a set into output.
 - **Match the file's idiom** (`os.path`, f-strings, small functions). Converting to `pathlib` is
   fine — wholesale, in its own commit, not half and half.
-- **Don't hand-edit `site/index.html`**, don't hard-code a game, don't add a template engine.
+- **Don't hand-edit `pages/dist/index.html`**, don't hard-code a game, don't add a template engine.
 - **Ruff** is the standard if we adopt linting (`target-version = "py39"`); nothing is configured yet.
 - **Verify by rendering**: run it, open the page, check light/dark and a narrow width, and test an
   awkward value (a `#`, an apostrophe, a non-ASCII name) through **both** parsers.

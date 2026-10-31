@@ -13,8 +13,8 @@ independent parsers**, none of which is a full TOML implementation:
 
 | Reader | What it is | Scope |
 |---|---|---|
-| `Scripts/gen-site.py` → `tomllib` | Real TOML — **only on Python 3.11+** | The site, in CI |
-| `Scripts/gen-site.py` → hand-rolled fallback | ~20 lines of regex | The site, **on this machine** (system `python3` is 3.9) |
+| `pages/gen-site.py` → `tomllib` | Real TOML — **only on Python 3.11+** | The site, in CI |
+| `pages/gen-site.py` → hand-rolled fallback | ~20 lines of regex | The site, **on this machine** (system `python3` is 3.9) |
 | `ProfileStore.fields()` / `.env()` (`Profile.swift`) | Line scanner, no TOML library | Everything Cellar does at runtime |
 
 Consequences you must design around:
@@ -128,7 +128,7 @@ profile in the same change, and don't invent a fourth name.
   that public CDN art — installation and launch still go through Battle.net; only the pictures come
   from Steam.
 - **Never bundle store or publisher artwork in the repo.** Hotlinking public CDN art is fine; a JPEG
-  in `Resources/` is a hard-rule violation ([`../AGENTS.md`](../AGENTS.md)). If a game has no art,
+  in `app/Resources/` is a hard-rule violation ([`../AGENTS.md`](../AGENTS.md)). If a game has no art,
   the app draws a deterministic `GeneratedCover` — that is the intended fallback, not a bug.
 
 ## Where profiles are found at runtime
@@ -140,7 +140,7 @@ slugs are de-duplicated in that priority order (`ProfileStore.all()`).
 
 ## Verify
 
-1. `python3 Scripts/gen-site.py` succeeds and the game's card renders — correct store label, status
+1. `python3 pages/gen-site.py` succeeds and the game's card renders — correct store label, status
    badge, and cover.
 2. `swift run cellar profiles` (and the app's library) lists it, and `cellar launch <slug>
    --print-env` shows the `[env]` values actually reaching Wine.

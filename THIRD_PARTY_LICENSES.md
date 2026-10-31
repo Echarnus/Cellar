@@ -2,7 +2,7 @@
 
 Everything Cellar uses that it did not write, where it comes from, under what licence, and what that
 licence asks of Cellar. Audited October 2026 against the source tree, the release scripts
-(`Scripts/package.sh`, `Scripts/make-dmg.sh`) and every URL Cellar downloads from.
+(`app/Scripts/package.sh`, `app/Scripts/make-dmg.sh`) and every URL Cellar downloads from.
 
 The distinction that decides the obligations is **who distributes the component**:
 
@@ -17,14 +17,14 @@ The distinction that decides the obligations is **who distributes the component*
 
 | Component | What it does | Licence | Obligation, and how it is met |
 |---|---|---|---|
-| **Cellar** (`Sources/`, `Shim/`, `Scripts/`, `profiles/`) | everything below | **GPL-3.0** | Licence text with every binary (`Legal/LICENSE`); corresponding source at the matching tag on GitHub, named in `NOTICE` |
+| **Cellar** (`app/src/`, `app/Shim/`, `app/Scripts/`, `profiles/`) | everything below | **GPL-3.0** | Licence text with every binary (`Legal/LICENSE`); corresponding source at the matching tag on GitHub, named in `NOTICE` |
 | **swift-argument-parser** (Apple) | parses the `cellar` command line; statically linked | **Apache-2.0 with Runtime Library Exception** | The exception waives §4(a)(b)(d) for compiled use; Cellar ships the text anyway (`Legal/licenses/swift-argument-parser.txt`) and credits it in About |
 | **Sparkle 2** (`sparkle-project/Sparkle`, pinned in `Package.swift`) | the app's self-updater; embedded as `Cellar.app/Contents/Frameworks/Sparkle.framework` | **MIT**, plus the bsdiff, sais-lite and ed25519 notices in the same file | Copyright and permission notice with every copy: `Legal/licenses/Sparkle.txt`, `NOTICE`, credited in About. Not in the CLI |
-| **SDL 3** and **sdl2-compat** (libsdl.org, pinned in `Scripts/build-sdl.sh`) | Cellar's own SDL, loaded by the runner's Wine ahead of the runner's copy so a wheel's force feedback reaches its motor; shipped as `sdl/libSDL3.dylib` + `sdl/libSDL2-2.0.0.dylib` in the app and the CLI zip | **zlib** | Notice kept with every copy: `Legal/licenses/SDL.txt`. Built from the release tarballs, verified by SHA-256; any Cellar patches live in `Shim/sdl/` and are marked as such, as zlib §2 asks. `Shim/sdl/0001-cellar-fanatec-force-feedback.patch` adds a Fanatec driver whose command encoding is ported from [hid-fanatecff](https://github.com/gotzl/hid-fanatecff), which declares `MODULE_LICENSE("GPL")` (GPL v2 or later in the kernel's terms); its two files are marked **GPL-2.0-or-later**. `Shim/sdl/0002-cellar-thrustmaster-force-feedback.patch` adds a Thrustmaster T300-family driver whose command encoding is ported from [hid-tmff2](https://github.com/Kimplul/hid-tmff2) (**GPL-2.0-or-later**), and whose two files carry the same licence; its mode switch is Cellar's own code, written from the USB request numbers and values that Linux's `hid-thrustmaster` documents. So the `libSDL3.dylib` Cellar ships is distributed under GPL-3.0 with Cellar, and its source is that patch on the pinned tarball |
+| **SDL 3** and **sdl2-compat** (libsdl.org, pinned in `app/Scripts/build-sdl.sh`) | Cellar's own SDL, loaded by the runner's Wine ahead of the runner's copy so a wheel's force feedback reaches its motor; shipped as `sdl/libSDL3.dylib` + `sdl/libSDL2-2.0.0.dylib` in the app and the CLI zip | **zlib** | Notice kept with every copy: `Legal/licenses/SDL.txt`. Built from the release tarballs, verified by SHA-256; any Cellar patches live in `app/Shim/sdl/` and are marked as such, as zlib §2 asks. `app/Shim/sdl/0001-cellar-fanatec-force-feedback.patch` adds a Fanatec driver whose command encoding is ported from [hid-fanatecff](https://github.com/gotzl/hid-fanatecff), which declares `MODULE_LICENSE("GPL")` (GPL v2 or later in the kernel's terms); its two files are marked **GPL-2.0-or-later**. `app/Shim/sdl/0002-cellar-thrustmaster-force-feedback.patch` adds a Thrustmaster T300-family driver whose command encoding is ported from [hid-tmff2](https://github.com/Kimplul/hid-tmff2) (**GPL-2.0-or-later**), and whose two files carry the same licence; its mode switch is Cellar's own code, written from the USB request numbers and values that Linux's `hid-thrustmaster` documents. So the `libSDL3.dylib` Cellar ships is distributed under GPL-3.0 with Cellar, and its source is that patch on the pinned tarball |
 | **Swift runtime / standard library** | language runtime | Apache-2.0 with Runtime Library Exception | Provided by macOS itself; nothing is embedded that needs attribution |
-| **Dock shim** (`Shim/cellar-dock-shim.c`) | keeps the bottle's client out of the Dock | GPL-3.0 (Cellar's own code) | — |
-| **App icon** (`Resources/AppIcon.png`) | the keg icon | GPL-3.0 — drawn by Cellar's own `Scripts/make-icon.swift` | — |
-| **Store marks** (`Sources/CellarUI/Marks/`) | small Steam / Battle.net / GOG marks | Cellar's own vector code; the marks themselves are their owners' trademarks | Nominative use only, non-affiliation in `NOTICE`. No logo file is bundled; see `docs/LEGAL.md` rule 4 |
+| **Dock shim** (`app/Shim/cellar-dock-shim.c`) | keeps the bottle's client out of the Dock | GPL-3.0 (Cellar's own code) | — |
+| **App icon** (`app/Resources/AppIcon.png`) | the keg icon | GPL-3.0 — drawn by Cellar's own `app/Scripts/make-icon.swift` | — |
+| **Store marks** (`app/src/CellarUI/Marks/`) | small Steam / Battle.net / GOG marks | Cellar's own vector code; the marks themselves are their owners' trademarks | Nominative use only, non-affiliation in `NOTICE`. No logo file is bundled; see `docs/LEGAL.md` rule 4 |
 | **Game profiles** (`profiles/*.toml`) | per-game facts | GPL-3.0 (Cellar's own data) | Facts only — AppIDs, paths, engine. No game files, no artwork |
 | **Fonts** | — | — | None shipped. The app uses the macOS system font; the site uses the visitor's system font stack |
 
@@ -74,6 +74,6 @@ Cellar is **GPL-3.0** ([LICENSE](LICENSE)), which is compatible with every shipp
 (Apache-2.0 is GPL-3.0-compatible; the Runtime Library Exception makes it moot for compiled code).
 Run-time components are separate programs and keep their own licences.
 
-When a new component is added, add a row here, a `Credit` in `Sources/CellarKit/Core/Credits.swift`, and —
+When a new component is added, add a row here, a `Credit` in `app/src/CellarKit/Core/Credits.swift`, and —
 if it ends up inside a Cellar artifact — its licence text in [`licenses/`](licenses/). The test
 `CreditsTests` fails if a runner or tool is downloaded from a publisher the credits do not name.

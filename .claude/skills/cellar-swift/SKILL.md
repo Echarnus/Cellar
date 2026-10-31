@@ -1,6 +1,6 @@
 ---
 name: cellar-swift
-description: Best practices for Swift, SwiftUI and AppKit in the Cellar repo. Use when editing anything under Sources/** — CellarKit, the cellar CLI, or the CellarApp SwiftUI app. Covers the SDK-unset build command, keeping logic in CellarKit, the subprocess pipe-deadlock rules for a project that is mostly a process driver, testing with Swift Testing (there is no test target yet), and the load-bearing SwiftUI/NSHostingView gotchas (AttributeGraph crash, HSplitView, the hand-built menu bar).
+description: Best practices for Swift, SwiftUI and AppKit in the Cellar repo. Use when editing anything under app/src/** — CellarKit, the cellar CLI, or the CellarApp SwiftUI app. Covers the SDK-unset build command, keeping logic in CellarKit, the subprocess pipe-deadlock rules for a project that is mostly a process driver, testing with Swift Testing (there is no test target yet), and the load-bearing SwiftUI/NSHostingView gotchas (AttributeGraph crash, HSplitView, the hand-built menu bar).
 ---
 
 # Cellar — Swift / SwiftUI / AppKit
@@ -12,7 +12,7 @@ The full guide is [`skills/swift.md`](../../../skills/swift.md); read it. Key ru
 - **All logic in `CellarKit`;** the CLI and app are thin. The app drives the `cellar` CLI as a
   subprocess for actions — don't reimplement an action in a view. **CellarKit never `print`s** —
   terminal output is the CLI's job, and it is UI.
-- **Engine actions are use cases** (`Sources/CellarKit/UseCases/`): `LoadLibrary`, `SetUpGame`,
+- **Engine actions are use cases** (`app/src/CellarKit/UseCases/`): `LoadLibrary`, `SetUpGame`,
   `InstallGame`, `LaunchGame`, `UninstallGame` — dependencies in `init`, one `run` reporting
   `GameEvent`s. Per-store behaviour lives in that store's `StoreAdapter`, never a `switch plan.store`;
   the adapters are in `CellarInfrastructure`, imported only by composition roots. Import
@@ -37,6 +37,6 @@ The full guide is [`skills/swift.md`](../../../skills/swift.md); read it. Key ru
   spins the run loop mid-update, and on macOS 27 the window then silently never redraws. Use
   `Shell.locate`, not `Shell.which`.
 - **Verify** (not by reading the diff): build clean → `swift run cellar selftest` → for GUI, `sh
-  Scripts/install-app.sh` and launch and exercise the path.
+  app/Scripts/install-app.sh` and launch and exercise the path.
 
 Before reporting done, run the **cellar-verifier** agent.

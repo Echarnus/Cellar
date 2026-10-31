@@ -32,6 +32,10 @@ jobs:
     timeout-minutes: 45
     outputs:
       version: ${{ steps.v.outputs.version }}
+    # The Swift package and its release scripts live in app/ (#133).
+    defaults:
+      run:
+        working-directory: app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,9 +73,9 @@ jobs:
         with:
           name: cellar-${{ steps.v.outputs.version }}
           path: |
-            dist/*.zip
-            dist/*.dmg
-            dist/SHA256SUMS.txt
+            app/dist/*.zip
+            app/dist/*.dmg
+            app/dist/SHA256SUMS.txt
           if-no-files-found: error
 
   publish:
@@ -96,6 +100,9 @@ jobs:
       TAG: ${{ github.ref_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
+    defaults:
+      run:
+        working-directory: app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -104,7 +111,7 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: cellar-${{ needs.build.outputs.version }}
-          path: dist
+          path: app/dist
       - name: Release notes from closed issues
         run: |
           python3 Scripts/release-notes.py --repo "$REPO" --tag "$TAG" --out dist/RELEASE_NOTES.md
@@ -125,8 +132,8 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
-            dist/*.dmg
-            dist/*.zip
+            app/dist/*.dmg
+            app/dist/*.zip
       - name: Publish
         id: publish
         run: |

@@ -34,8 +34,8 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
   service), the cached name, DepotDownloader's token wherever it landed, and the session seeded
   into every bottle. A relocated Cellar (`CELLAR_HOME`) never touches the real keychain or token
   store.
-- **Tests prove it.** `Tests/CellarKitTests/CredentialStorageTests.swift` feeds real-shaped leaks
-  through each path; `Tests/CellarIntegrationTests/KeychainTests.swift` round-trips the real
+- **Tests prove it.** `app/tests/CellarKitTests/CredentialStorageTests.swift` feeds real-shaped leaks
+  through each path; `app/tests/CellarIntegrationTests/KeychainTests.swift` round-trips the real
   keychain under a throwaway service. A change that adds a place a credential can go adds a row
   above and a test there.
 
@@ -65,7 +65,7 @@ the player's rights, the way it would on Windows.
 
 | Area | Status | How |
 |---|---|---|
-| Downloaded runners + DepotDownloader | ✅ | Pinned SHA-256 per file (`RunnerArtifact.sha256`, `DepotTool.downloadSHA256`), checked fresh *and* cached, before anything is unpacked or made executable (`Checksum`). Bumping a pin is a reviewed PR. SDL is pinned the same way in `Scripts/build-sdl.sh`. (#120) |
+| Downloaded runners + DepotDownloader | ✅ | Pinned SHA-256 per file (`RunnerArtifact.sha256`, `DepotTool.downloadSHA256`), checked fresh *and* cached, before anything is unpacked or made executable (`Checksum`). Bumping a pin is a reviewed PR. SDL is pinned the same way in `app/Scripts/build-sdl.sh`. (#120) |
 | Steam / Battle.net installers | Accepted risk | The vendors' own moving "latest" files on their HTTPS CDNs; they cannot be pinned. They run inside the bottle, not on the Mac side. |
 | Transport | ✅ | Every `curl` is HTTPS-only, redirects included (`Downloader.httpsOnly`). (#121) |
 | Secrets on command lines | ✅ | Tokens and refresh tokens go to curl on stdin (`--config -`), never argv, which every process can read. DepotDownloader never gets a password on argv. Cellar's own command lines are logged redacted, fail-closed. (#121) |

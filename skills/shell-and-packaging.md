@@ -1,6 +1,6 @@
 # Skill: Shell scripts & macOS packaging
 
-Best practices for `Scripts/*.sh` and how Cellar assembles its `.app`, DMG, and release artifacts.
+Best practices for `app/Scripts/*.sh` and how Cellar assembles its `.app`, DMG, and release artifacts.
 Read [`../AGENTS.md`](../AGENTS.md) first.
 
 ## Shell style
@@ -26,7 +26,7 @@ Read [`../AGENTS.md`](../AGENTS.md) first.
 what catches the unquoted-expansion and word-splitting bugs nobody spots by reading:
 
 ```sh
-shellcheck -s sh Scripts/*.sh      # -s sh forces POSIX mode, matching our shebang
+shellcheck -s sh app/Scripts/*.sh      # -s sh forces POSIX mode, matching our shebang
 ```
 
 It is **not currently installed on this machine and not wired into CI** — that is a gap, not a
@@ -57,7 +57,7 @@ unset DEVELOPER_DIR SDKROOT
 ```
 
 A Nix/devenv shell exports these pointing at a non-macOS SDK; without unsetting, the build fails or
-links the wrong SDK. `install-app.sh` and `package.sh` do it by sourcing `Scripts/select-xcode.sh` —
+links the wrong SDK. `install-app.sh` and `package.sh` do it by sourcing `app/Scripts/select-xcode.sh` —
 keep it. That helper also handles the second half: once unset, `xcode-select -p` decides, and the
 Command Line Tools alone cannot build the SwiftUI app (no SwiftUI macro plugins), so it switches to an
 installed Xcode whose toolchain runs, says which, and fails with the fix when there is none. It changes
@@ -72,7 +72,7 @@ into another script, source it.
 - `CFBundleName` = `Cellar` (drives the menu-bar app name and the About panel title).
 - `CFBundleGetInfoString` + `NSHumanReadableCopyright` — the human-readable description and licence
   line. Don't drop them; the app looks unfinished without a description.
-- `CFBundleIconFile` = `AppIcon` — the icon is built from `Resources/AppIcon.png` via
+- `CFBundleIconFile` = `AppIcon` — the icon is built from `app/Resources/AppIcon.png` via
   `make-icon.swift` (regenerated if missing).
 - `LSMinimumSystemVersion`, `NSHighResolutionCapable`, a stable `CFBundleIdentifier`.
 
@@ -98,11 +98,11 @@ touch this:
   keep that the last step that touches the bundle.
 - Copying files with `ditto` preserves extended attributes and signatures; a naive `cp -R` of a
   signed bundle can invalidate it. Prefer `ditto` when assembling the bundle.
-- **Signing goes through `Scripts/sign-app.sh`**, inside-out (Sparkle's XPC services and helpers,
+- **Signing goes through `app/Scripts/sign-app.sh`**, inside-out (Sparkle's XPC services and helpers,
   the bundled CLI, the Dock shim, then the app) rather than `--deep`. Ad-hoc by default; with
   `CELLAR_SIGN_IDENTITY` set to a Developer ID it adds the hardened runtime and a timestamp — only
   then, because ad-hoc code has no Team ID and library validation would refuse Sparkle.framework.
-  `Scripts/notarize.sh` submits and staples, and is a no-op without the notary key. The steps to
+  `app/Scripts/notarize.sh` submits and staples, and is a no-op without the notary key. The steps to
   switch it on are in `docs/RELEASING.md` — **and the release notes and the DMG's read-me must stop
   telling people to use Open Anyway in the same change.** Don't ship one without the other.
 

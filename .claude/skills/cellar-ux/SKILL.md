@@ -28,7 +28,7 @@ landed. Key rules:
   geometry. Not every mark is a disc — ask `StoreMark.outline(of:size:)` before ringing one. Never
   leave a blank cover either: `GeneratedCover` draws a deterministic one.
 - **Then judge it at the size *and scale* it ships at.** A 12pt chip is 24 device pixels; detail finer
-  than a pixel is static, however authentic. Zoom to inspect, never to approve — `Scripts/test.sh`'s
+  than a pixel is static, however authentic. Zoom to inspect, never to approve — `app/Scripts/test.sh`'s
   `markSurvivesAtDeviceScale` renders at 2× because an 8× render once passed a mark the app showed as
   mush.
 - **Copy:** sentence case, say what will happen in one sentence, name the window the player will see,
@@ -39,10 +39,10 @@ landed. Key rules:
   Prefer **semantic text styles** (`.body`, `.headline`) over `.font(.system(size:))` so the app
   follows the system text size. Everything must be reachable by keyboard — and a new window-level
   command needs its menu item added by hand, or it is mouse-only.
-- **English and Dutch.** The app's screens are translated (`Resources/Localization/nl.lproj`); a new
+- **English and Dutch.** The app's screens are translated (`app/Resources/Localization/nl.lproj`); a new
   SwiftUI literal needs a Dutch entry or `LocalizationTests` fails. Never build a sentence from
   concatenated fragments — a `"…" + "…"` is a `String`, which SwiftUI never translates.
-- **Verify by launching, not by compiling.** `Scripts/install-app.sh` (or `package.sh` + run
+- **Verify by launching, not by compiling.** `app/Scripts/install-app.sh` (or `package.sh` + run
   `dist/Cellar.app`), then look at the changed screen and screenshot it.
 
 Mechanics and the crashes that constrain the UI live in
