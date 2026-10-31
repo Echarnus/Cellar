@@ -6,7 +6,7 @@ import CellarUI
 
 struct GameDetailView: View {
     let game: GameSummary
-    @ObservedObject var runner: CellarRunner
+    let runner: ActivityStore
     let onChange: () -> Void
     @AppStorage("showHUD") private var showHUD = false
     @State private var showDetails = false

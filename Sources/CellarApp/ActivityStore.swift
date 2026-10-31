@@ -1,29 +1,39 @@
 import Foundation
+import Observation
 import CellarKit
 
+/// What Cellar is doing right now, for every window at once.
+///
 /// Drives the `cellar` CLI as a subprocess so the GUI reuses every tested code path (setup, launch
 /// with its auto-retry, steam add) instead of reimplementing them. Streams combined output.
+///
+/// There is one of these for the player's actions, made by `AppModel` and handed to every window
+/// (docs/APP-ARCHITECTURE.md). It used to be one per window, so "busy" was per window: Settings
+/// could start a sign-in while the library was mid-install, and the library never learned a
+/// sign-in was running. Background work that must never hold the Play button — `RuntimePreparation`
+/// — keeps an instance of its own on purpose.
 @MainActor
-final class CellarRunner: ObservableObject {
+@Observable
+final class ActivityStore {
     /// Everything the CLI has printed, markers removed.
-    @Published var log: String = ""
-    @Published var busy: Bool = false
-    @Published var busyTitle: String = ""
+    var log: String = ""
+    var busy: Bool = false
+    var busyTitle: String = ""
     /// How far a launch has got, when the running command is one that reports it. Kept after the
     /// command ends, so the launch window can show how it finished rather than going blank.
-    @Published private(set) var stage: LaunchStage?
+    private(set) var stage: LaunchStage?
     /// The exit status of the last command, nil while one is running.
-    @Published private(set) var exitCode: Int32?
-    @Published private(set) var phase: Phase = .idle
+    private(set) var exitCode: Int32?
+    private(set) var phase: Phase = .idle
     /// How many times the launch has been attempted. Counted from the stages rather than scraped
     /// out of the CLI's prose, so the launch window can say "second try" in its own words instead
     /// of quoting a line about the D3DMetal startup race at someone who wants to play a game.
-    @Published private(set) var attempt: Int = 0
+    private(set) var attempt: Int = 0
     /// Where an install stands, when the running command is `install --machine-progress`. Nil for
     /// every other command, and until the install has said which phase it is in.
-    @Published private(set) var installProgress: InstallProgress?
+    private(set) var installProgress: InstallProgress?
     /// The game being installed, so only its page draws the bar.
-    @Published private(set) var installingSlug: String?
+    private(set) var installingSlug: String?
 
     /// A launch does not end when the game starts: `cellar launch` stays alive for the whole session
     /// so it can close the layer afterwards. Without this distinction the app spends a two-hour play
@@ -40,20 +50,27 @@ final class CellarRunner: ObservableObject {
     ///
     /// The CLI inside Cellar.app comes first: it was built with this app, and an app update
     /// replaces the two together. One on PATH would keep driving the new app with an old engine.
-    private lazy var binary: String = Bundle.main.path(forAuxiliaryExecutable: "cellar")
-        ?? Shell.locate("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
+    private var binary: String {
+        if let resolvedBinary { return resolvedBinary }
+        let found = Bundle.main.path(forAuxiliaryExecutable: "cellar")
+            ?? Shell.locate("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
+        resolvedBinary = found
+        return found
+    }
+    /// Held by hand rather than as a `lazy var`, which `@Observable` does not take.
+    @ObservationIgnored private var resolvedBinary: String?
 
     /// The running command, so it can be called off.
-    private var process: Process?
+    @ObservationIgnored private var process: Process?
     /// Output received but not yet ended by a newline — held back so a marker split across two
     /// reads is still recognised. Shown in the log regardless, or a `\r`-only progress line
     /// (DepotDownloader's) would look like a stall.
-    private var pending: String = ""
-    private var committed: String = ""
+    @ObservationIgnored private var pending: String = ""
+    @ObservationIgnored private var committed: String = ""
     /// Whether the running command reports stage markers (only `launch --machine-progress` does).
-    private var readsStages = false
+    @ObservationIgnored private var readsStages = false
     /// The running command's line observer, if it asked for one.
-    private var lineObserver: (@MainActor (String) -> Void)?
+    @ObservationIgnored private var lineObserver: (@MainActor (String) -> Void)?
 
     init() {}
 
@@ -214,11 +231,11 @@ final class CellarRunner: ObservableObject {
     }
 
     /// The game currently being launched, if the running command is a launch.
-    @Published private(set) var launchingSlug: String?
+    private(set) var launchingSlug: String?
 
     /// Whether the last command was called off rather than failing on its own — a non-zero exit the
     /// player asked for is not an error to report back to them.
-    @Published private(set) var cancelled: Bool = false
+    private(set) var cancelled: Bool = false
 
     /// Stop the running command. Anything it already opened — Steam, Battle.net, the game itself —
     /// stays open; Cellar only stops waiting on it, and says so where the button lives.

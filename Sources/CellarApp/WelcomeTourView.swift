@@ -34,6 +34,8 @@ enum WelcomeTour {
 /// Both are things a new player meets on first launch, and they should be able to land independently
 /// — which order they appear in is a decision to make when the second one merges.
 struct WelcomeTourView: View {
+    /// The app's one activity (`AppModel`), handed on to the sign-in step.
+    let runner: ActivityStore
     /// Called when the player finishes or skips — the host closes the window and records it.
     let onFinish: () -> Void
 
@@ -137,7 +139,7 @@ struct WelcomeTourView: View {
         VStack(alignment: .leading, spacing: 0) {
             PageHeading(title: "Sign in to your stores",
                         subtitle: "Sign in once per store and every game you own there can be installed. You can do this later instead — Settings, or ⌘⇧A — and Cellar works fine until you do.")
-            StoreSignInPanel(activityHeight: 78)
+            StoreSignInPanel(runner: runner, activityHeight: 78)
                 .frame(maxHeight: .infinity)
         }
     }

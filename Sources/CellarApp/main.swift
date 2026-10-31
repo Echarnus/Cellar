@@ -31,6 +31,16 @@ extension Notification.Name {
     static let cellarShowGame = Notification.Name("cellar.showGame")
 }
 
+/// The app's composition root: the state every window shares, made once and handed to each window
+/// as it is built (docs/APP-ARCHITECTURE.md). Settings, Accounts and the welcome tour are separate
+/// `NSWindow`s — a sheet under `NSHostingView` is a fatal AttributeGraph cycle — so they share no
+/// view tree, and this is how they still see the same Cellar.
+@MainActor
+final class AppModel {
+    /// The player's actions — one at a time, for the whole app.
+    let activity = ActivityStore()
+}
+
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
 // whose window hosts the SwiftUI ContentView. This is the Phase-3 "Steam-like" front-end over
 // CellarKit — choose a game, see its state, and play it, with the game's own icon.
@@ -38,6 +48,7 @@ extension Notification.Name {
 // Because there is no App scene, AppKit installs no default menu bar — so we build one ourselves
 // (⌘Q to quit, About, Settings…, and the Edit menu that text fields need for cut/copy/paste).
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    let model = AppModel()
     var window: NSWindow!
     var settingsWindow: NSWindow?
     var accountsWindow: NSWindow?
@@ -121,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let useDiagnostic = ProcessInfo.processInfo.environment["CELLAR_DIAG"] != nil
         window.contentView = useDiagnostic
             ? NSHostingView(rootView: AnyView(Text("Cellar GUI works").padding()))
-            : NSHostingView(rootView: ContentView())
+            : NSHostingView(rootView: ContentView(runner: model.activity))
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.bringToFront()
@@ -292,7 +303,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.title = "Settings"
             w.isReleasedWhenClosed = false
             w.center()
-            w.contentView = NSHostingView(rootView: SettingsView(onClose: { [weak self] in
+            w.contentView = NSHostingView(rootView: SettingsView(runner: model.activity, onClose: { [weak self] in
                 self?.settingsWindow?.close()
             }))
             settingsWindow = w
@@ -344,7 +355,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.title = "Welcome to Cellar"
             w.isReleasedWhenClosed = false
             w.center()
-            w.contentView = NSHostingView(rootView: WelcomeTourView(onFinish: { [weak self] in
+            w.contentView = NSHostingView(rootView: WelcomeTourView(runner: model.activity, onFinish: { [weak self] in
                 WelcomeTour.markSeen()
                 self?.welcomeTourWindow?.close()
             }))

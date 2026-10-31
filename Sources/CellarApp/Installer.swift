@@ -12,7 +12,7 @@ import CellarKit
 /// `cellar prepare`, run by the app on launch until everything every game shares is on the Mac.
 ///
 /// It starts while the player is reading the welcome tour, so by the time they press Install the
-/// runtime and the Steam client are already here. It runs on its own `CellarRunner`, not the
+/// runtime and the Steam client are already here. It runs on its own `ActivityStore`, not the
 /// library's, so it never holds the Play and Install buttons — a game set up meanwhile waits for it
 /// in the CLI (`SetupLock`) and says so in its own activity log.
 @MainActor
@@ -42,7 +42,7 @@ final class RuntimePreparation: ObservableObject {
         }
     }
 
-    private let runner = CellarRunner()
+    private let runner = ActivityStore()
 
     var isWorking: Bool { if case .working = state { return true } else { return false } }
 
@@ -197,7 +197,7 @@ enum CellarUninstaller {
 
     private static func run(keepSaves: Bool) {
         RuntimePreparation.shared.cancel()
-        let runner = CellarRunner()
+        let runner = ActivityStore()
         // Deleting a games library takes a while; a window that says so beats an app that seems
         // to have done nothing.
         let progress = progressWindow(keepSaves: keepSaves)

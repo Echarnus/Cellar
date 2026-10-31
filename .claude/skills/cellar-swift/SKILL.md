@@ -16,7 +16,7 @@ The full guide is [`skills/swift.md`](../../../skills/swift.md); read it. Key ru
   stderr — safe only because its outputs are tiny, and it says so. A chatty child (Wine, above all)
   can fill the stderr pipe buffer while the parent blocks on stdout and **deadlock both sides**. Use
   `WineRunner.run(inheritIO: true)` or `readabilityHandler`s draining **both** pipes concurrently, as
-  `CellarRunner.swift` does. Never `waitUntilExit()` before draining; clear a handler at EOF; hop to
+  `ActivityStore.swift` does. Never `waitUntilExit()` before draining; clear a handler at EOF; hop to
   the main actor before touching `@State` from one.
 - **Testing:** there is **no test target** — `swift test` runs nothing, and `cellar selftest` is a
   smoke test, not a suite. New pure logic should come with tests: **Swift Testing** (`import

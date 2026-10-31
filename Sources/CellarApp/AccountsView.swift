@@ -15,7 +15,7 @@ import CellarUI
 /// whose DRM talks to a running Steam, and it is reported as a fact about the machine — never as
 /// another sign-in to perform.
 struct AccountsSection: View {
-    @ObservedObject var runner: CellarRunner
+    let runner: ActivityStore
     let state: StoreAccountState
     let refresh: () -> Void
 

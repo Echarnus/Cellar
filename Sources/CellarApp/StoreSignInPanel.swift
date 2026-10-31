@@ -15,12 +15,13 @@ import CellarKit
 /// Everything AttributeGraph-sensitive lives here rather than in the hosts: no work in `init`, no
 /// disk read from a view body, no view tree that changes shape mid-run (see `skills/swift.md`).
 struct StoreSignInPanel: View {
+    /// The app's one activity (`AppModel`).
+    let runner: ActivityStore
     /// Height of the activity strip, or `nil` to leave it out entirely. Constant per instance —
     /// the tour is tighter for space than the Accounts window, but neither changes its mind
     /// half-way through a run, so the view tree's shape stays fixed.
     var activityHeight: CGFloat? = 108
 
-    @StateObject private var runner = CellarRunner()
     /// Read once per refresh, never from a view body — see `StoreAccountState`.
     @State private var state = StoreAccountState.unknown
 

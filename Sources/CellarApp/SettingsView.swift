@@ -10,6 +10,9 @@ import CellarUI
 /// the thing a player goes looking for later, so it is the first section of the one window called
 /// Settings. There is no second place to sign in.
 struct SettingsView: View {
+    /// The app's one activity (`AppModel`), so a command started here holds the library's buttons
+    /// too, and the activity pane shows everything Cellar is running.
+    let runner: ActivityStore
     @AppStorage("showHUD") private var showHUD = false
     /// Settings is shown in a standalone NSWindow (not a SwiftUI sheet — that crashes under
     /// NSHostingView), so anything that hands off to another window closes this one through this
@@ -24,7 +27,6 @@ struct SettingsView: View {
         case failed(String)
     }
     @State private var export: Export = .idle
-    @StateObject private var runner = CellarRunner()
     /// Read after the first layout, never from the body (skills/swift.md).
     @State private var databaseVersion = ""
     /// Measured off the main thread when the pane opens: walking a 100 GB game takes seconds.

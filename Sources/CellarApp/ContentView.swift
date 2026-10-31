@@ -168,7 +168,8 @@ final class Library: ObservableObject {
 
 struct ContentView: View {
     @StateObject private var lib = Library()
-    @StateObject private var runner = CellarRunner()
+    /// The app's one activity, shared with Settings and the welcome tour (`AppModel`).
+    let runner: ActivityStore
     @ObservedObject private var preparation = RuntimePreparation.shared
     @FocusState private var searchFocused: Bool
 

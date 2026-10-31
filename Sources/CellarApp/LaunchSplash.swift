@@ -25,7 +25,7 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
     /// "Show progress" must not open a second copy.
     /// `onFinished` runs when a launch started from this window ends — a retry on another backend —
     /// so the page behind it can pick up what changed.
-    static func present(game: GameSummary, runner: CellarRunner, onFinished: @escaping @MainActor () -> Void = {}) {
+    static func present(game: GameSummary, runner: ActivityStore, onFinished: @escaping @MainActor () -> Void = {}) {
         if let current {
             current.window.makeKeyAndOrderFront(nil)
             NSApp.bringToFront()
@@ -41,7 +41,7 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
 
     static func dismiss() { current?.close() }
 
-    private func show(game: GameSummary, runner: CellarRunner, onFinished: @escaping @MainActor () -> Void) {
+    private func show(game: GameSummary, runner: ActivityStore, onFinished: @escaping @MainActor () -> Void) {
         // Borderless, so the game's own art runs to the top edge — a titled window keeps a title bar
         // above the content whatever `fullSizeContentView` claims, and a bare strip over the banner
         // is exactly the "assembled from parts" look this window exists to replace. Fixed size, like
@@ -90,7 +90,7 @@ struct LaunchSplashView: View {
     static let height: CGFloat = 470
 
     let game: GameSummary
-    @ObservedObject var runner: CellarRunner
+    let runner: ActivityStore
     let onFinished: @MainActor () -> Void
     let onDismiss: () -> Void
 
