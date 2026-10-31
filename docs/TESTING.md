@@ -258,7 +258,14 @@ To test a wheel:
    `CELLAR_RUNNER_SDL=1 cellar launch <game>` — to tell Cellar's SDL apart from the rest of the path.
    For a Fanatec base, also try Settings › General › Racing wheels at 25% and then 100% (does the
    strength follow?) and `CELLAR_FFB_DISABLE=1` (steering without Cellar's driver).
-6. Note the game, runner and backend, and record the result in the game's profile notes.
+6. Note the game, runner and backend, and record the result in the game's profile: `wheel =
+   "steering"` (steering and pedals, no force feedback) or `"full"` (with force feedback), plus the
+   wheel and firmware in `notes`. Only a game whose `status` is no longer `untested` may claim one;
+   `ProfileDatabaseTests` enforces it.
+
+The race sims to try first are `assetto-corsa` (DXVK by default) and `assetto-corsa-competizione`
+(D3DMetal by default). Both ship `wheel = "untested"` and in-game binding steps in `wheel_setup`,
+which the game page shows; check that those steps match the menus you actually see.
 
 ## Where this sits in the verification ladder
 

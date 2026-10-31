@@ -57,6 +57,11 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   runs the exe without standing Windows Steam up in the bottle.
 - **`[compatibility]`** — `anticheat`, `drm`, `requires_account`, `online`, `status`, `notes`, and optionally
   `controller = "full" | "partial" | "none"` — only what you saw a pad do in this game under Cellar.
+  Optional `wheel = "full" | "steering" | "untested" | "none"` — what a racing wheel did in this
+  game (`full` includes force feedback; `steering` is steering and pedals without it), shown as the
+  *Racing wheel* row; only `untested` or `none` while the game's own `status` is `untested`. With it,
+  `wheel_setup` — the in-game steps that bind a wheel, shown verbatim on the game page. See
+  `assetto-corsa.toml`.
   Optional `network_check` — space-separated `https://` addresses of the game's own online services
   (a workshop, an account server) that `cellar network <slug>` probes on top of the store's. Only
   addresses you have seen the game use or the publisher documents; a guessed host proves nothing.
