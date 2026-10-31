@@ -286,11 +286,17 @@ plumbing, and double-clicking it would run Wine with no program). Its executable
 **copy** of the runner's loader — re-copied whenever the runner's changes — and its Info.plist carries
 the game's name, icon, the games category, `LSSupportsGameMode`, plus what Wine embeds in its own
 loader (`LSUIElement`, `NSPrincipalClass = WineApplication`) so the Mac driver behaves as before.
-`WineRunner.spawn(bundledLoader:)` starts that copy through `posix_spawn` with `argv[0]` naming the
-runner's own binary: Wine's loader looks for `ntdll.so` beside its executable, then beside `argv[0]`
-(`loader/main.c`), so it finds the runner, and everything after — ntdll, `wineserver`, child
-processes — resolves from the runner's real path as before. A symlink would not do: macOS
-identifies the app by the resolved executable path.
+Which loader is copied matters, because Wine re-execs at startup. On WineForge (Wine 11 layout)
+`bin/wine` is only a first-run wrapper that re-execs into `lib/wine/x86_64-unix/wine` — the loader
+every Windows process actually runs as — so that inner loader is the one copied, and it is started
+the way Wine starts its own child processes: `WINELOADERNOEXEC=1`, no re-exec. (The first version
+copied `bin/wine` only when `ntdll.so` sat beside it, so on WineForge no game app was ever made and
+the game kept running as bare "wine".) On a Wine 10 layout `bin/wine` is the loader itself.
+`WineRunner.spawn(bundledLoader:)` starts the copy through `posix_spawn` with `argv[0]` naming the
+runner's own loader: Wine finds `ntdll.so` beside `argv[0]` (Wine 11), from its real path or through
+`WINEDLLPATH` (Wine 10) — `loader/main.c` — so it finds the runner, and everything after — ntdll,
+`wineserver`, child processes — resolves from the runner's real path as before. A symlink would not
+do: macOS identifies the app by the resolved executable path.
 
 Limits: only processes Cellar starts itself get it — the direct route, and Steam games Cellar
 downloaded (`launchAlongside`). A game Steam's `rungameid` or Battle.net starts is the client's

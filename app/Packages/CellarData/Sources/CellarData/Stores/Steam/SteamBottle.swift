@@ -470,7 +470,7 @@ public extension SteamBottle {
     /// exactly what it asks for — a live session belonging to an account that owns the game — while
     /// keeping the download path free of the client's install dialog.
     public static func launchAlongside(runner: WineRunner, exe: URL, appID: Int, showHUD: Bool = false,
-                                gameEnv: [String: String] = [:], bundledLoader: URL? = nil,
+                                gameEnv: [String: String] = [:], bundledLoader: GameApp.Start? = nil,
                                 game: String = "the game", expectsSignIn: Bool = false,
                                 attempts: Int = 8,
                                 progress: (String) -> Void = { _ in },

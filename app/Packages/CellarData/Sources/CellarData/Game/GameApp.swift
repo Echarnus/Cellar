@@ -14,12 +14,13 @@ import Foundation
 /// bundle its executable sits in, so that process is "Planet Coaster 2", category games: Game Mode,
 /// and the game's name and icon everywhere macOS shows a running app.
 ///
-/// Wine still has to find the rest of itself. Its loader looks for `ntdll.so` beside its own
-/// executable first and beside `argv[0]` second (`loader/main.c`), so the copy is started with
-/// `argv[0]` naming the runner's own binary — the copy finds nothing beside itself, then finds the
-/// runner. Everything after that (ntdll, the server, child processes) resolves from the runner's
-/// real path, exactly as before. If a runner re-executes itself into its own loader at startup, the
-/// game simply runs as it always did: no Game Mode, nothing broken.
+/// Wine still has to find the rest of itself. Its loader works out where `ntdll.so` is from
+/// `argv[0]` (Wine 10.x: the real path of `argv[0]`, then `WINEDLLPATH`; Wine 11+: beside its own
+/// executable, then beside `argv[0]` — `loader/main.c`), so the copy is started with `argv[0]`
+/// naming the runner's own binary, and finds the runner. Everything after that (ntdll, the
+/// server, child processes) resolves from the runner's real path, exactly as before. If a runner
+/// re-executes itself into its own loader at startup, the game simply runs as it always did: no
+/// Game Mode, nothing broken.
 ///
 /// Only the game's own process can be started this way. A game Steam or Battle.net starts is a
 /// child of the client, created by Wine from the runner's loader, so it keeps the bundle-less
@@ -35,15 +36,46 @@ public enum GameApp {
         Paths.gameApps.appendingPathComponent("\(slug).app", isDirectory: true)
     }
 
-    /// The loader to copy, when this runner's layout supports starting it from elsewhere: the real
-    /// file behind the runner's `wine`, with `ntdll.so` beside it (Wine 7.x+ layout). GPTK-style
-    /// `wine64` + `wine64-preloader` runners re-exec by name and are left alone.
-    static func loader(for binary: URL) -> URL? {
+    /// How to start the game from its app: the loader to copy into it, the `argv[0]` to give that
+    /// copy so Wine finds the rest of itself, and whether to skip Wine's first-run re-exec.
+    public struct Start: Equatable, Sendable {
+        /// The copy inside the game's `.app` — what actually runs.
+        public let executable: URL
+        /// The runner's own loader, passed as `argv[0]`.
+        public let argv0: String
+        /// Extra environment for the start.
+        public let environment: [String: String]
+    }
+
+    /// Which of the runner's files the game's process ends up running as — the one to copy — and
+    /// whether Wine has to be told not to re-exec. Copying the wrong one is invisible: Wine would
+    /// re-exec from the bundle into the runner, and the game would be "wine" again.
+    ///
+    /// - **Wine 11 layout** (WineForge today): `lib/wine/<arch>-unix/wine` sits beside `ntdll.so`
+    ///   and is the loader Wine execs every process into; `bin/wine` is only the first-run wrapper
+    ///   that re-execs into it. So the inner loader is copied and started the way Wine starts its
+    ///   own child processes — `WINELOADERNOEXEC=1`, no re-exec. It finds `ntdll.so` beside
+    ///   `argv[0]` (`loader/main.c`).
+    /// - **Wine 10 layout**: `bin/wine` is the loader itself and finds `ntdll.so` at
+    ///   `../lib/wine/<arch>-unix/` from the real path of `argv[0]`, or through `WINEDLLPATH`.
+    ///   Started as it always is: a runner built with a separate preloader re-execs, and the game
+    ///   then runs as before, without the bundle.
+    ///
+    /// GPTK-style `wine64` + `wine64-preloader` runners are left alone.
+    static func loader(for binary: URL) -> (file: URL, noExec: Bool)? {
+        let fm = FileManager.default
         let real = binary.resolvingSymlinksInPath()
-        guard real.lastPathComponent == "wine",
-              FileManager.default.fileExists(atPath: real.deletingLastPathComponent()
-                  .appendingPathComponent("ntdll.so").path) else { return nil }
-        return real
+        guard real.lastPathComponent == "wine" else { return nil }
+        let dir = real.deletingLastPathComponent()
+        if fm.fileExists(atPath: dir.appendingPathComponent("ntdll.so").path) { return (real, true) }
+        for arch in ["x86_64-unix", "aarch64-unix"] {
+            let unix = dir.deletingLastPathComponent().appendingPathComponent("lib/wine/\(arch)", isDirectory: true)
+            guard fm.fileExists(atPath: unix.appendingPathComponent("ntdll.so").path) else { continue }
+            let inner = unix.appendingPathComponent("wine")
+            if fm.isExecutableFile(atPath: inner.path) { return (inner.resolvingSymlinksInPath(), true) }
+            return (real, false)
+        }
+        return nil
     }
 
     /// The Info.plist of a game app. Mirrors what Wine embeds in its own loader (`LSUIElement`,
@@ -72,10 +104,10 @@ public enum GameApp {
         return info
     }
 
-    /// Make sure the game's app exists and carries this runner's loader, and return the executable
-    /// to start the game with. Nil means "start it the usual way": the runner's layout doesn't
+    /// Make sure the game's app exists and carries this runner's loader, and return how to start
+    /// the game from it. Nil means "start it the usual way": the runner's layout doesn't
     /// allow it, it was switched off, or the bundle couldn't be written. Never a reason not to play.
-    public static func prepare(name: String, slug: String, runnerBinary: URL, icon: URL?) -> URL? {
+    public static func prepare(name: String, slug: String, runnerBinary: URL, icon: URL?) -> Start? {
         if ProcessInfo.processInfo.environment[disableVariable] == "1" { return nil }
         guard let loader = loader(for: runnerBinary) else { return nil }
         let fm = FileManager.default
@@ -90,10 +122,10 @@ public enum GameApp {
             var changed = false
 
             // A runner update replaces the loader; the copy must follow it, byte for byte.
-            let source = try Data(contentsOf: loader)
+            let source = try Data(contentsOf: loader.file)
             if (try? Data(contentsOf: executable)) != source {
                 try? fm.removeItem(at: executable)
-                try fm.copyItem(at: loader, to: executable)
+                try fm.copyItem(at: loader.file, to: executable)
                 try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
                 changed = true
             }
@@ -120,7 +152,8 @@ public enum GameApp {
                 let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
                 if fm.fileExists(atPath: lsregister) { Shell.run(lsregister, ["-f", app.path]) }
             }
-            return executable
+            return Start(executable: executable, argv0: loader.file.path,
+                         environment: loader.noExec ? ["WINELOADERNOEXEC": "1"] : [:])
         } catch {
             CellarLog.failure(.launch, "Couldn't prepare \(name)'s app bundle; starting it the usual way",
                               error, subject: slug)
@@ -129,7 +162,7 @@ public enum GameApp {
     }
 
     /// `prepare` for a plan and the runner about to start it.
-    public static func prepare(for plan: GamePlan, runner: WineRunner) -> URL? {
+    public static func prepare(for plan: GamePlan, runner: WineRunner) -> Start? {
         prepare(name: plan.name, slug: plan.slug, runnerBinary: runner.binary,
                 icon: AppBundle.resolveGameICNS(slug: plan.slug, prefix: plan.prefix,
                                                 appID: plan.appID, installRoots: plan.installRoots))
