@@ -251,7 +251,7 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 Button("Check for new games now") {
-                    runner.run(.updateProfiles(quiet: false), title: "Updating the game database",
+                    runner.run(.updateProfiles(quiet: false), title: String(localized: "Updating the game database"),
                                then: { databaseVersion = Self.describeDatabase() })
                 }
                 .disabled(runner.busy)
@@ -281,7 +281,7 @@ struct SettingsView: View {
                 }
             }
             Button("Clean Up Installers and Scratch Files") {
-                runner.run(.cleanStorage, title: "Cleaning up", then: { measureStorage() })
+                runner.run(.cleanStorage, title: String(localized: "Cleaning up"), then: { measureStorage() })
             }
             .disabled(runner.busy)
             Text("Removes downloaded installers and temporary files Cellar fetches again when it needs them. Games, bottles, save games and sign-ins stay. To move a game to an external drive, use the ••• menu on its page.")

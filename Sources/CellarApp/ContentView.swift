@@ -131,7 +131,7 @@ struct ContentView: View {
     private var storeChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                FilterChip(title: "All stores", tint: .secondary,
+                FilterChip(title: String(localized: "All stores"), tint: .secondary,
                            selected: lib.query.store == nil,
                            action: { lib.query.store = nil }) {
                     Image(systemName: "square.grid.2x2.fill").font(.caption2.weight(.semibold))

@@ -95,14 +95,14 @@ struct WelcomeTourView: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 FactRow(symbol: "cube.transparent", tint: .pink,
-                        title: "No Windows, no virtual machine",
-                        detail: "Cellar builds a small Windows environment per game — Wine, plus Apple's D3DMetal — and translates the game's graphics to Metal as it runs.")
+                        title: String(localized: "No Windows, no virtual machine"),
+                        detail: String(localized: "Cellar builds a small Windows environment per game — Wine, plus Apple's D3DMetal — and translates the game's graphics to Metal as it runs."))
                 FactRow(symbol: "person.badge.shield.checkmark", tint: .blue,
-                        title: "Games you already own",
-                        detail: "Everything installs from your own Steam, Battle.net or GOG account. Cellar doesn't host, sell or unlock anything.")
+                        title: String(localized: "Games you already own"),
+                        detail: String(localized: "Everything installs from your own Steam, Battle.net or GOG account. Cellar doesn't host, sell or unlock anything."))
                 FactRow(symbol: "heart", tint: .red,
-                        title: "Free and open source",
-                        detail: "GPL-3.0, no account with us, no telemetry. Not affiliated with Valve, Blizzard, GOG or Apple.")
+                        title: String(localized: "Free and open source"),
+                        detail: String(localized: "GPL-3.0, no account with us, no telemetry. Not affiliated with Valve, Blizzard, GOG or Apple."))
             }
             .padding(.horizontal, 40)
             .padding(.top, 26)
@@ -114,16 +114,16 @@ struct WelcomeTourView: View {
 
     private var howItWorksPage: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PageHeading(title: "How a game gets running",
-                        subtitle: "Three steps, in this order. Every game's page tells you which one is next, so there is nothing to remember.")
+            PageHeading(title: String(localized: "How a game gets running"),
+                        subtitle: String(localized: "Three steps, in this order. Every game's page tells you which one is next, so there is nothing to remember."))
 
             VStack(alignment: .leading, spacing: 12) {
-                StepRow(number: 1, title: "Sign in to the store",
-                        detail: "A game comes from Steam, Battle.net or GOG. One sign-in covers every game from that store — you are not asked again per game.")
-                StepRow(number: 2, title: "Install",
-                        detail: "One button. Cellar gets the Windows runtime, builds the game its own bottle and downloads it — with a progress bar. The first game takes a few extra minutes; the ones after are quick.")
-                StepRow(number: 3, title: "Play",
-                        detail: "Press Play. Cellar starts whatever the game needs alongside it, and shuts all of it down when you quit.")
+                StepRow(number: 1, title: String(localized: "Sign in to the store"),
+                        detail: String(localized: "A game comes from Steam, Battle.net or GOG. One sign-in covers every game from that store — you are not asked again per game."))
+                StepRow(number: 2, title: String(localized: "Install"),
+                        detail: String(localized: "One button. Cellar gets the Windows runtime, builds the game its own bottle and downloads it — with a progress bar. The first game takes a few extra minutes; the ones after are quick."))
+                StepRow(number: 3, title: String(localized: "Play"),
+                        detail: String(localized: "Press Play. Cellar starts whatever the game needs alongside it, and shuts all of it down when you quit."))
             }
             .padding(.horizontal, 40)
 
@@ -140,8 +140,8 @@ struct WelcomeTourView: View {
 
     private var accountsPage: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PageHeading(title: "Sign in to your stores",
-                        subtitle: "Sign in once per store and every game you own there can be installed. You can do this later instead — Settings, or ⌘⇧A — and Cellar works fine until you do.")
+            PageHeading(title: String(localized: "Sign in to your stores"),
+                        subtitle: String(localized: "Sign in once per store and every game you own there can be installed. You can do this later instead — Settings, or ⌘⇧A — and Cellar works fine until you do."))
             StoreSignInPanel(runner: runner, library: library, accounts: accounts, activityHeight: 78)
                 .frame(maxHeight: .infinity)
         }
@@ -169,21 +169,21 @@ struct WelcomeTourView: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 FactRow(symbol: "person.crop.circle", tint: .blue,
-                        title: "Accounts — sign in any time",
-                        detail: "The person icon in the sidebar, ⌘⇧A, or Settings → Manage accounts. Signing in later works exactly as it does here.")
+                        title: String(localized: "Accounts — sign in any time"),
+                        detail: String(localized: "The person icon in the sidebar, ⌘⇧A, or Settings → Manage accounts. Signing in later works exactly as it does here."))
                 FactRow(symbol: "gearshape", tint: .gray,
-                        title: "Settings — ⌘,",
-                        detail: "The Wine runner, your logs and the Cellar folder. It also replays this tour whenever you want it.")
+                        title: String(localized: "Settings — ⌘,"),
+                        detail: String(localized: "The Wine runner, your logs and the Cellar folder. It also replays this tour whenever you want it."))
                 // Only while it is actually happening: a tour replayed later must not claim a
                 // download that finished weeks ago, or one the player switched off.
                 if preparation.isWorking {
                     FactRow(symbol: "arrow.down.circle", tint: .pink,
-                            title: "Getting ready in the background",
-                            detail: "Cellar is already downloading the Windows runtime and Steam client every game shares — a few gigabytes — so your first game only has to download itself. The library's footer shows how it's going.")
+                            title: String(localized: "Getting ready in the background"),
+                            detail: String(localized: "Cellar is already downloading the Windows runtime and Steam client every game shares — a few gigabytes — so your first game only has to download itself. The library's footer shows how it's going."))
                 }
                 FactRow(symbol: "questionmark.circle", tint: .purple,
-                        title: "Questions",
-                        detail: "The supported-games list and the FAQ live on the Cellar site, linked from Settings.")
+                        title: String(localized: "Questions"),
+                        detail: String(localized: "The supported-games list and the FAQ live on the Cellar site, linked from Settings."))
             }
             .padding(.horizontal, 40)
             .padding(.top, 24)

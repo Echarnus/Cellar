@@ -53,7 +53,7 @@ final class RuntimePreparation {
         guard isEnabled, !isWorking, runner.binaryExists else { return }
         guard !Preparation.isComplete else { state = .ready; return }
         state = .working("Starting…")
-        runner.run(.prepare, title: "Getting Cellar ready", observe: { [weak self] line in
+        runner.run(.prepare, title: String(localized: "Getting Cellar ready"), observe: { [weak self] line in
             let text = line.trimmingCharacters(in: .whitespaces)
             // The CLI drops colour when its output is a pipe; strip escape codes anyway, so a
             // stray one never reaches the footer.
@@ -209,7 +209,7 @@ enum CellarUninstaller {
         // Deleting a games library takes a while; a window that says so beats an app that seems
         // to have done nothing.
         let progress = progressWindow(keepSaves: keepSaves)
-        runner.run(.uninstallCellar(keepSaves: keepSaves), title: "Uninstalling Cellar", then: {
+        runner.run(.uninstallCellar(keepSaves: keepSaves), title: String(localized: "Uninstalling Cellar"), then: {
             progress.close()
             let succeeded = runner.exitCode == 0
             let done = NSAlert()

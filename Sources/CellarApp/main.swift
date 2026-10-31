@@ -43,7 +43,7 @@ final class AppModel {
     /// then show what turned up.
     func draftProfiles() {
         guard !activity.busy else { return }
-        activity.run(.draftProfiles, title: "Finding games without a profile",
+        activity.run(.draftProfiles, title: String(localized: "Finding games without a profile"),
                      then: { [library] in library.refresh() })
     }
 }

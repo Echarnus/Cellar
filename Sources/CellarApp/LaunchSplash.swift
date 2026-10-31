@@ -191,7 +191,7 @@ struct LaunchSplashView: View {
 
     private var arrived: some View {
         OutcomeBlock(symbol: "checkmark.circle.fill", tint: .green,
-                title: "\(game.name) is running",
+                title: String(localized: "\(game.name) is running"),
                 detail: game.needsClientAtRuntime
                     ? "Cellar closes \(game.store.displayName) and the whole layer when you quit."
                     : "Cellar closes the layer when you quit.")
@@ -200,7 +200,7 @@ struct LaunchSplashView: View {
     private var failure: some View {
         VStack(alignment: .leading, spacing: 12) {
             OutcomeBlock(symbol: "exclamationmark.triangle.fill", tint: .orange,
-                    title: "\(game.name) didn't start",
+                    title: String(localized: "\(game.name) didn't start"),
                     detail: failureDetail)
             if let retry = offeredBackend {
                 Text("Its profile names \(retry.displayName) as the one to try when \(currentBackendName) doesn't work. \(retry.summary) If \(game.name) comes up, Cellar keeps using it; you can switch back on the game's page.")
@@ -223,8 +223,8 @@ struct LaunchSplashView: View {
 
     private var stopped: some View {
         OutcomeBlock(symbol: "stop.circle.fill", tint: .secondary,
-                title: "Launch stopped",
-                detail: "Cellar stopped waiting. Anything already open stays open.")
+                title: String(localized: "Launch stopped"),
+                detail: String(localized: "Cellar stopped waiting. Anything already open stays open."))
     }
 
     // MARK: - Footer

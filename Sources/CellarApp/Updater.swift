@@ -66,7 +66,7 @@ final class AppUpdater {
     /// Sparkle's controller validates the item, so it greys out while a check is already running.
     func makeMenuItem() -> NSMenuItem? {
         guard let controller else { return nil }
-        let item = NSMenuItem(title: "Check for Updates…",
+        let item = NSMenuItem(title: String(localized: "Check for Updates…"),
                               action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
                               keyEquivalent: "")
         item.target = controller

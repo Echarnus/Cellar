@@ -80,7 +80,7 @@ struct AccountsSection: View {
 
     private func steamAction() {
         if case .signedIn = state.steam {
-            runner.run(.steamSignOut, title: "Signing out", then: {
+            runner.run(.steamSignOut, title: String(localized: "Signing out"), then: {
                 steamQRCode = nil
                 accountsChanged()
             })
@@ -89,7 +89,7 @@ struct AccountsSection: View {
         steamQRCode = nil
         steamSignInProgress = nil
         steamQRReader = SteamQRCodeReader()
-        runner.run(.steamSignIn, title: "Waiting for the QR scan", observe: { line in
+        runner.run(.steamSignIn, title: String(localized: "Waiting for the QR scan"), observe: { line in
             // DepotDownloader only *draws* the challenge, as terminal ASCII sized for a monospace
             // font — unscannable in a GUI. Read it back into modules and draw it properly. Steam
             // rotates the code, so later blocks replace it.
@@ -166,14 +166,14 @@ struct AccountsSection: View {
                 actionTitle: state.gogSignedIn ? "Sign out" : "Sign in",
                 busy: runner.busy) {
                     if state.gogSignedIn {
-                        runner.run(.gogSignOut, title: "Signing out", then: { accountsChanged() })
+                        runner.run(.gogSignOut, title: String(localized: "Signing out"), then: { accountsChanged() })
                     } else {
                         gogSignInFailed = nil
                         GOGSignInWindow.present { result in
                             switch result {
                             case .code(let code):
                                 runner.run(.gogSignIn(code: code),
-                                           title: "Signing in to GOG", then: { accountsChanged() })
+                                           title: String(localized: "Signing in to GOG"), then: { accountsChanged() })
                             case .cancelled:
                                 break   // no error: closing the window is a legitimate answer
                             case .failed(let why):

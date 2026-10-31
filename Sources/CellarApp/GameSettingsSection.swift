@@ -23,15 +23,15 @@ struct GameSettingsSection: View {
 
     private var rows: [Row] {
         var rows = [
-            Row(setting: .retina, title: "Retina resolution",
+            Row(setting: .retina, title: String(localized: "Retina resolution"),
                 tradeOff: "Renders at your display's full pixel density. Sharper, and up to four times the work for the GPU."),
-            Row(setting: .metalHUD, title: "Show frame rate",
+            Row(setting: .metalHUD, title: String(localized: "Show frame rate"),
                 tradeOff: "Metal's overlay with frames per second and frame time. Costs next to nothing."),
-            Row(setting: .metalValidation, title: "Metal validation",
+            Row(setting: .metalValidation, title: String(localized: "Metal validation"),
                 tradeOff: "Checks every graphics call. Slower, but it stops some games crashing on D3DMetal."),
         ]
         if game.backend == GraphicsBackend.d3dmetal.rawValue {
-            rows.insert(Row(setting: .metalFXUpscaling, title: "MetalFX upscaling",
+            rows.insert(Row(setting: .metalFXUpscaling, title: String(localized: "MetalFX upscaling"),
                             tradeOff: "Appears as DLSS in the game's own settings: renders smaller and upscales. Faster, slightly softer."),
                         at: 1)
         }
