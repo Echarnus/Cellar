@@ -20,6 +20,26 @@ final class Library: ObservableObject {
 
     static let lastSelectedKey = "lastSelectedGame"
 
+    /// Name, or most recently played first — remembered between launches.
+    @Published var sort: Sort = Sort(rawValue: UserDefaults.standard.string(forKey: "librarySort") ?? "") ?? .name {
+        didSet { UserDefaults.standard.set(sort.rawValue, forKey: "librarySort") }
+    }
+
+    enum Sort: String, CaseIterable, Identifiable {
+        case name = "Name", recent = "Recently played"
+        var id: String { rawValue }
+    }
+
+    /// Ordered by the chosen sort; a game never played sorts after every played one, by name.
+    func ordered(_ games: [GameSummary]) -> [GameSummary] {
+        games.sorted { a, b in
+            if sort == .recent, a.lastPlayed != b.lastPlayed {
+                return (a.lastPlayed ?? .distantPast) > (b.lastPlayed ?? .distantPast)
+            }
+            return a.name < b.name
+        }
+    }
+
     enum Filter: String, CaseIterable, Identifiable {
         case all = "All", installed = "Installed", notInstalled = "Not installed"
         var id: String { rawValue }
@@ -82,7 +102,7 @@ final class Library: ObservableObject {
         let stores = GameStore.allCases.sorted { $0.sortIndex < $1.sortIndex }
         return [false, true].flatMap { guessed in
             stores.compactMap { store in
-                let inStore = filtered.filter { $0.store == store && $0.isDraft == guessed }.sorted { $0.name < $1.name }
+                let inStore = ordered(filtered.filter { $0.store == store && $0.isDraft == guessed })
                 return inStore.isEmpty ? nil : LibrarySection(store: store, guessed: guessed, games: inStore)
             }
         }
@@ -179,9 +199,22 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .cellarRefreshLibrary)) { _ in
             lib.refresh()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .cellarShowGame)) { note in
+            guard let slug = note.object as? String, lib.games.contains(where: { $0.slug == slug }) else { return }
+            lib.storeFilter = nil
+            lib.query = ""
+            lib.selected = slug
+        }
         .onReceive(NotificationCenter.default.publisher(for: .cellarFocusSearch)) { _ in
             searchFocused = true
         }
+    }
+
+    /// When the game database was last fetched, so the daily check survives a relaunch.
+    @AppStorage("profilesLastChecked") private var lastDatabaseCheckStamp: Double = 0
+    private var lastDatabaseCheck: Date {
+        get { Date(timeIntervalSince1970: lastDatabaseCheckStamp) }
+        nonmutating set { lastDatabaseCheckStamp = newValue.timeIntervalSince1970 }
     }
 
     /// How old an answer from Steam may get before the app asks again.
@@ -204,6 +237,13 @@ struct ContentView: View {
                     _ = await runner.runBeside(["update", slug, "--check"])
                 }
                 lib.refresh()
+            }
+            // The game database, once a day, the same quiet way. A build with no signing key has
+            // nothing it could accept, so it doesn't ask.
+            if !ProfileUpdates.publicKey.isEmpty, !runner.busy,
+               Date().timeIntervalSince(lastDatabaseCheck) > 24 * 60 * 60 {
+                lastDatabaseCheck = Date()
+                if await runner.runBeside(["profiles", "update", "--quiet"]) == 0 { lib.refresh() }
             }
             try? await Task.sleep(for: .seconds(30 * 60))
         }
@@ -258,7 +298,7 @@ struct ContentView: View {
                 .accessibilityLabel("Search games")
             if !lib.query.isEmpty {
                 Button { lib.query = "" } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .buttonStyle(.borderless).foregroundStyle(.secondary).help("Clear search")
                     .accessibilityLabel("Clear search")
                     .help("Clear search")
             }
@@ -292,12 +332,25 @@ struct ContentView: View {
     }
 
     private var stateFilter: some View {
-        Picker("", selection: $lib.filter) {
-            ForEach(Library.Filter.allCases) { Text($0.rawValue).tag($0) }
+        HStack(spacing: 6) {
+            Picker("", selection: $lib.filter) {
+                ForEach(Library.Filter.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden()
+            .accessibilityLabel("Filter by readiness")
+            Menu {
+                Picker("Sort by", selection: $lib.sort) {
+                    ForEach(Library.Sort.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .help("Sort by \(lib.sort == .name ? "name" : "most recently played")")
+            .accessibilityLabel("Sort, currently by \(lib.sort.rawValue.lowercased())")
         }
-        .pickerStyle(.segmented).labelsHidden()
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .accessibilityLabel("Filter by readiness")
     }
 
     private var libraryList: some View {
@@ -531,6 +584,8 @@ struct SidebarRow: View {
     let game: GameSummary
     let selected: Bool
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         HStack(spacing: 11) {
@@ -543,10 +598,10 @@ struct SidebarRow: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 5).padding(.horizontal, 8)
-        .background(selected ? Color.accentColor.opacity(0.20)
-                             : (hovering ? Color.primary.opacity(0.06) : Color.clear),
+        .background(selected ? Color.accentColor.opacity(contrast == .increased ? 0.40 : 0.20)
+                             : (hovering ? Color.primary.opacity(contrast == .increased ? 0.14 : 0.06) : Color.clear),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .onHover { hover in withAnimation(.easeOut(duration: 0.12)) { hovering = hover } }
+        .onHover { hover in withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { hovering = hover } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(game.name), \(game.store.displayName), \(game.statusText)")
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
@@ -612,13 +667,9 @@ struct SidebarMaterial: NSViewRepresentable {
 
 extension View {
     /// A list the keyboard can reach shouldn't draw a blue ring round the whole sidebar: the
-    /// selected row is the focus indicator, as in Finder. The modifier only exists from macOS 14.
-    @ViewBuilder func noFocusRing() -> some View {
-        if #available(macOS 14.0, *) {
-            focusEffectDisabled()
-        } else {
-            self
-        }
+    /// selected row is the focus indicator, as in Finder.
+    func noFocusRing() -> some View {
+        focusEffectDisabled()
     }
 }
 

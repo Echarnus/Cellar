@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import GameController
 import CellarKit
 import CellarUI
 
@@ -16,6 +17,10 @@ struct GameDetailView: View {
     @State private var language = GameLanguageMenu.Selection()
     /// The newest copy of this game's saves, read when the page appears and after a backup or restore.
     @State private var latestBackup: SaveBackups.Backup?
+    /// The controllers macOS sees, kept current as pads come and go.
+    @State private var pads: [Controllers.Pad] = []
+    /// Wheels, pedals and shifters, read when the page appears (macOS posts no notice for them).
+    @State private var wheels: [Wheels.Device] = []
 
     var body: some View {
         ScrollView {
@@ -27,10 +32,21 @@ struct GameDetailView: View {
                         .font(.callout).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    if let drive = game.missingDrive {
+                        Label("\(game.name) is on the drive “\(drive)”, which isn't connected. Connect it to play.",
+                              systemImage: "externaldrive.badge.xmark")
+                            .font(.callout).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let played = playedLine {
+                        Label(played, systemImage: "clock").font(.callout).foregroundStyle(.secondary)
+                    }
                     notice
                     chips
                     information
                     if game.bottleExists { saves }
+                    if game.bottleExists { GameSettingsSection(game: game) }
+                    GameLogSection(game: game)
                     activityLog
                 }
                 .padding(24)
@@ -40,7 +56,18 @@ struct GameDetailView: View {
         .task(id: game.slug) {
             language = .load(game)
             latestBackup = SaveBackups.list(bottle: game.bottleName).first
+            pads = Controllers.connected()
+            wheels = Wheels.connected()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidConnect)) { _ in pads = Controllers.connected() }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in pads = Controllers.connected() }
+    }
+
+    /// "Played 12 h · last played yesterday" — kept on this Mac only.
+    private var playedLine: String? {
+        guard let record = game.playtime, record.sessions > 0, let last = record.lastPlayed else { return nil }
+        let when = RelativeDateTimeFormatter().localizedString(for: last, relativeTo: Date())
+        return "Played \(Playtime.describe(seconds: record.totalSeconds)) · last played \(when)"
     }
 
     // MARK: - Hero
@@ -173,6 +200,12 @@ struct GameDetailView: View {
             if game.isDraft {
                 // A guess that works is worth handing in: the file is an ordinary profile.
                 Button("Save Profile As…") { exportProfile() }
+            }
+            if game.isOnOtherDrive {
+                Button("Move Back to This Mac") { act(["storage", "move-back", game.slug], "Moving \(game.name) back") }
+                    .disabled(game.missingDrive != nil)
+            } else if game.gameInstalled, game.store != .battlenet {
+                Button("Move to Another Drive…") { chooseDrive() }
             }
             Button("Show logs in Finder") { NSWorkspace.shared.open(Paths.logs) }
             // Removal is last and on its own, where destructive actions belong. Each entry states
@@ -312,6 +345,24 @@ struct GameDetailView: View {
                     .help("\(game.name) starts on \(profiles.displayName) again from its next launch. \(profiles.summary)")
             }
 
+            controllerLine
+
+            // A race sim's wheel is bound inside the game, not in Cellar, so say where — shown
+            // whether or not a wheel is plugged in now, because that is when a player reads it.
+            if let setup = facts.wheelSetup, !setup.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("Setting up a racing wheel", systemImage: "steeringwheel")
+                        .font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    Text(setup).font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if wheels.isEmpty {
+                        Link("Connecting a wheel to your Mac", destination: Links.controllersHelp)
+                            .font(.caption)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+
             if let notes = facts.notes, !notes.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
@@ -338,6 +389,40 @@ struct GameDetailView: View {
         // is the truth.
         guard (try? BackendChoice.set(nil, in: BottleConfig.url(forBottle: game.bottleName))) != nil else { return }
         onChange()
+    }
+
+    /// The pads connected now, next to what the profile recorded about this game and a controller.
+    /// Said as two facts, never combined into a promise that the pad will work in the game.
+    @ViewBuilder private var controllerLine: some View {
+        if !pads.isEmpty || !wheels.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                if !pads.isEmpty {
+                    Label("Connected: \(pads.map(\.name).joined(separator: ", "))", systemImage: "gamecontroller")
+                        .font(.callout)
+                }
+                if !wheels.isEmpty {
+                    Label("Connected: \(wheels.map(\.name).joined(separator: ", "))", systemImage: "steeringwheel")
+                        .font(.callout)
+                    Text(Wheels.forceFeedbackNote(for: wheels, cellarSDL: CellarSDL.libraryDirectory != nil))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if game.facts.controller == nil {
+                    Text("This game's profile doesn't say how it handles a controller yet.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let note = Controllers.steamInputNote(store: game.store, throughClient: game.needsClientAtRuntime) {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            if !wheels.isEmpty {
+                // A wheel's set-up happens outside Cellar (PC mode, firmware), so say where to read it.
+                Link("How to set up a racing wheel", destination: Links.controllersHelp)
+                    .font(.caption)
+            }
+        }
     }
 
     @ViewBuilder private func factColumns(_ facts: GameFacts) -> some View {
@@ -444,6 +529,19 @@ struct GameDetailView: View {
         guard panel.runModal() == .OK, let target = panel.url else { return }
         try? FileManager.default.removeItem(at: target)
         try? FileManager.default.copyItem(at: source, to: target)
+    }
+
+    /// Pick a folder on another drive, then move the game there through the CLI.
+    private func chooseDrive() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Move Here"
+        panel.message = "Choose a folder on the drive to move \(game.name) to. Cellar puts it in a “Cellar Games” folder there, and the game plays and updates from it while the drive is connected."
+        panel.directoryURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        act(["storage", "move", game.slug, "--to", folder.path], "Moving \(game.name)")
     }
 
     private func act(_ args: [String], _ title: String) {

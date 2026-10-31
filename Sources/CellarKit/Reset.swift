@@ -42,7 +42,8 @@ public enum Reset {
             switch target {
             case .path(let url):             return FileManager.default.fileExists(atPath: url.path)
             case .steamShortcuts(let names):  return !names.isEmpty
-            case .storeCredentials(.gog):    return GOGAuth.isSignedIn
+            case .storeCredentials(.gog):    return GOGAuth.isSignedIn || GOGAuth.cachedUsername != nil
+            case .storeCredentials(.steam):  return !Reset.steamTokenStoresOutsideCellar.isEmpty || SteamTokenVault.isSealed
             case .storeCredentials:          return false
             }
         }
@@ -82,13 +83,27 @@ public enum Reset {
         add(Paths.logs, "Logs", "nothing to restore")
         add(Paths.userProfiles, "Game profiles you added yourself",
             "re-added by hand — Cellar's own profiles ship with the app and come back on their own")
-        // The keychain, last, because it is the one thing here that is a credential rather than a
-        // download. Steam's token goes with DepotDownloader's directory above; GOG's does not live
-        // in a file at all.
-        if GOGAuth.isSignedIn {
-            items.append(Item(target: .storeCredentials(.gog),
-                              title: "Your GOG sign-in (an OAuth token in your login keychain)",
-                              cost: "one sign-in", bytes: 0))
+        // Credentials, last, because they are the one thing here that is not a download.
+        //
+        // Steam's token does *not* reliably go with DepotDownloader's directory above: DepotDownloader
+        // 3.4.0 ignores the `HOME` Cellar gives it and writes its store into the shared .NET isolated
+        // storage in `~/Library`. A reset that only removed Cellar's folder printed "Clean slate."
+        // and left a working Steam refresh token behind — so the stores are named and removed here.
+        //
+        // Never from a relocated Cellar (`CELLAR_HOME`): those stores and the login keychain are the
+        // player's real ones, and a test or a throwaway install must not sign the player out.
+        if !isRelocated {
+            let strays = steamTokenStoresOutsideCellar
+            if !strays.isEmpty || SteamTokenVault.isSealed {
+                items.append(Item(target: .storeCredentials(.steam),
+                                  title: "Your Steam sign-in token (in your keychain, or DepotDownloader's file)",
+                                  cost: "one QR scan", bytes: strays.reduce(0) { $0 + size(of: $1) }))
+            }
+            if GOGAuth.isSignedIn || GOGAuth.cachedUsername != nil {
+                items.append(Item(target: .storeCredentials(.gog),
+                                  title: "Your GOG sign-in (an OAuth token in your login keychain)",
+                                  cost: "one sign-in", bytes: 0))
+            }
         }
 
         // Outside Application Support. Found by identity, never by name, so nothing the player made
@@ -255,6 +270,7 @@ public enum Reset {
         // that takes the sign-in away but keeps the bottles would otherwise leave that copy behind,
         // still signing the player in — so it goes first, while the account name is still readable.
         let removingSignIn = items.contains { $0.target == .path(DepotTool.root) }
+            || items.contains { $0.target == .storeCredentials(.steam) }
             || items.contains { $0.target == .path(SteamAccount.recordFile) }
         if removingSignIn, let account = SteamAccount.record?.accountName,
            !items.contains(where: { $0.target == .path(Paths.prefixes) }) {
@@ -278,7 +294,13 @@ public enum Reset {
                     }
                 case .storeCredentials(.gog):
                     try GOGAuth.signOut()
+                    // Every item under Cellar's GOG service, not only today's account name: an item
+                    // filed under an older one is still somebody's token.
+                    try Keychain.removeAll(store: .gog)
                     StoreLibrary.forgetGOG()
+                case .storeCredentials(.steam):
+                    for file in steamTokenStoresOutsideCellar { try FileManager.default.removeItem(at: file) }
+                    try SteamTokenVault.forget()
                 case .storeCredentials(let store):
                     throw CellarError.invalidArgument("No credential store for \(store.displayName).")
                 }
@@ -288,6 +310,13 @@ public enum Reset {
             }
         }
         return failures
+    }
+
+    /// DepotDownloader's token stores that removing `DepotTool.root` would not reach. Only the
+    /// `account.config` files — isolated storage is shared with other .NET programs, and resetting
+    /// Cellar is no licence to delete their state.
+    static var steamTokenStoresOutsideCellar: [URL] {
+        DepotTool.storedSessionFiles.filter { !$0.path.hasPrefix(DepotTool.root.path + "/") }
     }
 
     /// A directory's size on disk, for the plan. Walks file sizes only — no contents are read.

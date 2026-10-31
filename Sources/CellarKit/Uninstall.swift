@@ -213,7 +213,9 @@ public enum Uninstall {
                 // A symlink is unlinked, never followed: the bottle's `Steam` directory is a link to
                 // the shared install that holds the sign-in and every other Steam game.
                 if isSymbolicLink(item.url) {
-                    progress("Unlinking the bottle's Steam — the shared install it points at, and your sign-in, stay…")
+                    progress(item.label == "Link to shared Steam"
+                        ? "Unlinking the bottle's Steam — the shared install it points at, and your sign-in, stay…"
+                        : "Unlinking \(item.label.lowercased())…")
                     try? fm.removeItem(at: item.url)
                     continue
                 }
@@ -365,7 +367,8 @@ public enum Uninstall {
 
     /// The directories Cellar owns. Anything outside them is never deleted, whatever a profile says.
     static var deletableRoots: [URL] {
-        [Paths.appSupport, AppBundle.applicationsDirectory]
+        // Plus the `Cellar Games` folders on other drives that games were moved into.
+        [Paths.appSupport, AppBundle.applicationsDirectory] + GameStorage.movedRoots
     }
 
     /// Directories that hold *other games' or other accounts'* data. Each is a legitimate parent of
@@ -374,7 +377,7 @@ public enum Uninstall {
         var roots = [Paths.appSupport, Paths.shared, Paths.sharedSteam, Paths.prefixes, Paths.runners,
                      Paths.cache, Paths.logs, Paths.userProfiles, AppBundle.applicationsDirectory,
                      Paths.cache.appendingPathComponent("icons"),
-                     Paths.cache.appendingPathComponent("gog")]
+                     Paths.cache.appendingPathComponent("gog")] + GameStorage.movedRoots
         let steamapps = Paths.sharedSteam.appendingPathComponent("steamapps")
         roots += [steamapps, steamapps.appendingPathComponent("common"),
                   steamapps.appendingPathComponent("downloading"),

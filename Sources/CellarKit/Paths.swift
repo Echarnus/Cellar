@@ -53,6 +53,9 @@ public enum Paths {
     public static var saveBackups: URL { appSupport.appendingPathComponent("save-backups", isDirectory: true) }
 
     /// User-installed game profiles (synced from the community registry in Phase 2).
+    /// The game database downloaded from the latest release (`ProfileUpdates`), signature checked.
+    public static var registryProfiles: URL { appSupport.appendingPathComponent("registry-profiles", isDirectory: true) }
+
     public static var userProfiles: URL { appSupport.appendingPathComponent("profiles", isDirectory: true) }
 
     /// Where the user-supplied Apple D3DMetal framework is copied to (never bundled/redistributed).
@@ -76,6 +79,9 @@ public enum Paths {
         // Repo-relative — supports `swift run cellar ...` from the project root during development.
         paths.append(URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("profiles", isDirectory: true))
+        // A newer database fetched since this Cellar shipped (`ProfileUpdates`) — only when it was
+        // made for this version or a later one, so an app update is never shadowed by a stale set.
+        if ProfileUpdates.isUsable { paths.append(registryProfiles) }
         paths.append(contentsOf: bundledProfiles)
         return paths
     }

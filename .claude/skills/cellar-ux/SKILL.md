@@ -39,9 +39,9 @@ landed. Key rules:
   Prefer **semantic text styles** (`.body`, `.headline`) over `.font(.system(size:))` so the app
   follows the system text size. Everything must be reachable by keyboard — and a new window-level
   command needs its menu item added by hand, or it is mouse-only.
-- **Not localized, deliberately — don't make it worse.** Every string is a hard-coded English
-  literal; there is no String Catalog. So never build a sentence from concatenated fragments (it
-  cannot be translated and reads badly to VoiceOver) — interpolate into a whole sentence.
+- **English and Dutch.** The app's screens are translated (`Resources/Localization/nl.lproj`); a new
+  SwiftUI literal needs a Dutch entry or `LocalizationTests` fails. Never build a sentence from
+  concatenated fragments — a `"…" + "…"` is a `String`, which SwiftUI never translates.
 - **Verify by launching, not by compiling.** `Scripts/install-app.sh` (or `package.sh` + run
   `dist/Cellar.app`), then look at the changed screen and screenshot it.
 

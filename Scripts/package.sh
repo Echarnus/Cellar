@@ -24,6 +24,8 @@ cp "$BINDIR/cellar" "$DIST/cli/bin/cellar"
 cp profiles/*.toml "$DIST/cli/share/cellar/profiles/"
 # The Dock shim travels with the CLI: the CLI is what spawns Wine, so it is what needs to find it.
 sh Scripts/build-dock-shim.sh "$DIST/cli/share/cellar/cellar-dock-shim.dylib"
+# Cellar's SDL, which Wine loads ahead of the runner's so a wheel's force feedback reaches its motor.
+sh Scripts/build-sdl.sh "$DIST/cli/share/cellar/sdl"
 # GPL-3.0 §4: the licence travels with the binary — and so do the notices of what is compiled into it.
 mkdir -p "$DIST/cli/share/cellar/legal"
 cp -R LICENSE NOTICE THIRD_PARTY_LICENSES.md licenses "$DIST/cli/share/cellar/legal/"
@@ -33,10 +35,14 @@ cp -R LICENSE NOTICE THIRD_PARTY_LICENSES.md licenses "$DIST/cli/share/cellar/le
 APP="$DIST/Cellar.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINDIR/CellarApp" "$APP/Contents/MacOS/CellarApp"
+# The app's translations: one <lang>.lproj per language, which SwiftUI reads through Bundle.main.
+# English is the development region, so a Mac set to a language Cellar lacks gets English.
+cp -R Resources/Localization/*.lproj "$APP/Contents/Resources/"
 # The shipped profile database. Searched after the player's own profiles, never instead of them.
 mkdir -p "$APP/Contents/Resources/profiles"
 cp profiles/*.toml "$APP/Contents/Resources/profiles/"
 cp "$DIST/cli/share/cellar/cellar-dock-shim.dylib" "$APP/Contents/Resources/"
+cp -R "$DIST/cli/share/cellar/sdl" "$APP/Contents/Resources/sdl"
 cp -R "$DIST/cli/share/cellar/legal" "$APP/Contents/Resources/Legal"
 
 [ -f Resources/AppIcon.png ] || swift Scripts/make-icon.swift Resources/AppIcon.png
@@ -48,8 +54,8 @@ done
 iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns"
 
 # Self-update (Sparkle), only once the release signing key exists: Resources/sparkle-public-key holds
-# its public half (Scripts/sparkle-keys.sh writes it), the private half is a repository secret. Without
-# it the app is built with updates switched off rather than with a feed it could never verify.
+# its public half (Scripts/sparkle-keys.sh writes it), the private half is a secret of the `release`
+# environment. Without it the app is built with updates switched off rather than with a feed it could never verify.
 # SUAllowsAutomaticUpdates is off: an update is always shown and installed on the player's say-so,
 # never swapped in on quit — Cellar may be the parent of a game that is still running.
 UPDATE_KEYS=""
@@ -68,13 +74,15 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>CellarApp</string>
   <key>CFBundleIdentifier</key><string>it.clercq.cellar.app</string>
   <key>CFBundleName</key><string>Cellar</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>nl</string></array>
   <key>CFBundleGetInfoString</key><string>Cellar — run Windows games on Apple Silicon via Wine + D3DMetal.</string>
   <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0; not affiliated with the Wine project, Valve, Blizzard, GOG, Apple or any game publisher.</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <!-- What Sparkle compares against the appcast's sparkle:version. -->
   <key>CFBundleVersion</key><string>$VERSION</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- Shown inside macOS's own permission dialog. Cellar asks for all three on first launch
        (WelcomeView) rather than letting a game trigger them mid-install; without these keys the

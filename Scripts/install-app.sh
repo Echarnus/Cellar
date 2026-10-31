@@ -18,6 +18,9 @@ BIN=".build/release/CellarApp"
 # The Dock shim, which keeps a bottle's Steam/Battle.net out of the Dock while a game starts.
 SHIM=".build/cellar-dock-shim.dylib"
 sh Scripts/build-dock-shim.sh "$SHIM"
+# Cellar's SDL, loaded by Wine ahead of the runner's so wheel force feedback reaches the motor.
+SDL=".build/sdl"
+sh Scripts/build-sdl.sh "$SDL"
 
 # App icon: build a multi-resolution .icns from Resources/AppIcon.png (regenerate it if missing).
 ICON_SRC="Resources/AppIcon.png"
@@ -61,12 +64,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>CellarApp</string>
   <key>CFBundleIdentifier</key><string>it.clercq.cellar.app</string>
   <key>CFBundleName</key><string>Cellar</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>nl</string></array>
   <key>CFBundleGetInfoString</key><string>Cellar — run Windows games on Apple Silicon via Wine + D3DMetal.</string>
   <key>NSHumanReadableCopyright</key><string>Free software under GPL-3.0; not affiliated with the Wine project, Valve, Blizzard, GOG, Apple or any game publisher.</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- Shown inside macOS's own permission dialog. Cellar asks for all three on first launch
        (WelcomeView) rather than letting a game trigger them mid-install; without these keys the
@@ -77,6 +82,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 $ICON_KEY
 </dict></plist>
 PLIST
+# The app's translations: one <lang>.lproj per language, which SwiftUI reads through Bundle.main.
+# English is the development region, so a Mac set to a language Cellar lacks gets English.
+cp -R Resources/Localization/*.lproj "$APP/Contents/Resources/"
 # Ship the profile database inside the bundle. Cellar searches this *after* the player's own
 # ~/Library/Application Support/Cellar/profiles, so shipping a new game (or a fixed profile) never
 # overwrites a profile someone has edited by hand.
@@ -87,6 +95,8 @@ echo "Bundled $(ls profiles/*.toml | wc -l | tr -d ' ') game profiles."
 # The Dock shim goes in the bundle, and beside the CLI's own state, because it is the `cellar`
 # binary — not the app — that spawns Wine, and the CLI may live anywhere on PATH.
 cp "$SHIM" "$APP/Contents/Resources/cellar-dock-shim.dylib"
+rm -rf "$APP/Contents/Resources/sdl"
+cp -R "$SDL" "$APP/Contents/Resources/sdl"
 # The same Legal/ folder package.sh ships, so a local install matches a release.
 rm -rf "$APP/Contents/Resources/Legal"
 mkdir -p "$APP/Contents/Resources/Legal"
@@ -104,6 +114,8 @@ install_file .build/release/cellar "$PREFIX/bin/cellar"
 rm -f "$PREFIX/share/cellar/profiles/"*.toml
 cp profiles/*.toml "$PREFIX/share/cellar/profiles/"
 install_file "$SHIM" "$PREFIX/share/cellar/cellar-dock-shim.dylib"
+rm -rf "$PREFIX/share/cellar/sdl"
+cp -R "$SDL" "$PREFIX/share/cellar/sdl"
 echo "Installed the cellar CLI at $PREFIX/bin/cellar (profiles in $PREFIX/share/cellar)."
 
 # The bundled CLI and the updater framework. No SUFeedURL/SUPublicEDKey above, on purpose: a build

@@ -88,7 +88,7 @@ public struct GamePlan {
             .first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    /// True when this game can be launched with no store client at all.
+    /// True when this store-installed game can be launched without its store's client running.
     public var canLaunchStoreFree: Bool { !needsLiveSession && directLaunchExe != nil }
 
     /// Who is being launched and by which route — what the launch stages are worded from.
@@ -140,11 +140,21 @@ public struct GameFacts: Sendable {
     public let status: String?
     /// Free text: the caveats, the hardware something was tested on, the known patch-day breakage.
     public let notes: String?
+    /// `full` / `partial` / `none`: what the profile's author saw a controller do in this game.
+    public let controller: String?
+    /// `full` / `steering` / `untested` / `none`: what a racing wheel was seen to do in this game.
+    public let wheel: String?
+    /// Free text: the in-game steps that bind a wheel, for a game made to be driven with one.
+    public let wheelSetup: String?
 
     public init(developer: String? = nil, released: String? = nil, engine: String? = nil,
                 graphicsAPI: String? = nil, anticheat: String? = nil, drm: String? = nil,
                 online: String? = nil, requiresAccount: String? = nil, status: String? = nil,
-                notes: String? = nil) {
+                notes: String? = nil, controller: String? = nil, wheel: String? = nil,
+                wheelSetup: String? = nil) {
+        self.controller = controller
+        self.wheel = wheel
+        self.wheelSetup = wheelSetup
         self.developer = developer
         self.released = released
         self.engine = engine
@@ -166,7 +176,8 @@ public struct GameFacts: Sendable {
 
     /// The facts that answer "will this actually run, and what does it want from me?".
     public var compatibility: [(label: String, value: String)] {
-        [("Anti-cheat", anticheat), ("DRM", drm), ("Online", online), ("Account", requiresAccount)]
+        [("Anti-cheat", anticheat), ("DRM", drm), ("Online", online), ("Account", requiresAccount),
+         ("Controller", Controllers.support(controller)), ("Racing wheel", Wheels.support(wheel))]
             .compactMap { label, value in value.map { (label, $0) } }
     }
 }
@@ -341,7 +352,7 @@ public struct GameSummary: Identifiable, Sendable {
             }
             return needsClientAtRuntime
                 ? "Installed. Play starts \(store.displayName) quietly in the background and closes the whole layer when you quit."
-                : "Installed. Play runs the game directly — no store client at all — and closes the layer when you quit."
+                : "Installed. Play starts the game directly, without opening \(store.displayName)'s client, and closes the layer when you quit."
         }
     }
 
@@ -376,6 +387,13 @@ public struct GameSummary: Identifiable, Sendable {
     public var fallbackBackend: String? = nil
     /// Cellar guessed this game's settings (`DraftProfile`); the library shows it apart, saying so.
     public var isDraft = false
+    /// The drive this game was moved to, when it isn't connected (`GameStorage`).
+    public var missingDrive: String? = nil
+    /// Whether the game's files live on another drive.
+    public var isOnOtherDrive = false
+    /// How long and how recently it was played (`Playtime`); nil when it never was.
+    public var playtime: Playtime.Record? = nil
+    public var lastPlayed: Date? { playtime?.lastPlayed }
 
     /// The player switched this game off the profile's backend.
     public var backendIsPlayerChoice: Bool { profileBackend.map { $0 != backend } ?? false }
@@ -427,7 +445,9 @@ public struct GameSummary: Identifiable, Sendable {
 public enum Game {
     /// A readiness summary for every known profile — the GUI's data source.
     public static func summaries() -> [GameSummary] {
-        ProfileStore.all().compactMap { ref in
+        // Read once, closing any session a crash left open — unless that game is running now.
+        let played = Playtime.all(isRunning: { slug in (try? plan(slug: slug)).map(Uninstall.isGameRunning) ?? false })
+        return ProfileStore.all().compactMap { ref in
             guard let plan = try? plan(slug: ref.slug) else { return nil }
             let clientInstalled = storeClientInstalled(plan)
             var summary = GameSummary(
@@ -464,6 +484,9 @@ public enum Game {
             summary.profileBackend = plan.profileBackend
             summary.fallbackBackend = plan.fallbackBackend
             summary.isDraft = plan.isDraft
+            summary.missingDrive = GameStorage.missingDrive(plan)
+            summary.isOnOtherDrive = GameStorage.movedLocation(slug: plan.slug) != nil
+            summary.playtime = played[plan.slug]
             return summary
         }
     }
@@ -479,7 +502,7 @@ public enum Game {
         var names: Set<String> = []
         for ref in ProfileStore.all() {
             let fields = ProfileStore.fields(ref)
-            guard (GameStore(profileValue: fields["store"]) ?? .default) == store else { continue }
+            guard GameStore(profileValue: fields["store"]) == store else { continue }
             names.insert(fields["bottle"] ?? ref.slug)
         }
         return names
@@ -499,7 +522,16 @@ public enum Game {
             throw CellarError.invalidArgument("No profile '\(slug)'. Try: cellar profiles list")
         }
         let fields = ProfileStore.fields(ref)
-        let store = GameStore(profileValue: fields["store"]) ?? .default
+        // Every game Cellar runs came from a store, and the store decides the whole pipeline. A
+        // profile that names none (or one Cellar doesn't support) is refused, never guessed at:
+        // guessing Steam would stand the wrong client up in the bottle.
+        guard let store = GameStore(profileValue: fields["store"]) else {
+            let named = fields["store"].map { "names the store '\($0)', which Cellar doesn't support" }
+                ?? "doesn't name its store"
+            throw CellarError.invalidArgument(
+                "The profile '\(slug)' \(named). Cellar only runs games installed through Steam, "
+                + "Battle.net or GOG — add store = \"steam\", \"battlenet\" or \"gog\" to \(ref.slug).toml.")
+        }
         // Several games can share one bottle (one sign-in, one download cache); a profile
         // opts in with `bottle = "<name>"`. Default: one bottle per game.
         let bottleName = fields["bottle"] ?? slug
@@ -540,7 +572,10 @@ public enum Game {
                 online: fields["online"],
                 requiresAccount: fields["requires_account"],
                 status: fields["status"],
-                notes: fields["notes"]),
+                notes: fields["notes"],
+                controller: fields["controller"],
+                wheel: fields["wheel"],
+                wheelSetup: fields["wheel_setup"]),
             metalFXUpscaling: performance.metalFXUpscaling,
             language: LanguageChoice.resolve(game: BottleConfig.language(bottleFile), global: CellarSettings.language),
             performance: performance,
@@ -754,6 +789,7 @@ public enum Game {
             progress(message)
         }
         CellarLog.info(.install, "Installing \(plan.name) via \(plan.store.displayName).", subject: plan.slug)
+        if let error = GameStorage.missingDriveError(plan) { throw error }
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
@@ -882,6 +918,9 @@ public enum Game {
                               progress: (String) -> Void,
                               stage: (LaunchStage) -> Void,
                               update: (InstallProgress) -> Void) throws -> LaunchRoute {
+        // A game moved to a drive that isn't plugged in: said by name, before anything reads as
+        // "not installed" and offers to download it onto the disk the player was keeping free.
+        if let error = GameStorage.missingDriveError(plan) { throw error }
         guard let wine = wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")
@@ -889,6 +928,11 @@ public enum Game {
         // After a runner update Wine would rebuild the prefix inside this launch, with its own
         // "Please wait" box on screen. Do it first, where nothing is drawn.
         wine.updatePrefixIfStale()
+        // Retina mode lives in the registry, not the environment. Only written when the profile or
+        // the player said something about it: every other game keeps Wine's default and pays nothing.
+        if let retina = plan.performance.entries.first(where: { $0.setting == .retina }), retina.source != .cellarDefault {
+            wine.setRetinaMode(retina.value == "true")
+        }
 
         // A copy Cellar downloaded has nobody else to keep it current: Steam doesn't know it exists.
         // So Cellar does what Steam does before it starts anything — catch it up first.

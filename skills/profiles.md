@@ -55,7 +55,13 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   locations in a binary database Cellar does not parse). Every game comes from a store: a DRM-free
   Steam game is still `steam`, with `needs_live_session = false` so Cellar downloads the depot and
   runs the exe without standing Windows Steam up in the bottle.
-- **`[compatibility]`** — `anticheat`, `drm`, `requires_account`, `online`, `status`, `notes`.
+- **`[compatibility]`** — `anticheat`, `drm`, `requires_account`, `online`, `status`, `notes`, and optionally
+  `controller = "full" | "partial" | "none"` — only what you saw a pad do in this game under Cellar.
+  Optional `wheel = "full" | "steering" | "untested" | "none"` — what a racing wheel did in this
+  game (`full` includes force feedback; `steering` is steering and pedals without it), shown as the
+  *Racing wheel* row; only `untested` or `none` while the game's own `status` is `untested`. With it,
+  `wheel_setup` — the in-game steps that bind a wheel, shown verbatim on the game page. See
+  `assetto-corsa.toml`.
   Optional `network_check` — space-separated `https://` addresses of the game's own online services
   (a workshop, an account server) that `cellar network <slug>` probes on top of the store's. Only
   addresses you have seen the game use or the publisher documents; a guessed host proves nothing.
@@ -80,8 +86,9 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
 - `status`: **`playable` | `experimental` | `untested`**. An unknown value renders as *Untested*.
   Players' reports arrive as `compatibility-report` issues (the app asks after a session; `cellar
   report <slug>`): a report is evidence to test against, not a status to copy in unverified.
-- `store`: **`steam` | `battlenet` | `gog`**. An unknown value is treated as Steam — which
-  would put a Battle.net game down the Steam pipeline. Spell it exactly.
+- `store`: **`steam` | `battlenet` | `gog`**, and **required**. Cellar only runs games installed
+  through a store — there is no "no store" value and no manual-install path. A profile that leaves
+  `store` out or names anything else is refused by `Game.plan` and never reaches the library.
 
 ## Honesty rules (these are not style preferences)
 

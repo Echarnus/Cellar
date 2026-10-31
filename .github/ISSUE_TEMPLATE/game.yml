@@ -1,0 +1,33 @@
+name: Add or update a game
+description: Ask for a game to be supported, or report how a supported game runs.
+labels: [game-profile, needs-triage]
+body:
+  - type: input
+    id: game
+    attributes:
+      label: Game and store
+      placeholder: Planet Coaster 2 (Steam, AppID 2688950)
+    validations:
+      required: true
+  - type: dropdown
+    id: status
+    attributes:
+      label: How does it run?
+      options:
+        - I haven't tried it
+        - Doesn't start
+        - Starts but isn't playable
+        - Playable with problems
+        - Plays well
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS version
+      placeholder: MacBook Pro M3 Pro, macOS 26.1
+  - type: textarea
+    id: notes
+    attributes:
+      label: Details
+      description: Frame rate, settings you changed, anti-cheat or DRM you ran into, anything else.

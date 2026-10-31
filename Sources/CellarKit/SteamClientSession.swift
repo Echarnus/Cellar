@@ -25,7 +25,7 @@ import Foundation
 public enum SteamClientSession {
     /// What a refresh token says about itself — read from its JWT payload, never verified (Steam does
     /// that). Enough to refuse to seed a token the client could not use.
-    struct Claims: Equatable {
+    struct Claims: Equatable, Codable {
         var steamID: String
         var audiences: [String]
         var expires: Date
@@ -176,6 +176,9 @@ extension SteamClientSession {
         var localConfig: String?
         var loginUsers: String?
         var config: String?
+        /// The token's public claims when the token itself is sealed in the keychain
+        /// (`SteamTokenVault`) — so deciding never needs the keychain, only handing over does.
+        var tokenClaims: Claims? = nil
     }
 
     static func readiness(_ s: Snapshot, now: Date = Date()) -> Readiness {
@@ -198,7 +201,7 @@ extension SteamClientSession {
            users.map({ remembers($0, account: account) }) ?? false {
             return .remembered
         }
-        guard let token = s.token, let claims = claims(ofToken: token), claims.isUsable(at: now) else {
+        guard let claims = s.token.flatMap(claims(ofToken:)) ?? s.tokenClaims, claims.isUsable(at: now) else {
             return .unavailable(.tokenNotForClient)
         }
         return .canHandOver
@@ -237,18 +240,20 @@ extension SteamClientSession {
         steamDirectory.appendingPathComponent("config/config.vdf")
     }
 
-    /// Reads the token too, so the library and the launch decide from the same facts: a session the
-    /// client would refuse is never promised on a game's page.
+    /// Reads the token only while it is on disk, and its public claims otherwise, so the library and
+    /// the launch decide from the same facts without a keychain read: a session the client would
+    /// refuse is never promised on a game's page.
     static func snapshot(prefix: URL, steamDirectory: URL, wineUser: String) -> Snapshot {
         let state = SteamAccount.state
         let account = state.isUsable ? state.accountName : nil
         func read(_ url: URL) -> String? { try? String(contentsOf: url, encoding: .utf8) }
         return Snapshot(
             cellarAccount: account,
-            token: account.flatMap(DepotTool.refreshToken(for:)),
+            token: account.flatMap(DepotTool.refreshTokenOnDisk(for:)),
             localConfig: read(localConfig(in: prefix, wineUser: wineUser)),
             loginUsers: read(loginUsersFile(steamDirectory: steamDirectory)),
-            config: read(configFile(steamDirectory: steamDirectory)))
+            config: read(configFile(steamDirectory: steamDirectory)),
+            tokenClaims: account.flatMap(SteamTokenVault.claims(for:)))
     }
 
     /// Write the session into the bottle's `local.vdf` and the shared install's `loginusers.vdf` and
@@ -257,10 +262,13 @@ extension SteamClientSession {
     static func handOver(prefix: URL, steamDirectory: URL, wineUser: String, now: Date = Date()) -> Readiness {
         let s = snapshot(prefix: prefix, steamDirectory: steamDirectory, wineUser: wineUser)
         let decision = readiness(s, now: now)
-        guard decision == .canHandOver, let account = s.cellarAccount, let token = s.token,
+        guard decision == .canHandOver, let account = s.cellarAccount else { return decision }
+        // The token itself is read only now, about to be used — from the keychain when sealed. A
+        // keychain that refuses is not a hand-over, so it must not be reported as one.
+        guard let token = s.token ?? DepotTool.refreshToken(for: account),
               let claims = claims(ofToken: token),
               let protected = protectedToken(token, account: account, wineUser: wineUser)
-        else { return decision }
+        else { return .unavailable(.tokenNotForClient) }
 
         // The bottle has to have been initialised before there is a Windows user folder to write into.
         // Checked here rather than in `readiness`, because a bottle that Play is about to initialise
@@ -288,7 +296,11 @@ extension SteamClientSession {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                         withIntermediateDirectories: true)
                 try file.text.write(to: url, atomically: true, encoding: .utf8)
+                PrivateFiles.restrict(file: url)
             }
+            // `local.vdf` now carries the token (under a DPAPI blob anyone with the file can open), so
+            // it is treated as the credential it is: out of backups as well as private.
+            PrivateFiles.protectCredential(localConfig(in: prefix, wineUser: wineUser))
         } catch {
             // Take back whatever landed, so a half-written hand-over leaves no token behind and no
             // claim of a sign-in.

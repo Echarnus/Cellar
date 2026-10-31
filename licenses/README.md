@@ -7,6 +7,7 @@ inside the app at `Cellar.app/Contents/Resources/Legal/`, and in the CLI zip at 
 |---|---|
 | [`../LICENSE`](../LICENSE) | Cellar itself — GPL-3.0 |
 | [`swift-argument-parser.txt`](swift-argument-parser.txt) | swift-argument-parser, compiled into both Cellar binaries |
+| [`SDL.txt`](SDL.txt) | SDL 3 and sdl2-compat, shipped as `sdl/libSDL3.dylib` and `sdl/libSDL2-2.0.0.dylib` and loaded by the runner's Wine for controllers and wheel force feedback (zlib). `libSDL3.dylib` also contains Cellar's Fanatec driver, GPL v2 or later, whose terms are Cellar's own [`../LICENSE`](../LICENSE) (GPL-3.0) |
 | [`Sparkle.txt`](Sparkle.txt) | Sparkle 2, the app's self-updater, shipped as `Cellar.app/Contents/Frameworks/Sparkle.framework` (MIT, plus the bsdiff, sais-lite and ed25519 notices it carries) |
 
 Only code that is **inside** a Cellar artifact needs its licence here. Wine runners, DepotDownloader

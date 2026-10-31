@@ -4,7 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
   workflow_dispatch:
+
+# Every job only reads the repository. A job that needs more asks for it itself.
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -20,12 +25,20 @@ jobs:
       matrix:
         os: [macos-15, macos-26]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Swift version
         run: swift --version
       - name: Build (release)
         run: swift build -c release
+      # Cellar's SDL (wheel force feedback). Built, checked for both architectures and the haptic API
+      # winebus binds to, and started once per slice by the script itself. Before the
+      # tests, whose tier A loads it the way winebus does.
+      - name: Build Cellar's SDL (universal)
+        run: sh Scripts/build-sdl.sh
       - name: Test suite
         run: sh Scripts/test.sh
       # SwiftPM does not build the Dock shim (it has to be universal), so nothing else here would
@@ -41,16 +54,47 @@ jobs:
           sh Scripts/package.sh 0.0.0-ci
           APP=dist/Cellar.app/Contents
           test -f "$APP/Frameworks/Sparkle.framework/Sparkle"
+          test -f "$APP/Resources/sdl/libSDL2-2.0.0.dylib"
+          test -f "$APP/Resources/sdl/libSDL3.dylib"
+          test -f "$APP/Resources/nl.lproj/Localizable.strings"
+          plutil -lint "$APP/Resources/nl.lproj/Localizable.strings"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$APP/Info.plist" | grep -qx ' *nl'
           otool -l "$APP/MacOS/CellarApp" | grep -q '@executable_path/../Frameworks'
           "$APP/MacOS/cellar" --version
       # The rendered store marks, light and dark. A reviewer can look at the actual pixels a PR
       # produces without checking it out and launching the app.
       - name: Upload rendered UI snapshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ui-snapshots-${{ matrix.os }}
           path: .build/ui-snapshots/*.png
           if-no-files-found: warn
       - name: Generate supported-games site (sanity)
         run: python3 Scripts/gen-site.py
+
+  lint:
+    name: Lint (workflows, shell, Python)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ACTIONLINT_VERSION: "1.7.12"
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Downloaded by version and checked against its published checksum, so a moved release
+      # cannot slip a different binary in.
+      - name: actionlint
+        run: |
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLO "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+          echo "${ACTIONLINT_SHA256}  ${tarball}" | sha256sum -c -
+          tar xzf "$tarball" actionlint
+          ./actionlint -color
+      # ShellCheck ships on the runner image. Warnings and errors fail the job; style notes do not.
+      - name: ShellCheck
+        run: shellcheck --severity=warning Scripts/*.sh
+      - name: Python compiles (3.9 floor)
+        run: python3 -m py_compile Scripts/*.py

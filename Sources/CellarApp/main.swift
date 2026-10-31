@@ -27,6 +27,8 @@ extension Notification.Name {
     static let cellarFocusSearch = Notification.Name("cellar.focusSearch")
     /// View › Add Installed Games Without a Profile: write draft profiles for them (`DraftProfile`).
     static let cellarDraftProfiles = Notification.Name("cellar.draftProfiles")
+    /// The Dock menu's recently played games: select one in the library. The object is its slug.
+    static let cellarShowGame = Notification.Name("cellar.showGame")
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -41,6 +43,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var accountsWindow: NSWindow?
     var folderAccessWindow: NSWindow?
     var welcomeTourWindow: NSWindow?
+
+    /// The Dock icon's menu: the last few games played, newest first. Reads the playtime record
+    /// only — no store is asked anything from a right-click.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let recent = Playtime.all()
+            .compactMap { slug, record in record.lastPlayed.map { (slug, $0) } }
+            .sorted { $0.1 > $1.1 }
+            .prefix(5)
+            .compactMap { slug, _ in (try? Game.plan(slug: slug)).map { (slug, $0.name) } }
+        guard !recent.isEmpty else { return nil }
+        let menu = NSMenu()
+        let header = menu.addItem(withTitle: "Recently Played", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        for (slug, name) in recent {
+            let item = menu.addItem(withTitle: name, action: #selector(showRecentGame(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = slug
+        }
+        return menu
+    }
+
+    @objc private func showRecentGame(_ sender: NSMenuItem) {
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.bringToFront()
+        NotificationCenter.default.post(name: .cellarShowGame, object: sender.representedObject)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // First thing, before anything can crash: this is also where a previous session that
@@ -372,6 +400,7 @@ app.run()
 /// two different pages.
 enum Links {
     static let help = URL(string: "https://echarnus.github.io/Cellar/faq.html")!
+    static let controllersHelp = URL(string: "https://echarnus.github.io/Cellar/faq.html#controllers")!
     static let supportedGames = URL(string: "https://echarnus.github.io/Cellar/")!
     static let repository = URL(string: "https://github.com/Echarnus/Cellar")!
     static let releases = URL(string: "https://github.com/Echarnus/Cellar/releases")!
@@ -387,14 +416,9 @@ extension Bundle {
 }
 
 extension NSApplication {
-    /// Brings Cellar forward. `activate(ignoringOtherApps:)` is deprecated from macOS 14, where
-    /// activation became cooperative and the flag is ignored anyway; the plain `activate()` is the
-    /// call that stays.
+    /// Brings Cellar forward. Activation is cooperative from macOS 14, so the plain `activate()` is
+    /// the call — `activate(ignoringOtherApps:)` is deprecated and its flag ignored.
     func bringToFront() {
-        if #available(macOS 14, *) {
-            activate()
-        } else {
-            activate(ignoringOtherApps: true)
-        }
+        activate()
     }
 }

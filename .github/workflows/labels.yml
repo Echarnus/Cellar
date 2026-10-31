@@ -1,0 +1,32 @@
+name: Labels
+
+# Applies .github/labels.yml. Creates missing labels and updates colours and descriptions; never
+# deletes a label, so one added by hand survives.
+on:
+  push:
+    branches: [main]
+    paths: [".github/labels.yml", ".github/workflows/labels.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Apply labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          yq -o=tsv '.[] | [.name, .color, .description]' .github/labels.yml |
+          while IFS="$(printf '\t')" read -r name color description; do
+            gh label create "$name" --color "$color" --description "$description" --force
+          done
