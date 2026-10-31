@@ -29,14 +29,14 @@ public enum InstallPhase: String, Sendable, CaseIterable {
 
     public func title(game: String, store: GameStore) -> String {
         switch self {
-        case .runtime:     return "Getting the Windows runtime"
-        case .bottle:      return "Building \(game)'s bottle"
-        case .client:      return "Installing \(store.displayName) into the bottle"
-        case .clientUpdate: return "Updating \(store.displayName)"
-        case .downloading: return "Downloading \(game)"
-        case .installing:  return "Installing \(game)"
-        case .updateCheck: return "Checking for a newer version"
-        case .updating:    return "Updating \(game)"
+        case .runtime:     return String(localized: "Getting the Windows runtime")
+        case .bottle:      return String(localized: "Building \(game)'s bottle")
+        case .client:      return String(localized: "Installing \(store.displayName) into the bottle")
+        case .clientUpdate: return String(localized: "Updating \(store.displayName)")
+        case .downloading: return String(localized: "Downloading \(game)")
+        case .installing:  return String(localized: "Installing \(game)")
+        case .updateCheck: return String(localized: "Checking for a newer version")
+        case .updating:    return String(localized: "Updating \(game)")
         }
     }
 
@@ -44,23 +44,23 @@ public enum InstallPhase: String, Sendable, CaseIterable {
     public func detail(store: GameStore) -> String {
         switch self {
         case .runtime:
-            return "A one-time download, shared by every game you add."
+            return String(localized: "A one-time download, shared by every game you add.")
         case .bottle:
-            return "Windows' folders and settings, just for this game."
+            return String(localized: "Windows' folders and settings, just for this game.")
         case .client:
             return store.descriptor.hasSilentInstaller
-                ? "Silent — there is nothing to click."
-                : "Blizzard's installer opens a window — click through it."
+                ? String(localized: "Silent — there is nothing to click.")
+                : String(localized: "Blizzard's installer opens a window — click through it.")
         case .clientUpdate:
-            return "Its first start fetches the full client — once, for every \(store.displayName) game."
+            return String(localized: "Its first start fetches the full client — once, for every \(store.displayName) game.")
         case .downloading:
-            return "Straight from your library. You can keep using your Mac."
+            return String(localized: "Straight from your library. You can keep using your Mac.")
         case .installing:
-            return "The installer runs with no window, so this bar is the progress."
+            return String(localized: "The installer runs with no window, so this bar is the progress.")
         case .updateCheck:
-            return "Asking \(store.displayName) which build is current. Nothing is downloaded yet."
+            return String(localized: "Asking \(store.displayName) which build is current. Nothing is downloaded yet.")
         case .updating:
-            return "Only what changed since your last download."
+            return String(localized: "Only what changed since your last download.")
         }
     }
 }

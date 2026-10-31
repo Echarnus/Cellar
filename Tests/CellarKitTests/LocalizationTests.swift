@@ -11,7 +11,11 @@ import Testing
 struct LocalizationTests {
 
     static let localization = Repo.root.appendingPathComponent("Resources/Localization", isDirectory: true)
-    static let appSources = Repo.root.appendingPathComponent("Sources/CellarApp", isDirectory: true)
+    /// The app, and the engine copy it shows: a game's next-step hint, launch and install steps,
+    /// the library's verdicts. Engine copy is `String(localized:)` too; it resolves against
+    /// `Bundle.main`, which is Cellar.app in the app and in the CLI bundled inside it.
+    static let sourceDirectories = ["CellarApp", "CellarKit", "CellarDomain"]
+        .map { Repo.root.appendingPathComponent("Sources/\($0)", isDirectory: true) }
 
     /// Names and the debug placeholder: the same in every language, so they are not in the table.
     static let untranslated: Set<String> = ["Cellar", "DepotDownloader", "Cellar GUI works"]
@@ -24,12 +28,13 @@ struct LocalizationTests {
     }
 
     static func appSource() throws -> String {
-        try FileManager.default
-            .contentsOfDirectory(at: appSources, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "swift" }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
-            .map { try String(contentsOf: $0, encoding: .utf8) }
-            .joined(separator: "\n")
+        try sourceDirectories.flatMap { directory -> [URL] in
+            let walk = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil)
+            return (walk?.allObjects as? [URL] ?? []).filter { $0.pathExtension == "swift" }
+        }
+        .sorted { $0.path < $1.path }
+        .map { try String(contentsOf: $0, encoding: .utf8) }
+        .joined(separator: "\n")
     }
 
     /// The calls whose first string literal is looked up in the table.
@@ -152,7 +157,7 @@ struct LocalizationTests {
     func everyKeyIsInTheSource() throws {
         let used = Self.keys(in: try Self.appSource())
         let dead = try Self.table("nl").keys.filter { !used.contains(Self.normalized($0)) }
-        #expect(dead.isEmpty, "in nl.lproj but no longer in Sources/CellarApp — reworded? \(dead.sorted())")
+        #expect(dead.isEmpty, "in nl.lproj but no longer in Sources — reworded? \(dead.sorted())")
     }
 
     @Test("A translation keeps its placeholders, and is not just the English again")
