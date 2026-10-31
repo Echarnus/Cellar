@@ -19,7 +19,7 @@ machinery unless a target genuinely needs it.
 
 ## Architecture rules
 
-- **Per-store behaviour belongs in `GameStore.descriptor`** (`Store.swift`), not in a `switch` inside
+- **Per-store behaviour belongs in `GameStore.descriptor`** (`GameStore.swift`), not in a `switch` inside
   a view or a command. If a view needs to know that Battle.net's installer isn't silent, that fact
   should reach it as data.
 - **All logic lives in `CellarKit`.** The CLI (`Sources/cellar`) and the app (`Sources/CellarApp`)

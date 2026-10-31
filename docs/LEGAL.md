@@ -52,7 +52,7 @@ verified research into each component's license and the relevant law.
      icon Wine extracted from the Windows client's `.exe` during setup, or a loose `.ico` the client
      ships. This is the player's own copy of the store's artwork, displayed in place; nothing is
      redistributed, exactly as with Apple's D3DMetal.
-   - **A vector shape Cellar draws itself** (`Sources/CellarUI/StoreMark.swift`) when the store is
+   - **A vector shape Cellar draws itself** (`Sources/CellarUI/Marks/`) when the store is
      not installed and there is nothing to point at.
 
    This matters because every storefront's own brand terms rule out shipping the artwork: Valve's

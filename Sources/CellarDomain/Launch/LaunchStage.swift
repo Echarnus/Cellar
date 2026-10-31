@@ -1,26 +1,5 @@
 import Foundation
 
-/// Who is being launched, and by which route — everything the wording of a stage depends on.
-///
-/// The route matters as much as the store: the same Steam game can run through the client or, when
-/// its profile says no live session is needed, straight from its exe. Saying "handing Steam the
-/// command" when no Steam is involved would be the sort of small lie the UX rules exist to prevent.
-public struct LaunchContext: Sendable {
-    public let game: String
-    public let store: GameStore
-    /// Whether the launch goes through the store's client rather than running the exe directly.
-    public let throughClient: Bool
-    /// Whether the launch first waits for the player to sign in to the store client in the bottle.
-    public let signsInFirst: Bool
-
-    public init(game: String, store: GameStore, throughClient: Bool, signsInFirst: Bool = false) {
-        self.game = game
-        self.store = store
-        self.throughClient = throughClient
-        self.signsInFirst = signsInFirst
-    }
-}
-
 /// The steps a launch really goes through, named so a player can be shown where they are.
 ///
 /// Starting a Windows game on a Mac is not instant: a store client may have to be woken, the launch
@@ -105,30 +84,5 @@ public enum LaunchStage: String, Sendable, CaseIterable {
         case .closed:
             return String(localized: "The layer is shut down.")
         }
-    }
-}
-
-/// A line the `cellar` CLI prints so the app can follow a launch step by step.
-///
-/// The app drives the CLI as a subprocess — that is how it inherits every tested path — which
-/// leaves stdout as the only channel between them. Rather than have the app guess at prose, which
-/// would break the moment a sentence is reworded, `cellar launch --machine-progress` prints one of
-/// these markers per stage and the app strips them out of what it shows.
-public enum LaunchMarker {
-    public static let prefix = "::cellar-stage::"
-
-    /// The line to print when `stage` is reached.
-    public static func line(_ stage: LaunchStage) -> String { prefix + stage.rawValue }
-
-    /// The stage a line announces, or nil if it is ordinary output.
-    public static func stage(in line: String) -> LaunchStage? {
-        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix(prefix) else { return nil }
-        return LaunchStage(rawValue: String(trimmed.dropFirst(prefix.count)))
-    }
-
-    /// Whether this line is a marker rather than something a person should read.
-    public static func isMarker(_ line: String) -> Bool {
-        line.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(prefix)
     }
 }

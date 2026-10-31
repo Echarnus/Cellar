@@ -89,7 +89,7 @@ fork of Wine.
 | CLI | `cellar` | thin ArgumentParser front-end over `CellarKit` |
 | Runner | `Runner.swift` | download/pin prebuilt LGPL Wine; graft D3DMetal; assemble backend env |
 | GPTK import | `Gptk.swift` | copy user-supplied D3DMetal from Apple's `.dmg` into the local cache |
-| **Store layer** | `Store.swift` + `Steam.swift` / `BattleNet.swift` | stand the game's own storefront client up inside the bottle |
+| **Store layer** | `GameStore.swift` + `Steam.swift` / `BattleNet.swift` | stand the game's own storefront client up inside the bottle |
 | Profile DB | `profiles/` + (Phase 2) registry sync | per-game config, generality |
 | GUI | `CellarApp` | native SwiftUI app over the same `CellarKit` core |
 
@@ -142,7 +142,7 @@ Three consequences worth stating plainly, because they shape the UI as much as t
 
 All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
 about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a `StoreAdapter`
-(`Sources/CellarInfrastructure/StoreAdapters.swift`: client set-up, install, opening the client,
+(`Sources/CellarInfrastructure/Adapters/`: client set-up, install, opening the client,
 launching through it, registered in `CellarInfrastructure.install()`), and a CLI command group.
 
 ### One Steam, every bottle

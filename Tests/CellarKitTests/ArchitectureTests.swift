@@ -111,6 +111,45 @@ struct ArchitectureTests {
         }
     }
 
+    /// The targets already laid out one type per file, in feature folders. The rest follow in the
+    /// next steps of the restructure (#133) and join this list as they land.
+    static let oneTypePerFileTargets = ["CellarDomain", "CellarInfrastructure", "CellarUI"]
+
+    @Test("One top-level type per file, and the file is named after it", arguments: oneTypePerFileTargets)
+    func oneTypePerFile(_ folder: String) throws {
+        let modifiers = Set(["public", "package", "internal", "private", "fileprivate", "final",
+                             "nonisolated", "indirect", "open"])
+        for (file, text) in try Self.sources(in: folder) {
+            var names: [String] = []
+            for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+                // Top level only: a nested type is indented, a top-level one starts the line.
+                guard let first = line.first, first.isLetter || first == "@" else { continue }
+                var words = line.split(separator: " ").map(String.init)
+                while let word = words.first, modifiers.contains(word) || word.hasPrefix("@") { words.removeFirst() }
+                guard words.count > 1, ["struct", "class", "enum", "actor", "protocol"].contains(words[0]) else { continue }
+                names.append(String(words[1].prefix { $0.isLetter || $0.isNumber || $0 == "_" }))
+            }
+            #expect(names.count <= 1, "\(folder)/\(file) declares \(names.count) types: \(names)")
+            if let name = names.first {
+                #expect(file == "\(name).swift", "\(folder)/\(file) declares \(name); name the file after it")
+            } else {
+                #expect(file.contains("+") || file == "main.swift" || file == "\(folder).swift",
+                        "\(folder)/\(file) declares no type; an extension file is named Type+Topic.swift")
+            }
+        }
+    }
+
+    @Test("Sources are grouped into feature folders, not left flat at the target root",
+          arguments: oneTypePerFileTargets)
+    func featureFolders(_ folder: String) throws {
+        let root = Repo.root.appendingPathComponent("Sources/\(folder)", isDirectory: true)
+        let loose = try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".swift") }
+        // Only the entry point (main.swift, or the module's own namespace file) may sit at the root.
+        for file in loose {
+            #expect(file == "main.swift" || file == "\(folder).swift", "\(folder)/\(file) belongs in a feature folder")
+        }
+    }
+
     @Test("Every target is checked in Swift 6 mode, and UI modules start on the main actor")
     func swift6Everywhere() throws {
         let manifest = try String(contentsOf: Repo.root.appendingPathComponent("Package.swift"), encoding: .utf8)
