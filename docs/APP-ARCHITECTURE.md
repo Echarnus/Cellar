@@ -452,6 +452,24 @@ packaging guidance. What matches, and what does not yet:
 | Re-exporting a module is not an official Swift feature (`@_exported` is underscored; SE-0409 left it unspecified) | Every file that uses a domain type writes `import CellarDomain`; nothing is re-exported | Fixed in #77 |
 | Organise app code into local packages and library targets (Apple, *Organizing your code with local packages*) | One SwiftPM package, library targets per layer | Matches |
 
+## Checked against enterprise architecture criteria (2026-10-31)
+
+The same pass, against the rules clean and hexagonal architecture are judged by. "Enforced" means a
+test fails the build when the rule breaks, not that a reviewer has to notice.
+
+| Criterion | Cellar | Status |
+|---|---|---|
+| Dependencies point inward: domain ← engine ← infrastructure ← composition roots | SwiftPM targets `CellarDomain` → `CellarKit` → `CellarInfrastructure`; SwiftPM refuses an undeclared import | Pass, enforced (`Package.swift`, `ArchitectureTests`) |
+| The domain is pure: no I/O, no framework | `CellarDomain` imports Foundation only | Pass, enforced (`ArchitectureTests.domainIsPure`) |
+| Ports and adapters: the core depends on interfaces, not implementations | `StoreAdapter` port in CellarKit; Steam, Battle.net and GOG adapters in `CellarInfrastructure`; CellarKit never names one | Pass, enforced (`engineNamesNoConcreteAdapter`, `useCasesDoNotSwitchOnStore`) |
+| Composition root: wiring happens once, at the edge | `CellarInfrastructure.install()` in the CLI's `main`, the app's `main.swift` and the test homes; nowhere else in the app | Pass, enforced (`entryPointsInstallInfrastructure`, `onlyTheAppsRootImportsInfrastructure`) |
+| The UI layer holds no business logic | Library rules live in CellarKit's `LibraryQuery`; actions are `CellarCommand`s run by the CLI; views read `@Observable` stores | Pass, by structure (CellarKit has no UI import: `engineHasNoUI`) |
+| Use cases are explicit and testable without I/O | `LoadLibrary`, `SetUpGame`, `InstallGame`, `LaunchGame`, `UninstallGame` take their dependencies in `init` | Pass, tested (`UseCaseTests` with a recording adapter) |
+| State management: one owner, unidirectional updates | `AppModel` owns every `@Observable @MainActor` store; no singletons, no notification wiring | Pass, tested (`LibraryQueryTests`, store tests) |
+| Contract between processes is typed and versioned | `CellarCommand` (checked by `cellar selftest` against the CLI's parser), `--events` JSON lines with `v` | Pass, tested (`CellarCommandTests`, `CommandEventTests`, `cellar selftest`) |
+| Compile-time data-race safety | Swift 6 language mode in every target, tests included | Pass, enforced (`swift6Everywhere`, and the compiler) |
+| Main thread kept free of blocking work | `LibraryStore.refresh()` still runs `LoadLibrary` on the main actor | Open: needs an Instruments trace on a real library before moving it (Apple's own advice, WWDC25 268). Not measurable from CI |
+
 ## Sources
 
 - Robert C. Martin, *The Clean Architecture* (2012) —
