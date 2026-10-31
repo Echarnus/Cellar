@@ -9,8 +9,12 @@ import CellarData
 ///
 /// Writes through CellarData directly, like the language picker: one line in a settings file, and
 /// the runner refuses work while a game is playing.
+///
+/// The page shows the switches a player picks for taste; `advanced` is the copy in Technical Details,
+/// which holds the one that only exists to work around a crash.
 struct GameSettingsSection: View {
     let game: GameSummary
+    var advanced = false
 
     /// Loaded after the first layout, never from the body (skills/swift.md).
     @State private var values: [PerformanceSetting: String] = [:]
@@ -23,6 +27,11 @@ struct GameSettingsSection: View {
     }
 
     private var rows: [Row] {
+        let all = allRows
+        return advanced ? all.filter { $0.setting == .metalValidation } : all.filter { $0.setting != .metalValidation }
+    }
+
+    private var allRows: [Row] {
         var rows = [
             Row(setting: .retina, title: String(localized: "Retina resolution"),
                 tradeOff: String(localized: "Renders at your display's full pixel density. Sharper, and up to four times the work for the GPU.")),
@@ -41,7 +50,7 @@ struct GameSettingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Display and performance").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+            Text(advanced ? String(localized: "Graphics fixes") : String(localized: "Display and performance")).font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 .kerning(0.5).textCase(.uppercase)
             ForEach(rows, id: \.setting) { row in
                 VStack(alignment: .leading, spacing: 2) {
@@ -50,7 +59,7 @@ struct GameSettingsSection: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text("Changes apply the next time \(game.name) starts. Fast sync is always on when the runner has one.")
+            Text("Changes apply the next time \(game.name) starts.")
                 .font(.caption).foregroundStyle(.secondary)
             if let failure {
                 Label(failure, systemImage: "exclamationmark.triangle.fill")

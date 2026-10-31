@@ -435,6 +435,38 @@ public enum Diagnostics {
         return out
     }
 
+    /// What stands in for Steam's sign-in QR code anywhere Cellar keeps or shows text.
+    public static let signInCodeRemoved = "[Steam sign-in QR code — shown in Accounts, never kept in a log]"
+
+    /// Whether a line of output is a row of Steam's sign-in QR code, as DepotDownloader draws it:
+    /// block characters and spaces, nothing else.
+    ///
+    /// That drawing is a live credential for as long as it is on screen — whoever scans it first
+    /// with the Steam app is asked to approve a sign-in to the player's account — so it belongs in
+    /// the one panel built to show it (`QRCodePanel`), never in an activity pane a player
+    /// screenshots into a bug report, and never in a diagnostics report.
+    public static func isSignInCodeRow(_ line: String) -> Bool {
+        line.contains("█") && line.allSatisfy { $0 == "█" || $0 == "▀" || $0 == "▄" || $0 == " " || $0 == "\t" || $0 == "\r" }
+    }
+
+    /// `text` with each run of QR rows replaced by one `signInCodeRemoved` line.
+    public static func redactSignInCodes(_ text: String) -> String {
+        guard text.contains("█") else { return text }
+        var lines: [String] = []
+        var inCode = false
+        // Foundation's split, not `Character`'s: a `\r\n` is one Swift character and would never split.
+        for line in text.components(separatedBy: "\n") {
+            if isSignInCodeRow(line) {
+                if !inCode { lines.append(signInCodeRemoved) }
+                inCode = true
+            } else {
+                lines.append(line)
+                inCode = false
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
     /// The account names Cellar knows the player by, for `redact`.
     static var knownIdentities: [String] {
         [SteamAccount.record?.accountName, GOGAuth.cachedUsername].compactMap { $0 }
@@ -453,7 +485,7 @@ public enum Diagnostics {
     /// - long hex runs: the DPAPI blob of a Steam "Remember me" (`local.vdf` ConnectCache) is
     ///   hundreds of hex digits, while every hash Cellar logs is at most 64.
     public static func redactCredentials(_ text: String) -> String {
-        var out = text
+        var out = redactSignInCodes(text)
         let rules: [(String, String)] = [
             // `ey` is how base64 of `{` starts. Not `eyJ`: Steam writes `{ "typ"…` with a space, which
             // encodes as `eyAi…`, and a rule keyed on `eyJ` let every Steam token straight through.
