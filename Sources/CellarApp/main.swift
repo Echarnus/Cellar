@@ -411,11 +411,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-app.setActivationPolicy(.regular)
-app.run()
+// Top-level code is not main-actor isolated in the Swift 5 language mode, though it does run on the
+// main thread; say so, so the main-actor AppDelegate can be made here.
+MainActor.assumeIsolated {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.setActivationPolicy(.regular)
+    app.run()
+}
 
 /// Where the app sends a player for help. One table, so Settings and the Help menu never point at
 /// two different pages.
