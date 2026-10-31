@@ -1,0 +1,6 @@
+# actionlint 1.7.12 predates GitHub's macOS 27 image, so it does not know the `xcode-27` label
+# (macOS 27 with Xcode 27, Cellar's minimum, #113). It is a GitHub-hosted runner, not a
+# self-hosted one; drop this list once actionlint learns the label.
+self-hosted-runner:
+  labels:
+    - xcode-27

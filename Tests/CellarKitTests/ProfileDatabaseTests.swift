@@ -108,6 +108,28 @@ struct ProfileDatabaseTests {
         #expect(!plan.facts.compatibility.isEmpty)
     }
 
+    @Test("A wheel answer uses the vocabulary, and is never better than the game's own status",
+          arguments: ProfileDatabaseTests.slugs)
+    func wheelAnswerIsHonest(_ slug: String) throws {
+        let facts = try Game.plan(slug: slug).facts
+        guard let wheel = facts.wheel else {
+            #expect(facts.wheelSetup == nil, "'\(slug)' explains wheel set-up but never says whether a wheel works")
+            return
+        }
+        #expect(["full", "steering", "untested", "none"].contains(wheel),
+                "'\(slug)' has wheel = '\(wheel)', which the app has no words for")
+        // A wheel result is something somebody felt in the game. A game nobody has launched
+        // cannot have one.
+        if facts.status == "untested" {
+            #expect(wheel == "untested" || wheel == "none",
+                    "'\(slug)' is untested but claims wheel = '\(wheel)'")
+        }
+        if wheel != "none" {
+            #expect(facts.wheelSetup?.isEmpty == false,
+                    "'\(slug)' is made for a wheel but does not say how to bind one in the game")
+        }
+    }
+
     @Test("The legal boundary is declared and never crossed", arguments: ProfileDatabaseTests.slugs)
     func legalBoundary(_ slug: String) throws {
         let text = try String(contentsOf: Self.directory.appendingPathComponent("\(slug).toml"),
@@ -152,6 +174,17 @@ struct ProfileDatabaseTests {
             #expect(summary?.artworkAppID == nil,
                     "'\(slug)' is not a Steam game, so it must not fetch Steam artwork")
         }
+    }
+
+    @Test("Every game has real cover art, whatever store it comes from",
+          arguments: ProfileDatabaseTests.slugs)
+    func everyGameHasCoverArt(_ slug: String) throws {
+        // The same chain the app's Artwork.portrait walks: art the profile declares, then the
+        // Steam CDN keyed on the AppID. The generated cover is a fallback for a failed fetch, not
+        // what a whole store's games should look like (the Witcher 3 card did, until #107).
+        let summary = try #require(Game.summaries().first { $0.slug == slug })
+        #expect(summary.artPortraitURL != nil || summary.artworkAppID != nil,
+                "'\(slug)' has no cover: add art_portrait under [art] (a Steam game gets one from steam_appid)")
     }
 
     @Test("Bottles are only shared deliberately")

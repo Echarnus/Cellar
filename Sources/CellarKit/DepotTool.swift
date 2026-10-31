@@ -304,19 +304,31 @@ public enum DepotTool {
 
     /// The accounts DepotDownloader holds a token for, with when each store was last written —
     /// newest store first. Names only; the one reader of a token is `refreshToken(for:)`.
+    ///
+    /// Between runs the store is sealed in the keychain (`SteamTokenVault`) and only its index — the
+    /// names, never the token — is on disk, so that is read instead. No keychain access: this is
+    /// what the app draws Accounts from.
     static var storedAccounts: [(names: [String], modified: Date)] {
-        storedSessionFiles.map { file in
+        let files = storedSessionFiles.map { file in
             let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
                 .contentModificationDate ?? .distantPast
-            return (DepotAccountStore.accountNames(in: file), modified)
+            return (names: DepotAccountStore.accountNames(in: file), modified: modified)
         }
-        .sorted { $0.modified > $1.modified }
+        let sealed = SteamTokenVault.sealedAccounts.map { [$0] } ?? []
+        return (files + sealed).sorted { $0.modified > $1.modified }
     }
 
     /// The stored refresh token for `account`, newest store first. Read for one purpose only —
     /// handing the Windows client in a bottle the same session (`SteamClientSession`) — and never
     /// written anywhere but that client's encrypted `local.vdf` entry.
+    ///
+    /// From the store file while one is on disk, otherwise from the keychain (`SteamTokenVault`) —
+    /// which is why it is called only where the token is about to be used, never to draw a screen.
     static func refreshToken(for account: String) -> String? {
+        refreshTokenOnDisk(for: account) ?? SteamTokenVault.refreshToken(for: account)
+    }
+
+    static func refreshTokenOnDisk(for account: String) -> String? {
         storedSessionFiles
             .map { ($0, (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast) }
             .sorted { $0.1 > $1.1 }
@@ -371,6 +383,7 @@ public enum DepotTool {
             try FileManager.default.removeItem(at: home)
         }
         for file in strays { try? FileManager.default.removeItem(at: file) }
+        try SteamTokenVault.forget()
     }
 
     // MARK: - Running the tool
@@ -430,7 +443,10 @@ public enum DepotTool {
     }
 
     private static func runInheritingIO(args: [String]) throws {
-        defer { protectStoredSessions() }
+        // The token goes back on disk for the run and into the keychain after it (#82); the
+        // tightening covers the stretch in between, and every run where the keychain says no.
+        let lease = SteamTokenVault.begin()
+        defer { protectStoredSessions(); lease?.end() }
         let p = try process(args)
         try p.run()
         p.waitUntilExit()
@@ -449,7 +465,8 @@ public enum DepotTool {
     private static func runStreaming(args: [String], timeout: TimeInterval? = nil,
                                      output: @escaping (String) -> Void,
                                      stopWhen: () -> Bool = { false }) throws -> Bool {
-        defer { protectStoredSessions() }
+        let lease = SteamTokenVault.begin()
+        defer { protectStoredSessions(); lease?.end() }
         let p = try process(args)
         let pipe = Pipe()
         p.standardOutput = pipe
@@ -489,6 +506,8 @@ public enum DepotTool {
         if !stoppedEarly, !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) { output(line) }
         if stoppedEarly {
             p.terminate()
+            // Let it go before the store is sealed, or a last write lands after the file was moved.
+            p.waitUntilExit()
             return true
         }
         p.waitUntilExit()

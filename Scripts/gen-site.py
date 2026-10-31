@@ -78,7 +78,7 @@ SITE_URL = "https://echarnus.github.io/Cellar/"
 # Where the site lives on its host. Only 404.html needs it: GitHub Pages serves that page for any
 # missing path, at any depth, so its links cannot be relative.
 SITE_PATH = "/Cellar/"
-MIN_MACOS = "13"  # LSMinimumSystemVersion in Scripts/package.sh
+MIN_MACOS = "27"  # LSMinimumSystemVersion in Scripts/package.sh and Package.swift
 
 STORES = {  # profile store → how the site labels it
     "steam": "Steam",
@@ -237,7 +237,7 @@ code{font:.86em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(-
 .hero .ctas{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .hero .fine{margin:18px 0 0;font-size:.9rem;color:#fff}
 .hero .fine a{color:#fff}
-.shelf{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:1/1}
+.shelf{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:1.08/1}
 @media (max-width:600px){.shelf{display:none}}
 .shelf .cover{position:absolute;width:44%;aspect-ratio:2/3;border-radius:14px;overflow:hidden;
   box-shadow:0 26px 60px rgba(0,0,0,.45);background:linear-gradient(160deg,#c4466e,#4a0f22)}
@@ -245,10 +245,11 @@ code{font:.86em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(-
 .shelf .c1{left:2%;top:14%;transform:rotate(-8deg)}
 .shelf .c2{left:28%;top:2%;z-index:2;width:46%}
 .shelf .c3{right:2%;top:14%;transform:rotate(8deg)}
-/* The icon sits under the covers, not on them, so it never hides a game's title. Its PNG carries
-   macOS's transparent margin and its own rounded tile: the shadow follows the tile (drop-shadow),
-   and height:auto keeps it square — the height attribute alone would pin it at 256px tall. */
-.shelf .appicon{position:absolute;z-index:3;left:50%;bottom:0;transform:translateX(-50%);width:24%;height:auto;
+/* The icon overlaps the bottom edge of the middle cover by about 40% of its height: enough to
+   tie it to the shelf, low enough to leave cover titles clear. Its PNG carries macOS's transparent
+   margin and its own rounded tile: the shadow follows the tile (drop-shadow), and height:auto
+   keeps it square — the height attribute alone would pin it at 256px tall. */
+.shelf .appicon{position:absolute;z-index:3;left:50%;bottom:8%;transform:translateX(-50%);width:24%;height:auto;
   aspect-ratio:1/1;filter:drop-shadow(0 14px 22px rgba(0,0,0,.45))}
 .page-head{color:#fff;background:radial-gradient(120% 140% at 15% -20%,var(--hero-1) 0%,var(--hero-2) 50%,var(--hero-3) 100%)}
 .page-head .wrap{padding-top:56px;padding-bottom:56px}
@@ -504,6 +505,12 @@ def load_games():
         portrait = art.get("art_portrait") or (
             f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg"
             if appid and storekey == "steam" else "")
+        # Every game gets a real cover; the generated placeholder is a fallback for a CDN outage,
+        # not a design for a whole store. A Steam game gets one from its AppID; any other store's
+        # profile has to bring art_portrait (diablo-4 and witcher-3 show how).
+        if not portrait:
+            fail(path, "no cover art: add art_portrait under [art] "
+                       "(a Steam game gets one from steam_appid)")
         # `needs_live_steam` is the original spelling of `needs_live_session`; both still read.
         needs_client = comp.get("needs_live_session", comp.get("needs_live_steam", True))
         drm = str(comp.get("drm", "")).strip()
@@ -849,7 +856,7 @@ def render_index(games, release):
       anything fails.</p></div>
     <ul class="reqs">
       <li><b>Apple Silicon</b><span>M1 or later. Intel Macs are not supported.</span></li>
-      <li><b>macOS {MIN_MACOS} or later</b><span>Tested most on macOS 26 Tahoe.</span></li>
+      <li><b>macOS {MIN_MACOS} or later</b><span>Every M1 Mac can run it; Software Update has it.</span></li>
       <li><b>Rosetta 2</b><span>Wine runs as an Intel app under Rosetta; macOS installs it on request.</span></li>
       <li><b>A game you own</b><span>On Steam, Battle.net or GOG, from your own account.</span></li>
     </ul>
@@ -895,8 +902,8 @@ FAQ_SECTIONS = [
          "Windows API calls a game makes, as it makes them. There is no Windows install to "
          "maintain and no licence to buy.</p>"),
         ("Which Macs does it work on?",
-         f"<p><b>Apple Silicon only</b> (M1 and later), on macOS {MIN_MACOS} or newer; it is tested "
-         "most on macOS 26 Tahoe. Cellar's Wine runners are x86 builds that run under Rosetta 2, "
+         f"<p><b>Apple Silicon only</b> (M1 and later), on macOS {MIN_MACOS} or newer — the newest "
+         "macOS every M1 Mac can run, so no Apple Silicon Mac is left out. Cellar's Wine runners are x86 builds that run under Rosetta 2, "
          "with the graphics work handed to Metal on the Apple GPU — so an Intel Mac is out of "
          "scope.</p>"
          "<p>Open the app, or run <code>cellar doctor</code>, and it will tell you what your "
@@ -1049,19 +1056,25 @@ FAQ_SECTIONS = [
          "mode.</li>"
          "<li><b>Logitech G29, G27, G25, Driving Force GT and Driving Force Pro</b> — force "
          "feedback is driven by Cellar.</li>"
-         "<li><b>Thrustmaster, MOZA, and Logitech's G920 and G923</b> — steering, pedals and "
-         "buttons, but no force feedback yet. Cellar's own drivers for them are being written.</li>"
+         "<li><b>"
+         "Thrustmaster T300 RS, T300 Ferrari Edition, TX, T248, TS-XW and TS-PC"
+         "</b> — force feedback is driven by Cellar's own Thrustmaster driver. A T300 starts in a "
+         "generic mode; Cellar switches it into its own mode when a game starts, the way "
+         "Thrustmaster's Windows driver does, so it briefly disconnects and comes back.</li>"
+         "<li><b>MOZA, Thrustmaster's T150, T500 and TMX, and Logitech's G920 and G923</b> — "
+         "steering, pedals and buttons, but no force feedback yet.</li>"
          "</ul>"
-         "<p>Both drivers are new. If force feedback feels wrong, report it with the wheel and the "
-         "game.</p>"
+         "<p>Cellar's drivers are new. If force feedback feels wrong, report it with the wheel and "
+         "the game.</p>"
          "<p><b>Fanatec bases start at half strength.</b> A direct-drive base at full torque can "
          "hurt a hand, so Cellar caps it until you choose otherwise. The base's own force-feedback "
-         "setting (FF in its tuning menu) still applies on top. To raise Cellar's cap for a game, "
-         "start it from Terminal with a percentage, for example "
-         "<code>CELLAR_FFB_MAX_PERCENT=80 cellar launch &lt;game&gt;</code>. A strength setting in "
-         "the app is coming. To turn Cellar's Fanatec driver off, start the game with "
+         "setting (FF in its tuning menu) still applies on top. To change it, open Cellar's "
+         "<b>Settings › General › Racing wheels</b> and pick a strength; it applies to every wheel "
+         "Cellar drives from a game's next launch (or <code>cellar controllers strength 75</code>). "
+         "Logitech and Thrustmaster wheels start at the game's own strength. To turn Cellar's "
+         "Fanatec and Thrustmaster drivers off, start the game with "
          "<code>CELLAR_FFB_DISABLE=1</code>.</p>"
-         "<p>The game's page and <code>cellar controllers</code> say which of the two your wheel "
+         "<p>The game's page and <code>cellar controllers</code> say which of these your wheel "
          "is. Results per wheel and per game are still being collected, and what has been tested is "
          "recorded in the game's profile.</p>"),
         ("What do I have to set up on the wheel itself?",
@@ -1076,7 +1089,8 @@ FAQ_SECTIONS = [
          "on the Mac, update it once on a Windows PC.</li>"
          "<li><b>Thrustmaster</b> — set the base to its PC mode and connect it over USB. "
          "Thrustmaster's drivers and firmware are Windows-only, and without the driver some bases "
-         "report the pedals as buttons, which most racing games cannot use.</li>"
+         "report the pedals as buttons, which most racing games cannot use. There is nothing to "
+         "install for force feedback: Cellar switches a T300 into the right mode itself.</li>"
          "<li><b>MOZA</b> — update the firmware and set the steering angle in MOZA Pit House on a "
          "Windows PC first; the base keeps those settings.</li>"
          "</ul>"

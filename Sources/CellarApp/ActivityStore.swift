@@ -1,29 +1,39 @@
 import Foundation
+import Observation
 import CellarKit
 
+/// What Cellar is doing right now, for every window at once.
+///
 /// Drives the `cellar` CLI as a subprocess so the GUI reuses every tested code path (setup, launch
 /// with its auto-retry, steam add) instead of reimplementing them. Streams combined output.
+///
+/// There is one of these for the player's actions, made by `AppModel` and handed to every window
+/// (docs/APP-ARCHITECTURE.md). It used to be one per window, so "busy" was per window: Settings
+/// could start a sign-in while the library was mid-install, and the library never learned a
+/// sign-in was running. Background work that must never hold the Play button — `RuntimePreparation`
+/// — keeps an instance of its own on purpose.
 @MainActor
-final class CellarRunner: ObservableObject {
+@Observable
+final class ActivityStore {
     /// Everything the CLI has printed, markers removed.
-    @Published var log: String = ""
-    @Published var busy: Bool = false
-    @Published var busyTitle: String = ""
+    var log: String = ""
+    var busy: Bool = false
+    var busyTitle: String = ""
     /// How far a launch has got, when the running command is one that reports it. Kept after the
     /// command ends, so the launch window can show how it finished rather than going blank.
-    @Published private(set) var stage: LaunchStage?
+    private(set) var stage: LaunchStage?
     /// The exit status of the last command, nil while one is running.
-    @Published private(set) var exitCode: Int32?
-    @Published private(set) var phase: Phase = .idle
+    private(set) var exitCode: Int32?
+    private(set) var phase: Phase = .idle
     /// How many times the launch has been attempted. Counted from the stages rather than scraped
     /// out of the CLI's prose, so the launch window can say "second try" in its own words instead
     /// of quoting a line about the D3DMetal startup race at someone who wants to play a game.
-    @Published private(set) var attempt: Int = 0
-    /// Where an install stands, when the running command is `install --machine-progress`. Nil for
+    private(set) var attempt: Int = 0
+    /// Where an install stands, when the running command is `install --events`. Nil for
     /// every other command, and until the install has said which phase it is in.
-    @Published private(set) var installProgress: InstallProgress?
+    private(set) var installProgress: InstallProgress?
     /// The game being installed, so only its page draws the bar.
-    @Published private(set) var installingSlug: String?
+    private(set) var installingSlug: String?
 
     /// A launch does not end when the game starts: `cellar launch` stays alive for the whole session
     /// so it can close the layer afterwards. Without this distinction the app spends a two-hour play
@@ -40,20 +50,27 @@ final class CellarRunner: ObservableObject {
     ///
     /// The CLI inside Cellar.app comes first: it was built with this app, and an app update
     /// replaces the two together. One on PATH would keep driving the new app with an old engine.
-    private lazy var binary: String = Bundle.main.path(forAuxiliaryExecutable: "cellar")
-        ?? Shell.locate("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
+    private var binary: String {
+        if let resolvedBinary { return resolvedBinary }
+        let found = Bundle.main.path(forAuxiliaryExecutable: "cellar")
+            ?? Shell.locate("cellar") ?? "\(NSHomeDirectory())/.local/bin/cellar"
+        resolvedBinary = found
+        return found
+    }
+    /// Held by hand rather than as a `lazy var`, which `@Observable` does not take.
+    @ObservationIgnored private var resolvedBinary: String?
 
     /// The running command, so it can be called off.
-    private var process: Process?
+    @ObservationIgnored private var process: Process?
     /// Output received but not yet ended by a newline — held back so a marker split across two
     /// reads is still recognised. Shown in the log regardless, or a `\r`-only progress line
     /// (DepotDownloader's) would look like a stall.
-    private var pending: String = ""
-    private var committed: String = ""
-    /// Whether the running command reports stage markers (only `launch --machine-progress` does).
-    private var readsStages = false
+    @ObservationIgnored private var pending: String = ""
+    @ObservationIgnored private var committed: String = ""
+    /// Whether the running command reports progress events (`CellarCommand.reportsStages`).
+    @ObservationIgnored private var readsStages = false
     /// The running command's line observer, if it asked for one.
-    private var lineObserver: (@MainActor (String) -> Void)?
+    @ObservationIgnored private var lineObserver: (@MainActor (String) -> Void)?
 
     init() {}
 
@@ -74,12 +91,19 @@ final class CellarRunner: ObservableObject {
     /// meant a QR row straddling a read arrived as two short rows and the matrix never squared up.
     /// `absorb` already assembles lines for the activity log, so the observer rides along with it.
     ///
-    /// `stages` says this command was asked to report its steps. Only then is the output read for
-    /// markers: every other command's output belongs to the player verbatim, and a line that
+    /// Only a command that reports its steps (`CellarCommand.reportsStages`) has its output read
+    /// for markers: every other command's output belongs to the player verbatim, and a line that
     /// happened to start with the marker prefix should not vanish from the activity log.
-    func run(_ args: [String], title: String, stages: Bool = false,
+    func run(_ command: CellarCommand, title: String,
              observe: (@MainActor (String) -> Void)? = nil,
              then: (@MainActor () -> Void)? = nil) {
+        run(arguments: command.arguments, title: title, stages: command.reportsStages,
+            observe: observe, then: then)
+    }
+
+    private func run(arguments args: [String], title: String, stages: Bool,
+                     observe: (@MainActor (String) -> Void)?,
+                     then: (@MainActor () -> Void)?) {
         guard !busy else { return }
         busy = true; busyTitle = title; phase = .working
         stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
@@ -161,9 +185,7 @@ final class CellarRunner: ObservableObject {
     func launch(slug: String, showHUD: Bool, backend: GraphicsBackend? = nil,
                 then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(["launch", slug, "--machine-progress"] + (showHUD ? ["--hud"] : [])
-                + (backend.map { ["--backend", $0.rawValue] } ?? []),
-            title: "Launching", stages: true, then: then)
+        run(.launch(slug: slug, showHUD: showHUD, backend: backend), title: "Launching", then: then)
         launchingSlug = slug
         launchShowsHUD = showHUD
     }
@@ -176,7 +198,7 @@ final class CellarRunner: ObservableObject {
     /// something a call site has to remember.
     func install(slug: String, title: String, then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(["install", slug, "--machine-progress"], title: title, stages: true, then: then)
+        run(.install(slug: slug, machineProgress: true), title: title, then: then)
         installingSlug = slug
     }
 
@@ -184,8 +206,9 @@ final class CellarRunner: ObservableObject {
     /// wait for it. For the background update check only: it must not take the one runner (and every
     /// Play button with it) away from the player, yet it talks to Steam, so it still goes through
     /// the CLI like every other networked action instead of running inside the app.
-    func runBeside(_ args: [String]) async -> Int32 {
+    func runBeside(_ command: CellarCommand) async -> Int32 {
         let path = binary
+        let args = command.arguments
         return await Task.detached(priority: .utility) {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: path)
@@ -203,16 +226,16 @@ final class CellarRunner: ObservableObject {
     /// a patch can be gigabytes, and a spinner is no answer to "how long".
     func update(slug: String, name: String, then: (@MainActor () -> Void)? = nil) {
         guard !busy else { return }
-        run(["update", slug, "--machine-progress"], title: "Updating \(name)", stages: true, then: then)
+        run(.update(slug: slug), title: "Updating \(name)", then: then)
         installingSlug = slug
     }
 
     /// The game currently being launched, if the running command is a launch.
-    @Published private(set) var launchingSlug: String?
+    private(set) var launchingSlug: String?
 
     /// Whether the last command was called off rather than failing on its own — a non-zero exit the
     /// player asked for is not an error to report back to them.
-    @Published private(set) var cancelled: Bool = false
+    private(set) var cancelled: Bool = false
 
     /// Stop the running command. Anything it already opened — Steam, Battle.net, the game itself —
     /// stays open; Cellar only stops waiting on it, and says so where the button lives.
@@ -224,18 +247,24 @@ final class CellarRunner: ObservableObject {
 
     // MARK: - Reading the output
 
-    /// Split output into lines, lift the stage markers out, and leave the rest for the player.
+    /// Split output into lines, lift the progress events out (`CommandEvent`), and leave the rest for the player.
     private func absorb(_ chunk: String) {
         pending += chunk
         while let newline = pending.firstIndex(of: "\n") {
             let line = String(pending[pending.startIndex..<newline])
             pending = String(pending[pending.index(after: newline)...])
-            if readsStages, let progress = InstallMarker.progress(in: line) {
-                installProgress = progress
-            } else if readsStages, let reached = LaunchMarker.stage(in: line) {
-                stage = reached
-                if reached == .starting { attempt += 1 }
-                if reached == .playing { phase = .playing }
+            if readsStages, let event = CommandEvent.parse(line) {
+                switch event {
+                case .install(let progress):
+                    installProgress = progress
+                case .stage(let reached):
+                    stage = reached
+                    if reached == .starting { attempt += 1 }
+                    if reached == .playing { phase = .playing }
+                }
+            } else if readsStages, CommandEvent.isEvent(line) {
+                // From a newer CLI than this app knows: not for the player to read as JSON.
+                continue
             } else {
                 committed += line + "\n"
                 lineObserver?(line)

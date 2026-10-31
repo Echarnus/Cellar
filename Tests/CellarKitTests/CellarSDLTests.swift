@@ -53,6 +53,8 @@ struct CellarSDLTests {
         let elite = try #require(Wheels.classify(vendorID: 0x0EB7, productID: 0x0E03, product: "FANATEC CSL Elite Wheel Base"))
         let unknownBase = try #require(Wheels.classify(vendorID: 0x0EB7, productID: 0x0ABC, product: "FANATEC Wheel"))
         let t300 = try #require(Wheels.classify(vendorID: 0x044F, productID: 0xB66E, product: "Thrustmaster T300RS Racing wheel"))
+        let t150 = try #require(Wheels.classify(vendorID: 0x044F, productID: 0xB677, product: "Thrustmaster T150 Racing Wheel"))
+        let generic = try #require(Wheels.classify(vendorID: 0x044F, productID: 0xB65D, product: "Thrustmaster FFB Wheel"))
         let pedals = try #require(Wheels.classify(vendorID: 0x0EB7, productID: 0x6204, product: "FANATEC CSL Pedals"))
 
         #expect(CellarSDL.drivesForceFeedback(g29))
@@ -60,7 +62,9 @@ struct CellarSDLTests {
         #expect(CellarSDL.drivesForceFeedback(csl))
         #expect(CellarSDL.drivesForceFeedback(elite))
         #expect(!CellarSDL.drivesForceFeedback(unknownBase), "a base the driver does not know is never promised")
-        #expect(!CellarSDL.drivesForceFeedback(t300))
+        #expect(CellarSDL.drivesForceFeedback(t300))
+        #expect(!CellarSDL.drivesForceFeedback(t150), "the T150 speaks another protocol")
+        #expect(!CellarSDL.drivesForceFeedback(generic), "a wheel in generic mode could be a T150: never promised")
         #expect(!CellarSDL.drivesForceFeedback(pedals))
 
         #expect(Wheels.forceFeedbackNote(for: [g29], cellarSDL: true) == Wheels.drivenForceFeedbackNote)
@@ -70,8 +74,15 @@ struct CellarSDLTests {
                 == Wheels.drivenForceFeedbackNote + " " + Wheels.cappedStrengthNote, "a Fanatec base says why it feels soft")
         #expect(!Wheels.forceFeedbackNote(for: [g29], cellarSDL: true).contains("half strength"))
         #expect(Wheels.forceFeedbackNote(for: [csl], cellarSDL: false) == Wheels.forceFeedbackNote)
-        #expect(Wheels.forceFeedbackNote(for: [g29, t300], cellarSDL: true) == Wheels.forceFeedbackNote,
+        #expect(Wheels.forceFeedbackNote(for: [g29, t150], cellarSDL: true) == Wheels.forceFeedbackNote,
                 "one undriven wheel connected: never the hopeful sentence")
+        #expect(Wheels.forceFeedbackNote(for: [t300], cellarSDL: true) == Wheels.drivenForceFeedbackNote,
+                "a Thrustmaster runs at the game's own strength: no half-strength sentence")
+        #expect(Wheels.forceFeedbackNote(for: [generic], cellarSDL: true) == Wheels.thrustmasterGenericNote)
+        #expect(Wheels.forceFeedbackNote(for: [csl, generic], cellarSDL: true)
+                == [Wheels.drivenForceFeedbackNote, Wheels.cappedStrengthNote, Wheels.thrustmasterGenericNote].joined(separator: " "))
+        #expect(Wheels.forceFeedbackNote(for: [generic], cellarSDL: false) == Wheels.forceFeedbackNote)
+        #expect(Wheels.thrustmasterGenericNote.contains("T150"), "the models it cannot switch are named")
         #expect(Wheels.forceFeedbackNote(for: [pedals], cellarSDL: true) == Wheels.forceFeedbackNote)
     }
 
@@ -83,6 +94,39 @@ struct CellarSDLTests {
         #expect(row.detail.contains("Cellar's SDL"))
         #expect(row.hint?.contains("Logitech G29") == true)
         #expect(row.hint?.contains("Fanatec CSL DD") == true)
-        #expect(row.hint?.contains("Thrustmaster") == false)
+        #expect(row.hint?.contains("Thrustmaster T300 RS") == true)
+        #expect(row.hint?.contains("G920") == false, "HID++ wheels are not driven yet")
+    }
+
+    // MARK: - Strength
+
+    @Test("No strength chosen leaves every driver at its own default")
+    func strengthDefault() {
+        #expect(CellarSDL.strengthEnvironment(nil).isEmpty)
+        #expect(CellarSDL.strengthDescription(nil).contains("Fanatec bases at half strength"))
+        #expect(CellarSDL.strengthDescription(nil).contains("Thrustmaster wheels at full strength"))
+    }
+
+    @Test("A chosen strength reaches both drivers, in each one's own units, clamped to 1–100")
+    func strengthUnits() {
+        let env = CellarSDL.strengthEnvironment(75)
+        #expect(env["CELLAR_FFB_MAX_PERCENT"] == "75")
+        #expect(env["SDL_HAPTIC_LG4FF_GAIN"] == "49151", "SDL's Logitech gain runs 0–65535")
+        #expect(CellarSDL.strengthEnvironment(100)["SDL_HAPTIC_LG4FF_GAIN"] == "65535")
+        #expect(CellarSDL.strengthEnvironment(0)["CELLAR_FFB_MAX_PERCENT"] == "1")
+        #expect(CellarSDL.strengthEnvironment(250)["CELLAR_FFB_MAX_PERCENT"] == "100")
+        #expect(CellarSDL.strengthChoices.allSatisfy { (1...100).contains($0) })
+    }
+
+    @Test("A strength typed on the command line wins over the one in Settings")
+    func strengthCallerWins() {
+        var env = ["CELLAR_FFB_MAX_PERCENT": "90"]
+        CellarSDL.applyStrength(25, to: &env)
+        #expect(env["CELLAR_FFB_MAX_PERCENT"] == "90")
+        #expect(env["SDL_HAPTIC_LG4FF_GAIN"] == "16383", "the other driver still gets Settings' value")
+
+        var empty: [String: String] = [:]
+        CellarSDL.applyStrength(nil, to: &empty)
+        #expect(empty.isEmpty)
     }
 }

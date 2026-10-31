@@ -48,7 +48,7 @@ INSTALL = (
     "store, and you pick a game to play."
 )
 REQUIREMENTS = (
-    "Requires an Apple Silicon Mac on macOS 14 or later. Today's runners are Intel builds that "
+    "Requires an Apple Silicon Mac on macOS 27 or later (every M1 Mac can run it). Today's runners are Intel builds that "
     "run under Rosetta 2, which macOS 28 keeps only for games: `cellar doctor` says where your "
     "Mac stands."
 )

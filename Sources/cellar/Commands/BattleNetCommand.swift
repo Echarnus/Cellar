@@ -122,7 +122,7 @@ struct BattleNetCommand: ParsableCommand {
         func run() throws {
             let plan = try Game.plan(slug: slug)
             try requireBattleNetProfile(plan)
-            try Game.installGame(plan) { print("  " + Term.dim($0)) }
+            try InstallGame(plan).run { if let line = $0.sentence { print("  " + Term.dim(line)) } }
             print(Term.dim("When the download finishes: cellar launch \(slug)"))
         }
     }

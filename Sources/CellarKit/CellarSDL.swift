@@ -6,8 +6,8 @@ import Foundation
 /// and a game's force-feedback effects, to it. The runner ships an SDL 2 whose only way to drive a
 /// wheel's motor is macOS's ForceFeedback plug-ins — which no wheel maker ships for Apple Silicon.
 /// Cellar's build is SDL 3 with sdl2-compat in front of it: SDL 3.4 talks to Logitech's older wheels
-/// over USB itself (HIDAPI), and Cellar's own patch (`Shim/sdl/`) drives Fanatec bases the same way,
-/// so the effects reach the motor. `Scripts/build-sdl.sh` builds it; it is
+/// over USB itself (HIDAPI), and Cellar's own patches (`Shim/sdl/`) drive Fanatec bases and
+/// Thrustmaster's T300 family the same way, so the effects reach the motor. `Scripts/build-sdl.sh` builds it; it is
 /// installed beside the `cellar` binary the same way the Dock shim is.
 ///
 /// Missing — a partial build, an old install — every launch uses the runner's SDL, exactly as before:
@@ -21,15 +21,27 @@ public enum CellarSDL {
     public static let forceFeedbackWheels: [Wheels.Vendor: String] = [
         .logitech: "G29, G27, G25, Driving Force GT and Driving Force Pro",
         .fanatec: "CSL DD, GT DD Pro, ClubSport DD, Podium DD1 and DD2, CSL Elite, ClubSport V2 and V2.5, CSR Elite and Porsche 911",
+        .thrustmaster: "T300 RS, T300 Ferrari Edition, TX, T248, TS-XW and TS-PC",
     ]
 
     /// The USB product IDs behind `forceFeedbackWheels`: SDL 3.4's Logitech driver's own list, and
-    /// the bases `CellarFanatec_IsSupported` takes (Shim/sdl/0001-cellar-fanatec-force-feedback.patch).
-    /// The CSL DD, GT DD Pro and ClubSport DD all report 0x0020 in PC mode.
+    /// the bases `CellarFanatec_IsSupported` takes (Shim/sdl/0001-cellar-fanatec-force-feedback.patch),
+    /// and the wheels `CellarThrustmaster_IsSupported` takes (0002-…). The CSL DD, GT DD Pro and
+    /// ClubSport DD all report 0x0020 in PC mode.
     static let forceFeedbackProducts: [Wheels.Vendor: Set<Int>] = [
         .logitech: [0xC24F, 0xC29B, 0xC299, 0xC29A, 0xC298, 0xC294],
         .fanatec: [0x0001, 0x0004, 0x0005, 0x0006, 0x0007, 0x0011, 0x0020, 0x0197, 0x0E03],
+        .thrustmaster: [0xB66E, 0xB66F, 0xB66D, 0xB696, 0xB669, 0xB692, 0xB689],
     ]
+
+    /// The "Thrustmaster FFB Wheel" every Thrustmaster wheel starts as, until something switches it to
+    /// its own mode. Cellar's SDL switches a T300 when a game starts; a T150, T500 or TMX looks the
+    /// same here, so it is never promised force feedback in this mode.
+    static let thrustmasterGenericProduct = 0xB65D
+
+    static func isGenericThrustmaster(_ device: Wheels.Device) -> Bool {
+        device.kind == .wheel && device.vendor == .thrustmaster && device.productID == thrustmasterGenericProduct
+    }
 
     /// How strong Cellar lets a wheel it drives get, in percent of the base's maximum, until the
     /// player raises it (`CELLAR_FFB_MAX_PERCENT`). A direct-drive base at full torque can hurt.
@@ -87,5 +99,65 @@ public enum CellarSDL {
     public static func libraryPath(_ dyld: [String], sdl directory: URL?) -> [String] {
         guard let directory else { return dyld }
         return [directory.path] + dyld.filter { $0 != directory.path }
+    }
+}
+
+// MARK: - Force-feedback strength
+
+extension CellarSDL {
+    /// The variable Cellar's Fanatec and Thrustmaster drivers read their cap from (`Shim/sdl/`).
+    static let fanatecStrengthVariable = "CELLAR_FFB_MAX_PERCENT"
+    /// The variable SDL's own Logitech driver reads its device gain from, 0–65535.
+    static let logitechGainVariable = "SDL_HAPTIC_LG4FF_GAIN"
+
+    /// The strengths offered in Settings and accepted by `cellar controllers strength`, in percent.
+    public static let strengthChoices = [25, 50, 75, 100]
+
+    /// What a wheel Cellar drives is told about its strength, for a launch. nil — the player has not
+    /// chosen — leaves every driver at its own default: Fanatec at `defaultStrengthPercent`,
+    /// Logitech and Thrustmaster at full, since their belt- and gear-driven motors are a fraction of
+    /// a direct-drive base's.
+    public static func strengthEnvironment(_ percent: Int?) -> [String: String] {
+        guard let percent else { return [:] }
+        let clamped = min(max(percent, 1), 100)
+        return [fanatecStrengthVariable: String(clamped),
+                logitechGainVariable: String(65535 * clamped / 100)]
+    }
+
+    /// Adds `strengthEnvironment` to a launch's environment. A value already there — someone typed
+    /// `CELLAR_FFB_MAX_PERCENT=80 cellar launch …` — wins over Settings.
+    public static func applyStrength(_ percent: Int?, to env: inout [String: String]) {
+        for (key, value) in strengthEnvironment(percent) where env[key]?.isEmpty ?? true {
+            env[key] = value
+        }
+    }
+
+    /// The strength in the player's words, for Settings, the CLI and doctor.
+    public static func strengthDescription(_ percent: Int?) -> String {
+        guard let percent else {
+            return "Cellar's default: Fanatec bases at half strength, Logitech and Thrustmaster wheels at full strength"
+        }
+        return "\(min(max(percent, 1), 100))% of the wheel's maximum, for every wheel Cellar drives"
+    }
+}
+
+extension CellarSettings {
+    static let strengthKey = "force_feedback_strength"
+
+    /// The force-feedback strength the player chose for every wheel Cellar drives, in percent; nil
+    /// keeps each driver's own default (`CellarSDL.strengthEnvironment`).
+    public static var forceFeedbackStrength: Int? {
+        BottleConfig.fields(url)[strengthKey].flatMap(Int.init).map { min(max($0, 1), 100) }
+    }
+
+    public static func setForceFeedbackStrength(_ percent: Int?) throws {
+        if let percent {
+            guard (1...100).contains(percent) else {
+                throw CellarError.invalidArgument("Force-feedback strength is a percentage from 1 to 100, not \(percent).")
+            }
+            try BottleConfig.set(key: strengthKey, to: String(percent), section: "controllers", in: url)
+        } else {
+            try BottleConfig.unset(key: strengthKey, in: url)
+        }
     }
 }

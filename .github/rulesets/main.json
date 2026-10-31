@@ -41,11 +41,7 @@
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           {
-            "context": "Build & self-test (macos-15)",
-            "integration_id": 15368
-          },
-          {
-            "context": "Build & self-test (macos-26)",
+            "context": "Build & self-test (macos-27)",
             "integration_id": 15368
           },
           {

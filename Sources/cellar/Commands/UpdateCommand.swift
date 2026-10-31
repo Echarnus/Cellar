@@ -23,8 +23,14 @@ struct UpdateCommand: ParsableCommand {
     var check = false
 
     @Flag(name: .customLong("machine-progress"),
-          help: "Also print a marker line as the update moves through its steps, for the Cellar app's progress bar.")
+          help: "Also print a marker line as the update moves through its steps, for the Cellar app's progress bar. Superseded by --events.")
     var machineProgress = false
+
+    @Flag(name: .customLong("events"),
+          help: "Also print each progress step as a versioned JSON line, for the Cellar app.")
+    var events = false
+
+    private var output: EventOutput { EventOutput(json: events, markers: machineProgress) }
 
     func run() throws {
         let plans: [GamePlan]
@@ -46,11 +52,11 @@ struct UpdateCommand: ParsableCommand {
 
         var last: InstallProgress?
         func report(_ progress: InstallProgress) {
-            guard machineProgress else { return }
+            guard output.isOn else { return }
             if let was = last?.fraction, let now = progress.fraction, last?.phase == progress.phase,
                abs(now - was) < 0.001 { return }
             last = progress
-            print(InstallMarker.line(progress))
+            output.emit(.install(progress))
         }
 
         var failed = false

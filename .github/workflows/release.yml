@@ -28,7 +28,7 @@ concurrency:
 jobs:
   build:
     name: Build downloads
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 45
     outputs:
       version: ${{ steps.v.outputs.version }}
@@ -78,7 +78,7 @@ jobs:
     name: Publish GitHub Release
     if: github.event_name == 'push'
     needs: build
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 20
     # The update-signing key lives in this environment, not in plain repository secrets, so only a
     # release run can read it. Add a tag rule to the environment to restrict it to v* tags.

@@ -49,20 +49,22 @@ struct CellarSDLIntegrationTests {
         quit()
     }
 
-    @Test("The shipped SDL 3 carries Cellar's Fanatec driver, in both slices")
-    func carriesFanatecDriver() throws {
+    @Test("The shipped SDL 3 carries Cellar's wheel drivers, in both slices",
+          arguments: ["Fanatec: the wheel base did not take its init commands",
+                      "Thrustmaster: the wheel did not take its open commands"])
+    func carriesWheelDriver(marker text: String) throws {
         guard requireBuilt() else { return }
-        // The driver is private to the library, so look for the text it is compiled with: one copy
-        // per architecture slice of the universal binary.
+        // The drivers are private to the library, so look for the text each is compiled with: one
+        // copy per architecture slice of the universal binary.
         let data = try Data(contentsOf: built.appendingPathComponent("libSDL3.dylib"))
-        let marker = Data("Fanatec: the wheel base did not take its init commands".utf8)
+        let marker = Data(text.utf8)
         var count = 0
         var start = data.startIndex
         while let found = data.range(of: marker, in: start..<data.endIndex) {
             count += 1
             start = found.upperBound
         }
-        #expect(count >= 2, "found \(count) copies; expected one per slice (x86_64 and arm64)")
+        #expect(count >= 2, "found \(count) copies of \"\(text)\"; expected one per slice (x86_64 and arm64)")
     }
 
     @Test("Cellar finds that build from a repo checkout, and the runner switch turns it off")
@@ -73,5 +75,21 @@ struct CellarSDLIntegrationTests {
         #expect(found?.standardizedFileURL == built.standardizedFileURL)
         #expect(CellarSDL.libraryDirectory(environment: ["CELLAR_RUNNER_SDL": "1"], resources: nil, executable: nil,
                                            workingDirectory: IT.repositoryRoot.path, appSupport: IT.scratch("as")) == nil)
+    }
+
+    @Test("Settings' wheel strength lands in settings.toml, under its own section, as a launch reads it")
+    func strengthSettingOnDisk() throws {
+        IT.ensure()
+        defer { try? CellarSettings.setForceFeedbackStrength(nil) }
+        try CellarSettings.setForceFeedbackStrength(50)
+        let text = try String(contentsOf: CellarSettings.url, encoding: .utf8)
+        #expect(text.contains("[controllers]"))
+        #expect(text.contains("force_feedback_strength = \"50\""))
+        let env = CellarSDL.strengthEnvironment(CellarSettings.forceFeedbackStrength)
+        #expect(env == ["CELLAR_FFB_MAX_PERCENT": "50", "SDL_HAPTIC_LG4FF_GAIN": "32767"])
+
+        try CellarSettings.setForceFeedbackStrength(nil)
+        let after = (try? String(contentsOf: CellarSettings.url, encoding: .utf8)) ?? ""
+        #expect(!after.contains("force_feedback_strength"), "default means no line, not a stored default")
     }
 }

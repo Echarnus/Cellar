@@ -1,12 +1,12 @@
 import Foundation
 import Testing
 
-/// The app's Dutch translation, checked against the SwiftUI source it translates.
+/// The app's Dutch translation, checked against the source it translates.
 ///
-/// SwiftUI looks a `Text("…")` literal up by its English text, so a translation is only as good as
-/// the match between that text and the key in `Localizable.strings`: reword a button and its Dutch
-/// silently falls back to English. These tests make that a failure instead, and they hold the line
-/// the other way too: a new literal on one of the app's screens needs a Dutch entry.
+/// SwiftUI and `String(localized:)` look a literal up by its English text, so a translation is only
+/// as good as the match between that text and the key in `Localizable.strings`: reword a button and
+/// its Dutch silently falls back to English. These tests make that a failure instead, and they hold
+/// the line the other way too: a new literal in the app needs a Dutch entry.
 @Suite("Localization")
 struct LocalizationTests {
 
@@ -23,61 +23,136 @@ struct LocalizationTests {
         return try #require(plist as? [String: String], "\(language) must be a flat key = value table")
     }
 
-    /// Every Swift file in the app, with multi-line literals' `\` continuations joined and their
-    /// opening `"""` folded into a plain quote, so a long caption written over several lines reads
-    /// as the one key SwiftUI looks up.
     static func appSource() throws -> String {
-        let files = try FileManager.default
+        try FileManager.default
             .contentsOfDirectory(at: appSources, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "swift" }
-        let joined = try files.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
-        return joined
-            .replacingOccurrences(of: #"\\\n[ \t]*"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"\"\"\"\n[ \t]*"#, with: "\"", options: .regularExpression)
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined(separator: "\n")
     }
 
-    /// The single-line literals SwiftUI localizes: the first argument of these views, when it is a
-    /// plain literal (no interpolation) that ends the argument, not one being concatenated to.
-    static func localizableLiterals(in source: String) throws -> Set<String> {
-        let regex = try NSRegularExpression(pattern:
-            #"\b(?:Text|Button|Label|Toggle|Section|Picker|Link|LabeledContent|\.help)\(\s*"((?:[^"\\]|\\[^(])*)"\s*[,)]"#)
-        let range = NSRange(source.startIndex..., in: source)
-        return Set(regex.matches(in: source, range: range).compactMap { match in
-            Range(match.range(at: 1), in: source).map { String(source[$0]) }
-                .map { $0.replacingOccurrences(of: #"\""#, with: "\"") }
-        }.filter { $0.contains(where: \.isLetter) })
+    /// The calls whose first string literal is looked up in the table.
+    static let lookups = try! NSRegularExpression(pattern:
+        #"\b(?:Text|Button|Label|Toggle|Section|Picker|Link|LabeledContent|help|accessibilityLabel|accessibilityValue|accessibilityHint)\(\s*(?=")|String\(localized:\s*(?=")"#)
+
+    /// Every key the app will look up: the literal each lookup is handed, with interpolations as
+    /// `%@`, and only when the literal is the whole argument — `"a" + b` is a `String`, which is
+    /// shown verbatim and never looked up.
+    static func keys(in source: String) -> Set<String> {
+        let chars = Array(source.unicodeScalars)
+        // NSRange counts UTF-16 units; the scanner walks scalars. Map one to the other once.
+        var scalarAt = [Int]()
+        for (index, scalar) in chars.enumerated() {
+            for _ in 0..<UTF16.width(scalar) { scalarAt.append(index) }
+        }
+        scalarAt.append(chars.count)
+        var found = Set<String>()
+        for match in lookups.matches(in: source, range: NSRange(source.startIndex..., in: source)) {
+            let start = scalarAt[match.range.location + match.range.length]
+            guard let (key, end) = literal(chars, at: start) else { continue }
+            var next = end
+            while next < chars.count, chars[next] == " " || chars[next] == "\n" { next += 1 }
+            guard next < chars.count, chars[next] == "," || chars[next] == ")" else { continue }
+            if key.replacingOccurrences(of: "%@", with: "").contains(where: \.isLetter) { found.insert(key) }
+        }
+        return found
+    }
+
+    /// Reads the Swift string literal opening at `start`, the way the compiler builds its key.
+    static func literal(_ c: [Unicode.Scalar], at start: Int) -> (String, Int)? {
+        if start + 2 < c.count, c[start + 1] == "\"", c[start + 2] == "\"" { return multiline(c, at: start) }
+        var out = "", i = start + 1
+        while i < c.count {
+            switch c[i] {
+            case "\"": return (out, i + 1)
+            case "\n": return nil
+            case "\\":
+                guard i + 1 < c.count else { return nil }
+                if c[i + 1] == "(" {
+                    i = skipInterpolation(c, from: i + 2)
+                    out += "%@"
+                    continue
+                }
+                switch c[i + 1] {
+                case "n": out += "\n"
+                case "t": out += "\t"
+                default: out.unicodeScalars.append(c[i + 1])
+                }
+                i += 2
+            default:
+                out.unicodeScalars.append(c[i]); i += 1
+            }
+        }
+        return nil
+    }
+
+    /// A `"""` literal: lines joined where they end in `\`, indentation stripped.
+    static func multiline(_ c: [Unicode.Scalar], at start: Int) -> (String, Int)? {
+        var i = start + 3, raw = ""
+        while i + 2 < c.count, !(c[i] == "\"" && c[i + 1] == "\"" && c[i + 2] == "\"") {
+            if c[i] == "\\", c[i + 1] == "(" {
+                i = skipInterpolation(c, from: i + 2); raw += "%@"; continue
+            }
+            raw.unicodeScalars.append(c[i]); i += 1
+        }
+        let joined = raw.replacingOccurrences(of: #"\\\n[ \t]*"#, with: "", options: .regularExpression)
+        let lines = joined.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.drop { $0 == " " || $0 == "\t" } }
+            .filter { !$0.isEmpty }
+        return (lines.joined(separator: "\n"), i + 3)
+    }
+
+    /// Past the `)` that closes an interpolation, stepping over strings nested inside it.
+    static func skipInterpolation(_ c: [Unicode.Scalar], from start: Int) -> Int {
+        var depth = 1, i = start
+        while i < c.count, depth > 0 {
+            switch c[i] {
+            case "\"":
+                i += 1
+                while i < c.count, c[i] != "\"" { i += c[i] == "\\" ? 2 : 1 }
+            case "(": depth += 1
+            case ")": depth -= 1
+            default: break
+            }
+            i += 1
+        }
+        return i
+    }
+
+    /// An `Int` interpolates as `%lld`, anything else as `%@`; the scanner cannot see types, so
+    /// both sides are compared with every placeholder written the same way.
+    static func normalized(_ key: String) -> String {
+        key.replacingOccurrences(of: #"%(?:\d+\$)?(?:lld|ld|d|@)"#, with: "%@", options: .regularExpression)
     }
 
     static func placeholders(_ text: String) -> [String] {
-        let regex = try! NSRegularExpression(pattern: #"%(?:\d+\$)?[@dlfs]"#)
+        let regex = try! NSRegularExpression(pattern: #"%(?:\d+\$)?(?:lld|ld|d|lf|f|@)"#)
         return regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
             .compactMap { Range($0.range, in: text).map { String(text[$0]) } }
+            .sorted()
     }
 
-    @Test("Both tables parse, English stays empty, and Dutch has the app's screens in it")
+    @Test("Both tables parse, English stays empty, and Dutch covers the app")
     func tablesParse() throws {
         #expect(try Self.table("en").isEmpty, "English is the source language: its keys are the text")
-        #expect(try Self.table("nl").count > 100)
+        #expect(try Self.table("nl").count > 200)
     }
 
-    @Test("Every Dutch key is still English text in the app, so none of them is dead")
-    func everyKeyIsInTheSource() throws {
-        let source = try Self.appSource()
-        for key in try Self.table("nl").keys {
-            // An interpolated literal's key has %@ where the source has \(…): match the text before it.
-            let literal = key.components(separatedBy: "%@").first ?? key
-            #expect(source.contains("\"" + literal.replacingOccurrences(of: "\"", with: #"\""#)),
-                    "'\(key)' is in nl.lproj but no longer in Sources/CellarApp — reworded?")
-        }
-    }
-
-    @Test("Every literal on the app's screens has a Dutch entry")
+    @Test("Every literal the app looks up has a Dutch entry")
     func everyLiteralIsTranslated() throws {
-        let dutch = try Self.table("nl")
-        let missing = try Self.localizableLiterals(in: Self.appSource())
+        let dutch = Set(try Self.table("nl").keys.map(Self.normalized))
+        let missing = Self.keys(in: try Self.appSource())
             .subtracting(Self.untranslated)
-            .filter { dutch[$0] == nil }
+            .filter { !dutch.contains($0) }
         #expect(missing.isEmpty, "add these to Resources/Localization/nl.lproj: \(missing.sorted())")
+    }
+
+    @Test("Every Dutch key is still looked up by the app, so none of them is dead")
+    func everyKeyIsInTheSource() throws {
+        let used = Self.keys(in: try Self.appSource())
+        let dead = try Self.table("nl").keys.filter { !used.contains(Self.normalized($0)) }
+        #expect(dead.isEmpty, "in nl.lproj but no longer in Sources/CellarApp — reworded? \(dead.sorted())")
     }
 
     @Test("A translation keeps its placeholders, and is not just the English again")
@@ -91,14 +166,23 @@ struct LocalizationTests {
         #expect(copied.isEmpty, "untranslated sentences: \(copied.keys.sorted())")
     }
 
-    @Test("A concatenated or interpolated label is spotted as one key, not English fragments")
-    func extractorReadsWholeLiterals() throws {
-        let sample = """
+    @Test("The scanner builds the keys the compiler builds")
+    func scannerReadsKeysLikeTheCompiler() {
+        let sample = #"""
         Text("One literal")
-        Button("With \\"quotes\\" inside") { }
+        Button("With \"quotes\" inside") { }
         Text("Joined, " + "so a String — never looked up")
-        Label("Connected: \\(names)", systemImage: "x")
-        """
-        #expect(try Self.localizableLiterals(in: sample) == ["One literal", #"With "quotes" inside"#])
+        Label("Connected: \(pads.map(\.name).joined(separator: ", "))", systemImage: "x")
+        alert.messageText = String(localized: "Uninstall \(game.name)?")
+        Text("""
+            One sentence \
+            over two lines.
+            """)
+        """#
+        #expect(Self.keys(in: sample) == [
+            "One literal", #"With "quotes" inside"#, "Connected: %@", "Uninstall %@?",
+            "One sentence over two lines.",
+        ])
+        #expect(Self.normalized("Step %lld of %lld") == "Step %@ of %@")
     }
 }

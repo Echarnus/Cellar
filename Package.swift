@@ -3,23 +3,32 @@ import PackageDescription
 
 let package = Package(
     name: "Cellar",
-    platforms: [.macOS(.v14)],
+    // The newest macOS every M1 Mac can run (Apple's compatibility list, issue #113). Spelled as a
+    // string so the manifest does not need a tools version that knows `.v27`.
+    platforms: [.macOS("27.0")],
     products: [
         .executable(name: "cellar", targets: ["cellar"]),
         .executable(name: "CellarApp", targets: ["CellarApp"]),
         .library(name: "CellarKit", targets: ["CellarKit"]),
+        .library(name: "CellarDomain", targets: ["CellarDomain"]),
         .library(name: "CellarUI", targets: ["CellarUI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         // The app's self-updater. Pinned exactly: it installs code on the player's Mac, so a new
         // version is a deliberate bump, not whatever resolved last.
-        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
     ],
     targets: [
-        // Core engine: environment detection, bottles, runners, profiles.
-        // The future SwiftUI app (Phase 3) imports this same library.
-        .target(name: "CellarKit"),
+        // The domain: pure types and policies — the stores' table of facts, launch stages, install
+        // phases, the events a command reports. Foundation value types only, no I/O, so it is the
+        // first target in Swift 6 language mode (docs/APP-ARCHITECTURE.md, step 10). Nothing here
+        // may import CellarKit; the compiler is what keeps it that way.
+        .target(name: "CellarDomain", swiftSettings: [.swiftLanguageMode(.v6)]),
+
+        // Core engine: environment detection, bottles, runners, profiles, the use cases and the
+        // store adapters. Re-exports CellarDomain, so `import CellarKit` still sees every type.
+        .target(name: "CellarKit", dependencies: ["CellarDomain"]),
 
         // Thin CLI over CellarKit.
         .executableTarget(
@@ -45,7 +54,7 @@ let package = Package(
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
 
-        .testTarget(name: "CellarKitTests", dependencies: ["CellarKit"]),
+        .testTarget(name: "CellarKitTests", dependencies: ["CellarKit", "CellarDomain"]),
 
         // Renders the marks offscreen and measures them. Needs the profile database and the golden
         // images on disk, so it is handed the repo root rather than guessing from #filePath.
@@ -56,6 +65,7 @@ let package = Package(
         // variables so the default run stays fast and CI stays green. See docs/TESTING.md.
         .testTarget(name: "CellarIntegrationTests", dependencies: ["CellarKit"]),
     ],
-    // Pragmatic: a synchronous CLI doesn't need Swift 6 strict-concurrency overhead yet.
+    // The default for every target that hasn't moved yet. Targets move to Swift 6 one at a time,
+    // with their own `swiftLanguageMode` setting, starting with CellarDomain.
     swiftLanguageModes: [.v5]
 )

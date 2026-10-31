@@ -40,12 +40,7 @@ public enum BattleNetBottle {
     /// Command-line fragments that identify the client's processes. `Agent.exe` is Blizzard's
     /// update agent and `Battle.net Helper.exe` its browser subprocesses — both outlive the client
     /// and both have to go when the bottle is shut down.
-    public static let clientProcesses = [
-        "Battle.net.exe",
-        "Battle.net Launcher.exe",
-        "Battle.net Helper.exe",
-        "Agent.exe",
-    ]
+    public static let clientProcesses = GameStore.battlenet.descriptor.clientProcessNames
 
     // MARK: - Locations
 

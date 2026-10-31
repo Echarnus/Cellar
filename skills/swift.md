@@ -26,7 +26,20 @@ machinery unless a target genuinely needs it.
   are thin. Never duplicate engine logic in a command or a view — add it to CellarKit and call it.
 - **The GUI drives the CLI as a subprocess** for side-effecting actions (setup, install, launch), so
   it inherits every tested path (silent Steam, the launch auto-retry, close-on-exit). Read-only state
-  comes from `Game.summaries()`. Don't reimplement an action inside the app.
+  comes from `LoadLibrary`. Don't reimplement an action inside the app.
+- **An engine action is a use case** (`Sources/CellarKit/UseCases/`: `LoadLibrary`, `SetUpGame`,
+  `InstallGame`, `LaunchGame`, `UninstallGame`): a small struct, its dependencies passed to `init`,
+  one `run` that reports `GameEvent`s. CLI commands call the use case; `Game.setUp`/`Game.launch`
+  are façades kept for older callers. Per-store behaviour goes in the store's `StoreAdapter`, never
+  in a `switch plan.store` inside a use case.
+- **The app names a command with `CellarCommand`, never a hand-built argument list.** Add a case
+  (and an entry in `CellarCommand.examples`) for anything new the app asks the CLI to do;
+  `cellar selftest` parses every example with the CLI's own parser, so a renamed flag fails CI.
+- **App state lives in `@Observable` stores owned by `AppModel`** (`main.swift`), handed to each
+  window as it is built — not created per view with `@StateObject`, not reached through `.shared`,
+  not synchronised with `NotificationCenter`. `ActivityStore` is the one runner for the player's
+  actions. Views read state and call the store's methods; they never assign to it. The target and
+  the migration are in [`docs/APP-ARCHITECTURE.md`](../docs/APP-ARCHITECTURE.md).
 - **CLI:** one file per command group under `Commands/`, ArgumentParser, small `struct` commands.
 - **CellarKit never prints.** Terminal output is the CLI's job (and is UI — see [`ux.md`](ux.md)).
   A library function that `print`s cannot be reused by the app, which renders the same information.
@@ -48,7 +61,7 @@ CLI itself. Two traps, one of which is live in the codebase today.
   - `WineRunner.run(..., inheritIO: true)` for anything long-running or noisy (it hands the child the
     parent's stdio, so no pipe can fill), or
   - a `readabilityHandler` on **both** pipes so they drain concurrently, the way
-    `CellarApp/CellarRunner.swift` streams the CLI's output.
+    `CellarApp/ActivityStore.swift` streams the CLI's output.
   If you ever do need both captured *and* volume-safe, drain both handlers into buffers and only then
   `waitUntilExit()`.
 - **Never `waitUntilExit()` before draining.** Same deadlock, more obvious.

@@ -2,18 +2,15 @@ import AppKit
 import CellarKit
 import SwiftUI
 
+/// What is left of the app's notifications: windows asking `AppDelegate` to open other windows,
+/// and ⌘F reaching a view's focus. State changes are not here — they are calls on the stores
+/// `AppModel` owns (docs/APP-ARCHITECTURE.md).
 extension Notification.Name {
     /// Posted by the "Settings…" menu item; ContentView opens its settings sheet on receipt.
     static let cellarOpenSettings = Notification.Name("cellar.openSettings")
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.
     static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
-    /// Posted when a store is signed in, signed out, added or removed, so the library re-reads
-    /// which games are the player's.
-    static let cellarAccountsChanged = Notification.Name("cellar.accountsChanged")
-    /// Posted while a sign-in goes on to ask the store which games are owned; `object` is the
-    /// progress sentence. The next `cellarAccountsChanged` after the command ends clears it.
-    static let cellarLibraryChecking = Notification.Name("cellar.libraryChecking")
     /// Posted by Settings' "Review folder access…" button — the same window first run shows, in its
     /// status-board form.
     static let cellarOpenFolderAccess = Notification.Name("cellar.openFolderAccess")
@@ -21,14 +18,34 @@ extension Notification.Name {
     /// Named for the *tour* specifically, because the folder-access screen above is the other
     /// first-run window and the two coexist rather than fight for the name.
     static let cellarOpenWelcomeTour = Notification.Name("cellar.openWelcomeTour")
-    /// Posted by View › Refresh Library (⌘R) — the same reload as the sidebar's button.
-    static let cellarRefreshLibrary = Notification.Name("cellar.refreshLibrary")
     /// Posted by Edit › Find… (⌘F), so the keyboard reaches the library search like any Mac app's.
     static let cellarFocusSearch = Notification.Name("cellar.focusSearch")
-    /// View › Add Installed Games Without a Profile: write draft profiles for them (`DraftProfile`).
-    static let cellarDraftProfiles = Notification.Name("cellar.draftProfiles")
-    /// The Dock menu's recently played games: select one in the library. The object is its slug.
-    static let cellarShowGame = Notification.Name("cellar.showGame")
+}
+
+/// The app's composition root: the state every window shares, made once and handed to each window
+/// as it is built (docs/APP-ARCHITECTURE.md). Settings, Accounts and the welcome tour are separate
+/// `NSWindow`s — a sheet under `NSHostingView` is a fatal AttributeGraph cycle — so they share no
+/// view tree, and this is how they still see the same Cellar.
+@MainActor
+final class AppModel {
+    /// The player's actions — one at a time, for the whole app.
+    let activity = ActivityStore()
+    /// The games, the selection and the sidebar's filters.
+    let library = LibraryStore()
+    /// Where the player is signed in.
+    lazy var accounts = AccountsStore(activity: activity)
+    /// The shared runtime downloading in the background — on its own runner, so it never holds Play.
+    let preparation = RuntimePreparation()
+    /// Sparkle, started the first time the menu bar asks for it.
+    lazy var updater = AppUpdater()
+
+    /// View › Add Installed Games Without a Profile: write draft profiles for them (`DraftProfile`),
+    /// then show what turned up.
+    func draftProfiles() {
+        guard !activity.busy else { return }
+        activity.run(.draftProfiles, title: "Finding games without a profile",
+                     then: { [library] in library.refresh() })
+    }
 }
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
@@ -37,7 +54,9 @@ extension Notification.Name {
 //
 // Because there is no App scene, AppKit installs no default menu bar — so we build one ourselves
 // (⌘Q to quit, About, Settings…, and the Edit menu that text fields need for cut/copy/paste).
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    let model = AppModel()
     var window: NSWindow!
     var settingsWindow: NSWindow?
     var accountsWindow: NSWindow?
@@ -54,7 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .compactMap { slug, _ in (try? Game.plan(slug: slug)).map { (slug, $0.name) } }
         guard !recent.isEmpty else { return nil }
         let menu = NSMenu()
-        let header = menu.addItem(withTitle: "Recently Played", action: nil, keyEquivalent: "")
+        let header = menu.addItem(withTitle: String(localized: "Recently Played"), action: nil, keyEquivalent: "")
         header.isEnabled = false
         for (slug, name) in recent {
             let item = menu.addItem(withTitle: name, action: #selector(showRecentGame(_:)), keyEquivalent: "")
@@ -67,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showRecentGame(_ sender: NSMenuItem) {
         window?.makeKeyAndOrderFront(nil)
         NSApp.bringToFront()
-        NotificationCenter.default.post(name: .cellarShowGame, object: sender.representedObject)
+        if let slug = sender.representedObject as? String { model.library.show(slug) }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -121,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let useDiagnostic = ProcessInfo.processInfo.environment["CELLAR_DIAG"] != nil
         window.contentView = useDiagnostic
             ? NSHostingView(rootView: AnyView(Text("Cellar GUI works").padding()))
-            : NSHostingView(rootView: ContentView())
+            : NSHostingView(rootView: ContentView(lib: model.library, runner: model.activity, preparation: model.preparation))
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.bringToFront()
@@ -146,11 +165,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The parts every game shares start downloading now, behind the tour, so the first
         // Install press is a game download and nothing else. A no-op once they are here.
         if !useDiagnostic {
-            DispatchQueue.main.async { RuntimePreparation.shared.startIfNeeded() }
+            DispatchQueue.main.async { [model] in model.preparation.startIfNeeded() }
         }
     }
 
-    @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin() }
+    @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin(preparation: model.preparation) }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
@@ -180,83 +199,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // App menu (its bold title comes from CFBundleName once wrapped as Cellar.app).
         let appMenu = submenu(appName)
-        appMenu.addItem(withTitle: "About \(appName)", action: #selector(showAbout), keyEquivalent: "")
+        appMenu.addItem(withTitle: String(localized: "About \(appName)"), action: #selector(showAbout), keyEquivalent: "")
             .target = self
         // Left out of a build from source: it has no feed to check, and a disabled item would only
         // raise a question it cannot answer. Settings › Updates says why.
-        if let updates = AppUpdater.shared.makeMenuItem() { appMenu.addItem(updates) }
-        appMenu.addItem(withTitle: "Welcome to \(appName)…", action: #selector(showWelcomeTour), keyEquivalent: "")
+        if let updates = model.updater.makeMenuItem() { appMenu.addItem(updates) }
+        appMenu.addItem(withTitle: String(localized: "Welcome to \(appName)…"), action: #selector(showWelcomeTour), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        appMenu.addItem(withTitle: String(localized: "Settings…"), action: #selector(showSettings), keyEquivalent: ",")
             .target = self
         // ⌘⇧A: an upper-case key equivalent is the shifted one.
-        appMenu.addItem(withTitle: "Accounts…", action: #selector(showAccounts), keyEquivalent: "A")
+        appMenu.addItem(withTitle: String(localized: "Accounts…"), action: #selector(showAccounts), keyEquivalent: "A")
             .target = self
         appMenu.addItem(.separator())
-        let services = appMenu.addItem(withTitle: "Services", action: nil, keyEquivalent: "")
-        let servicesMenu = NSMenu(title: "Services")
+        let services = appMenu.addItem(withTitle: String(localized: "Services"), action: nil, keyEquivalent: "")
+        let servicesMenu = NSMenu(title: String(localized: "Services"))
         services.submenu = servicesMenu
         NSApp.servicesMenu = servicesMenu
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide \(appName)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        let hideOthers = appMenu.addItem(withTitle: "Hide Others",
+        appMenu.addItem(withTitle: String(localized: "Hide \(appName)"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = appMenu.addItem(withTitle: String(localized: "Hide Others"),
                                          action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
-        appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: String(localized: "Show All"), action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         // Next to Quit, where a Mac app that removes itself puts it; it asks before doing anything.
-        appMenu.addItem(withTitle: "Uninstall \(appName)…", action: #selector(uninstallCellar), keyEquivalent: "")
+        appMenu.addItem(withTitle: String(localized: "Uninstall \(appName)…"), action: #selector(uninstallCellar), keyEquivalent: "")
             .target = self
-        appMenu.addItem(withTitle: "Quit \(appName)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: String(localized: "Quit \(appName)"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         // File menu — Close belongs here, not in Window, on every Mac.
-        let fileMenu = submenu("File")
-        fileMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let fileMenu = submenu(String(localized: "File"))
+        fileMenu.addItem(withTitle: String(localized: "Close Window"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
 
         // Edit menu — text fields (the library search box) need these for cut/copy/paste/select-all.
-        let editMenu = submenu("Edit")
-        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
-        editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        let editMenu = submenu(String(localized: "Edit"))
+        editMenu.addItem(withTitle: String(localized: "Undo"), action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: String(localized: "Redo"), action: Selector(("redo:")), keyEquivalent: "Z")
         editMenu.addItem(.separator())
-        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Delete", action: #selector(NSText.delete(_:)), keyEquivalent: "")
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(withTitle: String(localized: "Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: String(localized: "Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: String(localized: "Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: String(localized: "Delete"), action: #selector(NSText.delete(_:)), keyEquivalent: "")
+        editMenu.addItem(withTitle: String(localized: "Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenu.addItem(.separator())
-        editMenu.addItem(withTitle: "Find…", action: #selector(focusSearch), keyEquivalent: "f")
+        editMenu.addItem(withTitle: String(localized: "Find…"), action: #selector(focusSearch), keyEquivalent: "f")
             .target = self
 
         // View menu.
-        let viewMenu = submenu("View")
-        viewMenu.addItem(withTitle: "Refresh Library", action: #selector(refreshLibrary), keyEquivalent: "r")
+        let viewMenu = submenu(String(localized: "View"))
+        viewMenu.addItem(withTitle: String(localized: "Refresh Library"), action: #selector(refreshLibrary), keyEquivalent: "r")
             .target = self
-        viewMenu.addItem(withTitle: "Add Installed Games Without a Profile", action: #selector(draftProfiles), keyEquivalent: "")
+        viewMenu.addItem(withTitle: String(localized: "Add Installed Games Without a Profile"), action: #selector(draftProfiles), keyEquivalent: "")
             .target = self
         viewMenu.addItem(.separator())
-        let fullScreen = viewMenu.addItem(withTitle: "Enter Full Screen",
+        let fullScreen = viewMenu.addItem(withTitle: String(localized: "Enter Full Screen"),
                                           action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
         fullScreen.keyEquivalentModifierMask = [.command, .control]
 
         // Window menu.
-        let windowMenu = submenu("Window")
-        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        let windowMenu = submenu(String(localized: "Window"))
+        windowMenu.addItem(withTitle: String(localized: "Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: String(localized: "Zoom"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
         windowMenu.addItem(.separator())
-        windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        windowMenu.addItem(withTitle: String(localized: "Bring All to Front"), action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
         NSApp.windowsMenu = windowMenu
 
         // Help menu. Registering it is what gives macOS's menu search field, for free.
-        let helpMenu = submenu("Help")
-        helpMenu.addItem(withTitle: "\(appName) Help", action: #selector(openHelp), keyEquivalent: "?")
+        let helpMenu = submenu(String(localized: "Help"))
+        helpMenu.addItem(withTitle: String(localized: "\(appName) Help"), action: #selector(openHelp), keyEquivalent: "?")
             .target = self
-        helpMenu.addItem(withTitle: "Supported Games", action: #selector(openSupportedGames), keyEquivalent: "")
+        helpMenu.addItem(withTitle: String(localized: "Supported Games"), action: #selector(openSupportedGames), keyEquivalent: "")
             .target = self
         helpMenu.addItem(.separator())
-        helpMenu.addItem(withTitle: "Show Logs in Finder", action: #selector(showLogs), keyEquivalent: "")
+        helpMenu.addItem(withTitle: String(localized: "Show Logs in Finder"), action: #selector(showLogs), keyEquivalent: "")
             .target = self
-        helpMenu.addItem(withTitle: "Report an Issue…", action: #selector(reportIssue), keyEquivalent: "")
+        helpMenu.addItem(withTitle: String(localized: "Report an Issue…"), action: #selector(reportIssue), keyEquivalent: "")
             .target = self
         NSApp.helpMenu = helpMenu
 
@@ -264,11 +283,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func refreshLibrary() {
-        NotificationCenter.default.post(name: .cellarRefreshLibrary, object: nil)
+        model.library.refresh()
     }
 
     @objc private func draftProfiles() {
-        NotificationCenter.default.post(name: .cellarDraftProfiles, object: nil)
+        model.draftProfiles()
     }
 
     @objc private func focusSearch() {
@@ -292,7 +311,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.title = "Settings"
             w.isReleasedWhenClosed = false
             w.center()
-            w.contentView = NSHostingView(rootView: SettingsView(onClose: { [weak self] in
+            w.contentView = NSHostingView(rootView: SettingsView(runner: model.activity, library: model.library, accounts: model.accounts,
+                                                                updater: model.updater, preparation: model.preparation, onClose: { [weak self] in
                 self?.settingsWindow?.close()
             }))
             settingsWindow = w
@@ -344,7 +364,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.title = "Welcome to Cellar"
             w.isReleasedWhenClosed = false
             w.center()
-            w.contentView = NSHostingView(rootView: WelcomeTourView(onFinish: { [weak self] in
+            w.contentView = NSHostingView(rootView: WelcomeTourView(runner: model.activity, library: model.library, accounts: model.accounts,
+                                                                   preparation: model.preparation, onFinish: { [weak self] in
                 WelcomeTour.markSeen()
                 self?.welcomeTourWindow?.close()
             }))
@@ -390,11 +411,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-app.setActivationPolicy(.regular)
-app.run()
+// Top-level code is not main-actor isolated in the Swift 5 language mode, though it does run on the
+// main thread; say so, so the main-actor AppDelegate can be made here.
+MainActor.assumeIsolated {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.setActivationPolicy(.regular)
+    app.run()
+}
 
 /// Where the app sends a player for help. One table, so Settings and the Help menu never point at
 /// two different pages.
