@@ -1005,7 +1005,7 @@ FAQ_SECTIONS = [
         ("Once per store, or once per game?",
          "<p><b>Once per store.</b> One Steam sign-in covers your whole Steam library — both what "
          "you own and downloading it. GOG is one token Cellar holds for the account. That is why "
-         "signing in lives on the <b>Accounts</b> screen — the person icon in the sidebar, ⌘⇧A, or "
+         "signing in lives on the <b>Accounts</b> screen — your account at the bottom of the sidebar, ⌘⇧A, or "
          "Settings → Manage accounts — and not on each game's page.</p>"),
         ("Does Cellar see my password?",
          "<p>No. Steam's sign-in is Steam's own QR device flow: you approve it in the Steam mobile "

@@ -19,7 +19,7 @@ struct GameCover: View {
         RemoteArt(Artwork.portrait(game)) {
             if let path = game.iconPath, let image = NSImage(contentsOfFile: path) {
                 // An extracted .icns is square; fill the cover with it rather than letterboxing.
-                Image(nsImage: image).resizable().scaledToFill()
+                GameArt(Image(nsImage: image))
             } else {
                 GeneratedCover(title: game.name, store: game.store, width: width)
             }

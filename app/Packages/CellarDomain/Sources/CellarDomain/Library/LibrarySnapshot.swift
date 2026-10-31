@@ -14,15 +14,21 @@ public struct LibrarySnapshot: Sendable {
     /// Whether any store is signed in (or, for Battle.net, added).
     public var hasConnectedStore: Bool
     public var gogSignedIn: Bool
+    /// Which stores are connected, for the account button at the foot of the sidebar.
+    public var connectedStores: [GameStore]
 
     public init(games: [GameSummary], withheld: [GameSummary], steam: SteamSignInState,
-                hasConnectedStore: Bool, gogSignedIn: Bool) {
+                hasConnectedStore: Bool, gogSignedIn: Bool, connectedStores: [GameStore] = []) {
         self.games = games
         self.withheld = withheld
         self.steam = steam
         self.hasConnectedStore = hasConnectedStore
         self.gogSignedIn = gogSignedIn
+        self.connectedStores = connectedStores
     }
+
+    /// The account button's two lines, read from the same snapshot as the games it explains.
+    public var account: AccountSummary { AccountSummary(connected: connectedStores, steam: steam) }
 
     public static let empty = LibrarySnapshot(games: [], withheld: [], steam: .signedOut,
                                               hasConnectedStore: false, gogSignedIn: false)

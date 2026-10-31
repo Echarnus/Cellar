@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // player accepts, the moved copy opens and this one quits — so nothing else is set up here.
         if MoveToApplications.offerIfNeeded() { return }
 
-        // The gear button in the SwiftUI sidebar asks for Settings via this notification (the menu
+        // The gear at the foot of the SwiftUI sidebar asks for Settings via this notification (the menu
         // item calls showSettings directly). Settings is a separate NSWindow, not a SwiftUI .sheet:
         // a sheet presented inside the hosted view triggers a fatal AttributeGraph cycle under
         // NSHostingView. A top-level window is its own view graph, so it's safe.
@@ -125,6 +125,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @MainActor @objc private func uninstallCellar() { CellarUninstaller.begin(preparation: model.preparation) }
+
+    /// Coming back to Cellar is when the library is most likely to be out of date: the player may
+    /// have finished a download in the in-bottle client, moved a game in Finder, or signed in from
+    /// the CLI. There is no Refresh button to press, so this is the press (`LibraryRefresh`).
+    func applicationDidBecomeActive(_ notification: Notification) {
+        model.library.refreshIfDue(.becameActive)
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 

@@ -22,6 +22,8 @@ final class LibraryViewModel {
     var steam: SteamSignInState { snapshot.steam }
     var hasConnectedStore: Bool { snapshot.hasConnectedStore }
     var signInReason: String { snapshot.signInReason }
+    /// The account button at the foot of the sidebar.
+    var account: AccountSummary { snapshot.account }
 
     /// The search field, the filters and the sort — bound straight to their controls.
     var query = LibraryQuery(sort: Sort(rawValue: UserDefaults.standard.string(forKey: LibraryViewModel.sortKey) ?? "") ?? .name) {
@@ -45,6 +47,8 @@ final class LibraryViewModel {
     static let sortKey = "librarySort"
 
     @ObservationIgnored private let repository: any LibraryRepository
+    /// When the disk was last read, so the automatic triggers can tell news from a burst of ⌘-Tabs.
+    @ObservationIgnored private var lastRefresh: Date?
 
     /// Where the library comes from: the engine's disk read in the app (`AppModel` passes
     /// `DiskLibraryRepository`), a fixed snapshot in a preview.
@@ -54,6 +58,14 @@ final class LibraryViewModel {
 
     // MARK: - Intents
 
+    /// Reads the library again if `trigger` makes it due (`LibraryRefresh`). This is how the
+    /// library stays current without a Refresh button: the window opening, the player coming back
+    /// to Cellar, an action finishing and a quiet timer all call it.
+    func refreshIfDue(_ trigger: LibraryRefresh.Trigger) {
+        guard LibraryRefresh.isDue(trigger, lastRefresh: lastRefresh) else { return }
+        refresh()
+    }
+
     /// Read the library again, off the main actor.
     ///
     /// The read walks every bottle, and the first one after a download also turns the game's icon
@@ -61,6 +73,7 @@ final class LibraryViewModel {
     /// seconds just as a download finished. One read runs at a time; a refresh asked for meanwhile
     /// runs once more after it, so the last word is always a read that started after the change.
     func refresh() {
+        lastRefresh = Date()
         // A store that has just been set up now has its own artwork on disk; re-resolve so its
         // mark upgrades from the drawn one to the store's own without needing a relaunch.
         StoreIcons.refresh()
