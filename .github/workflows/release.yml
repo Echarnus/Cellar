@@ -52,6 +52,15 @@ jobs:
             echo "::error::'$version' is not a SemVer version (expected e.g. 0.4.0 or 0.4.0-beta.1)"
             exit 1
           fi
+          # The app, the CLI and every diagnostics report name CellarVersion.current, so a tag that
+          # disagrees with it would ship a build that misreports its own version.
+          # Found rather than hard-coded, so moving the file can't silently switch the check off.
+          version_file="$(find . -name CellarVersion.swift -not -path './.build/*' | head -n 1)"
+          source_version="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' "${version_file:-/dev/null}")"
+          if [ "$EVENT" = "push" ] && [ "$source_version" != "$version" ]; then
+            echo "::error::Tag v$version but CellarVersion.current is '$source_version'. Bump app/${version_file#./} in a PR first."
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Test suite
         run: sh Scripts/test.sh
