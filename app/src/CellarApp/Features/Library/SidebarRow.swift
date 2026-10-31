@@ -6,6 +6,9 @@ import CellarUI
 struct SidebarRow: View {
     let game: GameSummary
     let selected: Bool
+    /// What Cellar is doing with this game right now — downloading, installing, queued — said in
+    /// place of its installed state while it lasts.
+    var activity: GameActivity? = nil
     @State private var hovering = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
@@ -16,7 +19,7 @@ struct SidebarRow: View {
                 .padding(.trailing, 4)   // room for the badge that overhangs the cover
             VStack(alignment: .leading, spacing: 2) {
                 Text(game.name).lineLimit(1).font(.callout.weight(.medium))
-                StatusPill(game: game, compact: true)
+                StatusPill(game: game, activity: activity, compact: true)
             }
             Spacer(minLength: 0)
         }
@@ -26,7 +29,7 @@ struct SidebarRow: View {
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .onHover { hover in withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { hovering = hover } }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(game.name), \(game.store.displayName), \(game.statusText)")
+        .accessibilityLabel("\(game.name), \(game.store.displayName), \(activity?.statusText ?? game.statusText)")
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
     }
 }

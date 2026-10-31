@@ -47,6 +47,17 @@ struct GameSummaryTests {
         #expect(summary(store: store, clientInstalled: false, gameInstalled: false).nextStep == .install)
     }
 
+    @Test("An install that stopped partway is not installed, and the page says Install resumes it",
+          arguments: GameStore.allCases)
+    func interruptedInstall(_ store: GameStore) {
+        var stopped = summary(store: store, gameInstalled: false)
+        stopped.installInterrupted = true
+        #expect(stopped.nextStep == .install, "a half-downloaded game never offers Play")
+        #expect(stopped.actionHint.contains("stopped before it finished"))
+        #expect(stopped.actionHint.contains("picks up where it left off"))
+        #expect(!summary(store: store, gameInstalled: false).actionHint.contains("stopped"))
+    }
+
     @Test("Setup survives only as repair: the game is there, what it runs on is not")
     func setupIsRepair() {
         #expect(summary(runnerInstalled: false).nextStep == .setup)

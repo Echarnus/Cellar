@@ -13,6 +13,9 @@ final class AppModel {
     let activity = ActivityStore()
     /// The games, the selection and the sidebar's filters.
     let library = LibraryViewModel(repository: DiskLibraryRepository())
+    /// The games being downloaded and the ones waiting their turn. Each install that ends refreshes
+    /// the library, so the game's page reads its new state from disk.
+    lazy var downloads = DownloadsViewModel(activity: activity, finished: { [library] in library.refresh() })
     /// Where the player is signed in.
     lazy var accounts = AccountsViewModel(activity: activity)
     /// The shared runtime downloading in the background — on its own runner, so it never holds Play.

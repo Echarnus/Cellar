@@ -116,6 +116,15 @@ struct GameMenuTests {
         #expect(main.contains(.addToApplications))
     }
 
+    @Test("A download that stopped partway can still be uninstalled, though it is not a game yet")
+    func interruptedDownload() {
+        var summary = game(gameInstalled: false)
+        summary.installInterrupted = true
+        let main = GameMenu(game: summary).main.flatMap { $0 }
+        #expect(main.contains(.uninstall))
+        #expect(!main.contains(.moveToDrive), "nothing whole to move yet")
+    }
+
     @Test("Battle.net games are never moved behind Blizzard's back")
     func battleNetStays() {
         let menu = GameMenu(game: game(store: .battlenet))

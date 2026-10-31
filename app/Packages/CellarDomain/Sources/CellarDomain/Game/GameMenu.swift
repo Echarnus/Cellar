@@ -81,7 +81,8 @@ public struct GameMenu: Sendable, Equatable {
         }
 
         var removal: [Item] = []
-        if game.gameInstalled { removal.append(.uninstall) }
+        // A download that stopped partway has files to remove too, though it is not a game yet.
+        if game.gameInstalled || game.installInterrupted { removal.append(.uninstall) }
 
         main = [everyday, storage, removal].filter { !$0.isEmpty }
 
