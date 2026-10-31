@@ -171,7 +171,8 @@ The differences are real, not cosmetic — the three that bite hardest:
 
 Encode any such difference in **`GameStore.descriptor`** (`Sources/CellarKit/Store.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
-branch in `Game.setUp`/`Game.launch`, and a CLI command group. Nothing else should need to know.
+`StoreAdapter` (`Sources/CellarKit/StoreAdapter.swift`), and a CLI command group. Nothing else should
+need to know: the use cases (`SetUpGame`, `InstallGame`, `LaunchGame`) ask the adapter.
 
 ## UX/UI is a requirement, not a finishing touch
 

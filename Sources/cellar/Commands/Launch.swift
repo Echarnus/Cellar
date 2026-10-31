@@ -106,16 +106,17 @@ struct Launch: ParsableCommand {
         // Whether the game itself was started. Only then is a different backend worth suggesting:
         // a runner that isn't installed or a game that isn't downloaded is not a graphics problem.
         var started = false
+        let launch = LaunchGame(plan, showHUD: hud, forceStore: forceStore, checkUpdates: !noUpdate)
         let route: LaunchRoute
         do {
-            route = try Game.launch(plan, showHUD: hud, forceStore: forceStore,
-                                    checkUpdates: !noUpdate,
-                                    stage: { stage in
-                                        if stage == .starting { started = true }
-                                        report(stage)
-                                    },
-                                    update: updateReporter()) {
-                print("  " + Term.dim($0))
+            let update = updateReporter()
+            route = try launch.run { event in
+                event.deliver(progress: { print("  " + Term.dim($0)) },
+                              install: update,
+                              launch: { stage in
+                                  if stage == .starting { started = true }
+                                  report(stage)
+                              })
             }
         } catch {
             if started, let retry = plan.retryBackend {
@@ -139,7 +140,7 @@ struct Launch: ParsableCommand {
             print(Term.dim("Playing… (Cellar will close \(plan.store.displayName) when you quit the game)"))
         }
         report(.playing)
-        Game.waitForExitThenShutDown(plan, route: route)
+        launch.waitForExitThenShutDown(route)
         report(.closed)
         print(Term.green("\(plan.name) closed. Layer shut down."))
     }

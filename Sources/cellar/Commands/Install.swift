@@ -68,8 +68,11 @@ struct Install: ParsableCommand {
             lastReported = progress
             print(InstallMarker.line(progress))
         }
-        try Game.setUp(plan, progress: { print("  " + Term.dim($0)) }, phase: report)
-        try Game.installGame(plan, progress: { print("  " + Term.dim($0)) }, phase: report)
+        func show(_ event: GameEvent) {
+            event.deliver(progress: { print("  " + Term.dim($0)) }, install: report)
+        }
+        try SetUpGame(plan).run(show)
+        try InstallGame(plan).run(show)
         if Game.isGameInstalled(plan) {
             print(Term.green("Installed.") + " Play it with: cellar launch \(slug)")
         } else {

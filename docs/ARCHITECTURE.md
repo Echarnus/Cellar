@@ -141,8 +141,9 @@ Three consequences worth stating plainly, because they shape the UI as much as t
   for why this stopped being a per-game question for Steam too.
 
 All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
-about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a branch in `Game.setUp`
-and `Game.launch`, and a CLI command group.
+about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a `StoreAdapter`
+(`Sources/CellarKit/StoreAdapter.swift`: client set-up, install, opening the client, launching
+through it), and a CLI command group.
 
 ### One Steam, every bottle
 

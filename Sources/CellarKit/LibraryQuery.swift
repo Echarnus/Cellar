@@ -125,9 +125,9 @@ public struct LibrarySnapshot: Sendable {
                                               hasConnectedStore: false, gogSignedIn: false)
 
     /// Reads the library as it is on disk now. Never asks a store anything over the network:
-    /// `Game.summaries()` runs on every refresh.
+    /// `LoadLibrary` runs on every refresh.
     public static func current() -> LibrarySnapshot {
-        let all = Game.summaries()
+        let all = LoadLibrary().summaries()
         return LibrarySnapshot(games: all.filter(\.isVisible), withheld: all.filter { !$0.isVisible },
                                steam: SteamAccount.state, hasConnectedStore: StoreLibrary.hasConnectedStore,
                                gogSignedIn: GOGAuth.isSignedIn)
