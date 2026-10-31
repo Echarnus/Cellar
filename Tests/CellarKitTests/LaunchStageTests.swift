@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import CellarDomain
 @testable import CellarKit
 
 /// The launch window's checklist, and the marker lines the app reads it from.

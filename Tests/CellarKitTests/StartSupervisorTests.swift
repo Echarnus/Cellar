@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import CellarDomain
 @testable import CellarKit
 
 /// `ProcessWatch.superviseStart` is what survives D3DMetal's startup race: a game that fast-fails a

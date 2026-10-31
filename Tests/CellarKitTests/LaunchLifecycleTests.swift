@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import CellarDomain
 @testable import CellarKit
 
 /// Launch → watch → quit → shut down, through Cellar's own calls, against a fake Wine.
