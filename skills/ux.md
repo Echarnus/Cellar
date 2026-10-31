@@ -56,7 +56,7 @@ inherits it, rather than special-casing a store in a view.
 ## Telling the stores apart
 
 A game's store decides what every button does next, so it is primary information, never a footnote.
-It is carried by **three signals, always together** — see `app/src/CellarUI/Marks/GameStore+StoreStyle.swift`:
+It is carried by **three signals, always together** — see `app/Packages/CellarUI/Sources/CellarUI/Marks/GameStore+StoreStyle.swift`:
 
 | Signal | Where |
 |---|---|

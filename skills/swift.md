@@ -27,7 +27,7 @@ machinery unless a target genuinely needs it.
 - **The GUI drives the CLI as a subprocess** for side-effecting actions (setup, install, launch), so
   it inherits every tested path (silent Steam, the launch auto-retry, close-on-exit). Read-only state
   comes from `LoadLibrary`. Don't reimplement an action inside the app.
-- **An engine action is a use case** (`app/src/CellarKit/UseCases/`: `LoadLibrary`, `SetUpGame`,
+- **An engine action is a use case** (`app/Packages/CellarKit/Sources/CellarKit/UseCases/`: `LoadLibrary`, `SetUpGame`,
   `InstallGame`, `LaunchGame`, `UninstallGame`): a small struct, its dependencies passed to `init`,
   one `run` that reports `GameEvent`s. CLI commands call the use case; `Game.setUp`/`Game.launch`
   are façades kept for older callers. Per-store behaviour goes in the store's `StoreAdapter`, never
