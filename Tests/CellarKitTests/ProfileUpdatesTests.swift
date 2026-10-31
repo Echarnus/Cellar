@@ -12,11 +12,12 @@ struct ProfileUpdatesTests {
     let key = Curve25519.Signing.PrivateKey()
     var publicKey: String { key.publicKey.rawRepresentation.base64EncodedString() }
 
-    func bundle(version: String = "99.0.0", profiles: [String: String]) throws -> Data {
+    func bundle(version: String = "99.0.0", published: TimeInterval = 1_800_000_000,
+                profiles: [String: String]) throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         return try encoder.encode(ProfileUpdates.ProfileBundle(format: 1, cellarVersion: version,
-                                                               published: Date(timeIntervalSince1970: 1_800_000_000),
+                                                               published: Date(timeIntervalSince1970: published),
                                                                profiles: profiles))
     }
 
@@ -67,6 +68,21 @@ struct ProfileUpdatesTests {
             try ProfileUpdates.install(try ProfileUpdates.verify(old, signature: try key.signature(for: old), key: publicKey))
         }
         #expect(try Game.plan(slug: slug).name == "From The Registry", "a refused bundle changes nothing")
+    }
+
+    @Test("A genuine but older set cannot be served again over a newer one")
+    func noReplay() throws {
+        TestHome.ensure()
+        defer { try? FileManager.default.removeItem(at: Paths.registryProfiles) }
+        let newer = try bundle(published: 1_800_000_000, profiles: ["replay-fixture.toml": "[game]\nname = \"Fixed\"\nstore = \"steam\"\n"])
+        _ = try ProfileUpdates.install(try ProfileUpdates.verify(newer, signature: try key.signature(for: newer), key: publicKey))
+        let older = try bundle(published: 1_700_000_000, profiles: ["replay-fixture.toml": "[game]\nname = \"Broken\"\nstore = \"steam\"\n"])
+        #expect(throws: ProfileUpdates.Failure.olderThanInstalled) {
+            try ProfileUpdates.install(try ProfileUpdates.verify(older, signature: try key.signature(for: older), key: publicKey))
+        }
+        #expect(try Game.plan(slug: "replay-fixture").name == "Fixed")
+        // The same set again is fine: re-fetching what is installed is not a replay.
+        _ = try ProfileUpdates.install(try ProfileUpdates.verify(newer, signature: try key.signature(for: newer), key: publicKey))
     }
 
     @Test("Versions compare by number, not by text")

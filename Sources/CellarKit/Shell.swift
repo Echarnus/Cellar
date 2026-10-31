@@ -15,7 +15,8 @@ public enum Shell {
     public static func run(
         _ executable: String,
         _ args: [String] = [],
-        environment: [String: String]? = nil
+        environment: [String: String]? = nil,
+        input: Data? = nil
     ) -> Result {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -26,11 +27,19 @@ public enum Shell {
         let errPipe = Pipe()
         process.standardOutput = outPipe
         process.standardError = errPipe
+        // `input` is for what must not be on a command line (any process can read another's argv):
+        // a secret is handed over on stdin instead. Small, so writing before reading cannot block.
+        let inPipe = input.map { _ in Pipe() }
+        if let inPipe { process.standardInput = inPipe }
 
         do {
             try process.run()
         } catch {
             return Result(exitCode: -1, stdout: "", stderr: error.localizedDescription)
+        }
+        if let inPipe, let input {
+            try? inPipe.fileHandleForWriting.write(contentsOf: input)
+            try? inPipe.fileHandleForWriting.close()
         }
 
         // Outputs here are small (version strings, paths); read-then-wait is fine.
