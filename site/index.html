@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en" class="no-js"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cellar — Windows games on your Mac</title>
+<meta name="description" content="Cellar runs the Windows games you own on Apple Silicon Macs: Wine with Apple&#x27;s D3DMetal, per-game profiles, and your own Steam, Battle.net and GOG accounts. Free and open source.">
+<meta name="theme-color" content="#fbf8f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121014" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://echarnus.github.io/Cellar/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Cellar">
+<meta property="og:title" content="Cellar — Windows games on your Mac"><meta property="og:description" content="Cellar runs the Windows games you own on Apple Silicon Macs: Wine with Apple&#x27;s D3DMetal, per-game profiles, and your own Steam, Battle.net and GOG accounts. Free and open source.">
+<meta property="og:url" content="https://echarnus.github.io/Cellar/"><meta property="og:image" content="https://echarnus.github.io/Cellar/icon.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="icon.png"><link rel="apple-touch-icon" href="icon.png">
+<script>document.documentElement.classList.remove('no-js');try{var t=localStorage.getItem('cellar-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>:root{color-scheme:light dark;--bg:#fbf8f7;--surface:#ffffff;--surface-2:#f3eded;--fg:#1c1a1d;--muted:#5f5960;--line:#e4d9da;--link:#9b2546;--focus:#9b2546;--primary:#8e1f3d;--on-primary:#ffffff;--ok:#1f7a3d;--warn:#9a5a00;--untested:#5f5960;--steam:#1f6fae;--steam-bg:#e8f1f9;--battlenet:#006c9e;--battlenet-bg:#e3f3fa;--gog:#7a32ab;--gog-bg:#f3eaf9;--shadow:rgba(40,16,24,.10);}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121014;--surface:#1c181c;--surface-2:#262026;--fg:#f4eff1;--muted:#b0a8ae;--line:#352c32;--link:#f59ab5;--focus:#f59ab5;--primary:#b02e57;--on-primary:#ffffff;--ok:#6ad48a;--warn:#f2b25c;--untested:#b0a8ae;--steam:#7ab8e8;--steam-bg:#1a2834;--battlenet:#4cc4ff;--battlenet-bg:#142a35;--gog:#cf97ee;--gog-bg:#2a1f33;--shadow:rgba(0,0,0,.45);}}
+:root[data-theme=dark]{--bg:#121014;--surface:#1c181c;--surface-2:#262026;--fg:#f4eff1;--muted:#b0a8ae;--line:#352c32;--link:#f59ab5;--focus:#f59ab5;--primary:#b02e57;--on-primary:#ffffff;--ok:#6ad48a;--warn:#f2b25c;--untested:#b0a8ae;--steam:#7ab8e8;--steam-bg:#1a2834;--battlenet:#4cc4ff;--battlenet-bg:#142a35;--gog:#cf97ee;--gog-bg:#2a1f33;--shadow:rgba(0,0,0,.45);}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+:root{--hero-1:#a52a52;--hero-2:#8e1f3d;--hero-3:#4a0f22;--badge-ok:#1f7a3d;--badge-warn:#9a5a00;--badge-muted:#5f5960;}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:17px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+img,svg{max-width:100%}
+a{color:var(--link);text-underline-offset:.18em}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:8px}
+h1,h2,h3{line-height:1.15;letter-spacing:-.022em;margin:0}
+p{margin:0 0 1em}
+code{font:.86em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface-2);
+  padding:2px 6px;border-radius:6px;overflow-wrap:anywhere}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip{position:absolute;left:12px;top:-60px;z-index:20;background:var(--surface);color:var(--fg);
+  padding:12px 18px;border-radius:10px;border:1px solid var(--line);font-weight:600}
+.skip:focus{top:12px}
+
+/* Top bar */
+.top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 86%,transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(14px);backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--line)}
+@supports not (background:color-mix(in srgb,red 50%,blue)){.top{background:var(--bg)}}
+.top .wrap{display:flex;align-items:center;gap:8px;min-height:60px;flex-wrap:wrap}
+.brand{display:inline-flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none;
+  font-weight:750;font-size:1.08rem;margin-right:auto;min-height:44px}
+.brand img{width:30px;height:30px;border-radius:7px}
+.nav{display:flex;gap:2px;order:3;width:100%;overflow-x:auto;margin:0 -8px;padding:0 0 6px;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav a{color:var(--muted);text-decoration:none;padding:0 12px;border-radius:9px;font-size:.95rem;
+  min-height:44px;display:inline-flex;align-items:center;white-space:nowrap}
+.nav a:hover{color:var(--fg);background:var(--surface-2)}
+.nav a[aria-current=page]{color:var(--fg);font-weight:600}
+@media (min-width:760px){.nav{order:0;width:auto;margin:0 6px 0 0;padding:0;overflow:visible}}
+.icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:11px;
+  border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.icon-btn:hover{background:var(--surface-2)}
+.icon-btn svg{width:20px;height:20px}
+.icon-btn .moon{display:none}
+:root[data-theme=dark] .icon-btn .sun{display:none}
+:root[data-theme=dark] .icon-btn .moon{display:block}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .icon-btn .sun{display:none}
+  :root:not([data-theme=light]) .icon-btn .moon{display:block}}
+.no-js .icon-btn{display:none}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;
+  padding:10px 18px;border-radius:12px;font-weight:650;text-decoration:none;border:1px solid transparent;
+  transition:transform .15s ease,box-shadow .15s ease,background-color .15s ease}
+.btn svg{width:18px;height:18px;flex:none}
+.btn-primary{background:var(--primary);color:var(--on-primary)}
+.btn-primary:hover{box-shadow:0 8px 22px var(--shadow);transform:translateY(-1px)}
+.btn-small{padding:8px 14px;font-size:.92rem}
+.btn-light{background:#fff;color:#1c1a1d;box-shadow:0 12px 32px rgba(0,0,0,.28)}
+.btn-light:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(0,0,0,.34)}
+.btn-ghost{color:#fff;border-color:rgba(255,255,255,.55)}
+.btn-ghost:hover{background:rgba(255,255,255,.12)}
+.btn-big{padding:14px 24px;font-size:1.05rem;border-radius:14px}
+.btn-big .lines{display:flex;flex-direction:column;text-align:left;line-height:1.25}
+.btn-big small{font-weight:500;font-size:.78rem;color:#4a454b}
+.hero .btn:focus-visible,.band .btn:focus-visible,.hero a:focus-visible,.band a:focus-visible{outline-color:#fff}
+
+/* Hero */
+.hero{color:#fff;background:radial-gradient(120% 120% at 15% -10%,var(--hero-1) 0%,var(--hero-2) 45%,var(--hero-3) 100%);
+  overflow:hidden}
+.hero .wrap{display:grid;gap:44px;align-items:center;padding-top:64px;padding-bottom:72px}
+@media (min-width:900px){.hero .wrap{grid-template-columns:1.05fr .95fr;padding-top:88px;padding-bottom:96px}}
+.eyebrow{display:inline-flex;gap:8px;align-items:center;font-size:.85rem;font-weight:600;letter-spacing:.02em;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:5px 12px;border-radius:99px;margin-bottom:22px}
+.hero h1{font-size:clamp(2.4rem,5.6vw,3.7rem);font-weight:800;letter-spacing:-.035em}
+.hero .lede{font-size:clamp(1.08rem,2.1vw,1.25rem);max-width:36ch;margin:20px 0 30px;color:#fff}
+.hero .ctas{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.hero .fine{margin:18px 0 0;font-size:.9rem;color:#fff}
+.hero .fine a{color:#fff}
+.hero .fine.sum{margin-top:8px;font-size:.82rem}
+.hero .fine code{overflow-wrap:anywhere;background:rgba(0,0,0,.28);color:#fff}
+.shelf{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:1.08/1}
+@media (max-width:600px){.shelf{display:none}}
+.shelf .cover{position:absolute;width:44%;aspect-ratio:2/3;border-radius:14px;overflow:hidden;
+  box-shadow:0 26px 60px rgba(0,0,0,.45);background:linear-gradient(160deg,#c4466e,#4a0f22)}
+.shelf .cover img{width:100%;height:100%;object-fit:cover;display:block}
+.shelf .c1{left:2%;top:14%;transform:rotate(-8deg)}
+.shelf .c2{left:28%;top:2%;z-index:2;width:46%}
+.shelf .c3{right:2%;top:14%;transform:rotate(8deg)}
+/* The icon overlaps the bottom edge of the middle cover by about 40% of its height: enough to
+   tie it to the shelf, low enough to leave cover titles clear. Its PNG carries macOS's transparent
+   margin and its own rounded tile: the shadow follows the tile (drop-shadow), and height:auto
+   keeps it square — the height attribute alone would pin it at 256px tall. */
+.shelf .appicon{position:absolute;z-index:3;left:50%;bottom:8%;transform:translateX(-50%);width:24%;height:auto;
+  aspect-ratio:1/1;filter:drop-shadow(0 14px 22px rgba(0,0,0,.45))}
+.page-head{color:#fff;background:radial-gradient(120% 140% at 15% -20%,var(--hero-1) 0%,var(--hero-2) 50%,var(--hero-3) 100%)}
+.page-head .wrap{padding-top:56px;padding-bottom:56px}
+.page-head h1{font-size:clamp(2.1rem,5vw,3rem);font-weight:800}
+.page-head p{margin:14px 0 0;max-width:56ch;font-size:1.12rem;color:#fff}
+
+/* Sections */
+section.block{padding:84px 0 0}
+.section-head{max-width:680px;margin-bottom:34px}
+.kicker{color:var(--link);font-weight:700;font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px}
+.section-head h2{font-size:clamp(1.8rem,3.6vw,2.5rem)}
+.section-head p{color:var(--muted);font-size:1.08rem;margin:14px 0 0}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:18px;overflow:hidden;margin:-36px 0 0;position:relative}
+@media (min-width:760px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stats div{background:var(--surface);padding:18px 20px}
+.stats b{display:block;font-size:1.6rem;letter-spacing:-.02em}
+.stats span{color:var(--muted);font-size:.92rem}
+
+.features{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));list-style:none;margin:0;padding:0}
+.feature{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px}
+.feature .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--surface-2);color:var(--link);margin-bottom:16px}
+.feature .ic svg{width:24px;height:24px}
+.feature h3{font-size:1.15rem;margin-bottom:8px}
+.feature p{color:var(--muted);margin:0}
+
+.steps{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));list-style:none;margin:0;padding:0;counter-reset:step}
+.steps li{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px 24px 24px 76px;counter-increment:step}
+.steps li::before{content:counter(step);position:absolute;left:24px;top:22px;width:36px;height:36px;border-radius:50%;
+  background:var(--primary);color:var(--on-primary);display:grid;place-items:center;font-weight:750}
+.steps h3{font-size:1.1rem;margin-bottom:6px}
+.steps p{margin:0;color:var(--muted)}
+
+/* Games */
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;margin:0 0 22px}
+.no-js .toolbar{display:none}
+.search{position:relative;flex:1 1 240px;max-width:360px}
+.search svg{position:absolute;left:13px;top:50%;width:18px;height:18px;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.search input{width:100%;min-height:44px;padding:10px 14px 10px 40px;border-radius:12px;border:1px solid var(--muted);
+  background:var(--surface);color:var(--fg);font:inherit;font-size:1rem}
+.seg{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:13px;background:var(--surface-2);border:1px solid var(--line)}
+.seg button{min-height:38px;padding:6px 13px;border:0;border-radius:9px;background:transparent;color:var(--fg);
+  font:inherit;font-size:.93rem;cursor:pointer}
+.seg button:hover{background:var(--surface)}
+.seg button[aria-pressed=true]{background:var(--surface);font-weight:650;box-shadow:0 1px 3px var(--shadow),inset 0 0 0 1px var(--line)}
+.seg .n{color:var(--muted);font-weight:500;margin-left:4px}
+.count{color:var(--muted);font-size:.95rem;margin:0 0 16px}
+.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));list-style:none;margin:0;padding:0}
+.card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;
+  transition:transform .18s ease,box-shadow .18s ease}
+.card:hover{transform:translateY(-3px);box-shadow:0 18px 36px var(--shadow)}
+.card[hidden]{display:none}
+.card .art{position:relative;aspect-ratio:2/3;background:linear-gradient(160deg,var(--hero-1),var(--hero-3));color:#fff}
+.card .art .ph{position:absolute;inset:0;display:grid;place-items:center;padding:18px;text-align:center;font-weight:750;font-size:1.25rem;line-height:1.2}
+.card .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.card .art img.broken{display:none}
+.badge{position:absolute;top:10px;left:10px;display:inline-flex;align-items:center;gap:5px;color:#fff;font-size:.78rem;
+  font-weight:700;padding:4px 10px 4px 8px;border-radius:99px;background:var(--badge-muted);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.badge svg{width:14px;height:14px}
+.badge.ok{background:var(--badge-ok)}.badge.warn{background:var(--badge-warn)}
+.card .meta{padding:16px 16px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
+/* On a phone, a row per game: a full-width 2:3 cover would make the list ten screens long. */
+@media (max-width:540px){.card{flex-direction:row}.card .art{width:108px;flex:none;aspect-ratio:auto;min-height:162px}
+  .card .art .ph{font-size:.85rem;padding:8px}.badge{top:6px;left:6px;font-size:.7rem;padding:3px 7px 3px 5px}
+  .card .meta{padding:12px 14px}}
+.card h3{font-size:1.06rem;line-height:1.25}
+.chip{display:inline-block;font-size:.8rem;font-weight:650;padding:3px 10px;border-radius:7px}
+.chip.steam{color:var(--steam);background:var(--steam-bg)}
+.chip.battlenet{color:var(--battlenet);background:var(--battlenet-bg)}
+.chip.gog{color:var(--gog);background:var(--gog-bg)}
+.facts{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.88rem}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0;overflow-wrap:anywhere}
+.card .more{margin-top:auto;font-size:.88rem;font-weight:600;min-height:44px;display:inline-flex;align-items:center}
+.empty{text-align:center;color:var(--muted);padding:40px 0}
+.legend{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));margin:28px 0 0;padding:0;list-style:none}
+.legend li{display:flex;gap:10px;align-items:flex-start;color:var(--muted);font-size:.93rem}
+.legend b{color:var(--fg)}
+.legend svg{width:18px;height:18px;flex:none;margin-top:3px}
+.legend .ok{color:var(--ok)}.legend .warn{color:var(--warn)}.legend .muted{color:var(--untested)}
+.callout{margin:28px 0 0;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:14px;padding:18px 22px}
+.callout h3{font-size:1.05rem;margin-bottom:4px}
+.callout p{margin:0;color:var(--muted)}
+
+/* Requirements */
+.reqs{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));list-style:none;margin:0;padding:0}
+.reqs li{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}
+.reqs b{display:block;font-size:1.05rem;margin-bottom:4px}
+.reqs span{color:var(--muted)}
+
+/* FAQ */
+.qa-list{max-width:820px}
+details.qa{background:var(--surface);border:1px solid var(--line);border-radius:14px;margin:10px 0;scroll-margin-top:84px}
+details.qa>summary{cursor:pointer;list-style:none;padding:14px 18px;font-weight:650;display:flex;gap:14px;align-items:center;min-height:52px;border-radius:14px}
+details.qa>summary::-webkit-details-marker{display:none}
+details.qa>summary::after{content:"";flex:none;margin-left:auto;width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+  transform:rotate(45deg) translate(-2px,-2px);transition:transform .2s ease}
+details.qa[open]>summary::after{transform:rotate(225deg) translate(-2px,-2px)}
+details.qa[open]>summary{border-bottom:1px solid var(--line);border-radius:14px 14px 0 0}
+details.qa .a{padding:16px 18px 4px}
+details.qa .a p,details.qa .a ul,details.qa .a ol{margin:0 0 14px}
+details.qa .a ul,details.qa .a ol{padding-left:20px}
+details.qa .a pre{margin:0 0 14px;overflow-x:auto}
+details.qa .a li{margin:5px 0}
+.faq-layout{display:grid;gap:36px;padding:44px 0 0}
+@media (min-width:960px){.faq-layout{grid-template-columns:240px 1fr}}
+.toc{align-self:start}
+@media (min-width:960px){.toc{position:sticky;top:84px}}
+.toc h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
+.toc ol{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px}
+@media (min-width:960px){.toc ol{flex-direction:column}}
+.toc a{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border-radius:9px;color:var(--fg);text-decoration:none;
+  background:var(--surface-2)}
+@media (min-width:960px){.toc a{background:none;display:flex}}
+.toc a:hover{background:var(--surface-2)}
+.faq-section{margin:0 0 44px;scroll-margin-top:84px}
+.faq-section h2{font-size:1.55rem}
+.faq-section .lede{color:var(--muted);margin:6px 0 14px}
+.more-link{display:inline-flex;align-items:center;min-height:44px;font-weight:650}
+
+/* Closing band + footer */
+.band{margin:96px 0 0;color:#fff;background:radial-gradient(120% 160% at 85% 120%,var(--hero-1) 0%,var(--hero-2) 50%,var(--hero-3) 100%)}
+.band .wrap{padding-top:64px;padding-bottom:64px;display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between}
+.band h2{font-size:clamp(1.7rem,3.4vw,2.3rem)}
+.band p{margin:10px 0 0;color:#fff;max-width:48ch}
+footer.site{border-top:1px solid var(--line);padding:48px 0 56px;color:var(--muted);font-size:.93rem}
+footer.site .cols{display:grid;gap:28px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:32px}
+footer.site h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--fg);margin:0 0 8px}
+footer.site ul{list-style:none;margin:0;padding:0}
+footer.site li a{display:inline-flex;align-items:center;min-height:36px;color:var(--muted);text-decoration:none}
+footer.site li a:hover{color:var(--fg);text-decoration:underline}
+footer.site .legal{max-width:80ch;margin:0}
+.notfound{padding:96px 0 40px;text-align:center}
+.notfound h1{font-size:clamp(2rem,5vw,3rem);margin-bottom:12px}
+.notfound p{color:var(--muted)}
+.notfound .ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:24px}
+.notfound .btn-ghost{color:var(--fg);border-color:var(--line)}
+
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}
+  .card:hover,.btn:hover{transform:none}}
+@media (prefers-contrast:more){:root{--line:var(--muted)}.seg button[aria-pressed=true]{outline:2px solid var(--fg)}}
+@media print{.top,.toolbar,.band{display:none}body{background:#fff;color:#000}}
+</style></head><body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="index.html"><img src="icon.png" alt="" width="30" height="30">Cellar</a>
+  <nav class="nav" aria-label="Main"><a href="index.html#features">Features</a><a href="index.html#games">Games</a><a href="faq.html">FAQ</a><a href="https://github.com/Echarnus/Cellar">GitHub</a></nav>
+  <button class="icon-btn" id="theme" type="button" aria-pressed="false" aria-label="Switch to dark mode"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+  <a class="btn btn-primary btn-small" href="https://github.com/Echarnus/Cellar/releases/download/v0.2.0/Cellar-0.2.0.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Download</a>
+</div></header>
+<main id="main">
+<section class="hero" aria-labelledby="hero-h"><div class="wrap">
+  <div>
+    <p class="eyebrow">Free and open source · For Apple Silicon</p>
+    <h1 id="hero-h">Your Windows games, on your Mac.</h1>
+    <p class="lede">Cellar runs the Windows games you already own on Apple Silicon. It sets up Wine and
+    Apple&rsquo;s D3DMetal for each game, signs in to your stores once, and gets out of the way.</p>
+    <div class="ctas">
+      <a class="btn btn-light btn-big" href="https://github.com/Echarnus/Cellar/releases/download/v0.2.0/Cellar-0.2.0.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span class="lines">Download for Mac<small>Version 0.2.0 · 0.8 MB · Apple Silicon · macOS 27 or later</small></span></a>
+      <a class="btn btn-ghost btn-big" href="#games">See supported games</a>
+    </div>
+    <p class="fine">Version 0.2.0 · <a href="https://github.com/Echarnus/Cellar/releases/tag/v0.2.0">what&rsquo;s new</a> · Cellar isn&rsquo;t notarised by Apple, so macOS asks once:
+    <a href="faq.html#macos-says-cellar-can-t-be-opened">how to open Cellar the first time</a></p>
+  </div>
+  <div class="shelf" aria-hidden="true"><div class="cover c1"><img src="https://cdn.cloudflare.steamstatic.com/steam/apps/2688950/library_600x900.jpg" alt="" width="600" height="900" onerror="this.remove()"></div><div class="cover c2"><img src="https://cdn.cloudflare.steamstatic.com/steam/apps/244210/library_600x900.jpg" alt="" width="600" height="900" onerror="this.remove()"></div><div class="cover c3"><img src="https://cdn.cloudflare.steamstatic.com/steam/apps/805550/library_600x900.jpg" alt="" width="600" height="900" onerror="this.remove()"></div><img class="appicon" src="icon.png" alt="" width="256" height="256"></div>
+</div></section>
+
+<div class="wrap">
+  <dl class="stats">
+    <div><dt class="sr-only">Game profiles</dt><dd style="margin:0"><b>10</b><span>game profiles</span></dd></div>
+    <div><dt class="sr-only">Confirmed playable</dt><dd style="margin:0"><b>1</b><span>confirmed playable</span></dd></div>
+    <div><dt class="sr-only">Stores</dt><dd style="margin:0"><b>3</b><span>stores: Steam, Battle.net, GOG</span></dd></div>
+    <div><dt class="sr-only">Price</dt><dd style="margin:0"><b>Free</b><span>GPL-3.0, no telemetry</span></dd></div>
+  </dl>
+
+  <section class="block" id="features" aria-labelledby="features-h">
+    <div class="section-head"><p class="kicker">Features</p>
+      <h2 id="features-h">Everything a game needs, set up for you.</h2>
+      <p>Cellar is to the Mac what Proton is to Linux: the Windows game runs much as it does on a PC,
+      and your Mac stays a Mac.</p></div>
+    <ul class="features"><li class="feature"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg></div><h3>One click from download to playing</h3><p>Cellar fetches the Wine runner, sets up the graphics layer and builds a bottle for each game. No Terminal, no Windows licence, no virtual machine.</p></li><li class="feature"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 9h16l-1.2 10.2a1 1 0 0 1-1 .8H6.2a1 1 0 0 1-1-.8z"/><path d="M8.5 9V7a3.5 3.5 0 0 1 7 0v2"/></svg></div><h3>Your stores, your library</h3><p>Steam, Battle.net and GOG. Sign in once per store, not once per game, and Cellar shows the games you own there.</p></li><li class="feature"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></div><h3>Apple's D3DMetal, or DXVK</h3><p>Direct3D is translated to Metal on the Apple GPU. Every game names a fallback backend for when the first choice misbehaves.</p></li><li class="feature"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div><h3>A profile for every game</h3><p>The fixes a game needs are written down once and reused forever, in an open database anyone can add to.</p></li><li class="feature"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 13 4-4"/><circle cx="12" cy="13" r="1.3"/></svg></div><h3>See what limits your frame rate</h3><p>Turn on the Metal performance overlay in Settings, or measure a session with <code>cellar perf measure</code>.</p></li><li class="feature"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Free, open and private</h3><p>GPL-3.0, no Cellar account, no telemetry. Games come from your own accounts, and their DRM runs untouched.</p></li></ul>
+  </section>
+
+  <section class="block" id="how" aria-labelledby="how-h">
+    <div class="section-head"><p class="kicker">How it works</p>
+      <h2 id="how-h">Three steps, once.</h2></div>
+    <ol class="steps"><li><h3>Install Cellar</h3><p>Open the download and drag Cellar to Applications. It sets up what it needs the first time a game asks for it.</p></li><li><h3>Sign in to your stores</h3><p>Steam, Battle.net or GOG, with your own account. Once per store; you can also skip it and do it later.</p></li><li><h3>Pick a game and play</h3><p>Choose a game you own, install it, and press Play. Cellar picks the runner and backend from the game's profile.</p></li></ol>
+  </section>
+
+  <section class="block" id="games" aria-labelledby="games-h">
+    <div class="section-head"><p class="kicker">Supported games</p>
+      <h2 id="games-h">What has a profile today.</h2>
+      <p>Every card comes straight from a profile in the repository, so this list can&rsquo;t claim more
+      than the profile does. A game without one may still run — the list is what has been written
+      down, not the limit.</p></div>
+    <div class="toolbar" role="search" aria-label="Filter games">
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><label class="sr-only" for="q">Search games</label>
+        <input id="q" type="search" placeholder="Search games" autocomplete="off"></div>
+      <div class="seg" role="group" aria-label="Store" data-key="store"><button type="button" data-value="all" aria-pressed="true">All stores<span class="n" aria-hidden="true">10</span><span class="sr-only">, 10 games</span></button><button type="button" data-value="steam" aria-pressed="false">Steam<span class="n" aria-hidden="true">8</span><span class="sr-only">, 8 games</span></button><button type="button" data-value="battlenet" aria-pressed="false">Battle.net<span class="n" aria-hidden="true">1</span><span class="sr-only">, 1 games</span></button><button type="button" data-value="gog" aria-pressed="false">GOG<span class="n" aria-hidden="true">1</span><span class="sr-only">, 1 games</span></button></div>
+      <div class="seg" role="group" aria-label="Status" data-key="status"><button type="button" data-value="all" aria-pressed="true">Any status<span class="n" aria-hidden="true">10</span><span class="sr-only">, 10 games</span></button><button type="button" data-value="playable" aria-pressed="false">Playable<span class="n" aria-hidden="true">1</span><span class="sr-only">, 1 games</span></button><button type="button" data-value="untested" aria-pressed="false">Untested<span class="n" aria-hidden="true">9</span><span class="sr-only">, 9 games</span></button></div>
+    </div>
+    <p class="count" id="count" role="status" aria-live="polite">Showing all 10 games</p>
+    <ul class="grid" id="grid">
+    <li class="card" data-name="planet coaster 2" data-status="playable" data-store="steam">
+      <div class="art"><span class="ph" aria-hidden="true">Planet Coaster 2</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/2688950/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/></svg>Playable</span></div>
+      <div class="meta">
+        <h3>Planet Coaster 2</h3>
+        <div><span class="chip steam">Steam</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 12</dd><dt>DRM</dt><dd>Denuvo Anti-Tamper</dd><dt>While playing</dt><dd>Steam app runs alongside</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/planet-coaster-2.toml">Read the profile<span class="sr-only"> for Planet Coaster 2</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="assetto corsa" data-status="untested" data-store="steam">
+      <div class="art"><span class="ph" aria-hidden="true">Assetto Corsa</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/244210/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>Assetto Corsa</h3>
+        <div><span class="chip steam">Steam</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 11</dd><dt>DRM</dt><dd>Steamworks (needs a running Steam client)</dd><dt>While playing</dt><dd>Steam app runs alongside</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/assetto-corsa.toml">Read the profile<span class="sr-only"> for Assetto Corsa</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="assetto corsa competizione" data-status="untested" data-store="steam">
+      <div class="art"><span class="ph" aria-hidden="true">Assetto Corsa Competizione</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/805550/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>Assetto Corsa Competizione</h3>
+        <div><span class="chip steam">Steam</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 11</dd><dt>DRM</dt><dd>Steamworks (needs a running Steam client)</dd><dt>While playing</dt><dd>Steam app runs alongside</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/assetto-corsa-competizione.toml">Read the profile<span class="sr-only"> for Assetto Corsa Competizione</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="dark souls iii" data-status="untested" data-store="steam">
+      <div class="art"><span class="ph" aria-hidden="true">DARK SOULS III</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/374320/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>DARK SOULS III</h3>
+        <div><span class="chip steam">Steam</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 11</dd><dt>DRM</dt><dd>Steamworks</dd><dt>While playing</dt><dd>Steam app runs alongside</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/dark-souls-3.toml">Read the profile<span class="sr-only"> for DARK SOULS III</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="diablo iv" data-status="untested" data-store="battlenet">
+      <div class="art"><span class="ph" aria-hidden="true">Diablo IV</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/2344520/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>Diablo IV</h3>
+        <div><span class="chip battlenet">Battle.net</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 12</dd><dt>DRM</dt><dd>Battle.net account + always-online</dd><dt>While playing</dt><dd>Battle.net app runs alongside</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/diablo-4.toml">Read the profile<span class="sr-only"> for Diablo IV</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="fallout shelter" data-status="untested" data-store="steam">
+      <div class="art"><span class="ph" aria-hidden="true">Fallout Shelter</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/588430/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>Fallout Shelter</h3>
+        <div><span class="chip steam">Steam</span></div>
+        <dl class="facts"><dt>DRM</dt><dd>none (no third-party DRM listed by Steam)</dd><dt>While playing</dt><dd>Just the game</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/fallout-shelter.toml">Read the profile<span class="sr-only"> for Fallout Shelter</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="grand theft auto v" data-status="untested" data-store="steam">
+      <div class="art"><span class="ph" aria-hidden="true">Grand Theft Auto V</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>Grand Theft Auto V</h3>
+        <div><span class="chip steam">Steam</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 11</dd><dt>DRM</dt><dd>Steamworks + Rockstar Social Club launcher</dd><dt>While playing</dt><dd>Steam app runs alongside</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/grand-theft-auto-v.toml">Read the profile<span class="sr-only"> for Grand Theft Auto V</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="stardew valley" data-status="untested" data-store="steam">
+      <div class="art"><span class="ph" aria-hidden="true">Stardew Valley</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/413150/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>Stardew Valley</h3>
+        <div><span class="chip steam">Steam</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 11</dd><dt>DRM</dt><dd>none (DRM-free)</dd><dt>While playing</dt><dd>Just the game</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/stardew-valley.toml">Read the profile<span class="sr-only"> for Stardew Valley</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="the elder scrolls v: skyrim special edition" data-status="untested" data-store="steam">
+      <div class="art"><span class="ph" aria-hidden="true">The Elder Scrolls V: Skyrim Special Edition</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>The Elder Scrolls V: Skyrim Special Edition</h3>
+        <div><span class="chip steam">Steam</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 11</dd><dt>DRM</dt><dd>Steamworks</dd><dt>While playing</dt><dd>Steam app runs alongside</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/skyrim-special-edition.toml">Read the profile<span class="sr-only"> for The Elder Scrolls V: Skyrim Special Edition</span></a>
+      </div>
+    </li>
+    <li class="card" data-name="the witcher 3: wild hunt" data-status="untested" data-store="gog">
+      <div class="art"><span class="ph" aria-hidden="true">The Witcher 3: Wild Hunt</span><img loading="lazy" decoding="async" src="https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900.jpg" alt="" width="600" height="900" onerror="this.classList.add('broken')"><span class="badge muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg>Untested</span></div>
+      <div class="meta">
+        <h3>The Witcher 3: Wild Hunt</h3>
+        <div><span class="chip gog">GOG</span></div>
+        <dl class="facts"><dt>Graphics</dt><dd>DirectX 11</dd><dt>DRM</dt><dd>none (DRM-free)</dd><dt>While playing</dt><dd>Just the game</dd></dl>
+        <a class="more" href="https://github.com/Echarnus/Cellar/blob/main/profiles/witcher-3.toml">Read the profile<span class="sr-only"> for The Witcher 3: Wild Hunt</span></a>
+      </div>
+    </li>
+    </ul>
+    <div class="empty" id="empty" hidden><p>No games match those filters.</p>
+      <button class="btn btn-primary btn-small" id="reset" type="button">Show all games</button></div>
+    <ul class="legend"><li><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/></svg><span><b>Playable</b> — Someone ran it on named hardware; the profile says which Mac.</span></li><li><svg class="warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2v.1"/></svg><span><b>Experimental</b> — It runs, with caveats worth reading first.</span></li><li><svg class="muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/></svg><span><b>Untested</b> — The profile exists; nobody has confirmed it yet.</span></li></ul>
+    <div class="callout"><h3>Don&rsquo;t see your game?</h3>
+      <p>A game is one small profile file: its store, its executable and graphics API, and what you saw
+      when you ran it. <a href="https://github.com/Echarnus/Cellar/blob/main/CONTRIBUTING.md">Add one</a>, or read
+      <a href="faq.html#games">how this list works</a>.</p></div>
+  </section>
+
+  <section class="block" id="requirements" aria-labelledby="req-h">
+    <div class="section-head"><p class="kicker">Requirements</p>
+      <h2 id="req-h">What your Mac needs.</h2>
+      <p>Open Cellar, or run <code>cellar doctor</code>, and it tells you what is missing before
+      anything fails.</p></div>
+    <ul class="reqs">
+      <li><b>Apple Silicon</b><span>M1 or later. Intel Macs are not supported.</span></li>
+      <li><b>macOS 27 or later</b><span>Every M1 Mac can run it; Software Update has it.</span></li>
+      <li><b>Rosetta 2</b><span>Wine runs as an Intel app under Rosetta; macOS installs it on request.</span></li>
+      <li><b>A game you own</b><span>On Steam, Battle.net or GOG, from your own account.</span></li>
+    </ul>
+  </section>
+
+  <section class="block" id="faq" aria-labelledby="faq-h">
+    <div class="section-head"><p class="kicker">Questions</p>
+      <h2 id="faq-h">The ones people ask first.</h2></div>
+    <div class="qa-list"><details class="qa" id="what-is-cellar"><summary>What is Cellar?</summary><div class="a"><p>Cellar runs <b>Windows games on Apple Silicon Macs</b>. For each game it builds a <i>bottle</i> — a small, self-contained Windows environment — from Wine plus a graphics-translation layer that turns the game's Direct3D calls into Metal. The game runs much as it does on a PC. Your Mac does not become one.</p><p>It is the same idea as Valve's Proton on Linux, aimed at macOS, and it is free and open source under GPL-3.0.</p></div></details><details class="qa" id="which-macs-does-it-work-on"><summary>Which Macs does it work on?</summary><div class="a"><p><b>Apple Silicon only</b> (M1 and later), on macOS 27 or newer — the newest macOS every M1 Mac can run, so no Apple Silicon Mac is left out. Cellar's Wine runners are x86 builds that run under Rosetta 2, with the graphics work handed to Metal on the Apple GPU — so an Intel Mac is out of scope.</p><p>Open the app, or run <code>cellar doctor</code>, and it will tell you what your machine is missing rather than failing later for an unclear reason.</p></div></details><details class="qa" id="macos-says-cellar-can-t-be-opened"><summary>macOS says Cellar can&#x27;t be opened.</summary><div class="a"><p>Cellar is free software and isn't signed with a paid Apple Developer ID, so Apple hasn't notarised it and macOS can't vouch for who made it. The first time you open it, macOS stops it once. On macOS 27 there is no Open button in that first message — right-clicking and choosing Open no longer skips it — so allow it from Settings:</p><ol><li>Drag Cellar to <b>Applications</b> and double-click it. macOS says <b>“Cellar” Not Opened</b>. Click <b>Done</b> — not <b>Move to Trash</b>.</li><li>Open <b>System Settings → Privacy &amp; Security</b> and scroll down to <b>Security</b>. You'll see <b>“Cellar” was blocked to protect your Mac</b>. Click <b>Open Anyway</b>. The button only shows for about an hour after step 1; if it's gone, do step 1 again.</li><li>macOS asks once more. Click <b>Open Anyway</b> and confirm with your password or Touch ID.</li></ol><p>You only do this once; after that Cellar opens normally, and its updates are checked against Cellar's own signing key. Before you do it, you can <a href="faq.html#how-do-i-know-the-download-really-is-cellar">check the download</a> is the one we published.</p><p>Don't use a Terminal command that removes the quarantine flag: it skips the same check for everything else it touches.</p></div></details><details class="qa" id="what-about-games-with-anti-cheat"><summary>What about games with anti-cheat?</summary><div class="a"><p>Competitive games with kernel-level anti-cheat generally do not run, and Cellar will not make them. It <b>never circumvents DRM or anti-cheat</b> — protection runs through the translation layer untouched, exactly as the publisher shipped it. Where a profile knows of an anti-cheat problem it says so plainly, rather than letting you discover it after a 60&nbsp;GB download.</p></div></details></div>
+    <a class="more-link" href="faq.html">All questions and answers</a>
+  </section>
+</div>
+
+<section class="band" aria-labelledby="band-h"><div class="wrap">
+  <div>
+    <h2 id="band-h">Bring your library over.</h2>
+    <p>Download Cellar, sign in to the stores you already use, and play the games you own.</p>
+  </div>
+  <a class="btn btn-light btn-big" href="https://github.com/Echarnus/Cellar/releases/download/v0.2.0/Cellar-0.2.0.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span class="lines">Download for Mac<small>Version 0.2.0 · 0.8 MB · Apple Silicon · macOS 27 or later</small></span></a>
+</div></section>
+</main>
+<footer class="site"><div class="wrap">
+  <div class="cols">
+    <div><h2>Cellar</h2><ul>
+      <li><a href="https://github.com/Echarnus/Cellar/releases/latest">Download</a></li>
+      <li><a href="https://github.com/Echarnus/Cellar/releases">All releases</a></li>
+      <li><a href="index.html#features">Features</a></li>
+      <li><a href="index.html#games">Supported games</a></li>
+    </ul></div>
+    <div><h2>Help</h2><ul>
+      <li><a href="faq.html">Questions &amp; answers</a></li>
+      <li><a href="faq.html#trouble">When something goes wrong</a></li>
+      <li><a href="https://github.com/Echarnus/Cellar/issues">Report a problem</a></li>
+    </ul></div>
+    <div><h2>Project</h2><ul>
+      <li><a href="https://github.com/Echarnus/Cellar">Source code</a></li>
+      <li><a href="https://github.com/Echarnus/Cellar/blob/main/CONTRIBUTING.md">Add a game</a></li>
+      <li><a href="https://github.com/Echarnus/Cellar/blob/main/LICENSE">Licence (GPL-3.0)</a></li>
+      <li><a href="https://github.com/Echarnus/Cellar/blob/main/docs/LEGAL.md">Legal</a></li>
+    </ul></div>
+  </div>
+  <p class="legal">10 profiled games, 1 confirmed playable. Cellar is free software
+  under GPL-3.0 and is not affiliated with Apple, Valve, Blizzard, GOG, CodeWeavers or any game
+  publisher; their names appear only to say where a game comes from. Built on
+  <a href="https://www.winehq.org/">Wine</a>, the Windows compatibility layer — Cellar is a launcher
+  over it, and the hard part is theirs.</p>
+</div></footer>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Cellar", "operatingSystem": "macOS 27 or later (Apple Silicon)", "applicationCategory": "GameApplication", "url": "https://echarnus.github.io/Cellar/", "downloadUrl": "https://github.com/Echarnus/Cellar/releases/download/v0.2.0/Cellar-0.2.0.dmg", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "softwareVersion": "0.2.0"}</script>
+<script>
+(function(){
+  var root=document.documentElement, btn=document.getElementById('theme');
+  if(!btn) return;
+  var mq=window.matchMedia('(prefers-color-scheme: dark)');
+  function dark(){return root.dataset.theme? root.dataset.theme==='dark' : mq.matches;}
+  function sync(){var d=dark();btn.setAttribute('aria-pressed',String(d));
+    btn.setAttribute('aria-label',d?'Dark mode is on. Switch to light mode':'Dark mode is off. Switch to dark mode');}
+  btn.addEventListener('click',function(){
+    var next=dark()?'light':'dark'; root.dataset.theme=next;
+    try{localStorage.setItem('cellar-theme',next)}catch(e){}
+    sync();});
+  if(mq.addEventListener) mq.addEventListener('change',sync);
+  sync();
+})();
+</script><script>
+(function(){
+  var cards=[].slice.call(document.querySelectorAll('#grid .card'));
+  var q=document.getElementById('q'), count=document.getElementById('count'), empty=document.getElementById('empty');
+  var state={store:'all',status:'all'};
+  function apply(){
+    var term=(q.value||'').trim().toLowerCase(), shown=0;
+    cards.forEach(function(c){
+      var ok=(!term||c.dataset.name.indexOf(term)>=0)
+        &&(state.store==='all'||c.dataset.store===state.store)
+        &&(state.status==='all'||c.dataset.status===state.status);
+      c.hidden=!ok; if(ok) shown++;});
+    count.textContent=shown===cards.length? 'Showing all '+cards.length+' games'
+      : 'Showing '+shown+' of '+cards.length+' games';
+    empty.hidden=shown>0;}
+  [].forEach.call(document.querySelectorAll('.seg'),function(group){
+    group.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      [].forEach.call(group.querySelectorAll('button'),function(x){x.setAttribute('aria-pressed',String(x===b));});
+      state[group.dataset.key]=b.dataset.value; apply();});});
+  q.addEventListener('input',apply);
+  var reset=document.getElementById('reset');
+  if(reset) reset.addEventListener('click',function(){
+    q.value=''; state={store:'all',status:'all'};
+    [].forEach.call(document.querySelectorAll('.seg button'),function(x){x.setAttribute('aria-pressed',String(x.dataset.value==='all'));});
+    apply(); q.focus();});
+  apply();
+})();
+</script>
+</body></html>

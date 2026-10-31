@@ -22,12 +22,26 @@ if args == ["--generate-key"] {
     print("ProfileUpdates.publicKey (commit it):              \(key.publicKey.rawRepresentation.base64EncodedString())")
     exit(0)
 }
-guard args.count == 2 else { fail("usage: swift Scripts/profiles-bundle.swift VERSION OUT_DIR | --generate-key") }
+if args == ["--public-key"] {
+    // The private key on stdin (never argv), its public half on stdout. Scripts/signing-keys.sh
+    // uses this to write ProfileUpdates.publicKey from the key in the keychain.
+    let text = String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let raw = Data(base64Encoded: text), let key = try? Curve25519.Signing.PrivateKey(rawRepresentation: raw) else {
+        fail("stdin is not a base64 raw Ed25519 private key")
+    }
+    print(key.publicKey.rawRepresentation.base64EncodedString())
+    exit(0)
+}
+guard args.count == 2 else { fail("usage: swift Scripts/profiles-bundle.swift VERSION OUT_DIR | --generate-key | --public-key") }
 let version = args[0].hasPrefix("v") ? String(args[0].dropFirst()) : args[0]
 let out = URL(fileURLWithPath: args[1], isDirectory: true)
 
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-let profiles = root.appendingPathComponent("profiles", isDirectory: true)
+// The profile database is at the top of the repository (`profiles/`), one level above `app/`.
+let profiles = [root.appendingPathComponent("profiles", isDirectory: true),
+                root.deletingLastPathComponent().appendingPathComponent("profiles", isDirectory: true)]
+    .first { FileManager.default.fileExists(atPath: $0.path) } ?? root.appendingPathComponent("profiles", isDirectory: true)
 let files = (try? FileManager.default.contentsOfDirectory(at: profiles, includingPropertiesForKeys: nil)) ?? []
 var contents: [String: String] = [:]
 for file in files where file.pathExtension == "toml" {

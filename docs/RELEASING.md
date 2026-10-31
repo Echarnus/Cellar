@@ -252,7 +252,7 @@ The chain of trust is an **EdDSA key**, not Apple code signing (there is no Deve
   nowhere else. `app/Scripts/make-appcast.sh <version> <notes.md>` signs the
   zip with it, checks it matches the public key in the repo, and writes `dist/appcast.xml`; the
   release workflow uploads that next to the zip.
-- **Set-up, once:** run `sh app/Scripts/sparkle-keys.sh` on the Mac, then commit
+- **Set-up, once:** run `sh app/Scripts/signing-keys.sh` (which runs `sparkle-keys.sh`) on the Mac, then commit
   `app/Resources/sparkle-public-key`. It reuses an existing key rather than making a new one.
 - **Never rotate or lose the key casually.** Every installed copy accepts only updates signed by the
   key it shipped with; a new key means every player downloads the next version by hand.
@@ -286,6 +286,10 @@ Every release should also publish the `profiles/` set as `profiles.json` + `prof
 build. Cellar refuses a bundle its compiled-in key (`ProfileUpdates.publicKey`) didn't sign, and
 ignores one made for an older Cellar than itself.
 
-One-time setup: `swift app/Scripts/profiles-bundle.swift --generate-key`, put the private key in the
-`release` environment as `PROFILES_SIGNING_KEY`, and commit the public key into
-`ProfileUpdates.publicKey`. Until then every build says it uses the database it shipped with.
+One-time setup, together with the update key: `sh app/Scripts/signing-keys.sh` on the Mac (needs
+`gh auth login`). It runs `sparkle-keys.sh`, makes the game-database key (backed up in the login
+keychain as `it.clercq.cellar.release.profiles`), stores it as `PROFILES_SIGNING_KEY` in the `release`
+environment, and writes its public half into `ProfileUpdates.publicKey`; commit the two changed files.
+The publish job then adds `profiles.json` + `profiles.json.sig` to every release. Until then every
+build says it uses the database it shipped with. It has to be a person's Mac: the app only ever
+carries public keys, and a workflow's `GITHUB_TOKEN` cannot write secrets.

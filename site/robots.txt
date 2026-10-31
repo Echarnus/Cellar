@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://echarnus.github.io/Cellar/sitemap.xml
