@@ -27,10 +27,10 @@ enum DepotAccountStore {
     static func accountNames(inCompressed data: Data) -> [String] {
         guard let raw = inflate(data) else { return [] }
         var names: [String] = []
-        var reader = ProtoReader(raw)
+        var reader = ProtoReader([UInt8](raw))
         while let (field, wire) = reader.tag() {
             guard wire == 2, let entry = reader.lengthDelimited() else {
-                guard reader.skip(wire) else { return names }
+                guard reader.skip(wire: wire) else { return names }
                 continue
             }
             guard field == 4 else { continue }
@@ -38,7 +38,7 @@ enum DepotAccountStore {
             while let (key, kwire) = inner.tag() {
                 if key == 1, kwire == 2, let bytes = inner.lengthDelimited() {
                     if let name = String(bytes: bytes, encoding: .utf8), !name.isEmpty { names.append(name) }
-                } else if !inner.skip(kwire) {
+                } else if !inner.skip(wire: kwire) {
                     break
                 }
             }
@@ -57,10 +57,10 @@ enum DepotAccountStore {
     static func refreshToken(for account: String, inCompressed data: Data) -> String? {
         guard let raw = inflate(data) else { return nil }
         var found: String?
-        var reader = ProtoReader(raw)
+        var reader = ProtoReader([UInt8](raw))
         while let (field, wire) = reader.tag() {
             guard wire == 2, let entry = reader.lengthDelimited() else {
-                guard reader.skip(wire) else { return found }
+                guard reader.skip(wire: wire) else { return found }
                 continue
             }
             guard field == 4 else { continue }
@@ -70,7 +70,7 @@ enum DepotAccountStore {
                 if kwire == 2, key == 1 || key == 2, let bytes = inner.lengthDelimited() {
                     let text = String(bytes: bytes, encoding: .utf8)
                     if key == 1 { name = text } else { token = text }
-                } else if !inner.skip(kwire) {
+                } else if !inner.skip(wire: kwire) {
                     break
                 }
             }
@@ -102,46 +102,5 @@ enum DepotAccountStore {
             capacity *= 4                                   // filled the buffer: may be truncated
         }
         return nil
-    }
-}
-
-/// Just enough protobuf to walk a message: varints, length-delimited fields, and skipping the rest.
-private struct ProtoReader {
-    private let bytes: [UInt8]
-    private var index = 0
-
-    init(_ data: Data) { bytes = [UInt8](data) }
-
-    mutating func tag() -> (field: UInt64, wire: UInt64)? {
-        guard index < bytes.count, let v = varint() else { return nil }
-        return (v >> 3, v & 7)
-    }
-
-    mutating func varint() -> UInt64? {
-        var result: UInt64 = 0
-        var shift: UInt64 = 0
-        while index < bytes.count, shift < 64 {
-            let b = bytes[index]; index += 1
-            result |= UInt64(b & 0x7f) << shift
-            if b & 0x80 == 0 { return result }
-            shift += 7
-        }
-        return nil
-    }
-
-    mutating func lengthDelimited() -> Data? {
-        guard let n = varint(), n <= UInt64(bytes.count - index) else { return nil }
-        defer { index += Int(n) }
-        return Data(bytes[index..<index + Int(n)])
-    }
-
-    mutating func skip(_ wire: UInt64) -> Bool {
-        switch wire {
-        case 0: return varint() != nil
-        case 1: guard index + 8 <= bytes.count else { return false }; index += 8; return true
-        case 2: return lengthDelimited() != nil
-        case 5: guard index + 4 <= bytes.count else { return false }; index += 4; return true
-        default: return false
-        }
     }
 }
