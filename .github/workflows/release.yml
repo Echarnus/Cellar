@@ -227,6 +227,12 @@ jobs:
           PROFILES_SIGNING_KEY: ${{ secrets.PROFILES_SIGNING_KEY }}
         run: |
           if [ -n "$PROFILES_SIGNING_KEY" ]; then
+            # The secret must be the key this build trusts, or every installed copy refuses the set.
+            derived="$(printf '%s' "$PROFILES_SIGNING_KEY" | swift Scripts/profiles-bundle.swift --public-key)"
+            if ! grep -q "publicKey = \"$derived\"" Packages/CellarData/Sources/CellarData/Library/ProfileUpdates.swift; then
+              echo "::error::PROFILES_SIGNING_KEY does not match ProfileUpdates.publicKey. Re-run Scripts/signing-keys.sh."
+              exit 1
+            fi
             swift Scripts/profiles-bundle.swift "$VERSION" dist
           else
             echo "::notice::No game database published: needs the PROFILES_SIGNING_KEY secret (Scripts/signing-keys.sh)."

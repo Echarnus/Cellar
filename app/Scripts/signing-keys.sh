@@ -53,7 +53,10 @@ unset KEY
 echo "Stored PROFILES_SIGNING_KEY in the release environment of $REPO."
 
 # The public half, compiled into every build from now on.
-sed -i '' "s|public static let publicKey = \"[^\"]*\"|public static let publicKey = \"$PUBLIC\"|" "$SWIFT_FILE"
+# Written through a temporary file, not `sed -i`: BSD sed wants `-i ''` and GNU sed (a Nix shell's)
+# reads that '' as a file name, so no single `-i` spelling works on both.
+sed "s|public static let publicKey = \"[^\"]*\"|public static let publicKey = \"$PUBLIC\"|" "$SWIFT_FILE" > "$SWIFT_FILE.tmp"
+mv "$SWIFT_FILE.tmp" "$SWIFT_FILE"
 grep -q "publicKey = \"$PUBLIC\"" "$SWIFT_FILE" || { echo "Could not write the public key into $SWIFT_FILE"; exit 1; }
 echo "Wrote the game-database public key into $SWIFT_FILE."
 
