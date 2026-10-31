@@ -11,13 +11,8 @@ import Foundation
 /// estimate in the honest direction — never longer than what was observed.
 public enum Playtime {
 
-    public struct Record: Codable, Sendable, Equatable {
-        public var totalSeconds: Int = 0
-        public var sessions: Int = 0
-        public var lastPlayed: Date?
-        /// A session that started and hasn't been closed yet.
-        public var openSince: Date?
-    }
+    /// One game's record, as a domain value every layer can name.
+    public typealias Record = PlayRecord
 
     static var file: URL { Paths.appSupport.appendingPathComponent("playtime.json") }
     private static let lock = NSLock()

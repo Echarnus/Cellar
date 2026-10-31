@@ -66,7 +66,8 @@ struct ArchitectureTests {
           arguments: ["CellarError", "CellarCommand", "Credit", "LogCategory", "LogLevel", "ProfileRef",
                       "DockPresence", "GraphicsBackend", "PrefixInfo", "RunnerArchitecture",
                       "RunnerArtifact", "RunnerSpec", "RemovalScope", "Ownership", "CheckResult",
-                      "CheckStatus", "DetectedGraphicsAPI", "PerformanceSetting", "GameLanguage"])
+                      "CheckStatus", "DetectedGraphicsAPI", "PerformanceSetting", "GameLanguage",
+                      "GameSummary", "GameFacts", "UpdateState", "PlayRecord", "LibraryVerdict"])
     func modelsLiveInTheDomain(_ type: String) throws {
         func declares(_ folder: String) throws -> Bool {
             try Self.sources(in: folder).contains { $0.file == "\(type).swift" }

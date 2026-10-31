@@ -1,4 +1,3 @@
-import CellarDomain
 import Foundation
 
 /// A game's readiness, for the GUI to decide what to show (and which button to offer next).
@@ -33,16 +32,6 @@ public struct GameSummary: Identifiable, Sendable {
     public let artHeroURL: String?
 
     public var id: String { slug }
-
-    /// Whether this game belongs in the player's library at all.
-    public var isVisible: Bool { verdict.isVisible }
-
-    /// Why this game is or isn't in the library — the whole answer, so a caller that needs the
-    /// sentence and the fix doesn't re-derive them from the parts.
-    public var verdict: StoreLibrary.Verdict {
-        StoreLibrary.verdict(store: store, ownership: ownership,
-                             isConnected: StoreLibrary.isConnected(store))
-    }
 
     /// The single most useful next action given the current state.
     public enum NextStep: Sendable {
@@ -164,7 +153,7 @@ public struct GameSummary: Identifiable, Sendable {
     /// Whether this copy is on Steam's current build — only for a game Cellar downloaded itself,
     /// since Steam updates the ones in its own library. Nil means Cellar doesn't manage it. Read
     /// from the last check, never by asking Steam: this is built on every library refresh.
-    public let update: GameUpdates.State?
+    public let update: UpdateState?
 
     /// A newer build is known to be out, so Play fetches it first.
     public var updatePending: Bool {
@@ -194,16 +183,11 @@ public struct GameSummary: Identifiable, Sendable {
     /// Whether the game's files live on another drive.
     public var isOnOtherDrive = false
     /// How long and how recently it was played (`Playtime`); nil when it never was.
-    public var playtime: Playtime.Record? = nil
+    public var playtime: PlayRecord? = nil
     public var lastPlayed: Date? { playtime?.lastPlayed }
 
     /// The player switched this game off the profile's backend.
     public var backendIsPlayerChoice: Bool { profileBackend.map { $0 != backend } ?? false }
-
-    /// The backend to offer when a launch didn't bring the game up — see `BackendChoice.retry`.
-    public var retryBackend: GraphicsBackend? {
-        BackendChoice.retry(current: backend, primary: profileBackend ?? backend, fallback: fallbackBackend)
-    }
 
     public init(slug: String, name: String, store: GameStore, appID: Int?, iconPath: String?,
                 runnerInstalled: Bool, clientInstalled: Bool, account: String?, gameInstalled: Bool,
@@ -213,7 +197,7 @@ public struct GameSummary: Identifiable, Sendable {
                 clientSignsInByItself: Bool = false,
                 artworkAppID: Int?,
                 artPortraitURL: String?, artHeroURL: String?,
-                needsClientAtRuntime: Bool, update: GameUpdates.State? = nil,
+                needsClientAtRuntime: Bool, update: UpdateState? = nil,
                 facts: GameFacts, runnerID: String, backend: String,
                 bottleName: String) {
         self.slug = slug
