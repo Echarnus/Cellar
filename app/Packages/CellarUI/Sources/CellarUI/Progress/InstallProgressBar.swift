@@ -1,6 +1,5 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
 
 /// How far an install has got: which step, and — where Cellar can measure it — how much of it.
 ///

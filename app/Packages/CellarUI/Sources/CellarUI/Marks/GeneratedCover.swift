@@ -1,6 +1,5 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
 
 /// The cover Cellar draws when nobody hands it one.
 ///

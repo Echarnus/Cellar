@@ -1,6 +1,5 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
 
 /// How a store looks and reads in the app.
 ///

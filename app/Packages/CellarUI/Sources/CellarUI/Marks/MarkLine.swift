@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// A straight segment between two points given in fractions of the mark's box.
 nonisolated struct MarkLine: Shape {

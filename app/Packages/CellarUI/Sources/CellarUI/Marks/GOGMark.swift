@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// GOG's mark: the white tile with `gog` over `com` in dark blocky lowercase.
 ///

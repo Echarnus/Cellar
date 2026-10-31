@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// Valve's mark: the valve wheel, the smaller wheel, and the handle that runs out to the rim, on
 /// the dark navy Steam has used since 2013.

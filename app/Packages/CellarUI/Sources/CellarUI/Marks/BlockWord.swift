@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// Two lines of blocky lowercase, drawn as rectangles on a pixel grid.
 ///
