@@ -37,6 +37,13 @@ SECTIONS = [
 ]
 OTHER = "Other changes"
 SKIP = "skip-changelog"
+# Open issues with this label are listed as known open items: built or investigated, but not
+# done until someone checks them on a real Mac. They never hold a release back.
+OPEN_ITEMS = "needs-mac-testing"
+OPEN_ITEMS_INTRO = (
+    "These are built or investigated, but still need a check on a real Mac or on real "
+    "hardware before we call them done. They carry over to the next release."
+)
 
 
 # The install section, the same in every release. User-facing copy (skills/ux.md).
@@ -146,6 +153,16 @@ def issues_closed_between(repo, since, until):
         page += 1
 
 
+def open_items(repo):
+    """Open issues still waiting on a test on a real Mac, for the Known open items section."""
+    query = "repo:%s is:issue is:open label:%s" % (repo, OPEN_ITEMS)
+    data = gh_json("api", "-X", "GET", "search/issues", "-f", "q=" + query, "-F", "per_page=100")
+    return [
+        {"number": item["number"], "title": item["title"], "url": item["html_url"]}
+        for item in data["items"]
+    ]
+
+
 def pull_request_list(repo, tag, prev):
     args = ["api", "repos/%s/releases/generate-notes" % repo, "-f", "tag_name=" + tag]
     if prev:
@@ -164,7 +181,7 @@ def section_of(issue):
     return OTHER
 
 
-def render(version, issues, prs, repo):
+def render(version, issues, prs, repo, waiting=()):
     lines = ["Cellar %s runs Windows games on Apple Silicon Macs." % version, ""]
     if issues:
         grouped = {}
@@ -178,6 +195,11 @@ def render(version, issues, prs, repo):
             lines.append("")
     else:
         lines += ["No tracked issues were closed in this release.", ""]
+    if waiting:
+        lines += ["## Known open items", "", OPEN_ITEMS_INTRO, ""]
+        lines += ["- %s ([#%d](%s))" % (i["title"], i["number"], i["url"])
+                  for i in sorted(waiting, key=lambda i: i["number"])]
+        lines.append("")
     if prs:
         lines += [prs.replace("## What's Changed", "## Pull requests"), ""]
     lines += ["## Install", "", INSTALL, "", REQUIREMENTS, "", DOWNLOADS % repo, "",
@@ -205,10 +227,13 @@ def main():
         issues.setdefault(issue["number"], issue)
     kept = [i for i in issues.values() if SKIP not in i["labels"]]
 
-    notes = render(args.tag.lstrip("v"), kept, pull_request_list(args.repo, args.tag, prev), args.repo)
+    waiting = open_items(args.repo)
+    notes = render(args.tag.lstrip("v"), kept, pull_request_list(args.repo, args.tag, prev),
+                   args.repo, waiting)
     with open(args.out, "w", encoding="utf-8") as fh:
         fh.write(notes)
-    print("%d issues since %s" % (len(kept), prev or "the first commit"), file=sys.stderr)
+    print("%d issues since %s, %d known open items" % (len(kept), prev or "the first commit",
+                                                       len(waiting)), file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -15,4 +15,5 @@
 - {name: ci, color: ededed, description: "Workflows, releases, repository tooling"}
 - {name: dependencies, color: 0366d6, description: "A dependency update"}
 - {name: skip-changelog, color: ffffff, description: "Leave out of the release notes"}
+- {name: needs-mac-testing, color: bfd4f2, description: "Built, but waits on a check on a real Mac or real hardware"}
 - {name: needs-triage, color: fef2c0, description: "Not yet looked at"}

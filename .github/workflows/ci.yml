@@ -101,3 +101,5 @@ jobs:
         run: shellcheck --severity=warning Scripts/*.sh
       - name: Python compiles (3.9 floor)
         run: python3 -m py_compile Scripts/*.py
+      - name: Release notes renderer
+        run: python3 Scripts/test-release-notes.py
