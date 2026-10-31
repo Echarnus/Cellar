@@ -50,7 +50,7 @@ public enum Paths {
 
     /// Copies of each bottle's save games (`SaveBackups`). Beside the bottles, never inside one, so
     /// removing a bottle cannot take its backups with it.
-    public static var saveBackups: URL { appSupport.appendingPathComponent("save-backups", isDirectory: true) }
+    public static var saveBackups: URL { CellarEnvironment.live.saveBackups }
 
     /// User-installed game profiles (synced from the community registry in Phase 2).
     /// The game database downloaded from the latest release (`ProfileUpdates`), signature checked.
