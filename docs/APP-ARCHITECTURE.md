@@ -431,6 +431,7 @@ target's root (#133).
 Packages/CellarDomain/Sources/CellarDomain/      pure types, Foundation only, no I/O
   Store/  Install/  Launch/  Events/  Core/  Commands/  About/  Checks/
   Diagnostics/  Game/  Library/  Runners/  Settings/  Storage/
+  Repositories/        the ports a view model asks (LibraryRepository); the engine implements them
 Packages/CellarKit/Sources/CellarKit/            the engine
   Core/                environment, paths, version, credits
   Game/                plans, facts, summaries, updates, play time
@@ -461,6 +462,13 @@ The models every layer trades in (errors, the CLI command contract, log levels, 
 runner specs, removal scope, ownership, check results, languages, performance switches) are
 declared in CellarDomain, and `ArchitectureTests.modelsLiveInTheDomain` keeps them there;
 `domainDoesNoIO` keeps the disk, processes and the network out of it.
+
+A view model reaches the machine only through a port declared in the domain. The library is the
+first: `LibraryStore` holds an `any LibraryRepository`, the composition root (`AppModel`) hands it
+the engine's `DiskLibraryRepository`, and a preview can hand it a fixed `LibrarySnapshot`. Values
+that used to be nested in engine types (`GameUpdates.State`, `Playtime.Record`,
+`StoreLibrary.Verdict`, `SteamAccount.State`) are domain types now, kept under their old names as
+typealiases so no caller had to change.
 
 Next steps (#133): the repository protocols and the use cases move into CellarDomain, and the I/O
 into a CellarData package (absorbing CellarKit and CellarInfrastructure); then each app feature

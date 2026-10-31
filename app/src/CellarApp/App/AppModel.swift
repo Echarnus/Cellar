@@ -12,7 +12,7 @@ final class AppModel {
     /// The player's actions — one at a time, for the whole app.
     let activity = ActivityStore()
     /// The games, the selection and the sidebar's filters.
-    let library = LibraryStore()
+    let library = LibraryStore(repository: DiskLibraryRepository())
     /// Where the player is signed in.
     lazy var accounts = AccountsStore(activity: activity)
     /// The shared runtime downloading in the background — on its own runner, so it never holds Play.

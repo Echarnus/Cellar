@@ -9,7 +9,7 @@ import CellarUI
 /// One instance, made by `AppModel` and shared by every window, so a sign-in finishing in Settings
 /// refreshes the same library the main window draws — a method call, not a notification someone has
 /// to be listening for. What the sidebar *means* (filtering, sections, the empty-library sentence)
-/// is decided by `LibraryQuery` and `LibrarySnapshot` in CellarKit, where it is unit-tested.
+/// is decided by `LibraryQuery` and `LibrarySnapshot` in CellarDomain, where it is unit-tested.
 @MainActor
 @Observable
 final class LibraryStore {
@@ -19,7 +19,7 @@ final class LibraryStore {
     private(set) var snapshot = LibrarySnapshot.empty
     var games: [GameSummary] { snapshot.games }
     var withheld: [GameSummary] { snapshot.withheld }
-    var steam: SteamAccount.State { snapshot.steam }
+    var steam: SteamSignInState { snapshot.steam }
     var hasConnectedStore: Bool { snapshot.hasConnectedStore }
     var signInReason: String { snapshot.signInReason }
 
@@ -44,11 +44,12 @@ final class LibraryStore {
     static let lastSelectedKey = "lastSelectedGame"
     static let sortKey = "librarySort"
 
-    @ObservationIgnored private let load: @MainActor () -> LibrarySnapshot
+    @ObservationIgnored private let repository: any LibraryRepository
 
-    /// `load` is the disk read; a test hands it a snapshot it built.
-    init(load: @escaping @MainActor () -> LibrarySnapshot = { LibrarySnapshot.current() }) {
-        self.load = load
+    /// Where the library comes from: the engine's disk read in the app (`AppModel` passes
+    /// `DiskLibraryRepository`), a fixed snapshot in a preview.
+    init(repository: any LibraryRepository) {
+        self.repository = repository
     }
 
     // MARK: - Intents
@@ -57,7 +58,7 @@ final class LibraryStore {
         // A store that has just been set up now has its own artwork on disk; re-resolve so its
         // mark upgrades from the drawn one to the store's own without needing a relaunch.
         StoreIcons.refresh()
-        snapshot = load()
+        snapshot = repository.snapshot()
         // What the sidebar just decided, on record: a reload that "does nothing" is otherwise
         // indistinguishable from one that ran and read a signed-out Steam.
         CellarLog.debug(.app, "Library refreshed: \(games.count) shown, \(withheld.count) withheld, \(hasConnectedStore ? "a store connected" : "no store connected") — \(SteamAccount.diagnosis)")

@@ -49,46 +49,11 @@ public enum SteamAccount {
 
     /// Steam sessions of this kind last roughly 200 days. Cellar starts mentioning it at 180 —
     /// early enough to be a warning, late enough not to be noise.
-    public static let expectedLifetimeInDays = 200
+    public static let expectedLifetimeInDays = SteamSignInState.expectedLifetimeInDays
     static let agingAfterDays = 180
 
-    /// The three states the Accounts screen has to draw, and the only three there are.
-    public enum State: Sendable, Equatable {
-        /// Nobody has signed in, or the sign-in was forgotten.
-        case signedOut
-        /// Signed in and usable. `aging` is true once it is old enough to expire soon.
-        case signedIn(account: String, days: Int, aging: Bool)
-        /// Steam rejected the stored session. The account name is kept, because the fix is to sign
-        /// in again *as that person*, and saying who makes that clearer.
-        case expired(account: String, reason: String)
-
-        public var isUsable: Bool { if case .signedIn = self { return true }; return false }
-
-        /// The account name, whatever the state — nil only when nobody ever signed in.
-        public var accountName: String? {
-            switch self {
-            case .signedOut:                  return nil
-            case .signedIn(let name, _, _):   return name
-            case .expired(let name, _):       return name
-            }
-        }
-
-        /// One sentence saying exactly where things stand. Used verbatim by the CLI and the app so
-        /// the two cannot describe the same session differently.
-        public var summary: String {
-            switch self {
-            case .signedOut:
-                return String(localized: "Not signed in. One scan with the Steam mobile app covers every Steam game.")
-            case .signedIn(let name, let days, let aging):
-                let age = days == 0 ? String(localized: "today") : days == 1 ? String(localized: "yesterday") : String(localized: "\(days) days ago")
-                return aging
-                    ? String(localized: "Signed in as \(name) \(age). Steam sessions last about \(expectedLifetimeInDays) days, so this one may ask you to scan again soon.")
-                    : String(localized: "Signed in as \(name) \(age).")
-            case .expired(let name, let reason):
-                return String(localized: "Steam ended the session for \(name) (\(reason)). Sign in again — it takes one scan.")
-            }
-        }
-    }
+    /// Where the Steam sign-in stands, as a domain value every layer can name.
+    public typealias State = SteamSignInState
 
     // MARK: - Reading and writing the record
 
