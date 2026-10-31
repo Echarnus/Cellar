@@ -1,0 +1,1418 @@
+diff -ruN a/src/haptic/darwin/SDL_cellar_thrustmaster.c b/src/haptic/darwin/SDL_cellar_thrustmaster.c
+--- a/src/haptic/darwin/SDL_cellar_thrustmaster.c
++++ b/src/haptic/darwin/SDL_cellar_thrustmaster.c
+@@ -0,0 +1,920 @@
++/*
++  Cellar: force feedback for Thrustmaster T300-family wheel bases on macOS, driven over USB HID.
++  Added to SDL by Cellar (https://github.com/Echarnus/Cellar); not part of upstream SDL.
++
++  SPDX-License-Identifier: GPL-2.0-or-later
++  The command encoding is ported from the Linux hid-tmff2 driver (https://github.com/Kimplul/hid-tmff2),
++  GPL-2.0-or-later: the packet layouts, the value scaling and the open/close/range/gain commands of
++  hid-tmt300rs.c and its T248, TX, TS-PC and TS-XW variants, and the queue of hid-tmff2.c.
++
++  How it works. Unlike a Fanatec base, these wheels keep effects themselves: an effect is uploaded
++  once into one of 16 slots, then started, stopped or modified by id. The wheel drops commands that
++  arrive too fast, so calls only queue work and a thread sends it every 8 ms, as hid-tmff2 does.
++
++  Safety. Cellar's cap (CELLAR_FFB_MAX_PERCENT, default 100 for these belt-driven bases) is applied
++  through the wheel's own gain, which scales every effect, together with the game's gain. Destroying
++  the engine stops every effect it started and closes the wheel's force feedback.
++*/
++
++#ifndef CELLAR_FFB_STANDALONE
++#include "SDL_internal.h"
++#endif
++
++#include "SDL_cellar_thrustmaster.h"
++
++#if defined(CELLAR_FFB_STANDALONE) || defined(SDL_HAPTIC_IOKIT)
++
++/* Product IDs in force-feedback mode, from hid-tmff2.h. */
++#define TM_T300RS_PS3_NORM 0xb66e
++#define TM_T300RS_PS3_ADV  0xb66f
++#define TM_T300RS_PS4_NORM 0xb66d
++#define TM_T248_PC         0xb696
++#define TM_TX_ACTIVE       0xb669
++#define TM_TSXW_ACTIVE     0xb692
++#define TM_TSPC_RACER      0xb689
++
++#define TM_QUEUE_UPLOAD 0
++#define TM_QUEUE_START 1
++#define TM_QUEUE_STOP 2
++#define TM_QUEUE_UPDATE 3
++#define TM_PLAYING 4
++
++/* hid-tmff2's default condition levels, in percent: its authors found 100 far too stiff. */
++#define TM_SPRING_LEVEL 30
++#define TM_DAMPER_LEVEL 30
++#define TM_FRICTION_LEVEL 30
++#define TM_DEFAULT_RANGE 900
++
++#define test_bit(bit, field) (*(field) & (1u << (bit)))
++#define set_bit(bit, field) (*(field) |= (1u << (bit)))
++#define clear_bit(bit, field) (*(field) &= ~(1u << (bit)))
++
++typedef enum
++{
++    TM_KIND_CONSTANT,
++    TM_KIND_RAMP,
++    TM_KIND_CONDITION,
++    TM_KIND_PERIODIC
++} tm_kind;
++
++/* An effect in the terms hid-tmff2 computes with (Linux's struct ff_effect). */
++typedef struct tm_effect
++{
++    tm_kind kind;
++    Uint16 sdl_type;
++    Uint16 direction; /* 0..0xffff, 0x4000 pushes the wheel to the right */
++    Uint16 length;    /* ms, 0 = infinite */
++    Uint16 delay;
++    Uint16 attack_length, attack_level, fade_length, fade_level;
++    Sint16 level;                 /* constant */
++    Sint16 start_level, end_level; /* ramp */
++    Sint16 right_coeff, left_coeff, center; /* condition */
++    Uint16 right_sat, left_sat, deadband;
++    Uint8 waveform; /* periodic: 1 square, 2 triangle, 3 sine, 4 saw up, 5 saw down */
++    Sint16 magnitude, offset;
++    Uint16 phase, period;
++} tm_effect;
++
++typedef struct tm_state
++{
++    tm_effect effect;
++    tm_effect old;
++    Uint32 flags;
++    Uint32 count; /* 0 = infinite */
++    Uint64 start_time;
++    bool allocated;
++} tm_state;
++
++struct CellarThrustmaster
++{
++    Uint16 product_id;
++    int buffer_length;
++    CellarThrustmaster_SendFunc send;
++    void *userdata;
++    Uint8 buffer[CELLAR_THRUSTMASTER_MAX_BUFFER];
++
++    tm_state states[CELLAR_THRUSTMASTER_MAX_EFFECTS];
++    int max_percent; /* Cellar's cap, 1..100 */
++    int app_gain;    /* the game's gain, 0..100 */
++
++    SDL_Mutex *mutex;
++    SDL_Thread *thread;
++    SDL_AtomicInt stop_thread;
++};
++
++static Sint32 clamp32(Sint32 value, Sint32 low, Sint32 high)
++{
++    return value < low ? low : (value > high ? high : value);
++}
++
++static Sint32 div_round(Sint64 value, Sint64 divisor)
++{
++    return (Sint32)(((value < 0) ^ (divisor < 0)) ? (value - divisor / 2) / divisor : (value + divisor / 2) / divisor);
++}
++
++/* ---- device table ------------------------------------------------------------------------- */
++
++bool CellarThrustmaster_IsSupported(Uint16 vendor_id, Uint16 product_id)
++{
++    if (vendor_id != CELLAR_THRUSTMASTER_VENDOR_ID) {
++        return false;
++    }
++    switch (product_id) {
++    case TM_T300RS_PS3_NORM:
++    case TM_T300RS_PS3_ADV:
++    case TM_T300RS_PS4_NORM:
++    case TM_T248_PC:
++    case TM_TX_ACTIVE:
++    case TM_TSXW_ACTIVE:
++    case TM_TSPC_RACER:
++        return true;
++    default:
++        return false;
++    }
++}
++
++Uint16 CellarThrustmaster_SwitchValue(const Uint8 *response, int length)
++{
++    Uint16 type, model;
++    if (!response || length < 8) {
++        return 0;
++    }
++    /* The answer opens with its kind, 0x49 or 0x47; both carry the model at bytes 6-7. The switch
++       values are the same facts Linux's hid-thrustmaster and hid-tmff2's hid-tminit act on. */
++    type = (Uint16)(response[0] | (response[1] << 8));
++    model = (Uint16)(response[6] | (response[7] << 8));
++    if (type != 0x49 && type != 0x47) {
++        return 0;
++    }
++    switch (model) {
++    case 0x0200: /* T300RS, no rim attached */
++    case 0x0204: /* T300 Ferrari Alcantara Edition */
++    case 0x0206: /* T300RS */
++    case 0x0209: /* T300RS, open wheel rim */
++    case 0x020a: /* T300RS, Sparco R383 mod */
++        return 0x0005;
++    default:
++        return 0; /* T150, T500 and the TMX speak other protocols */
++    }
++}
++
++int CellarThrustmaster_BufferLength(Uint16 product_id)
++{
++    return product_id == TM_T300RS_PS4_NORM ? 31 : 63;
++}
++
++/* The T300 opens and closes with one command; its successors with two. */
++static bool is_t300(Uint16 product_id)
++{
++    return product_id == TM_T300RS_PS3_NORM || product_id == TM_T300RS_PS3_ADV || product_id == TM_T300RS_PS4_NORM;
++}
++
++int CellarThrustmaster_MaxPercentFromEnv(void)
++{
++    const char *value = SDL_getenv("CELLAR_FFB_MAX_PERCENT");
++    int percent;
++    if (!value || !*value) {
++        return CELLAR_THRUSTMASTER_DEFAULT_MAX_PERCENT;
++    }
++    percent = SDL_atoi(value);
++    return percent < 1 ? 1 : (percent > 100 ? 100 : percent);
++}
++
++/* ---- SDL effect -> hid-tmff2's terms -------------------------------------------------------- */
++
++static Uint16 to_polar(const SDL_HapticDirection *src)
++{
++    Uint32 tmp;
++    switch (src->type) {
++    case SDL_HAPTIC_POLAR:
++        return (Uint16)(((src->dir[0] % 36000) * 0x8000) / 18000);
++    case SDL_HAPTIC_SPHERICAL:
++        tmp = ((Uint32)(src->dir[0] + 9000)) % 36000;
++        return (Uint16)((tmp * 0x8000) / 18000);
++    case SDL_HAPTIC_CARTESIAN:
++        if (!src->dir[1]) {
++            return (Uint16)(src->dir[0] >= 0 ? 0x4000 : 0xC000);
++        } else if (!src->dir[0]) {
++            return (Uint16)(src->dir[1] >= 0 ? 0x8000 : 0);
++        } else {
++            double f = SDL_atan2(src->dir[1], src->dir[0]);
++            tmp = (Uint32)((((Sint32)(f * 18000.0 / SDL_PI_D)) + 45000) % 36000);
++            return (Uint16)((tmp * 0x8000) / 18000);
++        }
++    case SDL_HAPTIC_STEERING_AXIS:
++    default:
++        return 0x4000;
++    }
++}
++
++static Uint16 to_length(Uint32 length)
++{
++    if (length == SDL_HAPTIC_INFINITY || length == 0) {
++        return 0;
++    }
++    return (Uint16)(length > 0xfffe ? 0xfffe : length);
++}
++
++static bool convert(const SDL_HapticEffect *src, tm_effect *dst)
++{
++    SDL_zerop(dst);
++    dst->sdl_type = src->type;
++    switch (src->type) {
++    case SDL_HAPTIC_CONSTANT:
++        dst->kind = TM_KIND_CONSTANT;
++        dst->direction = to_polar(&src->constant.direction);
++        dst->length = to_length(src->constant.length);
++        dst->delay = src->constant.delay;
++        dst->level = src->constant.level;
++        dst->attack_length = src->constant.attack_length;
++        dst->attack_level = src->constant.attack_level;
++        dst->fade_length = src->constant.fade_length;
++        dst->fade_level = src->constant.fade_level;
++        return true;
++    case SDL_HAPTIC_RAMP:
++        dst->kind = TM_KIND_RAMP;
++        dst->direction = to_polar(&src->ramp.direction);
++        dst->length = to_length(src->ramp.length);
++        dst->delay = src->ramp.delay;
++        dst->start_level = src->ramp.start;
++        dst->end_level = src->ramp.end;
++        dst->attack_length = src->ramp.attack_length;
++        dst->attack_level = src->ramp.attack_level;
++        dst->fade_length = src->ramp.fade_length;
++        dst->fade_level = src->ramp.fade_level;
++        return true;
++    case SDL_HAPTIC_SPRING:
++    case SDL_HAPTIC_DAMPER:
++    case SDL_HAPTIC_INERTIA:
++    case SDL_HAPTIC_FRICTION:
++        dst->kind = TM_KIND_CONDITION;
++        dst->direction = to_polar(&src->condition.direction);
++        dst->length = to_length(src->condition.length);
++        dst->delay = src->condition.delay;
++        dst->right_coeff = src->condition.right_coeff[0];
++        dst->left_coeff = src->condition.left_coeff[0];
++        dst->right_sat = src->condition.right_sat[0];
++        dst->left_sat = src->condition.left_sat[0];
++        dst->deadband = src->condition.deadband[0];
++        dst->center = src->condition.center[0];
++        return true;
++    case SDL_HAPTIC_SQUARE:
++    case SDL_HAPTIC_TRIANGLE:
++    case SDL_HAPTIC_SINE:
++    case SDL_HAPTIC_SAWTOOTHUP:
++    case SDL_HAPTIC_SAWTOOTHDOWN:
++        if (src->periodic.period == 0) {
++            return false;
++        }
++        dst->kind = TM_KIND_PERIODIC;
++        dst->waveform = src->type == SDL_HAPTIC_SQUARE ? 1 : src->type == SDL_HAPTIC_TRIANGLE ? 2 :
++                        src->type == SDL_HAPTIC_SINE ? 3 : src->type == SDL_HAPTIC_SAWTOOTHUP ? 4 : 5;
++        dst->direction = to_polar(&src->periodic.direction);
++        dst->length = to_length(src->periodic.length);
++        dst->delay = src->periodic.delay;
++        dst->magnitude = src->periodic.magnitude;
++        dst->offset = src->periodic.offset;
++        /* SDL's phase is in hundredths of a degree; Linux's spans 0..0xffff. */
++        dst->phase = (Uint16)(((Uint32)(src->periodic.phase % 36000) * 0x10000) / 36000);
++        dst->period = src->periodic.period;
++        dst->attack_length = src->periodic.attack_length;
++        dst->attack_level = src->periodic.attack_level;
++        dst->fade_length = src->periodic.fade_length;
++        dst->fade_level = src->periodic.fade_level;
++        return true;
++    default:
++        return false;
++    }
++}
++
++/* ---- hid-tmff2's value scaling ---------------------------------------------------------------- */
++
++static Sint32 scale_direction(Sint32 level, Uint16 direction)
++{
++    double scaled = (double)level * SDL_sin((double)direction * 2.0 * SDL_PI_D / 65536.0);
++    return (Sint32)(scaled < 0 ? scaled - 0.5 : scaled + 0.5);
++}
++
++static Uint16 wheel_length(Uint16 length)
++{
++    return length == 0 ? 0xffff : length; /* the wheel's "infinite" */
++}
++
++static Sint16 constant_level(const tm_effect *e)
++{
++    /* The Windows driver uses [-16385, 16381]. */
++    return (Sint16)div_round(scale_direction(e->level, e->direction), 2);
++}
++
++static void ramp_parameters(const tm_effect *e, Uint16 *slope, Sint16 *center, Uint8 *invert)
++{
++    Sint32 start = scale_direction(e->start_level, e->direction);
++    Sint32 end = scale_direction(e->end_level, e->direction);
++    *slope = (Uint16)div_round(start > end ? start - end : end - start, 2);
++    *center = (Sint16)clamp32(div_round((Sint64)start + end, 2), -32768, 32767);
++    *invert = start < end ? 0x04 : 0x05;
++}
++
++static void periodic_values(const tm_effect *e, Sint16 *magnitude, Sint16 *offset, Uint16 *phase)
++{
++    Sint32 m = scale_direction(e->magnitude, e->direction);
++    Uint32 p = e->phase;
++    Sint32 headroom;
++    if (m < 0) {
++        /* The wheel takes positive magnitudes only: turn the wave half a cycle instead. */
++        m = -m;
++        p = (p + 0x8000) % 0x10000;
++    }
++    if (m > 32767) {
++        m = 32767;
++    }
++    *magnitude = (Sint16)m;
++    /* The wheel spans a full turn of phase with [0, 32677). */
++    *phase = (Uint16)div_round((Sint64)p * 32677, 0x10000);
++    headroom = 0x7fff - m;
++    *offset = (Sint16)clamp32(e->offset, -headroom, headroom);
++}
++
++static Uint16 condition_max_saturation(Uint16 sdl_type)
++{
++    return sdl_type == SDL_HAPTIC_SPRING ? 0x6aa6 : 0x7ffc;
++}
++
++static Sint16 condition_coefficient(Sint16 coeff, Uint16 sdl_type)
++{
++    int level = sdl_type == SDL_HAPTIC_SPRING ? TM_SPRING_LEVEL :
++                sdl_type == SDL_HAPTIC_DAMPER ? TM_DAMPER_LEVEL :
++                sdl_type == SDL_HAPTIC_FRICTION ? TM_FRICTION_LEVEL : 100;
++    return (Sint16)div_round((Sint64)coeff * level, 100);
++}
++
++static Uint16 condition_saturation(Uint16 sat, Uint16 sdl_type)
++{
++    Uint16 max = condition_max_saturation(sdl_type);
++    return sat == 0 ? max : (Uint16)div_round((Sint64)sat * max, 0xffff);
++}
++
++static void condition_deadband(const tm_effect *e, Sint16 *right, Sint16 *left)
++{
++    Sint32 half = div_round(e->deadband, 2);
++    *right = (Sint16)clamp32(e->center + half, -0x7fff, 0x7fff);
++    *left = (Sint16)clamp32(e->center - half, -0x7fff, 0x7fff);
++}
++
++/* ---- packets ---------------------------------------------------------------------------------- */
++
++static void put16(Uint8 *at, Sint32 value)
++{
++    at[0] = (Uint8)(value & 0xff);
++    at[1] = (Uint8)((value >> 8) & 0xff);
++}
++
++static bool send_buffer(CellarThrustmaster *dev)
++{
++    bool ok = dev->send(dev->userdata, dev->buffer, dev->buffer_length);
++    SDL_memset(dev->buffer, 0, sizeof(dev->buffer));
++    return ok;
++}
++
++static bool send2(CellarThrustmaster *dev, Uint8 b0, Uint8 b1)
++{
++    dev->buffer[0] = b0;
++    dev->buffer[1] = b1;
++    return send_buffer(dev);
++}
++
++static void header(CellarThrustmaster *dev, int id, Uint8 code)
++{
++    dev->buffer[0] = 0x00;
++    dev->buffer[1] = (Uint8)(id + 1);
++    dev->buffer[2] = code;
++}
++
++static void envelope(Uint8 *at, const tm_effect *e)
++{
++    put16(at + 0, e->attack_length);
++    put16(at + 2, e->attack_level);
++    put16(at + 4, e->fade_length);
++    put16(at + 6, e->fade_level);
++}
++
++static void timing(Uint8 *at, Uint16 duration, Uint16 offset)
++{
++    at[0] = 0x4f;
++    put16(at + 1, duration);
++    put16(at + 5, offset);
++    put16(at + 8, 0xffff);
++}
++
++static bool upload(CellarThrustmaster *dev, int id, const tm_effect *e)
++{
++    Uint8 *b = dev->buffer;
++    Uint16 duration = wheel_length(e->length);
++    switch (e->kind) {
++    case TM_KIND_CONSTANT:
++        header(dev, id, 0x6a);
++        put16(b + 3, constant_level(e));
++        envelope(b + 5, e);
++        timing(b + 14, duration, e->delay);
++        break;
++    case TM_KIND_RAMP: {
++        Uint16 slope;
++        Sint16 center;
++        Uint8 invert;
++        ramp_parameters(e, &slope, &center, &invert);
++        header(dev, id, 0x6b);
++        put16(b + 3, slope);
++        put16(b + 5, center);
++        put16(b + 9, duration);
++        put16(b + 11, 0x8000);
++        envelope(b + 13, e);
++        b[21] = invert;
++        timing(b + 22, duration, e->delay);
++        break;
++    }
++    case TM_KIND_CONDITION: {
++        static const Uint8 hardcoded[] = { 0xfe, 0xff, 0xfe, 0xff, 0xfe, 0xff, 0xfe, 0xff };
++        Sint16 right_band, left_band;
++        Uint16 max = condition_max_saturation(e->sdl_type);
++        condition_deadband(e, &right_band, &left_band);
++        header(dev, id, 0x64);
++        put16(b + 3, condition_coefficient(e->right_coeff, e->sdl_type));
++        put16(b + 5, condition_coefficient(e->left_coeff, e->sdl_type));
++        put16(b + 7, right_band);
++        put16(b + 9, left_band);
++        put16(b + 11, condition_saturation(e->right_sat, e->sdl_type));
++        put16(b + 13, condition_saturation(e->left_sat, e->sdl_type));
++        SDL_memcpy(b + 15, hardcoded, sizeof(hardcoded));
++        put16(b + 23, max);
++        put16(b + 25, max);
++        b[27] = e->sdl_type == SDL_HAPTIC_SPRING ? 0x06 : 0x07;
++        timing(b + 28, duration, e->delay);
++        break;
++    }
++    case TM_KIND_PERIODIC: {
++        Sint16 magnitude, offset;
++        Uint16 phase;
++        periodic_values(e, &magnitude, &offset, &phase);
++        header(dev, id, 0x6b);
++        put16(b + 3, magnitude);
++        put16(b + 5, offset);
++        put16(b + 7, phase);
++        put16(b + 9, e->period);
++        put16(b + 11, 0x8000);
++        envelope(b + 13, e);
++        b[21] = e->waveform;
++        timing(b + 22, duration, e->delay);
++        break;
++    }
++    }
++    return send_buffer(dev);
++}
++
++static bool envelope_changed(const tm_effect *a, const tm_effect *b)
++{
++    return a->attack_length != b->attack_length || a->attack_level != b->attack_level ||
++           a->fade_length != b->fade_length || a->fade_level != b->fade_level;
++}
++
++/* Sends only what changed since `old`, as the wheel's modify commands; nothing when nothing did. */
++static bool update(CellarThrustmaster *dev, int id, const tm_effect *e, const tm_effect *old)
++{
++    Uint8 *b = dev->buffer;
++    Uint16 duration = wheel_length(e->length);
++    bool timing_same = e->length == old->length && e->delay == old->delay;
++
++    switch (e->kind) {
++    case TM_KIND_CONSTANT:
++        if (!envelope_changed(e, old) && constant_level(e) == constant_level(old) && timing_same) {
++            return true;
++        }
++        header(dev, id, 0x6a);
++        put16(b + 3, constant_level(e));
++        envelope(b + 5, e);
++        b[13] = 0x00;
++        b[14] = 0x45;
++        put16(b + 15, duration);
++        put16(b + 17, e->delay);
++        break;
++    case TM_KIND_RAMP: {
++        Uint16 slope, old_slope;
++        Sint16 center, old_center;
++        Uint8 invert, old_invert;
++        ramp_parameters(e, &slope, &center, &invert);
++        ramp_parameters(old, &old_slope, &old_center, &old_invert);
++        if (!envelope_changed(e, old) && slope == old_slope && center == old_center && invert == old_invert && timing_same) {
++            return true;
++        }
++        header(dev, id, 0x6e);
++        b[3] = 0x0b;
++        put16(b + 4, slope);
++        put16(b + 6, center);
++        put16(b + 8, duration);
++        envelope(b + 10, e);
++        b[18] = invert;
++        b[19] = 0x45;
++        put16(b + 20, duration);
++        put16(b + 22, e->delay);
++        break;
++    }
++    case TM_KIND_CONDITION: {
++        Sint16 rb, lb, old_rb, old_lb;
++        condition_deadband(e, &rb, &lb);
++        condition_deadband(old, &old_rb, &old_lb);
++        if (condition_coefficient(e->right_coeff, e->sdl_type) == condition_coefficient(old->right_coeff, old->sdl_type) &&
++            condition_coefficient(e->left_coeff, e->sdl_type) == condition_coefficient(old->left_coeff, old->sdl_type) &&
++            rb == old_rb && lb == old_lb &&
++            condition_saturation(e->right_sat, e->sdl_type) == condition_saturation(old->right_sat, old->sdl_type) &&
++            condition_saturation(e->left_sat, e->sdl_type) == condition_saturation(old->left_sat, old->sdl_type) &&
++            timing_same) {
++            return true;
++        }
++        header(dev, id, 0x4c);
++        put16(b + 3, condition_coefficient(e->right_coeff, e->sdl_type));
++        put16(b + 5, condition_coefficient(e->left_coeff, e->sdl_type));
++        put16(b + 7, rb);
++        put16(b + 9, lb);
++        put16(b + 11, condition_saturation(e->right_sat, e->sdl_type));
++        put16(b + 13, condition_saturation(e->left_sat, e->sdl_type));
++        b[15] = 0x06;
++        b[16] = 0x45;
++        put16(b + 17, duration);
++        put16(b + 19, e->delay);
++        break;
++    }
++    case TM_KIND_PERIODIC: {
++        Sint16 magnitude, offset, old_magnitude, old_offset;
++        Uint16 phase, old_phase;
++        periodic_values(e, &magnitude, &offset, &phase);
++        periodic_values(old, &old_magnitude, &old_offset, &old_phase);
++        if (!envelope_changed(e, old) && magnitude == old_magnitude && offset == old_offset &&
++            phase == old_phase && e->period == old->period && timing_same) {
++            return true;
++        }
++        header(dev, id, 0x6e);
++        b[3] = 0x0f;
++        put16(b + 4, magnitude);
++        put16(b + 6, offset);
++        put16(b + 8, phase);
++        put16(b + 10, e->period);
++        envelope(b + 12, e);
++        b[20] = e->waveform;
++        b[21] = 0x45;
++        put16(b + 22, duration);
++        put16(b + 24, e->delay);
++        break;
++    }
++    }
++    return send_buffer(dev);
++}
++
++static bool play(CellarThrustmaster *dev, int id, Uint32 count)
++{
++    header(dev, id, 0x89);
++    dev->buffer[3] = 0x41;
++    put16(dev->buffer + 4, (count == 0 || count >= 65535) ? 0 : (Sint32)count);
++    return send_buffer(dev);
++}
++
++static bool stop(CellarThrustmaster *dev, int id)
++{
++    header(dev, id, 0x89);
++    return send_buffer(dev);
++}
++
++/* The wheel's gain scales every effect: the game's gain, then Cellar's cap. */
++static bool send_gain(CellarThrustmaster *dev)
++{
++    Uint32 gain = (Uint32)0xffff * (Uint32)dev->app_gain / 100 * (Uint32)dev->max_percent / 100;
++    return send2(dev, 0x02, (Uint8)((gain >> 8) & 0xff));
++}
++
++static bool send_range(CellarThrustmaster *dev, Uint16 degrees)
++{
++    Uint16 low = is_t300(dev->product_id) ? 40 : 140;
++    Uint16 high = (dev->product_id == TM_T248_PC || dev->product_id == TM_TX_ACTIVE) ? 900 : 1080;
++    Uint16 scaled;
++    degrees = degrees < low ? low : (degrees > high ? high : degrees);
++    scaled = (Uint16)(degrees * 0x3c);
++    dev->buffer[0] = 0x08;
++    dev->buffer[1] = 0x11;
++    put16(dev->buffer + 2, scaled);
++    return send_buffer(dev);
++}
++
++/* ---- the queue (after hid-tmff2's work handler) ------------------------------------------------ */
++
++int CellarThrustmaster_Tick(CellarThrustmaster *dev, Uint64 now)
++{
++    int status = 0;
++    int id;
++    for (id = 0; id < CELLAR_THRUSTMASTER_MAX_EFFECTS; id++) {
++        tm_state *state = &dev->states[id];
++        Uint32 actions = 0;
++
++        if (test_bit(TM_PLAYING, &state->flags) && state->effect.length && state->count) {
++            Uint64 span = (Uint64)(state->effect.delay + state->effect.length) * state->count;
++            if (now - state->start_time >= span) {
++                clear_bit(TM_PLAYING, &state->flags);
++                clear_bit(TM_QUEUE_UPDATE, &state->flags);
++            }
++        }
++        if (test_bit(TM_QUEUE_UPLOAD, &state->flags)) {
++            set_bit(TM_QUEUE_UPLOAD, &actions);
++            clear_bit(TM_QUEUE_UPLOAD, &state->flags);
++            clear_bit(TM_QUEUE_UPDATE, &state->flags); /* an upload is up to date */
++        }
++        if (test_bit(TM_QUEUE_UPDATE, &state->flags)) {
++            set_bit(TM_QUEUE_UPDATE, &actions);
++            clear_bit(TM_QUEUE_UPDATE, &state->flags);
++        }
++        if (test_bit(TM_QUEUE_START, &state->flags)) {
++            set_bit(TM_QUEUE_START, &actions);
++            clear_bit(TM_QUEUE_START, &state->flags);
++            set_bit(TM_PLAYING, &state->flags);
++            state->start_time = now; /* the wheel starts it now, not when the game asked */
++        }
++        if (test_bit(TM_QUEUE_STOP, &state->flags)) {
++            set_bit(TM_QUEUE_STOP, &actions);
++            clear_bit(TM_QUEUE_STOP, &state->flags);
++            clear_bit(TM_PLAYING, &state->flags);
++        }
++
++        if (test_bit(TM_QUEUE_UPLOAD, &actions) && !upload(dev, id, &state->effect)) {
++            status = -1;
++        }
++        if (test_bit(TM_QUEUE_UPDATE, &actions)) {
++            if (!update(dev, id, &state->effect, &state->old)) {
++                status = -1;
++            }
++            state->old = state->effect;
++        }
++        if (test_bit(TM_QUEUE_START, &actions) && !play(dev, id, state->count)) {
++            status = -1;
++        }
++        if (test_bit(TM_QUEUE_STOP, &actions) && !stop(dev, id)) {
++            status = -1;
++        }
++    }
++    return status;
++}
++
++static int SDLCALL thread_main(void *userdata)
++{
++    CellarThrustmaster *dev = (CellarThrustmaster *)userdata;
++    while (!SDL_GetAtomicInt(&dev->stop_thread)) {
++        SDL_LockMutex(dev->mutex);
++        CellarThrustmaster_Tick(dev, SDL_GetTicks());
++        SDL_UnlockMutex(dev->mutex);
++        SDL_Delay(CELLAR_THRUSTMASTER_TICK_MS);
++    }
++    return 0;
++}
++
++/* ---- lifecycle ------------------------------------------------------------------------------ */
++
++static bool send_open(CellarThrustmaster *dev)
++{
++    if (is_t300(dev->product_id)) {
++        return send2(dev, 0x01, 0x05);
++    }
++    return send2(dev, 0x01, 0x04) && send2(dev, 0x01, 0x05);
++}
++
++static bool send_close(CellarThrustmaster *dev)
++{
++    if (is_t300(dev->product_id)) {
++        return send2(dev, 0x01, 0x00);
++    }
++    return send2(dev, 0x01, 0x05) && send2(dev, 0x01, 0x00);
++}
++
++CellarThrustmaster *CellarThrustmaster_Create(Uint16 product_id, CellarThrustmaster_SendFunc send,
++                                              void *userdata, int max_percent, bool run_thread)
++{
++    CellarThrustmaster *dev = (CellarThrustmaster *)SDL_calloc(1, sizeof(*dev));
++    if (!dev) {
++        return NULL;
++    }
++    dev->product_id = product_id;
++    dev->buffer_length = CellarThrustmaster_BufferLength(product_id);
++    dev->send = send;
++    dev->userdata = userdata;
++    dev->max_percent = max_percent < 1 ? 1 : (max_percent > 100 ? 100 : max_percent);
++    dev->app_gain = 100;
++
++    if (!send_open(dev) || !send_range(dev, TM_DEFAULT_RANGE) || !send_gain(dev)) {
++        SDL_free(dev);
++        SDL_SetError("Thrustmaster: the wheel did not take its open commands");
++        return NULL;
++    }
++    dev->mutex = SDL_CreateMutex();
++    if (!dev->mutex) {
++        SDL_free(dev);
++        return NULL;
++    }
++    if (run_thread) {
++        SDL_SetAtomicInt(&dev->stop_thread, 0);
++        dev->thread = SDL_CreateThread(thread_main, "CellarThrustmasterFFB", dev);
++        if (!dev->thread) {
++            SDL_DestroyMutex(dev->mutex);
++            SDL_free(dev);
++            return NULL;
++        }
++    }
++    return dev;
++}
++
++void CellarThrustmaster_Destroy(CellarThrustmaster *dev)
++{
++    int id;
++    if (!dev) {
++        return;
++    }
++    if (dev->thread) {
++        SDL_SetAtomicInt(&dev->stop_thread, 1);
++        SDL_WaitThread(dev->thread, NULL);
++        dev->thread = NULL;
++    }
++    /* No force outlives the game: stop whatever the wheel may still be playing, then close. */
++    for (id = 0; id < CELLAR_THRUSTMASTER_MAX_EFFECTS; id++) {
++        tm_state *state = &dev->states[id];
++        if (test_bit(TM_PLAYING, &state->flags) || test_bit(TM_QUEUE_START, &state->flags)) {
++            stop(dev, id);
++        }
++    }
++    send_close(dev);
++    SDL_DestroyMutex(dev->mutex);
++    SDL_free(dev);
++}
++
++Uint32 CellarThrustmaster_GetFeatures(void)
++{
++    return SDL_HAPTIC_CONSTANT | SDL_HAPTIC_SINE | SDL_HAPTIC_SQUARE | SDL_HAPTIC_TRIANGLE |
++           SDL_HAPTIC_SAWTOOTHUP | SDL_HAPTIC_SAWTOOTHDOWN | SDL_HAPTIC_RAMP | SDL_HAPTIC_SPRING |
++           SDL_HAPTIC_DAMPER | SDL_HAPTIC_INERTIA | SDL_HAPTIC_FRICTION | SDL_HAPTIC_GAIN |
++           SDL_HAPTIC_AUTOCENTER | SDL_HAPTIC_STATUS;
++}
++
++int CellarThrustmaster_NumEffects(void)
++{
++    return CELLAR_THRUSTMASTER_MAX_EFFECTS;
++}
++
++/* ---- effect calls --------------------------------------------------------------------------- */
++
++static bool valid_id(CellarThrustmaster *dev, int id)
++{
++    return id >= 0 && id < CELLAR_THRUSTMASTER_MAX_EFFECTS && dev->states[id].allocated;
++}
++
++int CellarThrustmaster_NewEffect(CellarThrustmaster *dev, const SDL_HapticEffect *effect)
++{
++    tm_effect converted;
++    int id = -1, i;
++    if (!convert(effect, &converted)) {
++        SDL_SetError("Thrustmaster: effect type not supported");
++        return -1;
++    }
++    SDL_LockMutex(dev->mutex);
++    for (i = 0; i < CELLAR_THRUSTMASTER_MAX_EFFECTS; i++) {
++        if (!dev->states[i].allocated) {
++            SDL_zero(dev->states[i]);
++            dev->states[i].allocated = true;
++            dev->states[i].effect = converted;
++            dev->states[i].old = converted;
++            set_bit(TM_QUEUE_UPLOAD, &dev->states[i].flags);
++            id = i;
++            break;
++        }
++    }
++    SDL_UnlockMutex(dev->mutex);
++    if (id < 0) {
++        SDL_SetError("Thrustmaster: no free effect slot");
++    }
++    return id;
++}
++
++bool CellarThrustmaster_UpdateEffect(CellarThrustmaster *dev, int id, const SDL_HapticEffect *effect)
++{
++    tm_effect converted;
++    tm_state *state;
++    if (!valid_id(dev, id) || !convert(effect, &converted)) {
++        return SDL_SetError("Thrustmaster: invalid effect");
++    }
++    SDL_LockMutex(dev->mutex);
++    state = &dev->states[id];
++    if (converted.kind != state->effect.kind) {
++        SDL_UnlockMutex(dev->mutex);
++        return SDL_SetError("Thrustmaster: an effect's type cannot change");
++    }
++    state->effect = converted;
++    if (!test_bit(TM_QUEUE_UPLOAD, &state->flags)) {
++        /* `old` already holds what the wheel has; the next tick sends the difference. */
++        set_bit(TM_QUEUE_UPDATE, &state->flags);
++    }
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++bool CellarThrustmaster_RunEffect(CellarThrustmaster *dev, int id, Uint32 iterations)
++{
++    tm_state *state;
++    if (!valid_id(dev, id)) {
++        return SDL_SetError("Thrustmaster: invalid effect");
++    }
++    SDL_LockMutex(dev->mutex);
++    state = &dev->states[id];
++    state->count = (iterations == SDL_HAPTIC_INFINITY) ? 0 : (iterations == 0 ? 1 : iterations);
++    set_bit(TM_QUEUE_START, &state->flags);
++    clear_bit(TM_QUEUE_STOP, &state->flags);
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++bool CellarThrustmaster_StopEffect(CellarThrustmaster *dev, int id)
++{
++    tm_state *state;
++    if (!valid_id(dev, id)) {
++        return SDL_SetError("Thrustmaster: invalid effect");
++    }
++    SDL_LockMutex(dev->mutex);
++    state = &dev->states[id];
++    set_bit(TM_QUEUE_STOP, &state->flags);
++    clear_bit(TM_QUEUE_START, &state->flags);
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++void CellarThrustmaster_DestroyEffect(CellarThrustmaster *dev, int id)
++{
++    tm_state *state;
++    if (!valid_id(dev, id)) {
++        return;
++    }
++    SDL_LockMutex(dev->mutex);
++    state = &dev->states[id];
++    /* The slot is freed now, so the stop cannot wait for the queue. */
++    if (test_bit(TM_PLAYING, &state->flags) || test_bit(TM_QUEUE_START, &state->flags)) {
++        stop(dev, id);
++    }
++    SDL_zerop(state);
++    SDL_UnlockMutex(dev->mutex);
++}
++
++int CellarThrustmaster_GetEffectStatus(CellarThrustmaster *dev, int id)
++{
++    int playing;
++    if (!valid_id(dev, id)) {
++        SDL_SetError("Thrustmaster: invalid effect");
++        return -1;
++    }
++    SDL_LockMutex(dev->mutex);
++    playing = (test_bit(TM_PLAYING, &dev->states[id].flags) || test_bit(TM_QUEUE_START, &dev->states[id].flags)) ? 1 : 0;
++    SDL_UnlockMutex(dev->mutex);
++    return playing;
++}
++
++bool CellarThrustmaster_SetGain(CellarThrustmaster *dev, int gain)
++{
++    bool ok;
++    SDL_LockMutex(dev->mutex);
++    dev->app_gain = gain < 0 ? 0 : (gain > 100 ? 100 : gain);
++    ok = send_gain(dev);
++    SDL_UnlockMutex(dev->mutex);
++    return ok ? true : SDL_SetError("Thrustmaster: the wheel did not take its gain");
++}
++
++bool CellarThrustmaster_SetAutocenter(CellarThrustmaster *dev, int autocenter)
++{
++    bool ok;
++    Uint32 value = (Uint32)0xffff * (Uint32)(autocenter < 0 ? 0 : (autocenter > 100 ? 100 : autocenter)) / 100;
++    SDL_LockMutex(dev->mutex);
++    dev->buffer[0] = 0x08;
++    dev->buffer[1] = 0x04;
++    put16(dev->buffer + 2, 0x0001);
++    ok = send_buffer(dev);
++    dev->buffer[0] = 0x08;
++    dev->buffer[1] = 0x03;
++    put16(dev->buffer + 2, (Sint32)value);
++    ok = send_buffer(dev) && ok;
++    SDL_UnlockMutex(dev->mutex);
++    return ok ? true : SDL_SetError("Thrustmaster: the wheel did not take its autocenter");
++}
++
++bool CellarThrustmaster_StopAll(CellarThrustmaster *dev)
++{
++    int id;
++    SDL_LockMutex(dev->mutex);
++    for (id = 0; id < CELLAR_THRUSTMASTER_MAX_EFFECTS; id++) {
++        tm_state *state = &dev->states[id];
++        if (test_bit(TM_PLAYING, &state->flags) || test_bit(TM_QUEUE_START, &state->flags)) {
++            set_bit(TM_QUEUE_STOP, &state->flags);
++            clear_bit(TM_QUEUE_START, &state->flags);
++        }
++    }
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++#endif /* CELLAR_FFB_STANDALONE || SDL_HAPTIC_IOKIT */
+diff -ruN a/src/haptic/darwin/SDL_cellar_thrustmaster.h b/src/haptic/darwin/SDL_cellar_thrustmaster.h
+--- a/src/haptic/darwin/SDL_cellar_thrustmaster.h
++++ b/src/haptic/darwin/SDL_cellar_thrustmaster.h
+@@ -0,0 +1,77 @@
++/*
++  Cellar: force feedback for Thrustmaster T300-family wheel bases on macOS, driven over USB HID.
++  Added to SDL by Cellar (https://github.com/Echarnus/Cellar); not part of upstream SDL.
++
++  SPDX-License-Identifier: GPL-2.0-or-later
++  The command encoding is ported from the Linux hid-tmff2 driver (https://github.com/Kimplul/hid-tmff2),
++  GPL-2.0-or-later. This file and its .c are distributed under the GPL, version 2 or later, as part
++  of Cellar's SDL build.
++*/
++
++#ifndef SDL_cellar_thrustmaster_h_
++#define SDL_cellar_thrustmaster_h_
++
++#ifdef CELLAR_FFB_STANDALONE
++#include <SDL3/SDL.h>
++#endif
++
++#define CELLAR_THRUSTMASTER_VENDOR_ID 0x044f
++#define CELLAR_THRUSTMASTER_MAX_EFFECTS 16
++/* The HID output report every command travels in. The wheel takes it whatever its descriptor says. */
++#define CELLAR_THRUSTMASTER_REPORT_ID 0x60
++#define CELLAR_THRUSTMASTER_MAX_BUFFER 63
++/* A belt-driven base is far weaker than a direct-drive one: the game's own strength, by default. */
++#define CELLAR_THRUSTMASTER_DEFAULT_MAX_PERCENT 100
++/* The wheel drops commands that come faster than this (hid-tmff2's timer period). */
++#define CELLAR_THRUSTMASTER_TICK_MS 8
++
++/* Writes one command (`len` bytes, without the report ID) to the wheel. Returns false on failure. */
++typedef bool (*CellarThrustmaster_SendFunc)(void *userdata, const Uint8 *buffer, int len);
++
++typedef struct CellarThrustmaster CellarThrustmaster;
++
++/* Whether a vendor/product pair is a T300-family wheel in its force-feedback mode. A wheel that
++   still reports the generic "FFB Wheel" product (0xb65d) has to be switched out of it first. */
++bool CellarThrustmaster_IsSupported(Uint16 vendor_id, Uint16 product_id);
++
++/* The generic mode every Thrustmaster wheel starts in, before the host switches it to its own. */
++#define CELLAR_THRUSTMASTER_GENERIC_PRODUCT_ID 0xb65d
++
++/* The mode switch for a wheel still in the generic mode: given the wheel's answer to the vendor
++   request 73 (bmRequestType 0xc1, 16 bytes), the wValue of request 83 (bmRequestType 0x41) that
++   switches it to the mode this engine drives. 0 for a wheel this engine does not drive. */
++Uint16 CellarThrustmaster_SwitchValue(const Uint8 *response, int length);
++
++/* The length of one command for this product: 31 bytes in PS4 mode, 63 otherwise. */
++int CellarThrustmaster_BufferLength(Uint16 product_id);
++
++/* The strength cap from CELLAR_FFB_MAX_PERCENT, clamped to 1..100; 100 when unset. */
++int CellarThrustmaster_MaxPercentFromEnv(void);
++
++/* Opens the engine: sends the wheel's open sequence, its steering range and gain, and (with
++   run_thread) starts the update thread. Returns NULL and sets an SDL error on failure. */
++CellarThrustmaster *CellarThrustmaster_Create(Uint16 product_id, CellarThrustmaster_SendFunc send,
++                                              void *userdata, int max_percent, bool run_thread);
++
++/* Stops every effect, sends the wheel's close sequence, joins the thread and frees the engine. */
++void CellarThrustmaster_Destroy(CellarThrustmaster *dev);
++
++Uint32 CellarThrustmaster_GetFeatures(void);
++int CellarThrustmaster_NumEffects(void);
++
++/* Effect calls, mirroring SDL_SYS_Haptic*. Ids are slots in 0..CELLAR_THRUSTMASTER_MAX_EFFECTS-1. */
++int CellarThrustmaster_NewEffect(CellarThrustmaster *dev, const SDL_HapticEffect *effect);
++bool CellarThrustmaster_UpdateEffect(CellarThrustmaster *dev, int id, const SDL_HapticEffect *effect);
++bool CellarThrustmaster_RunEffect(CellarThrustmaster *dev, int id, Uint32 iterations);
++bool CellarThrustmaster_StopEffect(CellarThrustmaster *dev, int id);
++void CellarThrustmaster_DestroyEffect(CellarThrustmaster *dev, int id);
++int CellarThrustmaster_GetEffectStatus(CellarThrustmaster *dev, int id);
++bool CellarThrustmaster_SetGain(CellarThrustmaster *dev, int gain);
++bool CellarThrustmaster_SetAutocenter(CellarThrustmaster *dev, int autocenter);
++bool CellarThrustmaster_StopAll(CellarThrustmaster *dev);
++
++/* One engine step at time now_ms: sends what the game queued since the last one. What the thread
++   does every CELLAR_THRUSTMASTER_TICK_MS. Exposed for tests. */
++int CellarThrustmaster_Tick(CellarThrustmaster *dev, Uint64 now_ms);
++
++#endif /* SDL_cellar_thrustmaster_h_ */
+diff -ruN a/src/haptic/darwin/SDL_syshaptic.c b/src/haptic/darwin/SDL_syshaptic.c
+--- a/src/haptic/darwin/SDL_syshaptic.c
++++ b/src/haptic/darwin/SDL_syshaptic.c
+@@ -20,7 +20,8 @@
+ */
+ /*
+   Altered by Cellar (https://github.com/Echarnus/Cellar): Fanatec wheel bases are driven over HID by
+-  SDL_cellar_fanatec.c instead of ForceFeedback.framework. Not part of upstream SDL.
++  SDL_cellar_fanatec.c instead of ForceFeedback.framework, and Thrustmaster T300-family wheels by
++  SDL_cellar_thrustmaster.c. Not part of upstream SDL.
+ */
+ #include "SDL_internal.h"
+ 
+@@ -31,10 +32,13 @@
+ #include "../../joystick/darwin/SDL_iokitjoystick_c.h" // For joystick hwdata
+ #include "SDL_syshaptic_c.h"
+ #include "SDL_cellar_fanatec.h" // Cellar: Fanatec force feedback over HID
++#include "SDL_cellar_thrustmaster.h" // Cellar: Thrustmaster force feedback over HID
+ 
+ #include <IOKit/IOKitLib.h>
+ #include <IOKit/hid/IOHIDKeys.h>
+ #include <IOKit/hid/IOHIDUsageTables.h>
++#include <IOKit/IOCFPlugIn.h>      // Cellar: the Thrustmaster mode switch
++#include <IOKit/usb/IOUSBLib.h>
+ #include <ForceFeedback/ForceFeedback.h>
+ #include <ForceFeedback/ForceFeedbackConstants.h>
+ 
+@@ -73,6 +77,7 @@
+     CellarFanatec *cellar_fanatec;
+     IOHIDDeviceRef cellar_device;
+     CFIndex cellar_report_id;
++    CellarThrustmaster *cellar_thrustmaster; // Cellar: the same, for a Thrustmaster wheel
+ };
+ 
+ /*
+@@ -82,7 +87,7 @@
+ {
+     FFEffectObjectReference ref; // Reference.
+     struct FFEFFECT effect;      // Hardware effect.
+-    int cellar_id;               // Cellar: the effect's id in the Fanatec engine
++    int cellar_id;               // Cellar: the effect's id in the Fanatec or Thrustmaster engine
+ };
+ 
+ /*
+@@ -693,9 +698,192 @@
+     haptic->naxes = 1;
+     return true;
+ }
++
++/*
++ * Cellar: Thrustmaster T300-family wheels, driven over HID by SDL_cellar_thrustmaster.c.
++ */
++// The product ID of a Thrustmaster joystick, or 0 for any other (or with CELLAR_FFB_DISABLE set).
++static Uint16 CellarThrustmasterProduct(SDL_Joystick *joystick)
++{
++    IOHIDDeviceRef device;
++    if (joystick->driver != &SDL_DARWIN_JoystickDriver || !joystick->hwdata || !joystick->hwdata->deviceRef) {
++        return 0;
++    }
++    if (SDL_GetHintBoolean("CELLAR_FFB_DISABLE", false)) {
++        return 0;
++    }
++    device = joystick->hwdata->deviceRef;
++    if (CellarHIDProperty(device, CFSTR(kIOHIDVendorIDKey)) != CELLAR_THRUSTMASTER_VENDOR_ID) {
++        return 0;
++    }
++    return CellarHIDProperty(device, CFSTR(kIOHIDProductIDKey));
++}
++
++static bool CellarIsThrustmasterFFBJoystick(SDL_Joystick *joystick)
++{
++    return CellarThrustmaster_IsSupported(CELLAR_THRUSTMASTER_VENDOR_ID, CellarThrustmasterProduct(joystick));
++}
++
++// The USB device behind a HID device: the first IOUSBHostDevice (or older IOUSBDevice) above it.
++static io_service_t CellarUSBDeviceFor(IOHIDDeviceRef hid)
++{
++    io_registry_entry_t entry = IOHIDDeviceGetService(hid);
++    if (!entry) {
++        return 0;
++    }
++    IOObjectRetain(entry);
++    while (entry) {
++        io_registry_entry_t parent = 0;
++        kern_return_t kr;
++        if (IOObjectConformsTo(entry, "IOUSBHostDevice") || IOObjectConformsTo(entry, "IOUSBDevice")) {
++            return entry;
++        }
++        kr = IORegistryEntryGetParentEntry(entry, kIOServicePlane, &parent);
++        IOObjectRelease(entry);
++        entry = kr == KERN_SUCCESS ? parent : 0;
++    }
++    return 0;
++}
++
++static IOReturn CellarUSBRequest(IOUSBDeviceInterface **usb, IOUSBDevRequest *request)
++{
++    IOReturn ret = (*usb)->DeviceRequest(usb, request);
++    if (ret == kIOReturnNotOpen && (*usb)->USBDeviceOpen(usb) == kIOReturnSuccess) {
++        ret = (*usb)->DeviceRequest(usb, request);
++        (*usb)->USBDeviceClose(usb);
++    }
++    return ret;
++}
++
++/* A Thrustmaster wheel starts as a generic "FFB Wheel" (0xb65d) with no force feedback, until the
++   host asks its model (vendor request 73) and switches it (request 83) - what Thrustmaster's Windows
++   driver and Linux's hid-thrustmaster do. The wheel then drops off the bus and comes back as its own
++   product, which SDL sees as a new joystick that CellarIsThrustmasterFFBJoystick takes. */
++static void CellarThrustmasterSwitchMode(IOHIDDeviceRef hid)
++{
++    // The packets Linux sends first: some T300s fail the switch without them.
++    static const Uint8 setup[5][9] = {
++        { 0x42, 0x01 }, { 0x0a, 0x04, 0x90, 0x03 }, { 0x0a, 0x04, 0x00, 0x0c }, { 0x0a, 0x04, 0x12, 0x10 }, { 0x0a, 0x04, 0x00, 0x06 }
++    };
++    static const CFIndex setup_lengths[5] = { 9, 8, 8, 8, 8 };
++    static SInt64 attempted[8];
++    static int nattempted = 0;
++    CFTypeRef location_ref = IOHIDDeviceGetProperty(hid, CFSTR(kIOHIDLocationIDKey));
++    SInt64 location = 0;
++    io_service_t service;
++    IOCFPlugInInterface **plugin = NULL;
++    IOUSBDeviceInterface **usb = NULL;
++    SInt32 score = 0;
++    Uint8 response[16];
++    IOUSBDevRequest request;
++    Uint16 value;
++    int i;
++
++    // One attempt per wheel per process: an unknown model must not be asked again on every scan.
++    if (location_ref && CFGetTypeID(location_ref) == CFNumberGetTypeID()) {
++        CFNumberGetValue((CFNumberRef)location_ref, kCFNumberSInt64Type, &location);
++    }
++    for (i = 0; i < nattempted; i++) {
++        if (attempted[i] == location) {
++            return;
++        }
++    }
++    if (nattempted < (int)SDL_arraysize(attempted)) {
++        attempted[nattempted++] = location;
++    }
++
++    service = CellarUSBDeviceFor(hid);
++    if (!service) {
++        return;
++    }
++    if (IOCreatePlugInInterfaceForService(service, kIOUSBDeviceUserClientTypeID, kIOCFPlugInInterfaceID,
++                                          &plugin, &score) != KERN_SUCCESS || !plugin) {
++        IOObjectRelease(service);
++        return;
++    }
++    IOObjectRelease(service);
++    (*plugin)->QueryInterface(plugin, CFUUIDGetUUIDBytes(kIOUSBDeviceInterfaceID), (LPVOID *)&usb);
++    IODestroyPlugInInterface(plugin);
++    if (!usb) {
++        return;
++    }
++
++    for (i = 0; i < 5; i++) {
++        IOHIDDeviceSetReport(hid, kIOHIDReportTypeOutput, 0, setup[i], setup_lengths[i]);
++    }
++
++    SDL_zero(response);
++    SDL_zero(request);
++    request.bmRequestType = 0xc1;
++    request.bRequest = 73;
++    request.wLength = sizeof(response);
++    request.pData = response;
++    if (CellarUSBRequest(usb, &request) == kIOReturnSuccess) {
++        value = CellarThrustmaster_SwitchValue(response, (int)request.wLenDone);
++        if (value) {
++            SDL_zero(request);
++            request.bmRequestType = 0x41;
++            request.bRequest = 83;
++            request.wValue = value;
++            // The wheel resets before it answers: no reply is the expected outcome.
++            CellarUSBRequest(usb, &request);
++        }
++    }
++    (*usb)->Release(usb);
++}
++
++static bool CellarThrustmasterSend(void *userdata, const Uint8 *buffer, int len)
++{
++    struct haptic_hwdata *hwdata = (struct haptic_hwdata *)userdata;
++    Uint8 report[1 + CELLAR_THRUSTMASTER_MAX_BUFFER];
++    if (len > CELLAR_THRUSTMASTER_MAX_BUFFER) {
++        return false;
++    }
++    // Every command is output report 0x60, ID first, as hid-tmff2 sends it.
++    report[0] = CELLAR_THRUSTMASTER_REPORT_ID;
++    SDL_memcpy(&report[1], buffer, (size_t)len);
++    return IOHIDDeviceSetReport(hwdata->cellar_device, kIOHIDReportTypeOutput, CELLAR_THRUSTMASTER_REPORT_ID,
++                                report, 1 + len) == kIOReturnSuccess;
++}
++
++static bool CellarThrustmasterOpen(SDL_Haptic *haptic, SDL_Joystick *joystick)
++{
++    IOHIDDeviceRef device = joystick->hwdata->deviceRef;
++    struct haptic_hwdata *hwdata = (struct haptic_hwdata *)SDL_calloc(1, sizeof(*hwdata));
++    if (!hwdata) {
++        return false;
++    }
++    hwdata->cellar_device = (IOHIDDeviceRef)CFRetain(device);
++    hwdata->cellar_report_id = CELLAR_THRUSTMASTER_REPORT_ID;
++    hwdata->cellar_thrustmaster = CellarThrustmaster_Create(CellarHIDProperty(device, CFSTR(kIOHIDProductIDKey)),
++                                                            CellarThrustmasterSend, hwdata,
++                                                            CellarThrustmaster_MaxPercentFromEnv(), true);
++    if (!hwdata->cellar_thrustmaster) {
++        CFRelease(hwdata->cellar_device);
++        SDL_free(hwdata);
++        return false;
++    }
++
++    haptic->effects = (struct haptic_effect *)SDL_calloc(CellarThrustmaster_NumEffects(), sizeof(struct haptic_effect));
++    if (!haptic->effects) {
++        CellarThrustmaster_Destroy(hwdata->cellar_thrustmaster);
++        CFRelease(hwdata->cellar_device);
++        SDL_free(hwdata);
++        return false;
++    }
++    haptic->hwdata = hwdata;
++    haptic->instance_id = SDL_GetNextObjectID();
++    haptic->name = SDL_strdup(joystick->name ? joystick->name : "Thrustmaster wheel");
++    haptic->supported = CellarThrustmaster_GetFeatures();
++    haptic->neffects = CellarThrustmaster_NumEffects();
++    haptic->nplaying = haptic->neffects;
++    haptic->naxes = 1;
++    return true;
++}
+ #endif // SDL_JOYSTICK_IOKIT
+ 
+ #define CELLAR_FANATEC(haptic) ((haptic)->hwdata ? (haptic)->hwdata->cellar_fanatec : NULL)
++#define CELLAR_THRUSTMASTER(haptic) ((haptic)->hwdata ? (haptic)->hwdata->cellar_thrustmaster : NULL)
+ 
+ /*
+  * Checks to see if a joystick has haptic features.
+@@ -709,6 +897,14 @@
+     if (CellarIsFanatecJoystick(joystick)) {
+         return true;
+     }
++    if (CellarIsThrustmasterFFBJoystick(joystick)) {
++        return true;
++    }
++    if (CellarThrustmasterProduct(joystick) == CELLAR_THRUSTMASTER_GENERIC_PRODUCT_ID) {
++        // Not yet: switch it, and it returns as a wheel this answers true for.
++        CellarThrustmasterSwitchMode(joystick->hwdata->deviceRef);
++        return false;
++    }
+     if (joystick->hwdata->ffservice != 0) {
+         return true;
+     }
+@@ -725,7 +921,7 @@
+     if (joystick->driver != &SDL_DARWIN_JoystickDriver) {
+         return false;
+     }
+-    if (CELLAR_FANATEC(haptic)) {
++    if (CELLAR_FANATEC(haptic) || CELLAR_THRUSTMASTER(haptic)) {
+         return haptic->hwdata->cellar_device == joystick->hwdata->deviceRef;
+     }
+     if (IOObjectIsEqualTo((io_object_t)((size_t)haptic->hwdata->device),
+@@ -750,6 +946,9 @@
+     if (CellarIsFanatecJoystick(joystick)) {
+         return CellarFanatecOpen(haptic, joystick);
+     }
++    if (CellarIsThrustmasterFFBJoystick(joystick)) {
++        return CellarThrustmasterOpen(haptic, joystick);
++    }
+     for (item = SDL_hapticlist; item; item = item->next) {
+         if (IOObjectIsEqualTo((io_object_t)item->dev,
+                               joystick->hwdata->ffservice)) {
+@@ -773,6 +972,17 @@
+  */
+ void SDL_SYS_HapticClose(SDL_Haptic *haptic)
+ {
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        // Stops every effect and closes the wheel's force feedback before anything is freed.
++        CellarThrustmaster_Destroy(haptic->hwdata->cellar_thrustmaster);
++        CFRelease(haptic->hwdata->cellar_device);
++        SDL_free(haptic->effects);
++        haptic->effects = NULL;
++        haptic->neffects = 0;
++        SDL_free(haptic->hwdata);
++        haptic->hwdata = NULL;
++        return;
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         // Stops every effect and the base itself before anything is freed.
+         CellarFanatec_Destroy(haptic->hwdata->cellar_fanatec);
+@@ -1252,6 +1462,20 @@
+     HRESULT ret;
+     CFUUIDRef type;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        int id = CellarThrustmaster_NewEffect(haptic->hwdata->cellar_thrustmaster, base);
++        if (id < 0) {
++            return false;
++        }
++        effect->hweffect = (struct haptic_hweffect *)SDL_calloc(1, sizeof(struct haptic_hweffect));
++        if (!effect->hweffect) {
++            CellarThrustmaster_DestroyEffect(haptic->hwdata->cellar_thrustmaster, id);
++            return false;
++        }
++        effect->hweffect->cellar_id = id;
++        return true;
++    }
++
+     if (CELLAR_FANATEC(haptic)) {
+         int id = CellarFanatec_NewEffect(haptic->hwdata->cellar_fanatec, base);
+         if (id < 0) {
+@@ -1314,6 +1538,9 @@
+     FFEffectParameterFlag flags;
+     FFEFFECT temp;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return CellarThrustmaster_UpdateEffect(haptic->hwdata->cellar_thrustmaster, effect->hweffect->cellar_id, data);
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return CellarFanatec_UpdateEffect(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id, data);
+     }
+@@ -1360,6 +1587,9 @@
+     HRESULT ret;
+     Uint32 iter;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return CellarThrustmaster_RunEffect(haptic->hwdata->cellar_thrustmaster, effect->hweffect->cellar_id, iterations);
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return CellarFanatec_RunEffect(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id, iterations);
+     }
+@@ -1388,6 +1618,9 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return CellarThrustmaster_StopEffect(haptic->hwdata->cellar_thrustmaster, effect->hweffect->cellar_id);
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return CellarFanatec_StopEffect(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id);
+     }
+@@ -1408,6 +1641,12 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        CellarThrustmaster_DestroyEffect(haptic->hwdata->cellar_thrustmaster, effect->hweffect->cellar_id);
++        SDL_free(effect->hweffect);
++        effect->hweffect = NULL;
++        return;
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         CellarFanatec_DestroyEffect(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id);
+         SDL_free(effect->hweffect);
+@@ -1435,6 +1674,9 @@
+     HRESULT ret;
+     FFEffectStatusFlag status;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return CellarThrustmaster_GetEffectStatus(haptic->hwdata->cellar_thrustmaster, effect->hweffect->cellar_id);
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return CellarFanatec_GetEffectStatus(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id);
+     }
+@@ -1459,6 +1701,9 @@
+     HRESULT ret;
+     Uint32 val;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return CellarThrustmaster_SetGain(haptic->hwdata->cellar_thrustmaster, gain);
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return CellarFanatec_SetGain(haptic->hwdata->cellar_fanatec, gain);
+     }
+@@ -1481,6 +1726,9 @@
+     HRESULT ret;
+     Uint32 val;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return CellarThrustmaster_SetAutocenter(haptic->hwdata->cellar_thrustmaster, autocenter);
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return SDL_Unsupported(); // never advertised: the base's own centring stays off
+     }
+@@ -1509,6 +1757,9 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return SDL_Unsupported(); // never advertised: the wheel has no pause
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return CellarFanatec_Pause(haptic->hwdata->cellar_fanatec);
+     }
+@@ -1529,6 +1780,9 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return SDL_Unsupported(); // never advertised: the wheel has no pause
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return CellarFanatec_Resume(haptic->hwdata->cellar_fanatec);
+     }
+@@ -1549,6 +1803,9 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_THRUSTMASTER(haptic)) {
++        return CellarThrustmaster_StopAll(haptic->hwdata->cellar_thrustmaster);
++    }
+     if (CELLAR_FANATEC(haptic)) {
+         return CellarFanatec_StopAll(haptic->hwdata->cellar_fanatec);
+     }

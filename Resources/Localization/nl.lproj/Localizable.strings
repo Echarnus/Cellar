@@ -132,6 +132,6 @@
 "Racing wheels" = "Racesturen";
 "Force feedback strength" = "Sterkte van force feedback";
 "Cellar's default" = "Standaard van Cellar";
-"Fanatec bases start at half strength and Logitech wheels at full." = "Fanatec-bases beginnen op halve sterkte, Logitech-sturen op volle sterkte.";
+"Fanatec bases start at half strength; Logitech and Thrustmaster wheels at full." = "Fanatec-bases beginnen op halve sterkte, Logitech- en Thrustmaster-sturen op volle sterkte.";
 "Every wheel Cellar drives pushes at most the strength chosen above." = "Elk stuur dat Cellar aanstuurt, duwt hoogstens met de sterkte die je hierboven kiest.";
 "Applies from a game's next launch. A direct-drive base is strong: raise it a step at a time. The base's own force-feedback setting still applies on top." = "Geldt vanaf de volgende keer dat een game start. Een direct-drive-base is sterk: verhoog de sterkte stap voor stap. De force-feedbackinstelling van de base zelf geldt daar nog bovenop.";
