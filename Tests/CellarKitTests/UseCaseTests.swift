@@ -58,7 +58,7 @@ struct UseCaseTests {
         var events: [GameEvent] = []
         try InstallGame(plan, adapter: RecordingAdapter()).run { events.append($0) }
         #expect(events == [.install(InstallProgress(.downloading)), .step("tool output"),
-                           .step("installed usecase-install")])
+                           .step("installed \(plan.slug)")])
     }
 
     @Test("The Game façade still splits the same stream back into its closures")
@@ -94,11 +94,11 @@ struct UseCaseTests {
     @Test("LoadLibrary reads only the profiles it is given, and skips one that won't resolve")
     func loadLibraryUsesInjectedProfiles() throws {
         let plan = try TestHome.plan("[game]\nname = \"Library Use Case Game\"\nstore = \"gog\"", slug: "usecase-library")
-        let library = LoadLibrary(slugs: { ["usecase-library", "usecase-broken"] }, plan: { slug in
+        let library = LoadLibrary(slugs: { [plan.slug, "usecase-broken"] }, plan: { slug in
             guard slug == plan.slug else { throw CellarError.invalidArgument("no such profile") }
             return plan
         })
-        #expect(library.summaries().map(\.slug) == ["usecase-library"])
+        #expect(library.summaries().map(\.slug) == [plan.slug])
     }
 
     // MARK: - Uninstall
