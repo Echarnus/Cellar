@@ -6,7 +6,7 @@ Run by `sh Scripts/test.sh --coverage`, which hands it the report SwiftPM wrote:
     python3 Scripts/coverage.py .build/arm64-apple-macosx/debug/codecov/Cellar.json
     python3 Scripts/coverage.py --update REPORT      # raise the baseline to what REPORT measured
 
-Measures the libraries the tests can import, CellarKit and CellarUI, and compares each with
+Measures the libraries the tests can import, CellarDomain, CellarKit and CellarUI, and compares each with
 Tests/coverage-baseline.json. Fails (exit 1) when a target falls more than TOLERANCE points below
 its baseline. `--update` only ever raises a number, so it cannot be used to paper over a drop.
 
@@ -23,7 +23,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASELINE = os.path.join(ROOT, "Tests", "coverage-baseline.json")
-TARGETS = ("CellarKit", "CellarUI")
+TARGETS = ("CellarDomain", "CellarKit", "CellarUI")
 
 # Two macOS images and a suite that watches real processes do not land on the identical line count
 # every run, so a hair of slack — far less than any untested function would cost.

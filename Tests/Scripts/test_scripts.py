@@ -108,10 +108,10 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(coverage.percent(totals["CellarUI"]), 100.0)
 
     def test_a_drop_below_the_baseline_fails(self):
-        self.assertEqual(coverage.judge({"CellarKit": 50.0, "CellarUI": 80.0}, {"CellarKit": 50.0, "CellarUI": 80.0}), [])
-        self.assertEqual(coverage.judge({"CellarKit": 49.8, "CellarUI": 80.0}, {"CellarKit": 50.0}), [],
+        self.assertEqual(coverage.judge({"CellarDomain": 90.0, "CellarKit": 50.0, "CellarUI": 80.0}, {"CellarKit": 50.0, "CellarUI": 80.0}), [])
+        self.assertEqual(coverage.judge({"CellarDomain": 90.0, "CellarKit": 49.8, "CellarUI": 80.0}, {"CellarKit": 50.0}), [],
                          "a hair under is noise between two macOS images")
-        found = coverage.judge({"CellarKit": 48.0, "CellarUI": 80.0}, {"CellarKit": 50.0})
+        found = coverage.judge({"CellarDomain": 90.0, "CellarKit": 48.0, "CellarUI": 80.0}, {"CellarKit": 50.0})
         self.assertEqual(len(found), 1)
         self.assertIn("CellarKit", found[0])
 

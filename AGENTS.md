@@ -115,11 +115,11 @@ an AI agent, is the one who proves it works, in the PR, before anyone else spend
   ladder; tick only the rungs you actually climbed and paste the evidence (test count, command
   output, screenshot). A rung you could not climb stays unticked, with who has to climb it. An agent
   without a Mac says so — CI then is the build, and the PR says that too.
-- **Coverage only goes up.** `sh Scripts/test.sh --coverage` measures CellarKit and CellarUI and
+- **Coverage only goes up.** `sh Scripts/test.sh --coverage` measures CellarDomain, CellarKit and CellarUI and
   fails below `Tests/coverage-baseline.json`. When a change raises it, raise the baseline in the same
   PR (`python3 Scripts/coverage.py --update <report>`).
 - **The gates are checks, not trust.** CI runs the unit and hermetic integration tiers with coverage
-  on both macOS images, the Wine tiers on a real runner, and *PR checklist*
+  on Cellar's minimum macOS, the Wine tiers on a real runner, and *PR checklist*
   (`Scripts/check-pr.py`) on the description. None of them replaces climbing the ladder.
 
 ### Testing

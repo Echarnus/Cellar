@@ -74,7 +74,7 @@ sh Scripts/test.sh --coverage
 ```
 
 runs the suite with `--enable-code-coverage` and hands SwiftPM's report to `Scripts/coverage.py`,
-which measures `CellarKit` and `CellarUI` (the executables cannot be imported by a test, so they are
+which measures `CellarDomain`, `CellarKit` and `CellarUI` (the executables cannot be imported by a test, so they are
 not counted — keep logic out of them) and compares each with `Tests/coverage-baseline.json`. More
 than 0.3 points below the baseline fails the run and names the least-covered files. CI writes the
 table to the job summary on every run.
@@ -91,7 +91,7 @@ python3 Scripts/coverage.py --update .build/*/debug/codecov/*.json
 
 | Check | Job | Fails when |
 |---|---|---|
-| Build, tests, coverage | *Build & self-test* (macOS 15, macOS 26) | the build breaks, a test fails, coverage drops |
+| Build, tests, coverage | *Build & self-test* (macOS 27) | the build breaks, a test fails, coverage drops |
 | The layer | *Wine tiers* | a real runner can't start and stop a Windows exe under Cellar |
 | The description | *PR checklist* | no `Closes #N`, nothing ticked under *How it was verified*, or `Sources/` changed without `Tests/` |
 | Hygiene | *Lint*, CodeQL, dependency review | see `docs/RELEASING.md` |
@@ -371,7 +371,7 @@ which the game page shows; check that those steps match the menus you actually s
 `cellar selftest` stays: it is a check an *installed* binary can run on a player's machine, which a
 test target cannot. The unit suite is the superset a developer runs.
 
-CI runs rungs 1, 2 and 2b on every push, with coverage, on both macOS images, and rung 2c (the
+CI runs rungs 1, 2 and 2b on every push, with coverage, on Cellar's minimum macOS, and rung 2c (the
 *Wine tiers* job: Rosetta, the default runner, then tiers B and C) on every PR. A hosted runner has
 no GPU worth translating to, so the Wine job proves that a Windows program starts and stops under
 Cellar, not that a game is fast — rung 2d and rung 3 remain **the rungs a human climbs before a

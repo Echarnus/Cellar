@@ -111,7 +111,8 @@ jobs:
     # Cellar decides correctly; this proves a Windows program actually runs, before the merge rather
     # than on the player's Mac. Not a required check yet — it downloads a runner from upstream on
     # every run, and has to prove it is stable on hosted runners first (docs/TESTING.md).
-    runs-on: macos-15
+    # Cellar's minimum macOS, the same image the build job uses.
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
