@@ -28,6 +28,10 @@ struct AccountsSection: View {
     @State private var steamSignInProgress: String?
     @State private var gogSignInFailed: String?
 
+    /// The QR sign-in's activity title, and how the panel knows that sign-in is the one running —
+    /// one value, so the comparison holds in every language.
+    private static let qrTitle = String(localized: "Waiting for the QR scan")
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             steamRow
@@ -89,7 +93,7 @@ struct AccountsSection: View {
         steamQRCode = nil
         steamSignInProgress = nil
         steamQRReader = SteamQRCodeReader()
-        runner.run(.steamSignIn, title: String(localized: "Waiting for the QR scan"), observe: { line in
+        runner.run(.steamSignIn, title: Self.qrTitle, observe: { line in
             // DepotDownloader only *draws* the challenge, as terminal ASCII sized for a monospace
             // font — unscannable in a GUI. Read it back into modules and draw it properly. Steam
             // rotates the code, so later blocks replace it.
@@ -125,7 +129,7 @@ struct AccountsSection: View {
     @ViewBuilder private var steamQRPanel: some View {
         if let steamQRCode {
             QRCodePanel(modules: steamQRCode)
-        } else if runner.busy, runner.busyTitle == "Waiting for the QR scan" {
+        } else if runner.busy, runner.busyTitle == Self.qrTitle {
             // The gap between launching the tool and its first output is real; name it. So is the
             // gap between approving on the phone and the command finishing.
             HStack(spacing: 8) {
