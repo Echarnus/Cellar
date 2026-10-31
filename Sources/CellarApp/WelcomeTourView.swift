@@ -222,7 +222,7 @@ struct WelcomeTourView: View {
 
             Button("Back") { step = step.previous }
                 .disabled(step == .welcome)
-            Button(step.isLast ? "Start using Cellar" : "Continue") {
+            Button(step.isLast ? String(localized: "Start using Cellar") : String(localized: "Continue")) {
                 if step.isLast { onFinish() } else { step = step.next }
             }
             .keyboardShortcut(.defaultAction)

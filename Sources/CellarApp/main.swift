@@ -341,7 +341,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // SwiftUI root frame lets layout feed back into the view graph, and this app aborts in
             // AttributeGraph when it does (skills/swift.md).
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        w.title = isReview ? "Folder access" : "Welcome to Cellar"
+        w.title = isReview ? String(localized: "Folder access") : String(localized: "Welcome to Cellar")
         w.isReleasedWhenClosed = false
         w.center()
         w.contentView = NSHostingView(rootView: WelcomeView(isReview: isReview) { [weak self] in
@@ -361,7 +361,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let w = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 620, height: 580),
                 styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = "Welcome to Cellar"
+            w.title = String(localized: "Welcome to Cellar")
             w.isReleasedWhenClosed = false
             w.center()
             w.contentView = NSHostingView(rootView: WelcomeTourView(runner: model.activity, library: model.library, accounts: model.accounts,

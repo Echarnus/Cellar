@@ -193,8 +193,8 @@ struct LaunchSplashView: View {
         OutcomeBlock(symbol: "checkmark.circle.fill", tint: .green,
                 title: String(localized: "\(game.name) is running"),
                 detail: game.needsClientAtRuntime
-                    ? "Cellar closes \(game.store.displayName) and the whole layer when you quit."
-                    : "Cellar closes the layer when you quit.")
+                    ? String(localized: "Cellar closes \(game.store.displayName) and the whole layer when you quit.")
+                    : String(localized: "Cellar closes the layer when you quit."))
     }
 
     private var failure: some View {
@@ -266,8 +266,8 @@ struct LaunchSplashView: View {
     private var waitingText: String {
         let clock = String(format: "%d:%02d", elapsed / 60, elapsed % 60)
         return elapsed < 20
-            ? "Windows games take a minute or two to come up."
-            : "\(clock) so far — Windows games take a minute or two to come up."
+            ? String(localized: "Windows games take a minute or two to come up.")
+            : String(localized: "\(clock) so far — Windows games take a minute or two to come up.")
     }
 
     // MARK: - State
@@ -313,10 +313,10 @@ struct LaunchSplashView: View {
     /// translated into the thing that actually needs doing.
     private var failureDetail: String {
         if runner.log.contains("Unknown option '--events'") || runner.log.contains("Unknown option '--machine-progress'") {
-            return "Cellar's command-line tool on this Mac is older than the app, so it doesn't understand this launch. Reinstalling Cellar updates both."
+            return String(localized: "Cellar's command-line tool on this Mac is older than the app, so it doesn't understand this launch. Reinstalling Cellar updates both.")
         }
         return lastError.isEmpty
-            ? "Cellar stopped before the game came up. The activity log on the game's page has the detail."
+            ? String(localized: "Cellar stopped before the game came up. The activity log on the game's page has the detail.")
             : lastError
     }
 
@@ -395,8 +395,8 @@ struct LaunchStepRow: View {
     private var spokenState: String {
         switch state {
         case .done:    return "Done"
-        case .current: return "In progress"
-        case .pending: return "Not started"
+        case .current: return String(localized: "In progress")
+        case .pending: return String(localized: "Not started")
         }
     }
 }

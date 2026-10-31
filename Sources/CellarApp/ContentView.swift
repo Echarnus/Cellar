@@ -284,12 +284,12 @@ struct ContentView: View {
         .frame(maxWidth: .infinity).padding(.top, 24).padding(.horizontal, 8)
     }
 
-    private static let checkingTitle = "Checking your library"
+    private static let checkingTitle = String(localized: "Checking your library")
 
     private var emptyState: StoreLibrary.EmptyLibrary {
         // The sidebar's own "Check now" is a check in progress too.
         let ownCheck = runner.busy && runner.busyTitle == Self.checkingTitle
-            ? "Asking your stores which games you own…" : nil
+            ? String(localized: "Asking your stores which games you own…") : nil
         return StoreLibrary.emptyLibrary(
             hasGames: !lib.games.isEmpty,
             checking: lib.checking ?? ownCheck,
@@ -325,9 +325,8 @@ struct ContentView: View {
     private var footerText: String {
         let games = lib.games.count
         let stores = lib.presentStores.count
-        let gameWord = games == 1 ? "game" : "games"
-        let storeWord = stores == 1 ? "store" : "stores"
-        return stores > 1 ? "\(games) \(gameWord) · \(stores) \(storeWord)" : "\(games) \(gameWord)"
+        let gameCount = games == 1 ? String(localized: "1 game") : String(localized: "\(games) games")
+        return stores > 1 ? String(localized: "\(gameCount) · \(stores) stores") : gameCount
     }
 }
 
@@ -362,7 +361,17 @@ struct StoreSectionHeader: View {
         // sidebar rather than an opaque strip floating over it.
         .background(SidebarMaterial())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(store.displayName)\(guessed ? ", untested, settings guessed by Cellar" : ""), \(count) \(count == 1 ? "game" : "games")")
+        .accessibilityLabel(Self.spokenHeading(store: store.displayName, guessed: guessed, count: count))
+    }
+
+    /// Whole sentences per case, so a translation never has to fit English words around a number.
+    static func spokenHeading(store: String, guessed: Bool, count: Int) -> String {
+        switch (guessed, count == 1) {
+        case (false, true):  return String(localized: "\(store), 1 game")
+        case (false, false): return String(localized: "\(store), \(count) games")
+        case (true, true):   return String(localized: "\(store), untested, settings guessed by Cellar, 1 game")
+        case (true, false):  return String(localized: "\(store), untested, settings guessed by Cellar, \(count) games")
+        }
     }
 }
 
@@ -424,8 +433,8 @@ extension GameSummary {
     /// One word for where this game stands, shared by the pill and by VoiceOver.
     var statusText: String {
         switch nextStep {
-        case .setup:   return "Needs repair"
-        case .install: return "Not installed"
+        case .setup:   return String(localized: "Needs repair")
+        case .install: return String(localized: "Not installed")
         case .play:    return "Installed"
         }
     }

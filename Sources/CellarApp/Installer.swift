@@ -247,15 +247,15 @@ enum CellarUninstaller {
     private static func progressWindow(keepSaves: Bool) -> NSWindow {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 380, height: 96),
                               styleMask: [.titled], backing: .buffered, defer: false)
-        window.title = "Uninstalling Cellar"
+        window.title = String(localized: "Uninstalling Cellar")
         window.isReleasedWhenClosed = false
         let spinner = NSProgressIndicator()
         spinner.style = .spinning
         spinner.controlSize = .regular
         spinner.startAnimation(nil)
         let label = NSTextField(wrappingLabelWithString: keepSaves
-            ? "Copying your save games, then removing Cellar and everything it downloaded…"
-            : "Removing Cellar and everything it downloaded…")
+            ? String(localized: "Copying your save games, then removing Cellar and everything it downloaded…")
+            : String(localized: "Removing Cellar and everything it downloaded…"))
         let stack = NSStackView(views: [spinner, label])
         stack.orientation = .horizontal
         stack.spacing = 12

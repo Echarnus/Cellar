@@ -67,7 +67,7 @@ struct GameDetailView: View {
     private var playedLine: String? {
         guard let record = game.playtime, record.sessions > 0, let last = record.lastPlayed else { return nil }
         let when = RelativeDateTimeFormatter().localizedString(for: last, relativeTo: Date())
-        return "Played \(Playtime.describe(seconds: record.totalSeconds)) · last played \(when)"
+        return String(localized: "Played \(Playtime.describe(seconds: record.totalSeconds)) · last played \(when)")
     }
 
     // MARK: - Hero
@@ -265,15 +265,15 @@ struct GameDetailView: View {
             case .gog:
                 Chip("DRM-free", system: "lock.open.fill")
             case .steam:
-                Chip(game.appID.map { "AppID \($0)" } ?? "No AppID", system: "number")
+                Chip(game.appID.map { String(localized: "AppID \(String($0))") } ?? String(localized: "No AppID"), system: "number")
             case .battlenet:
-                Chip(game.productCode.map { "Product " + $0 } ?? "No product code", system: "tag")
+                Chip(game.productCode.map { String(localized: "Product \($0)") } ?? String(localized: "No product code"), system: "tag")
             }
             // From the profile, not from what is on disk: before the download, a game that never
             // talks to its store must not be labelled as needing it.
             let needsClient = game.needsClientAtRuntime && game.needsLiveSession
                 && game.store.descriptor.installsClientInBottle
-            Chip(needsClient ? "Needs \(game.store.displayName) running" : "Runs on its own",
+            Chip(needsClient ? String(localized: "Needs \(game.store.displayName) running") : String(localized: "Runs on its own"),
                  system: needsClient ? "link" : "bolt.fill")
             if let update = game.update { updateChip(update) }
             Spacer()
@@ -286,17 +286,17 @@ struct GameDetailView: View {
     @ViewBuilder private func updateChip(_ update: GameUpdates.State) -> some View {
         switch update {
         case .upToDate(let checked) where GameUpdates.isFresh(update, within: GameUpdates.recheckInterval):
-            Chip("Up to date", system: "checkmark.seal")
+            Chip(String(localized: "Up to date"), system: "checkmark.seal")
                 .help("Steam confirmed this is the current build \(Self.relative(checked)).")
         case .upToDate(let checked):
             // An old "up to date" is only a fact about the past; say when, not what.
-            Chip("Checked \(Self.relative(checked))", system: "clock")
+            Chip(String(localized: "Checked \(Self.relative(checked))"), system: "clock")
                 .help("Steam said this was the current build then. Play checks again before it starts the game.")
         case .available(let checked):
-            Chip("Update available", system: "arrow.down.circle.fill", tint: .blue)
+            Chip(String(localized: "Update available"), system: "arrow.down.circle.fill", tint: .blue)
                 .help("Steam has a newer build than the one on disk (checked \(Self.relative(checked))). Play downloads only what changed, first.")
         case .unknown:
-            Chip("Not checked for updates", system: "questionmark.circle")
+            Chip(String(localized: "Not checked for updates"), system: "questionmark.circle")
                 .help("Cellar hasn't been able to ask Steam yet. Play checks before it starts the game.")
         }
     }
@@ -381,7 +381,7 @@ struct GameDetailView: View {
     /// The backend, and whose choice it is — a switch the player made is never shown as the profile's.
     private var graphicsValue: String {
         let name = GraphicsBackend(rawValue: game.backend)?.displayName ?? game.backend
-        return game.backendIsPlayerChoice ? "\(name) — your choice" : name
+        return game.backendIsPlayerChoice ? String(localized: "\(name) — your choice") : name
     }
 
     private func resetBackend() {
@@ -456,10 +456,10 @@ struct GameDetailView: View {
 
     private var backupSummary: String {
         guard let backup = latestBackup else {
-            return "No backup yet. Cellar takes one by itself before a reset, an update or removing the bottle."
+            return String(localized: "No backup yet. Cellar takes one by itself before a reset, an update or removing the bottle.")
         }
         let when = RelativeDateTimeFormatter().localizedString(for: backup.manifest.created, relativeTo: Date())
-        return "Last backed up \(when) — \(backup.manifest.reason.description.lowercased()), \(ByteSize.describe(backup.manifest.bytes)). Cellar keeps the last \(SaveBackups.keep)."
+        return String(localized: "Last backed up \(when) — \(backup.manifest.reason.description.lowercased()), \(ByteSize.describe(backup.manifest.bytes)). Cellar keeps the last \(SaveBackups.keep).")
     }
 
     private func refreshBackups() {
@@ -482,7 +482,7 @@ struct GameDetailView: View {
     private var activityLog: some View {
         DisclosureGroup(isExpanded: $showDetails) {
             ScrollView {
-                Text(runner.log.isEmpty ? "Nothing has run yet." : runner.log)
+                Text(runner.log.isEmpty ? String(localized: "Nothing has run yet.") : runner.log)
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(6)
@@ -515,7 +515,7 @@ struct GameDetailView: View {
             // game itself and opens Blizzard's client for a Battle.net one — but that is a fact
             // about the store, not something the player should have to know to press a button.
             runner.install(slug: game.slug,
-                           title: game.store == .battlenet ? "Opening Battle.net" : "Downloading \(game.name)",
+                           title: game.store == .battlenet ? String(localized: "Opening Battle.net") : String(localized: "Downloading \(game.name)"),
                            then: { onChange() })
         }
     }
@@ -525,7 +525,7 @@ struct GameDetailView: View {
         guard let source = ProfileStore.find(game.slug)?.url else { return }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = source.lastPathComponent
-        panel.message = "Cellar guessed this profile's settings. If \(game.name) runs, set status and notes to what you saw, then contribute it to Cellar's profiles."
+        panel.message = String(localized: "Cellar guessed this profile's settings. If \(game.name) runs, set status and notes to what you saw, then contribute it to Cellar's profiles.")
         guard panel.runModal() == .OK, let target = panel.url else { return }
         try? FileManager.default.removeItem(at: target)
         try? FileManager.default.copyItem(at: source, to: target)
@@ -537,8 +537,8 @@ struct GameDetailView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.prompt = "Move Here"
-        panel.message = "Choose a folder on the drive to move \(game.name) to. Cellar puts it in a “Cellar Games” folder there, and the game plays and updates from it while the drive is connected."
+        panel.prompt = String(localized: "Move Here")
+        panel.message = String(localized: "Choose a folder on the drive to move \(game.name) to. Cellar puts it in a “Cellar Games” folder there, and the game plays and updates from it while the drive is connected.")
         panel.directoryURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         act(.moveToDrive(slug: game.slug, folder: folder.path), String(localized: "Moving \(game.name)"))
