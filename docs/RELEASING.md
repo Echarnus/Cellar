@@ -1,8 +1,9 @@
 # Branching & releasing
 
 Cellar uses **trunk-based development**: short-lived branches, one pull request per issue, merged into
-`main` as soon as the checks are green, and releases cut as tags on `main`. No `develop` branch, no
-release branches.
+`main` as soon as the checks are green. A release is a **release branch** cut from `main`
+(`release/0.4`): pushing it tags, builds and publishes the release, with no button to press. No
+`develop` branch.
 
 ## Issues
 
@@ -73,7 +74,7 @@ update waits for a person.
 | `scorecard.yml` | `main`, weekly | OpenSSF Scorecard for the repository's supply-chain practices. |
 | `labels.yml` | `main` when the labels change | Applies `.github/labels.yml`. |
 | `pages.yml` | `main` when profiles change | Publishes the supported-games site. |
-| `release.yml` | a `v*` tag | Builds, writes the notes, publishes the release. |
+| `release.yml` | a push to `release/**`, a `v*` tag, or a manual run | Tags, builds, writes the notes, publishes the release. |
 
 Every workflow declares least-privilege `permissions:`, pins every action to a commit SHA (Dependabot
 keeps them current) and passes `${{ }}` values through `env:`, never into a `run:` line. See
@@ -95,30 +96,46 @@ A suffix makes a pre-release: `v0.5.0-beta.1` is published as one, and the in-ap
 
 ## Cutting a release
 
-First bump `CellarVersion.current` (`app/Packages/CellarData/Sources/CellarData/Core/CellarVersion.swift`) to the new
-version in a PR. The app, the CLI and every diagnostics report read it, and `release.yml` refuses a
-tag that disagrees with it. Then release the merged commit, either way:
+Releases are git-first. The version comes from `CellarVersion.current`
+(`app/Packages/CellarData/Sources/CellarData/Core/CellarVersion.swift`), which the app, the CLI and
+every diagnostics report read, so bump it in a PR on `main` first. Then cut the release branch:
 
 ```sh
-# From GitHub (no local tag push; what Claude uses): Actions → Release → Run workflow on main,
-# version 0.4.0, publish ticked. Or from a terminal:
-gh workflow run release.yml --ref main -f version=0.4.0 -f publish=true
-
-# Or by pushing the tag yourself:
-git switch main && git pull
-git tag -a v0.4.0 -m "Cellar 0.4.0"
-git push origin v0.4.0
+git push origin main:release/0.4      # no local checkout needed; or from a checkout of main
 ```
 
-A manual run with `publish` builds and tests main first, then creates the `v0.4.0` tag on exactly
-that commit and publishes. It refuses a run that isn't on `main`, a version that disagrees with
-`CellarVersion.current`, and a tag that already exists (the tags ruleset forbids moving one).
+That push is the release. `release.yml` checks that `CellarVersion.current` is `0.4.something`,
+builds and tests the pushed commit, creates the annotated tag `v0.4.0` on exactly that commit and
+publishes the release with its notes.
 
-Either way, [`release.yml`](../.github/workflows/release.yml) runs:
+**A patch** (0.4.1) goes onto the same branch. Fix it on `main` first as usual, then open a PR into
+`release/0.4` that carries the fix and bumps `CellarVersion.current` to `0.4.1`. Merging that PR
+releases `v0.4.1`. A push to the branch whose version is already tagged releases nothing: the run
+stops after its plan job and says so, so landing a fix without a bump can never move a release.
+`release/0.4` must not be deleted or force-pushed
+([`release-branches.json`](../.github/rulesets/release-branches.json)).
 
-1. **Build** (macOS, read-only token): runs the test suite, `app/Scripts/package.sh` and
+Two older ways still work, both from `main`:
+
+```sh
+# A manual run: Actions → Release → Run workflow on main, version 0.4.0, publish ticked. Or:
+gh workflow run release.yml --ref main -f version=0.4.0 -f publish=true
+
+# Pushing the tag yourself:
+git switch main && git pull && git tag -a v0.4.0 -m "Cellar 0.4.0" && git push origin v0.4.0
+```
+
+Every way refuses a version that disagrees with `CellarVersion.current`, and a tag that already
+exists (the tags ruleset forbids moving one). A manual run with `publish` refuses any branch but
+`main`.
+
+Whichever way it starts, [`release.yml`](../.github/workflows/release.yml) runs:
+
+1. **Plan** (Linux, read-only token): works out the version and whether there is anything to release.
+2. **Build** (macOS, read-only token): runs the test suite, `app/Scripts/package.sh` and
    `app/Scripts/make-dmg.sh`, and writes `SHA256SUMS.txt`.
-2. **Publish** (the `release` environment, the only job with write access):
+3. **Publish** (the `release` environment, the only job with write access):
+   - creates the `v` tag on the built commit, unless the run was started by pushing one;
    - writes the notes with `app/Scripts/release-notes.py`: every issue closed by a PR merged since the
      previous tag, plus any issue closed as completed in that window, grouped by label, then
      GitHub's list of merged PRs and the install instructions;
@@ -219,12 +236,13 @@ These are settings, not files, so the maintainer applies them once:
 1. **Settings → General → Pull Requests**: allow squash merging only, tick *Allow auto-merge* and
    *Automatically delete head branches*.
 2. **Settings → Rules → Rulesets → New ruleset → Import**: import
-   [`.github/rulesets/main.json`](../.github/rulesets/main.json) (protects `main`) and
+   [`.github/rulesets/main.json`](../.github/rulesets/main.json) (protects `main`),
    [`.github/rulesets/tags.json`](../.github/rulesets/tags.json) (release tags can't be moved or
-   deleted).
-3. **Settings → Environments → release**: add deployment rules allowing only tags matching `v*`
-   and the `main` branch (a manual release runs on `main`; the workflow refuses to publish from any
-   other branch).
+   deleted) and [`.github/rulesets/release-branches.json`](../.github/rulesets/release-branches.json)
+   (release branches can't be deleted or force-pushed).
+3. **Settings → Environments → release**: if it has deployment rules, allow tags matching `v*`
+   and the branches `release/*` and `main` (a release runs on one of those; the workflow refuses to
+   publish from any other ref).
    `sh app/Scripts/sparkle-keys.sh` creates the environment if needed and stores `SPARKLE_ED_PRIVATE_KEY`
    in it; the Developer ID secrets (below) go there too.
 4. **Settings → Code security**: turn on Dependabot alerts and security updates, secret scanning
