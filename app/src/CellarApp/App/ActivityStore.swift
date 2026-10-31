@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Observation
-import CellarKit
+import CellarData
 
 /// What Cellar is doing right now, for every window at once.
 ///

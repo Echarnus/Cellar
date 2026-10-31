@@ -34,7 +34,7 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
   service), the cached name, DepotDownloader's token wherever it landed, and the session seeded
   into every bottle. A relocated Cellar (`CELLAR_HOME`) never touches the real keychain or token
   store.
-- **Tests prove it.** `app/tests/CellarKitTests/CredentialStorageTests.swift` feeds real-shaped leaks
+- **Tests prove it.** `app/tests/CellarDataTests/CredentialStorageTests.swift` feeds real-shaped leaks
   through each path; `app/tests/CellarIntegrationTests/KeychainTests.swift` round-trips the real
   keychain under a throwaway service. A change that adds a place a credential can go adds a row
   above and a test there.

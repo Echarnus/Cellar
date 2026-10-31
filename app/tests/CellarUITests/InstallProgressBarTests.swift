@@ -2,7 +2,7 @@ import CellarDomain
 import Testing
 import SwiftUI
 import Foundation
-import CellarKit
+import CellarData
 @testable import CellarUI
 
 /// The install progress bar, drawn offscreen in every state it passes through.

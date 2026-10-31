@@ -1,7 +1,7 @@
 import CellarDomain
 import Testing
 import SwiftUI
-import CellarKit
+import CellarData
 import CellarUI
 
 /// What a store mark has to look like, checked by rendering it and measuring the pixels.
@@ -82,7 +82,7 @@ struct StoreMarkTests {
         #expect(abs(c.y - 0.5) < 0.22, "\(store.rawValue) at \(Int(size))pt: ink centroid y = \(round2(c.y))")
     }
 
-    /// Each mark's disc carries its store's accent, and CellarKit's descriptor is where that colour
+    /// Each mark's disc carries its store's accent, and CellarData's descriptor is where that colour
     /// is defined. If a mark's own gradient drifts away from the descriptor, the app and the CLI
     /// start describing the same store differently.
     ///

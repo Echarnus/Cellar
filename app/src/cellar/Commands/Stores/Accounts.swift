@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 
 /// One screen for "who am I signed in as, everywhere" — the CLI half of the app's Accounts window.
 ///

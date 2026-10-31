@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 import CellarUI
 
 /// Remote image with a graceful fallback. `AsyncImage` handles fetching, `URLCache` the caching.

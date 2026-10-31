@@ -1,7 +1,7 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
+import CellarData
 
 // MARK: - Moving out of the disk image
 

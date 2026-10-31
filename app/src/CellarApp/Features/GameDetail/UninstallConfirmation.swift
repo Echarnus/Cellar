@@ -1,6 +1,6 @@
 import CellarDomain
 import AppKit
-import CellarKit
+import CellarData
 
 /// The "are you sure" for removing a game — the one place in Cellar where a wrong click costs a
 /// player a 36 GB download.

@@ -17,8 +17,8 @@ let mainActorByDefault: [SwiftSetting] = approachable + [.defaultIsolation(MainA
 /// declares — an illegal import is a compile error, not a review comment (#133):
 ///
 ///     CellarDomain   ← nothing
-///     CellarKit      ← CellarDomain           (+ CellarInfrastructure, the adapters)
-///     CellarUI       ← CellarDomain, CellarKit
+///     CellarData     ← CellarDomain           (+ CellarInfrastructure, the adapters)
+///     CellarUI       ← CellarDomain
 ///     cellar, CellarApp (here) ← all of them; only their entry points import CellarInfrastructure
 let package = Package(
     name: "Cellar",
@@ -31,7 +31,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "Packages/CellarDomain"),
-        .package(path: "Packages/CellarKit"),
+        .package(path: "Packages/CellarData"),
         .package(path: "Packages/CellarUI"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         // The app's self-updater. Pinned exactly: it installs code on the player's Mac, so a new
@@ -39,27 +39,27 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
     ],
     targets: [
-        // Thin CLI over CellarKit.
+        // Thin CLI over CellarData.
         .executableTarget(
             name: "cellar",
             dependencies: [
-                .product(name: "CellarKit", package: "CellarKit"),
+                .product(name: "CellarData", package: "CellarData"),
                 .product(name: "CellarDomain", package: "CellarDomain"),
-                .product(name: "CellarInfrastructure", package: "CellarKit"),
+                .product(name: "CellarInfrastructure", package: "CellarData"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "src/cellar",
             swiftSettings: approachable
         ),
 
-        // A native SwiftUI "Steam-like" front-end over the same CellarKit core. Drives the
+        // A native SwiftUI "Steam-like" front-end over the same CellarData core. Drives the
         // `cellar` CLI as a subprocess for actions, so it reuses every tested path.
         .executableTarget(
             name: "CellarApp",
             dependencies: [
-                .product(name: "CellarKit", package: "CellarKit"),
+                .product(name: "CellarData", package: "CellarData"),
                 .product(name: "CellarDomain", package: "CellarDomain"),
-                .product(name: "CellarInfrastructure", package: "CellarKit"),
+                .product(name: "CellarInfrastructure", package: "CellarData"),
                 .product(name: "CellarUI", package: "CellarUI"),
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
@@ -71,13 +71,13 @@ let package = Package(
         ),
 
         .testTarget(
-            name: "CellarKitTests",
+            name: "CellarDataTests",
             dependencies: [
-                .product(name: "CellarKit", package: "CellarKit"),
+                .product(name: "CellarData", package: "CellarData"),
                 .product(name: "CellarDomain", package: "CellarDomain"),
-                .product(name: "CellarInfrastructure", package: "CellarKit"),
+                .product(name: "CellarInfrastructure", package: "CellarData"),
             ],
-            path: "tests/CellarKitTests"
+            path: "tests/CellarDataTests"
         ),
 
         // Renders the marks offscreen and measures them. Needs the profile database and the golden
@@ -86,7 +86,7 @@ let package = Package(
             name: "CellarUITests",
             dependencies: [
                 .product(name: "CellarUI", package: "CellarUI"),
-                .product(name: "CellarKit", package: "CellarKit"),
+                .product(name: "CellarData", package: "CellarData"),
                 .product(name: "CellarDomain", package: "CellarDomain"),
             ],
             path: "tests/CellarUITests"
@@ -98,9 +98,9 @@ let package = Package(
         .testTarget(
             name: "CellarIntegrationTests",
             dependencies: [
-                .product(name: "CellarKit", package: "CellarKit"),
+                .product(name: "CellarData", package: "CellarData"),
                 .product(name: "CellarDomain", package: "CellarDomain"),
-                .product(name: "CellarInfrastructure", package: "CellarKit"),
+                .product(name: "CellarInfrastructure", package: "CellarData"),
             ],
             path: "tests/CellarIntegrationTests"
         ),

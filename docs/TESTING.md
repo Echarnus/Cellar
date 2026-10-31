@@ -30,7 +30,7 @@ Windows game on a Mac) cannot run in a unit test:
 
 | Layer | Where | Runs | Proves |
 |---|---|---|---|
-| **Unit** | `app/tests/CellarKitTests` | every PR, seconds | decisions: parsing, routes, readiness, copy, the store table |
+| **Unit** | `app/tests/CellarDataTests` | every PR, seconds | decisions: parsing, routes, readiness, copy, the store table |
 | **Rendered UI** | `app/tests/CellarUITests` | every PR | store marks and views, drawn offscreen and measured |
 | **Hermetic integration** | tier A + `FakeWine` | every PR | what Cellar writes to disk and hands to Wine; launch → watch → shut down |
 | **Wine tiers** | tiers B and C | every PR (*Wine tiers* job) | a real runner, a real prefix, a real Windows exe |
@@ -74,7 +74,7 @@ sh app/Scripts/test.sh --coverage
 ```
 
 runs the suite with `--enable-code-coverage` and hands SwiftPM's report to `app/Scripts/coverage.py`,
-which measures `CellarDomain`, `CellarKit` and `CellarUI` (the executables cannot be imported by a test, so they are
+which measures `CellarDomain`, `CellarData` and `CellarUI` (the executables cannot be imported by a test, so they are
 not counted — keep logic out of them) and compares each with `app/tests/coverage-baseline.json`. More
 than 0.3 points below the baseline fails the run and names the least-covered files. CI writes the
 table to the job summary on every run.

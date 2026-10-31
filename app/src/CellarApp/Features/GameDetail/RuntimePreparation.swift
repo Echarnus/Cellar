@@ -1,11 +1,11 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
+import CellarData
 
 // The installer's three jobs that only the app can do: getting the shared parts in the background on
 // first launch, moving itself out of the disk image, and taking itself off the Mac again. The
-// deciding lives in CellarKit (`Preparation`, `InstallLocation`, `Reset` + `SaveGames`); this file
+// deciding lives in CellarData (`Preparation`, `InstallLocation`, `Reset` + `SaveGames`); this file
 // only asks and shows.
 
 // MARK: - Getting ready in the background

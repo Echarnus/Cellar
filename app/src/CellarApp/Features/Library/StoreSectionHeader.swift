@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 import CellarUI
 
 /// A store's heading in the library. Carries the mark *and* the word, so the section — not each

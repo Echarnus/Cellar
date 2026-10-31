@@ -1,11 +1,11 @@
 import CellarDomain
 import AppKit
-import CellarKit
+import CellarData
 import SwiftUI
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
 // whose window hosts the SwiftUI LibraryView. This is the Phase-3 "Steam-like" front-end over
-// CellarKit — choose a game, see its state, and play it, with the game's own icon.
+// CellarData — choose a game, see its state, and play it, with the game's own icon.
 //
 // Because there is no App scene, AppKit installs no default menu bar — so we build one ourselves
 // (⌘Q to quit, About, Settings…, and the Edit menu that text fields need for cut/copy/paste).

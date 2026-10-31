@@ -2,7 +2,7 @@ import CellarDomain
 import Foundation
 import Security
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// Tier A: the real login keychain, through the code GOG's sign-in uses (issue #79).
 ///

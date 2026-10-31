@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 import CellarUI
 
 /// A game's cover, in one place so the sidebar and the header can never disagree about what a

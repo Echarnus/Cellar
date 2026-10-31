@@ -5,7 +5,7 @@ generalized into a per-game profile system, then given a native GUI.
 
 ## Phase 0 — Bootstrap ✅ (current)
 
-- [x] Swift package: `CellarKit` core + `cellar` CLI
+- [x] Swift package: `CellarData` core + `cellar` CLI
 - [x] `cellar doctor` — environment diagnostics (Apple Silicon, macOS, Rosetta, brew, gh, disk, D3DMetal)
 - [x] `cellar prefix create / list / remove` — bottle management + `bottle.toml`
 - [x] `cellar profiles list / show` — profile discovery
@@ -38,7 +38,7 @@ generalized into a per-game profile system, then given a native GUI.
 
 ## Phase 3 — Native SwiftUI GUI
 
-- [ ] macOS app over the same `CellarKit` core (no Electron)
+- [ ] macOS app over the same `CellarData` core (no Electron)
 - [ ] Prefix UI, profile browser with one-click install, GPTK import wizard (drag-drop, never bundled)
 - [x] Per-game MetalFX (`metalfx_upscaling`, honoured since 2026-09-09) · fast sync read from the runner
 - [ ] Per-game Retina / sync overrides in the app, live logs

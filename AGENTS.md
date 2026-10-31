@@ -16,7 +16,7 @@ A free, GPL-3.0, Proton-like layer that runs **Windows games on Apple Silicon Ma
 Wine runner + a graphics-translation backend (Apple **D3DMetal**, or open-source **DXVK → MoltenVK**)
 into per-game **bottles**, driven by a **profile database**, and stands the game's own **storefront
 client** up inside the bottle — Windows **Steam**, or Blizzard's **Battle.net**. There is a `cellar`
-CLI and a native SwiftUI app (`CellarApp`), both over one core library (`CellarKit`).
+CLI and a native SwiftUI app (`CellarApp`), both over one core library (`CellarData`).
 
 Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · legal boundaries: [`docs/LEGAL.md`](docs/LEGAL.md).
@@ -32,11 +32,11 @@ both use them.
 | Path | What lives there |
 |---|---|
 | `app/Packages/CellarDomain/Sources/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store/`), launch stages, install phases, `GameEvent`/`CommandEvent`, and the models every layer trades in (`CellarError`, `CellarCommand`, `GraphicsBackend`, `RunnerSpec`, `Ownership`, `GameLanguage`, …). Imported explicitly (`import CellarDomain`); nothing re-exports it. |
-| `app/Packages/CellarKit/Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the use cases (`UseCases/`), the `StoreAdapter` port and its registry (`StoreAdapter.swift`), the store plugins (`Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
-| `app/Packages/CellarKit/Sources/CellarInfrastructure/` | The concrete store adapters (`SteamAdapter`, `BattleNetAdapter`, `GOGAdapter`) behind CellarKit's `StoreAdapter` port. Only composition roots import it: the CLI's `main`, the app's `main.swift` and the tests' set-up call `CellarInfrastructure.install()`. No view or store may (`ArchitectureTests`). |
-| `app/src/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
+| `app/Packages/CellarData/Sources/CellarData/` | Core library — environment detection, bottles/prefixes, runners, profiles, the use cases (`UseCases/`), the `StoreAdapter` port and its registry (`StoreAdapter.swift`), the store plugins (`Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
+| `app/Packages/CellarData/Sources/CellarInfrastructure/` | The concrete store adapters (`SteamAdapter`, `BattleNetAdapter`, `GOGAdapter`) behind CellarData's `StoreAdapter` port. Only composition roots import it: the CLI's `main`, the app's `main.swift` and the tests' set-up call `CellarInfrastructure.install()`. No view or store may (`ArchitectureTests`). |
+| `app/src/cellar/` | Thin CLI over CellarData (ArgumentParser). One file per command group under `Commands/`. |
 | `app/Packages/CellarUI/Sources/CellarUI/` | The app's presentation primitives — store marks, lockups, the generated cover, and `Snapshot`, which renders a SwiftUI view to pixels. A library rather than part of the app, because **a test cannot import an executable**. |
-| `app/tests/CellarKitTests/` | Unit tests over the engine — parsing, the store table, launch routes, the readiness ladder and its copy, the profile database. Fast, hermetic, no Wine. |
+| `app/tests/CellarDataTests/` | Unit tests over the engine — parsing, the store table, launch routes, the readiness ladder and its copy, the profile database. Fast, hermetic, no Wine. |
 | `app/tests/CellarUITests/` | Store marks rendered offscreen and measured, plus the snapshot sheet. |
 | `app/tests/CellarIntegrationTests/` | Integration tests, tiered: bottles and app bundles always; a real runner, prefix and Windows game behind `CELLAR_IT=1`. See [`docs/TESTING.md`](docs/TESTING.md). |
 | `app/src/CellarApp/` | Native SwiftUI "Steam-like" front-end. Hand-rolled `NSApplication` (no `@main` scene); **drives the `cellar` CLI as a subprocess** for actions, so it reuses every tested path. |
@@ -127,7 +127,7 @@ an AI agent, is the one who proves it works, in the PR, before anyone else spend
   ladder; tick only the rungs you actually climbed and paste the evidence (test count, command
   output, screenshot). A rung you could not climb stays unticked, with who has to climb it. An agent
   without a Mac says so — CI then is the build, and the PR says that too.
-- **Coverage only goes up.** `sh app/Scripts/test.sh --coverage` measures CellarDomain, CellarKit and CellarUI and
+- **Coverage only goes up.** `sh app/Scripts/test.sh --coverage` measures CellarDomain, CellarData and CellarUI and
   fails below `app/tests/coverage-baseline.json`. When a change raises it, raise the baseline in the same
   PR (`python3 app/Scripts/coverage.py --update <report>`).
 - **The gates are checks, not trust.** CI runs the unit and hermetic integration tiers with coverage
@@ -151,7 +151,7 @@ Three targets, and the split matters:
 
 | Target | Covers | Why it exists |
 |---|---|---|
-| `CellarKit` | the engine | logic |
+| `CellarData` | the engine | logic |
 | `CellarUI` | store marks, lockups, the generated cover, `Snapshot` | **a test cannot import an executable**, so anything to be verified without launching the app lives here, not in `CellarApp` |
 | `CellarApp` | windows, menus, state, the CLI subprocess | the part that genuinely needs launching |
 
@@ -168,7 +168,7 @@ every size it is used at, in one image. **Open that instead of launching the app
 CI uploads it as an artifact on every PR. It does not replace rung 4 — a snapshot cannot show you
 that a window resizes or a click lands — but it catches the wrong-looking before it reaches anyone.
 
-**Launches are tested against a fake Wine.** `app/tests/CellarKitTests/Support/FakeWine.swift` turns the
+**Launches are tested against a fake Wine.** `app/tests/CellarDataTests/Support/FakeWine.swift` turns the
 sandbox's stub runner into scripts that record every call — the exe, the prefix, the locale, the
 profile's `[env]` — and keep a fake game alive for as long as a test asks. That is how the launch →
 watch → shut-down path runs on every PR without a runner. Reach for it before adding a protocol or
@@ -210,7 +210,7 @@ The differences are real, not cosmetic — the three that bite hardest:
 
 Encode any such difference in **`GameStore.descriptor`** (`app/Packages/CellarDomain/Sources/CellarDomain/Store/StoreDescriptor.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
-`StoreAdapter` (`app/Packages/CellarKit/Sources/CellarInfrastructure/Adapters/`, registered in
+`StoreAdapter` (`app/Packages/CellarData/Sources/CellarInfrastructure/Adapters/`, registered in
 `CellarInfrastructure.install()`), and a CLI command group. Nothing else should
 need to know: the use cases (`SetUpGame`, `InstallGame`, `LaunchGame`) ask the adapter.
 
@@ -237,7 +237,7 @@ per language:
   it is the bar the change will be judged against.
 - **Swift / SwiftUI / AppKit** → [`skills/swift.md`](skills/swift.md). Load-bearing project rules
   (AttributeGraph crash from detail-pane animation, `HSplitView` not `NavigationSplitView`, the
-  hand-built menu bar, keeping logic in CellarKit) live there — read it before touching
+  hand-built menu bar, keeping logic in CellarData) live there — read it before touching
   `app/src/**`.
 - **Wine, runners, backends, bottles** → [`skills/wine-and-runners.md`](skills/wine-and-runners.md).
   The four load-bearing launch findings (no `/usr/bin/arch`, inherit-then-strip the environment,

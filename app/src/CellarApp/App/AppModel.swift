@@ -1,6 +1,6 @@
 import CellarDomain
 import AppKit
-import CellarKit
+import CellarData
 import SwiftUI
 
 /// The app's composition root: the state every window shares, made once and handed to each window

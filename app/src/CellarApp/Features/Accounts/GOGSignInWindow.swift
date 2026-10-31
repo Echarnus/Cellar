@@ -1,7 +1,7 @@
 import CellarDomain
 import AppKit
 import WebKit
-import CellarKit
+import CellarData
 
 /// GOG's OAuth sign-in, in its own window.
 ///

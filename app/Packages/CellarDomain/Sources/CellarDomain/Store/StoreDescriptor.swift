@@ -1,7 +1,7 @@
 import Foundation
 
 /// Everything that differs per store, in one table: the words, the marks, and the shape of the
-/// player's journey. Kept UI-framework-free (a hex string, not a `Color`) so CellarKit stays
+/// player's journey. Kept UI-framework-free (a hex string, not a `Color`) so CellarData stays
 /// dependency-light and the CLI and the app can both render it.
 public struct StoreDescriptor: Sendable {
     public let store: GameStore

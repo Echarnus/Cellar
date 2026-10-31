@@ -44,9 +44,9 @@ install_file() {
   mv -f "$2.new" "$2"
 }
 
-# One version, from CellarKit. A diagnostics report that names a version nobody shipped is worse
+# One version, from CellarData. A diagnostics report that names a version nobody shipped is worse
 # than no version at all, and a dev install used to claim 0.1 forever.
-VERSION="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' Packages/CellarKit/Sources/CellarKit/Core/CellarVersion.swift)"
+VERSION="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' Packages/CellarData/Sources/CellarData/Core/CellarVersion.swift)"
 VERSION="${VERSION:-0.0.0}-dev"
 
 APP="$HOME/Applications/Cellar.app"

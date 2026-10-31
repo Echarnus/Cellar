@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// Tier A: play time, recorded by the same session hooks `cellar launch` calls and read back through
 /// the library the app shows — including a session a crash never closed.

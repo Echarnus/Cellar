@@ -163,7 +163,7 @@ view — an `NSAlert`, a menu item — wraps its literal in `String(localized: "
   not `"…" + "…"`: concatenation turns it into a `String` and it silently stays English.
 - **Text held in a `String` variable is not looked up.** A custom view that takes `title: String`
   shows it verbatim, so the caller passes `String(localized: "…")`. The same goes for copy computed
-  in CellarKit or CellarDomain: `String(localized:)` there resolves against `Bundle.main`, which is
+  in CellarData or CellarDomain: `String(localized:)` there resolves against `Bundle.main`, which is
   Cellar.app both in the app and in the CLI `bundle-app.sh` puts inside it. A `cellar` run from
   `~/.local/bin` or `swift run` has no table beside it, so it prints English — and so do the tests.
 - **Never translate what is stored or parsed.** A reason cached on disk (`Ownership.unknown`), a

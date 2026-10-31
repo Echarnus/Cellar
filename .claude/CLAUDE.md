@@ -16,7 +16,7 @@ one matching your work; each points back at the portable guide for the full deta
 
 - **cellar-ux** — **anything a player sees** (the app, CLI wording, errors). Read this one first;
   the UX bar is a requirement in this repo, not a polish pass.
-- **cellar-swift** — `app/src/**` (CellarKit, the CLI, the SwiftUI app).
+- **cellar-swift** — `app/src/**` (CellarData, the CLI, the SwiftUI app).
 - **cellar-wine** — runners, graphics backends, bottles, launching the layer.
 - **cellar-profiles** — `profiles/*.toml`: adding a game, changing the schema.
 - **cellar-web** — the static site (the page itself).

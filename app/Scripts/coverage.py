@@ -6,12 +6,12 @@ Run by `sh Scripts/test.sh --coverage`, which hands it the report SwiftPM wrote:
     python3 Scripts/coverage.py .build/arm64-apple-macosx/debug/codecov/Cellar.json
     python3 Scripts/coverage.py --update REPORT...   # raise the baseline to what the reports measured
 
-Measures the libraries the tests can import, CellarDomain, CellarKit and CellarUI, and compares each with
+Measures the libraries the tests can import, CellarDomain, CellarData and CellarUI, and compares each with
 tests/coverage-baseline.json. Fails (exit 1) when a target falls more than TOLERANCE points below
 its baseline. `--update` only ever raises a number, so it cannot be used to paper over a drop.
 
 The executables (the CLI and the app) are not measured: a test cannot import an executable, which
-is exactly why logic lives in CellarKit and views worth checking live in CellarUI (AGENTS.md).
+is exactly why logic lives in CellarData and views worth checking live in CellarUI (AGENTS.md).
 
 Writes a Markdown summary to $GITHUB_STEP_SUMMARY when CI sets it, so the numbers sit on the run's
 page. Standard library only, Python 3.9 floor (skills/python.md).
@@ -23,7 +23,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASELINE = os.path.join(ROOT, "tests", "coverage-baseline.json")
-TARGETS = ("CellarDomain", "CellarKit", "CellarUI")
+TARGETS = ("CellarDomain", "CellarData", "CellarUI")
 
 # Two macOS images and a suite that watches real processes do not land on the identical line count
 # every run, so a hair of slack — far less than any untested function would cost.
@@ -114,8 +114,8 @@ def summary(totals, measured, baseline, failures):
         t = totals[target]
         rows.append(f"| {target} | {t['covered']} / {t['count']} | {measured.get(target, 0.0):.1f}% "
                     f"| {baseline.get(target, 0.0):.1f}% |")
-    # The targets that failed, or CellarKit when none did: the least covered files are where to start.
-    focus = [t for t in TARGETS if any(f.startswith(f"{t}:") for f in failures)] or ["CellarKit"]
+    # The targets that failed, or CellarData when none did: the least covered files are where to start.
+    focus = [t for t in TARGETS if any(f.startswith(f"{t}:") for f in failures)] or ["CellarData"]
     for target in focus:
         rows += ["", f"**Least covered in {target}** — the place to start:", ""]
         for pct, path, covered, count in sorted(totals[target]["files"])[:WORST]:

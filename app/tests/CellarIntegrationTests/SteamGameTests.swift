@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// Tier D: a **real Steam game**, downloaded from a real depot with the player's own sign-in, and
 /// started on this Mac.

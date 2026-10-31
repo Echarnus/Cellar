@@ -2,7 +2,7 @@ import CellarDomain
 import SwiftUI
 import AppKit
 import GameController
-import CellarKit
+import CellarData
 import CellarUI
 
 /// How far a profile has actually been verified. Said plainly, because "untested" is information

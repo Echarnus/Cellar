@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import CellarKit
+import CellarData
 
 /// The first-run folder ask: what macOS answered for each folder, which one it is asking about now,
 /// and whether the walk is done.

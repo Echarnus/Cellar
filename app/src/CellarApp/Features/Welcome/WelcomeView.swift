@@ -1,7 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
+import CellarData
 import CellarUI
 
 /// First run: ask for the folders every Windows game needs, once, having said what they are for.

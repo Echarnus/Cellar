@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 import Foundation
 
 /// Keep the games Cellar downloaded itself on Steam's current build.

@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 
 /// One verb for "get this game onto my Mac", whatever store it came from.
 ///

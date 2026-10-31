@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// Tier A: a game moved to another drive, inside a real bottle Cellar created — seen by the library,
 /// counted in Storage, found at launch through the link, and removed from both places on uninstall

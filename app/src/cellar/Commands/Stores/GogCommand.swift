@@ -1,6 +1,6 @@
 import CellarDomain
 import ArgumentParser
-import CellarKit
+import CellarData
 import Foundation
 
 struct GogCommand: ParsableCommand {

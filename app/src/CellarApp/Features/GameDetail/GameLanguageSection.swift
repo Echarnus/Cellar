@@ -1,12 +1,12 @@
 import CellarDomain
 import SwiftUI
-import CellarKit
+import CellarData
 
 /// Settings › General › Language: the language every game, and the store client that starts it,
 /// runs in. Follows the Mac unless the player picks one; a game can still have its own (its •••
 /// menu, `GameLanguageMenu`).
 ///
-/// Writes through CellarKit directly rather than through the `cellar` subprocess: it is one line in
+/// Writes through CellarData directly rather than through the `cellar` subprocess: it is one line in
 /// a settings file, and the app's runner refuses work while a game is playing — a picker that
 /// silently did nothing mid-game would be worse than one that bypasses it.
 struct GameLanguageSection: View {

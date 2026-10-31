@@ -1,7 +1,7 @@
 import CellarDomain
 import Foundation
 import Testing
-@testable import CellarKit
+@testable import CellarData
 
 /// Tier A: what Cellar says about game controllers, through the same paths `cellar doctor` and the
 /// library use — real GameController discovery, a real profile on disk, the real summaries.

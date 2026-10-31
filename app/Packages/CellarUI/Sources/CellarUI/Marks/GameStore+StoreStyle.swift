@@ -17,7 +17,7 @@ import SwiftUI
 /// never have carried this by itself; and a mark with no label is a puzzle for anyone who has not
 /// met it before. Position, mark and word travel together everywhere.
 extension GameStore {
-    /// The store's accent, from CellarKit's descriptor so the CLI and the app agree.
+    /// The store's accent, from CellarData's descriptor so the CLI and the app agree.
     public var tint: Color {
         let rgb = descriptor.accentColorComponents
         return Color(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue, opacity: 1)

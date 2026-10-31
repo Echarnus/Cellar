@@ -5,7 +5,7 @@ import Foundation
 /// A store is not a cosmetic label. Each one has its own installer, its own idea of "signed in",
 /// its own way of being told to install and to launch a title, and its own failure modes — so the
 /// setup ladder, the launch sequence and the words shown to the player all differ per store. The
-/// descriptor below is the single place that difference is written down; CellarKit, the CLI and the
+/// descriptor below is the single place that difference is written down; CellarData, the CLI and the
 /// app all read their vocabulary from here so the three never drift apart.
 ///
 /// Adding a store means: a case here, a `*Bottle` type beside `SteamBottle` / `BattleNetBottle`,
