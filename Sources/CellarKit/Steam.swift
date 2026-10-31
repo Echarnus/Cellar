@@ -20,18 +20,7 @@ public enum SteamBottle {
     /// actually takes the Dock icon; `steam.exe` claims one too once it has shown a window. The
     /// rest are short-lived helpers Steam runs at startup. Used to keep the client out of the Dock
     /// while a game is starting (`DockShim`). The game is deliberately not on this list.
-    public static let clientProcesses = [
-        "steam.exe",
-        "steamwebhelper.exe",
-        "steamservice.exe",
-        "steamsysinfo.exe",
-        "steamerrorreporter.exe",
-        "steamerrorreporter64.exe",
-        "gldriverquery.exe",
-        "gldriverquery64.exe",
-        "vulkandriverquery.exe",
-        "vulkandriverquery64.exe",
-    ]
+    public static let clientProcesses = GameStore.steam.descriptor.clientProcessNames
 
     public static func steamExecutable(in prefix: URL) -> URL {
         prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam/steam.exe")
