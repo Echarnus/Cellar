@@ -23,12 +23,10 @@
 "%@, untested, settings guessed by Cellar, 1 game" = "%@, niet getest, instellingen geraden door Cellar, 1 game";
 "%lld bytes" = "%lld bytes";
 "%lld days ago" = "%lld dagen geleden";
-"%lld games" = "%lld games";
 "%lld KB" = "%lld KB";
 "%lld more games once you sign in" = "Nog %lld games zodra je inlogt";
 "%lld profiles from Cellar %@, fetched %@" = "%lld profielen van Cellar %@, opgehaald %@";
 "%lld supported games are waiting behind it." = "Er wachten %lld ondersteunde games achter.";
-"1 game" = "1 game";
 "1 more game once you sign in" = "Nog 1 game zodra je inlogt";
 "1 supported game is waiting behind it." = "Er wacht 1 ondersteunde game achter.";
 "A game comes from Steam, Battle.net or GOG. One sign-in covers every game from that store — you are not asked again per game." = "Een game komt van Steam, Battle.net of GOG. Eén keer inloggen dekt elke game van die winkel — je wordt het niet per game opnieuw gevraagd.";
@@ -39,7 +37,6 @@
 "About" = "Over";
 "About %@" = "Over %@";
 "Account names, your home folder and anything token-shaped are left out of both." = "Accountnamen, je thuismap en alles wat op een token lijkt, blijven uit beide weg.";
-"Accounts" = "Accounts";
 "Accounts — sign in any time" = "Accounts — log in wanneer je wilt";
 "Accounts — sign in to Steam, GOG and Battle.net (⌘⇧A)" = "Accounts — log in bij Steam, GOG en Battle.net (⌘⇧A)";
 "Accounts…" = "Accounts…";
@@ -183,6 +180,7 @@
 "Folder access" = "Toegang tot mappen";
 "Force feedback strength" = "Sterkte van force feedback";
 "Free and open source" = "Gratis en open source";
+"From %@" = "Van %@";
 "Game database" = "Gamedatabase";
 "Game log" = "Gamelog";
 "Gameplay" = "Spelen";
@@ -289,6 +287,7 @@
 "Opening %@." = "%@ openen.";
 "Opening Battle.net" = "Battle.net openen";
 "Opening Steam" = "Steam openen";
+"Opens Accounts" = "Opent Accounts";
 "Opens GOG in a window. One sign-in covers every GOG game." = "Opent GOG in een venster. Eén keer inloggen dekt elke GOG-game.";
 "Paste" = "Plak";
 "Pick a game in the sidebar and Cellar will tell you what it needs next." = "Kies een game in de navigatiekolom en Cellar vertelt je wat hij nog nodig heeft.";
@@ -305,8 +304,6 @@
 "Recently Played" = "Onlangs gespeeld";
 "Redo" = "Opnieuw";
 "Refresh Library" = "Vernieuw bibliotheek";
-"Refresh the library" = "Vernieuw de bibliotheek";
-"Refresh the library (⌘R)" = "Vernieuw de bibliotheek (⌘R)";
 "Remove" = "Verwijder";
 "Removes Cellar and everything it downloaded. You choose whether to keep your save games first." = "Verwijdert Cellar en alles wat het downloadde. Je kiest eerst of je je opgeslagen games bewaart.";
 "Removes downloaded installers and temporary files Cellar fetches again when it needs them. Games, bottles, save games and sign-ins stay. To move a game to an external drive, use the ••• menu on its page." = "Verwijdert gedownloade installers en tijdelijke bestanden die Cellar opnieuw ophaalt wanneer het ze nodig heeft. Games, bottles, opgeslagen games en aanmeldingen blijven. Wil je een game naar een externe schijf verplaatsen, gebruik dan het •••-menu op zijn pagina.";
@@ -388,8 +385,10 @@
 "Steam ended the session for %@ (%@). Sign in again — it takes one scan." = "Steam beëindigde de sessie voor %@ (%@). Log opnieuw in — het kost één scan.";
 "Steam has a newer build than the one on disk (checked %@). Play downloads only what changed, first." = "Steam heeft een nieuwere build dan die op schijf (gecontroleerd %@). Spelen downloadt eerst alleen wat veranderd is.";
 "Steam said this was the current build then. Play checks again before it starts the game." = "Steam zei toen dat dit de huidige build was. Spelen controleert opnieuw voor de game start.";
+"Steam sign-in expired" = "Steam-login verlopen";
 "Steam sign-in QR code" = "QR-code om in te loggen bij Steam";
 "Steam starts in the background with no window. %@ will not start reliably until it is ready, so Cellar waits." = "Steam start op de achtergrond zonder venster. %@ start niet betrouwbaar tot het klaar is, dus Cellar wacht.";
+"Steam, GOG or Battle.net" = "Steam, GOG of Battle.net";
 "Step %lld of %lld" = "Stap %lld van %lld";
 "Step %lld. %@. %@" = "Stap %lld. %@. %@";
 "Stop waiting for %@. Anything already open — %@, the game itself — stays open." = "Stop met wachten op %@. Wat al open is — %@, de game zelf — blijft open.";
@@ -404,7 +403,7 @@
 "The installer runs with no window, so this bar is the progress." = "Het installatieprogramma draait zonder venster, dus deze balk is de voortgang.";
 "The layer is shut down." = "De laag is afgesloten.";
 "The one Cellar %@ shipped with" = "Die van Cellar %@ zelf";
-"The person icon in the sidebar, ⌘⇧A, or Settings → Manage accounts. Signing in later works exactly as it does here." = "Het persoonsicoon in de navigatiekolom, ⌘⇧A, of Instellingen → Beheer accounts. Later inloggen werkt precies zoals hier.";
+"Your account at the bottom of the sidebar, ⌘⇧A, or Settings → Manage accounts. Signing in later works exactly as it does here." = "Je account onderaan de navigatiekolom, ⌘⇧A, of Instellingen → Beheer accounts. Later inloggen werkt precies zoals hier.";
 "The saves the game has now are replaced by that backup (%@). Cellar keeps a copy of the current ones first, so you can go back." = "De huidige opgeslagen voortgang wordt vervangen door die reservekopie (%@). Cellar bewaart eerst een kopie van de huidige, zodat je terug kunt.";
 "The supported-games list and the FAQ live on the Cellar site, linked from Settings." = "De lijst met ondersteunde games en de veelgestelde vragen staan op de Cellar-site, gelinkt vanuit Instellingen.";
 "The Windows runtime and Steam client download when Cellar opens, so a first game doesn't wait for them." = "De Windows-runtime en Steam-client downloaden wanneer Cellar opent, zodat een eerste game er niet op wacht.";
@@ -454,6 +453,7 @@
 "yesterday" = "gisteren";
 "You're all set" = "Je bent klaar";
 "You're signed in. Cellar lists a game once its store confirms you own it." = "Je bent ingelogd. Cellar toont een game zodra de winkel bevestigt dat je hem bezit.";
+"Your accounts" = "Je accounts";
 "Your library hasn't been checked yet" = "Je bibliotheek is nog niet gecontroleerd";
 "Your save games are in Documents › Cellar Saved Games. Cellar will now quit." = "Je opgeslagen games staan in Documenten › Cellar Saved Games. Cellar stopt nu.";
 "Your whole GOG library — DRM-free, so nothing runs beside your game." = "Je hele GOG-bibliotheek — zonder DRM, dus er draait niets naast je game.";
