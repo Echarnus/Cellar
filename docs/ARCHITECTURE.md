@@ -454,7 +454,10 @@ base by vendor and product ID, and hand it to `SDL_cellar_fanatec.c` instead of 
 - Reports go out with `IOHIDDeviceSetReport` on the base's first output report. On open the driver
   sends hid-fanatecff's init sequence and sets the base's range to "auto", so the game sets it.
 - **Safety.** Every force and coefficient is scaled by the game's gain, then by Cellar's cap
-  (`CELLAR_FFB_MAX_PERCENT`, default 50, `CellarSDL.defaultStrengthPercent`). The sum of effects is
+  (`CELLAR_FFB_MAX_PERCENT`, default 50, `CellarSDL.defaultStrengthPercent`). The player picks the
+  strength in Settings › General › Racing wheels or with `cellar controllers strength`. It is kept in
+  `settings.toml` and set at launch by `Wine.environment` for both drivers, including
+  `SDL_HAPTIC_LG4FF_GAIN` for SDL's Logitech driver. The sum of effects is
   clamped before the cap, so stacking effects cannot pass it. Closing the haptic stops every slot and
   sends the base's stop-all command. `CELLAR_FFB_DISABLE=1` turns the driver off.
 - Wine sees the base once: `winebus` drops the raw IOHID copy of a joystick whose `is_hidraw_enabled`

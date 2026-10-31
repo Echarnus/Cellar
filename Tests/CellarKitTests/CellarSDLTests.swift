@@ -85,4 +85,35 @@ struct CellarSDLTests {
         #expect(row.hint?.contains("Fanatec CSL DD") == true)
         #expect(row.hint?.contains("Thrustmaster") == false)
     }
+
+    // MARK: - Strength
+
+    @Test("No strength chosen leaves every driver at its own default")
+    func strengthDefault() {
+        #expect(CellarSDL.strengthEnvironment(nil).isEmpty)
+        #expect(CellarSDL.strengthDescription(nil).contains("Fanatec bases at half strength"))
+    }
+
+    @Test("A chosen strength reaches both drivers, in each one's own units, clamped to 1–100")
+    func strengthUnits() {
+        let env = CellarSDL.strengthEnvironment(75)
+        #expect(env["CELLAR_FFB_MAX_PERCENT"] == "75")
+        #expect(env["SDL_HAPTIC_LG4FF_GAIN"] == "49151", "SDL's Logitech gain runs 0–65535")
+        #expect(CellarSDL.strengthEnvironment(100)["SDL_HAPTIC_LG4FF_GAIN"] == "65535")
+        #expect(CellarSDL.strengthEnvironment(0)["CELLAR_FFB_MAX_PERCENT"] == "1")
+        #expect(CellarSDL.strengthEnvironment(250)["CELLAR_FFB_MAX_PERCENT"] == "100")
+        #expect(CellarSDL.strengthChoices.allSatisfy { (1...100).contains($0) })
+    }
+
+    @Test("A strength typed on the command line wins over the one in Settings")
+    func strengthCallerWins() {
+        var env = ["CELLAR_FFB_MAX_PERCENT": "90"]
+        CellarSDL.applyStrength(25, to: &env)
+        #expect(env["CELLAR_FFB_MAX_PERCENT"] == "90")
+        #expect(env["SDL_HAPTIC_LG4FF_GAIN"] == "16383", "the other driver still gets Settings' value")
+
+        var empty: [String: String] = [:]
+        CellarSDL.applyStrength(nil, to: &empty)
+        #expect(empty.isEmpty)
+    }
 }

@@ -74,4 +74,20 @@ struct CellarSDLIntegrationTests {
         #expect(CellarSDL.libraryDirectory(environment: ["CELLAR_RUNNER_SDL": "1"], resources: nil, executable: nil,
                                            workingDirectory: IT.repositoryRoot.path, appSupport: IT.scratch("as")) == nil)
     }
+
+    @Test("Settings' wheel strength lands in settings.toml, under its own section, as a launch reads it")
+    func strengthSettingOnDisk() throws {
+        IT.ensure()
+        defer { try? CellarSettings.setForceFeedbackStrength(nil) }
+        try CellarSettings.setForceFeedbackStrength(50)
+        let text = try String(contentsOf: CellarSettings.url, encoding: .utf8)
+        #expect(text.contains("[controllers]"))
+        #expect(text.contains("force_feedback_strength = \"50\""))
+        let env = CellarSDL.strengthEnvironment(CellarSettings.forceFeedbackStrength)
+        #expect(env == ["CELLAR_FFB_MAX_PERCENT": "50", "SDL_HAPTIC_LG4FF_GAIN": "32767"])
+
+        try CellarSettings.setForceFeedbackStrength(nil)
+        let after = (try? String(contentsOf: CellarSettings.url, encoding: .utf8)) ?? ""
+        #expect(!after.contains("force_feedback_strength"), "default means no line, not a stored default")
+    }
 }
