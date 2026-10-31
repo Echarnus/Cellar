@@ -12,7 +12,7 @@ import CellarUI
 /// is decided by `LibraryQuery` and `LibrarySnapshot` in CellarDomain, where it is unit-tested.
 @MainActor
 @Observable
-final class LibraryStore {
+final class LibraryViewModel {
     typealias Filter = LibraryQuery.Filter
     typealias Sort = LibraryQuery.Sort
 
@@ -24,7 +24,7 @@ final class LibraryStore {
     var signInReason: String { snapshot.signInReason }
 
     /// The search field, the filters and the sort — bound straight to their controls.
-    var query = LibraryQuery(sort: Sort(rawValue: UserDefaults.standard.string(forKey: LibraryStore.sortKey) ?? "") ?? .name) {
+    var query = LibraryQuery(sort: Sort(rawValue: UserDefaults.standard.string(forKey: LibraryViewModel.sortKey) ?? "") ?? .name) {
         didSet {
             if query.sort != oldValue.sort { UserDefaults.standard.set(query.sort.rawValue, forKey: Self.sortKey) }
         }

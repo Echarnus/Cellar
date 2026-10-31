@@ -7,7 +7,7 @@ import CellarKit
 /// used to read it into a `@State` each, with a copy of the same refresh in both.
 @MainActor
 @Observable
-final class AccountsStore {
+final class AccountsViewModel {
     /// Read once per refresh, never from a view body — see `StoreAccountState`.
     private(set) var state = StoreAccountState.unknown
 

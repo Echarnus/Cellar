@@ -2,7 +2,7 @@ import Foundation
 
 /// What the library sidebar shows, worked out from the games and the player's search and filters —
 /// no disk, no network, no SwiftUI, so every rule here is a unit test rather than something to
-/// launch the app to see. The app's `LibraryStore` holds the state; this decides what it means.
+/// launch the app to see. The app's `LibraryViewModel` holds the state; this decides what it means.
 public struct LibraryQuery: Equatable, Sendable {
     public enum Filter: String, CaseIterable, Identifiable, Sendable {
         case all = "All", installed = "Installed", notInstalled = "Not installed"

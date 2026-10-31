@@ -4,9 +4,9 @@ import AppKit
 import CellarKit
 import CellarUI
 
-struct ContentView: View {
+struct LibraryView: View {
     /// The app's one library (`AppModel`), shared with Settings and the welcome tour.
-    @Bindable var lib: LibraryStore
+    @Bindable var lib: LibraryViewModel
     /// The app's one activity, shared with Settings and the welcome tour (`AppModel`).
     let runner: ActivityStore
     let preparation: RuntimePreparation
@@ -153,13 +153,13 @@ struct ContentView: View {
     private var stateFilter: some View {
         HStack(spacing: 6) {
             Picker("", selection: $lib.query.filter) {
-                ForEach(LibraryStore.Filter.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(LibraryViewModel.Filter.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden()
             .accessibilityLabel("Filter by readiness")
             Menu {
                 Picker("Sort by", selection: $lib.query.sort) {
-                    ForEach(LibraryStore.Sort.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(LibraryViewModel.Sort.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.inline)
             } label: {

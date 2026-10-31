@@ -1,7 +1,6 @@
 import CellarDomain
 import SwiftUI
 import AppKit
-import CellarKit
 
 /// A numbered step in the three-step story, in a card so the order reads at a glance.
 struct StepRow: View {
@@ -29,4 +28,9 @@ struct StepRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Step \(number). \(title). \(detail)")
     }
+}
+
+#Preview {
+    StepRow(number: 1, title: "Sign in to your store", detail: "Cellar lists the games your account owns.")
+        .padding()
 }

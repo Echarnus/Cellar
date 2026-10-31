@@ -22,8 +22,8 @@ import CellarKit
 struct WelcomeTourView: View {
     /// The app's one activity (`AppModel`), handed on to the sign-in step.
     let runner: ActivityStore
-    let library: LibraryStore
-    let accounts: AccountsStore
+    let library: LibraryViewModel
+    let accounts: AccountsViewModel
     let preparation: RuntimePreparation
     /// Called when the player finishes or skips — the host closes the window and records it.
     let onFinish: () -> Void

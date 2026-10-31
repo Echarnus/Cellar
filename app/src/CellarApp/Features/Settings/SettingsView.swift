@@ -15,8 +15,8 @@ struct SettingsView: View {
     /// too, and the activity pane shows everything Cellar is running.
     let runner: ActivityStore
     /// The app's one library, told directly when an account changes.
-    let library: LibraryStore
-    let accounts: AccountsStore
+    let library: LibraryViewModel
+    let accounts: AccountsViewModel
     @Bindable var updater: AppUpdater
     let preparation: RuntimePreparation
     @AppStorage("showHUD") private var showHUD = false
@@ -72,7 +72,7 @@ struct SettingsView: View {
                     // Signing in is account-level, so it belongs here as well as behind ⌘⇧A — the
                     // welcome tour promises "you can do this later in Settings", and this is that.
                     Section {
-                        AccountsSection(runner: runner, library: library, state: accounts.state, refresh: { accounts.refresh() })
+                        AccountsView(runner: runner, library: library, state: accounts.state, refresh: { accounts.refresh() })
                             .padding(.vertical, 4)
                     } footer: {
                         Text("One sign-in per store covers your whole library.")

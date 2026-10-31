@@ -1,7 +1,6 @@
 import CellarDomain
 import AppKit
 import SwiftUI
-import CellarKit
 import CellarUI
 
 /// One step of the launch: where it stands, what it is called, and — when it is the one happening —
