@@ -17,7 +17,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      # Dependency review needs the repository's Dependency graph, a setting only an admin can turn
+      # on. Until it is, say so on the run instead of failing every PR on something no PR can fix;
+      # once it is on, the review runs and blocks as below.
+      - name: Check the Dependency graph is on
+        id: graph
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if out=$(gh api "repos/$REPO/dependency-graph/compare/$BASE...$HEAD" 2>&1 >/dev/null); then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$out" | grep -qiE 'dependency graph|not (enabled|supported)'; then
+            echo "::warning title=Dependency review skipped::The Dependency graph is off. Turn it on at https://github.com/$REPO/settings/security_analysis and this check starts blocking vulnerable and non-GPL-compatible dependencies."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$out" >&2
+            exit 1
+          fi
+      - if: steps.graph.outputs.enabled == 'true'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
           # Proprietary and non-commercial licences cannot be redistributed in a GPL-3.0 release.

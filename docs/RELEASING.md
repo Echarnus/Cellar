@@ -206,8 +206,9 @@ These are settings, not files, so the maintainer applies them once:
 3. **Settings → Environments → release**: add a deployment rule allowing only tags matching `v*`.
    `sh Scripts/sparkle-keys.sh` creates the environment if needed and stores `SPARKLE_ED_PRIVATE_KEY`
    in it; the Developer ID secrets (below) go there too.
-4. **Settings → Code security**: turn on Dependabot alerts and security updates, secret scanning
-   and push protection, and private vulnerability reporting.
+4. **Settings → Code security**: turn on the **Dependency graph**, Dependabot alerts and security
+   updates, secret scanning and push protection, and private vulnerability reporting. Until the
+   Dependency graph is on, dependency review passes with a warning instead of reviewing anything.
 5. **Settings → Actions → General**: workflow permissions *Read repository contents*, and untick
    *Allow GitHub Actions to create and approve pull requests*.
 
