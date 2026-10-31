@@ -21,21 +21,21 @@ struct WheelStrengthSection: View {
                     Text("\(percent)%").tag(Int?.some(percent))
                 }
             }
-            Text(note)
-                .font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                if chosen == nil {
+                    Text("Fanatec bases start at half strength and Logitech wheels at full.")
+                } else {
+                    Text("Every wheel Cellar drives pushes at most the strength chosen above.")
+                }
+                Text("Applies from a game's next launch. A direct-drive base is strong: raise it a step at a time. The base's own force-feedback setting still applies on top.")
+            }
+            .font(.caption).foregroundStyle(.secondary)
             if let failure {
                 Label(failure, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption).foregroundStyle(.red)
             }
         }
         .task { chosen = CellarSettings.forceFeedbackStrength }
-    }
-
-    /// What the choice means, then the one thing worth knowing before raising it.
-    private var note: String {
-        let what = chosen.map { "Every wheel Cellar drives pushes at most \($0)% of its maximum." }
-            ?? "Fanatec bases start at half strength and Logitech wheels at full."
-        return what + " Applies from a game's next launch. A direct-drive base is strong: raise it a step at a time. The base's own force-feedback setting still applies on top."
     }
 
     private func save(_ percent: Int?) {
