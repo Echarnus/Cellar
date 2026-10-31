@@ -102,12 +102,33 @@ public enum Wheels {
     public static let drivenForceFeedbackNote =
         "Cellar drives this wheel's force feedback over USB itself. It is new: if it feels wrong, or too strong, say so in a report."
 
+    /// Added for a Fanatec base Cellar drives: its own driver caps the strength
+    /// (`CellarSDL.defaultStrengthPercent`), and the player should know why it feels soft.
+    public static let cappedStrengthNote =
+        "Fanatec bases start at half strength, because a direct-drive base at full torque can hurt; the FAQ says how to raise it."
+
     /// The force-feedback sentence for what is connected: the hopeful one only when every wheel
     /// connected is one Cellar's SDL drives and that SDL is installed.
     public static func forceFeedbackNote(for devices: [Device], cellarSDL: Bool) -> String {
         let wheels = devices.filter { $0.kind == .wheel }
         guard cellarSDL, !wheels.isEmpty, wheels.allSatisfy(CellarSDL.drivesForceFeedback) else { return forceFeedbackNote }
-        return drivenForceFeedbackNote
+        return wheels.contains { $0.vendor == .fanatec }
+            ? drivenForceFeedbackNote + " " + cappedStrengthNote
+            : drivenForceFeedbackNote
+    }
+
+    /// What a profile's `wheel` field records, in the player's words. Nil for no field, so a game
+    /// nobody drives with a wheel shows no row at all. `untested` is said out loud: a race sim
+    /// with a blank where the wheel answer belongs reads as "works", which nobody has seen yet.
+    public static func support(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespaces).lowercased(), !value.isEmpty else { return nil }
+        switch value {
+        case "full":     return "Steering, pedals and force feedback"
+        case "steering": return "Steering and pedals, no force feedback"
+        case "untested": return "Made for a wheel, not yet tried with one in Cellar"
+        case "none":     return "No wheel support"
+        default:         return value
+        }
     }
 
     /// Sorts one HID device into sim-racing hardware, or nil for anything else. Pure, so the

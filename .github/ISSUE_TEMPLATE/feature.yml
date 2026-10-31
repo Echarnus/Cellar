@@ -1,0 +1,16 @@
+name: Suggest an improvement
+description: Something Cellar could do, or do better.
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to be easier?
+      description: Describe the situation and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: How it could work. Optional, the problem matters more.

@@ -5,8 +5,9 @@ import Foundation
 /// Wine's input layer (winebus) loads `libSDL2-2.0.0.dylib` by name and hands every game controller,
 /// and a game's force-feedback effects, to it. The runner ships an SDL 2 whose only way to drive a
 /// wheel's motor is macOS's ForceFeedback plug-ins — which no wheel maker ships for Apple Silicon.
-/// Cellar's build is SDL 3 with sdl2-compat in front of it: SDL 3.4 talks to supported wheels over
-/// USB itself (HIDAPI), so the effects reach the motor. `Scripts/build-sdl.sh` builds it; it is
+/// Cellar's build is SDL 3 with sdl2-compat in front of it: SDL 3.4 talks to Logitech's older wheels
+/// over USB itself (HIDAPI), and Cellar's own patch (`Shim/sdl/`) drives Fanatec bases the same way,
+/// so the effects reach the motor. `Scripts/build-sdl.sh` builds it; it is
 /// installed beside the `cellar` binary the same way the Dock shim is.
 ///
 /// Missing — a partial build, an old install — every launch uses the runner's SDL, exactly as before:
@@ -19,12 +20,20 @@ public enum CellarSDL {
     /// the build so the doctor row and the FAQ never claim a wheel the library cannot drive.
     public static let forceFeedbackWheels: [Wheels.Vendor: String] = [
         .logitech: "G29, G27, G25, Driving Force GT and Driving Force Pro",
+        .fanatec: "CSL DD, GT DD Pro, ClubSport DD, Podium DD1 and DD2, CSL Elite, ClubSport V2 and V2.5, CSR Elite and Porsche 911",
     ]
 
-    /// The USB product IDs behind `forceFeedbackWheels` — SDL 3.4's Logitech driver's own list.
+    /// The USB product IDs behind `forceFeedbackWheels`: SDL 3.4's Logitech driver's own list, and
+    /// the bases `CellarFanatec_IsSupported` takes (Shim/sdl/0001-cellar-fanatec-force-feedback.patch).
+    /// The CSL DD, GT DD Pro and ClubSport DD all report 0x0020 in PC mode.
     static let forceFeedbackProducts: [Wheels.Vendor: Set<Int>] = [
         .logitech: [0xC24F, 0xC29B, 0xC299, 0xC29A, 0xC298, 0xC294],
+        .fanatec: [0x0001, 0x0004, 0x0005, 0x0006, 0x0007, 0x0011, 0x0020, 0x0197, 0x0E03],
     ]
+
+    /// How strong Cellar lets a wheel it drives get, in percent of the base's maximum, until the
+    /// player raises it (`CELLAR_FFB_MAX_PERCENT`). A direct-drive base at full torque can hurt.
+    public static let defaultStrengthPercent = 50
 
     /// Whether Cellar's SDL drives this device's motor. Pedals and shifters have none.
     public static func drivesForceFeedback(_ device: Wheels.Device) -> Bool {

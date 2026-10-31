@@ -50,17 +50,27 @@ struct CellarSDLTests {
         let g29 = try #require(Wheels.classify(vendorID: 0x046D, productID: 0xC24F, product: "G29 Driving Force Racing Wheel"))
         let g920 = try #require(Wheels.classify(vendorID: 0x046D, productID: 0xC262, product: "Logitech G920 Driving Force Racing Wheel"))
         let csl = try #require(Wheels.classify(vendorID: 0x0EB7, productID: 0x0020, product: "FANATEC CSL DD"))
+        let elite = try #require(Wheels.classify(vendorID: 0x0EB7, productID: 0x0E03, product: "FANATEC CSL Elite Wheel Base"))
+        let unknownBase = try #require(Wheels.classify(vendorID: 0x0EB7, productID: 0x0ABC, product: "FANATEC Wheel"))
+        let t300 = try #require(Wheels.classify(vendorID: 0x044F, productID: 0xB66E, product: "Thrustmaster T300RS Racing wheel"))
         let pedals = try #require(Wheels.classify(vendorID: 0x0EB7, productID: 0x6204, product: "FANATEC CSL Pedals"))
 
         #expect(CellarSDL.drivesForceFeedback(g29))
         #expect(!CellarSDL.drivesForceFeedback(g920), "the G920 speaks HID++, which SDL 3.4's driver does not")
-        #expect(!CellarSDL.drivesForceFeedback(csl))
+        #expect(CellarSDL.drivesForceFeedback(csl))
+        #expect(CellarSDL.drivesForceFeedback(elite))
+        #expect(!CellarSDL.drivesForceFeedback(unknownBase), "a base the driver does not know is never promised")
+        #expect(!CellarSDL.drivesForceFeedback(t300))
         #expect(!CellarSDL.drivesForceFeedback(pedals))
 
         #expect(Wheels.forceFeedbackNote(for: [g29], cellarSDL: true) == Wheels.drivenForceFeedbackNote)
         #expect(Wheels.forceFeedbackNote(for: [g29, pedals], cellarSDL: true) == Wheels.drivenForceFeedbackNote)
         #expect(Wheels.forceFeedbackNote(for: [g29], cellarSDL: false) == Wheels.forceFeedbackNote)
-        #expect(Wheels.forceFeedbackNote(for: [g29, csl], cellarSDL: true) == Wheels.forceFeedbackNote,
+        #expect(Wheels.forceFeedbackNote(for: [csl, pedals], cellarSDL: true)
+                == Wheels.drivenForceFeedbackNote + " " + Wheels.cappedStrengthNote, "a Fanatec base says why it feels soft")
+        #expect(!Wheels.forceFeedbackNote(for: [g29], cellarSDL: true).contains("half strength"))
+        #expect(Wheels.forceFeedbackNote(for: [csl], cellarSDL: false) == Wheels.forceFeedbackNote)
+        #expect(Wheels.forceFeedbackNote(for: [g29, t300], cellarSDL: true) == Wheels.forceFeedbackNote,
                 "one undriven wheel connected: never the hopeful sentence")
         #expect(Wheels.forceFeedbackNote(for: [pedals], cellarSDL: true) == Wheels.forceFeedbackNote)
     }
@@ -72,6 +82,7 @@ struct CellarSDLTests {
         #expect(row.status == .info)
         #expect(row.detail.contains("Cellar's SDL"))
         #expect(row.hint?.contains("Logitech G29") == true)
-        #expect(row.hint?.contains("Fanatec") == false)
+        #expect(row.hint?.contains("Fanatec CSL DD") == true)
+        #expect(row.hint?.contains("Thrustmaster") == false)
     }
 }

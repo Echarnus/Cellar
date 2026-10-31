@@ -1,0 +1,16 @@
+# How GitHub lists merged pull requests under "Pull requests" in a release's notes. The issues
+# above that list come from Scripts/release-notes.py.
+changelog:
+  exclude:
+    labels: [skip-changelog]
+  categories:
+    - title: Breaking changes
+      labels: [breaking-change]
+    - title: Fixes
+      labels: [bug, security]
+    - title: New and improved
+      labels: [enhancement, performance, ux, compatibility, networking, game-profile]
+    - title: Dependencies
+      labels: [dependencies]
+    - title: Other changes
+      labels: ["*"]

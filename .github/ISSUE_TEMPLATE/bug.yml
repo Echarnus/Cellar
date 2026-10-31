@@ -1,0 +1,36 @@
+name: Something doesn't work
+description: A game won't start, something in the app is wrong, or Cellar shows an error.
+labels: [bug, needs-triage]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: Which game, and from which store (Steam, Battle.net, GOG). Leave empty if it's not about a game.
+      placeholder: Planet Coaster 2 (Steam)
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS version
+      placeholder: MacBook Pro M3 Pro, macOS 26.1
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Cellar version
+      description: Cellar → About Cellar, or `cellar --version`.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostics report
+      description: In the app, Settings → Diagnostics → Export diagnostics…, or run `cellar logs export`, then drag the file here. Account names and tokens are removed, but read it before you post it.
