@@ -195,6 +195,7 @@ struct SupplyChainTests {
     func signingKeysScript() throws {
         let script = try String(contentsOf: Repo.app.appendingPathComponent("Scripts/signing-keys.sh"), encoding: .utf8)
         #expect(script.contains("sh Scripts/sparkle-keys.sh"))
+        #expect(script.contains(". Scripts/select-xcode.sh"), "a Nix SDKROOT must not reach `swift`")
         #expect(script.contains("gh secret set PROFILES_SIGNING_KEY --repo \"$REPO\" --env release"))
         #expect(script.contains("security add-generic-password -s \"$SERVICE\""), "the keychain copy is the backup")
         #expect(!script.contains("> \"$"), "a private key is never redirected into a file")

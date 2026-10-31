@@ -20,6 +20,10 @@ cd "$(dirname "$0")/.."
 REPO="Echarnus/Cellar"
 SERVICE="it.clercq.cellar.release.profiles"
 SWIFT_FILE="Packages/CellarData/Sources/CellarData/Library/ProfileUpdates.swift"
+# A Nix/devenv shell exports SDKROOT/DEVELOPER_DIR for a non-matching SDK, and `swift` then fails
+# with "this SDK is not supported by the compiler". sparkle-keys.sh clears them only for itself, so
+# clear them here too, before this script runs `swift` for the game-database key.
+. Scripts/select-xcode.sh
 
 command -v gh >/dev/null 2>&1 || { echo "Needs the GitHub CLI: brew install gh && gh auth login"; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "Sign the GitHub CLI in first: gh auth login"; exit 1; }
