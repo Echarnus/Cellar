@@ -20,7 +20,7 @@ is fine if you say who has to run it. The PR checklist check fails until at leas
 ## Tests
 
 <!-- Which tests this adds or changes, and what each would catch if the change broke. A change to
-Swift under app/src/ must touch app/tests/ — or replace this comment with one line saying why it can't:
+Swift under app/src/ or app/Packages/*/Sources/ must touch a test — or replace this comment with one line saying why it can't:
 
 No tests needed: <the reason, about this change>
 -->

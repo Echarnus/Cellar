@@ -36,7 +36,8 @@ def target_of(filename):
     """The library a source file belongs to, or None for tests, dependencies and executables."""
     parts = filename.replace("\\", "/").split("/")
     for i, part in enumerate(parts[:-1]):
-        if part == "src" and parts[i + 1] in TARGETS:
+        # app/Packages/<Library>/Sources/<Library>/…, the layout since the libraries became local packages.
+        if part in ("Sources", "src") and parts[i + 1] in TARGETS:
             # A dependency checked out under .build has sources of its own.
             if ".build" in parts[:i]:
                 return None

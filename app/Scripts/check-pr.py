@@ -45,11 +45,18 @@ def section(body, heading):
 
 
 def touches_code(files):
-    return any(f.startswith("app/src/") and f.endswith(".swift") for f in files)
+    """Swift in the executables (app/src/) or in a library package's Sources/ (app/Packages/*/Sources/)."""
+    def is_code(f):
+        parts = f.split("/")
+        return f.endswith(".swift") and (f.startswith("app/src/") or (
+            len(parts) > 3 and parts[:2] == ["app", "Packages"] and parts[3] == "Sources"))
+    return any(is_code(f) for f in files)
 
 
 def touches_tests(files):
-    return any(f.startswith("app/tests/") for f in files)
+    """The app's test targets (app/tests/), or a library package's own Tests/."""
+    return any(f.startswith("app/tests/") or (f.startswith("app/Packages/") and "/Tests/" in f)
+               for f in files)
 
 
 def problems(body, files, author=""):

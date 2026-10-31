@@ -15,7 +15,7 @@ struct LocalizationTests {
     /// the library's verdicts. Engine copy is `String(localized:)` too; it resolves against
     /// `Bundle.main`, which is Cellar.app in the app and in the CLI bundled inside it.
     static let sourceDirectories = ["CellarApp", "CellarKit", "CellarDomain"]
-        .map { Repo.app.appendingPathComponent("src/\($0)", isDirectory: true) }
+        .map { Repo.source($0) }
 
     /// Names and the debug placeholder: the same in every language, so they are not in the table.
     static let untranslated: Set<String> = ["Cellar", "DepotDownloader", "Cellar GUI works"]

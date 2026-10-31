@@ -41,12 +41,19 @@ Closes #80
 
 class PRChecklistTests(unittest.TestCase):
     def test_a_complete_pr_passes(self):
-        self.assertEqual(check_pr.problems(GOOD, ["app/src/CellarKit/Game.swift", "app/tests/CellarKitTests/X.swift"]), [])
+        self.assertEqual(check_pr.problems(GOOD, ["app/Packages/CellarKit/Sources/CellarKit/Game.swift", "app/tests/CellarKitTests/X.swift"]), [])
+
+    def test_code_is_the_executables_and_every_library_package(self):
+        self.assertTrue(check_pr.touches_code(["app/src/CellarApp/App/AppModel.swift"]))
+        self.assertTrue(check_pr.touches_code(["app/Packages/CellarUI/Sources/CellarUI/StoreMark.swift"]))
+        self.assertFalse(check_pr.touches_code(["app/Packages/CellarKit/Package.swift", "pages/gen-site.py"]))
+        self.assertTrue(check_pr.touches_tests(["app/Packages/CellarKit/Tests/CellarKitTests/X.swift"]))
+        self.assertFalse(check_pr.touches_tests(["app/Packages/CellarKit/Sources/CellarKit/X.swift"]))
 
     def test_the_untouched_template_fails_on_every_count(self):
         with open(os.path.join(os.path.dirname(ROOT), ".github", "pull_request_template.md"), encoding="utf-8") as handle:
             template = handle.read()
-        found = check_pr.problems(template, ["app/src/CellarKit/Game.swift"])
+        found = check_pr.problems(template, ["app/Packages/CellarKit/Sources/CellarKit/Game.swift"])
         self.assertEqual(len(found), 3, found)
 
     def test_an_issue_link_is_required(self):
@@ -70,7 +77,7 @@ class PRChecklistTests(unittest.TestCase):
         self.assertTrue(check_pr.problems(body, []))
 
     def test_swift_without_tests_needs_a_reason(self):
-        files = ["app/src/CellarKit/Game.swift"]
+        files = ["app/Packages/CellarKit/Sources/CellarKit/Game.swift"]
         self.assertTrue(check_pr.problems(GOOD, files))
         self.assertTrue(check_pr.problems(GOOD + "\nNo tests needed: n/a\n", files))
         self.assertEqual(check_pr.problems(
@@ -98,10 +105,10 @@ class CoverageTests(unittest.TestCase):
 
     def test_only_the_libraries_are_measured(self):
         totals = self.measure([
-            (f"{ROOT}/src/CellarKit/Game.swift", 100, 50),
-            (f"{ROOT}/src/CellarUI/StoreMark.swift", 10, 10),
+            (f"{ROOT}/Packages/CellarKit/Sources/CellarKit/Game.swift", 100, 50),
+            (f"{ROOT}/Packages/CellarUI/Sources/CellarUI/StoreMark.swift", 10, 10),
             (f"{ROOT}/tests/CellarKitTests/GameTests.swift", 1000, 1000),
-            (f"{ROOT}/.build/checkouts/swift-argument-parser/src/CellarKit/Fake.swift", 1000, 0),
+            (f"{ROOT}/.build/checkouts/swift-argument-parser/Sources/CellarKit/Fake.swift", 1000, 0),
             (f"{ROOT}/src/cellar/Cellar.swift", 1000, 0),
         ])
         self.assertEqual((totals["CellarKit"]["covered"], totals["CellarKit"]["count"]), (50, 100))

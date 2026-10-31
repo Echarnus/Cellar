@@ -17,6 +17,20 @@ enum Repo {
     /// The checkout root holds what the app and the site share: profiles, licences, `.github/`.
     static var app: URL { root.appendingPathComponent("app", isDirectory: true) }
 
+    /// The local package each library lives in (`app/Packages/<package>/Sources/<target>`). The
+    /// executables are the app shell's own targets, in `app/src/<target>`.
+    static let packageOfLibrary = ["CellarDomain": "CellarDomain", "CellarKit": "CellarKit",
+                                   "CellarInfrastructure": "CellarKit", "CellarUI": "CellarUI"]
+
+    /// A path inside a target's sources, written as `<Target>/<rest>`: `CellarKit/UseCases`.
+    static func source(_ path: String) -> URL {
+        let target = String(path.split(separator: "/").first ?? "")
+        if let package = packageOfLibrary[target] {
+            return app.appendingPathComponent("Packages/\(package)/Sources/\(path)")
+        }
+        return app.appendingPathComponent("src/\(path)")
+    }
+
     static var profiles: URL { root.appendingPathComponent("profiles", isDirectory: true) }
 
     /// Every `profiles/*.toml` in the checkout, sorted, so a failure names the same profile twice

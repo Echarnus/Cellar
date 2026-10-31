@@ -124,7 +124,7 @@ public extension GameStore {
 
     /// Library ordering: stores appear in a stable, meaningful order rather than alphabetically.
     /// Package-wide, not public: `GameStore.inLibraryOrder` is the API.
-    package var sortIndex: Int {
+    public var sortIndex: Int {
         switch self {
         case .steam: return 0
         case .battlenet: return 1

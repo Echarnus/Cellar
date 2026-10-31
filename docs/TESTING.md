@@ -93,7 +93,7 @@ python3 app/Scripts/coverage.py --update app/.build/*/debug/codecov/*.json
 |---|---|---|
 | Build, tests, coverage | *Build & self-test* (macOS 27) | the build breaks, a test fails, coverage drops |
 | The layer | *Wine tiers* | a real runner can't start and stop a Windows exe under Cellar |
-| The description | *PR checklist* | no `Closes #N`, nothing ticked under *How it was verified*, or `app/src/` changed without `app/tests/` |
+| The description | *PR checklist* | no `Closes #N`, nothing ticked under *How it was verified*, or Swift changed without a test |
 | Hygiene | *Lint*, CodeQL, dependency review | see `docs/RELEASING.md` |
 
 *Wine tiers* is reported on every PR but is not yet a required check: it downloads its runner from
@@ -381,7 +381,7 @@ release**.
 
 ## Adding tests
 
-**Every PR that changes Swift under `app/src/` changes a test under `app/tests/`**, and the test is one
+**Every PR that changes Swift under `app/src/` or `app/Packages/*/Sources/` changes a test**, and the test is one
 that would fail without the change. A bug fix starts with the test that reproduces it. The *PR
 checklist* check enforces this (a `No tests needed: <reason>` line in the PR body is the only way
 past it, and the reason has to be about the change). Where the test goes:

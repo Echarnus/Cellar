@@ -142,7 +142,7 @@ Three consequences worth stating plainly, because they shape the UI as much as t
 
 All of it lives in `StoreDescriptor`, so the CLI and the app say the same thing without either knowing
 about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a `StoreAdapter`
-(`app/src/CellarInfrastructure/Adapters/`: client set-up, install, opening the client,
+(`app/Packages/CellarKit/Sources/CellarInfrastructure/Adapters/`: client set-up, install, opening the client,
 launching through it, registered in `CellarInfrastructure.install()`), and a CLI command group.
 
 ### One Steam, every bottle
@@ -381,7 +381,7 @@ save then lands where Finder and Time Machine can see it. Those three are exactl
 gates behind a privacy prompt, so left alone the player meets *"Cellar.app would like to access files
 in your Documents folder"* halfway through an install, with nothing on screen explaining it.
 
-So Cellar owns the timing instead (`app/src/CellarKit/System/HomeFolderAccess.swift`):
+So Cellar owns the timing instead (`app/Packages/CellarKit/Sources/CellarKit/System/HomeFolderAccess.swift`):
 
 - **The app asks on first launch** (`WelcomeView`) — the same three dialogs macOS would have shown,
   together, before anything is at stake, under a sentence saying what each folder is for. The
@@ -506,8 +506,8 @@ the app, into one file.
 
 | Piece | Where | What it does |
 |---|---|---|
-| `CellarLog` | `app/src/CellarKit/Diagnostics/CellarLog.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
-| `Diagnostics` | `app/src/CellarKit/Diagnostics/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
+| `CellarLog` | `app/Packages/CellarKit/Sources/CellarKit/Diagnostics/CellarLog.swift` | The writer. One entry per line, four levels (`debug` `info` `warn` `error`), a category and an optional subject (usually the game slug). Rolls at 512 KB into `.1` and `.2`, so the history is capped at ~1.5 MB and can always be sent. |
+| `Diagnostics` | `app/Packages/CellarKit/Sources/CellarKit/Diagnostics/Diagnostics.swift` | Lifecycle bookkeeping, play sessions, macOS crash-report lookup, and the exportable report. |
 | `cellar logs` | `app/src/cellar/Commands/Maintenance/LogsCommand.swift` | `show` (filter by level or game), `path`, `export`, `clear`. |
 | Settings → Diagnostics | `app/src/CellarApp/Features/Settings/SettingsView.swift` | The same export, one button, saved to the Desktop. |
 

@@ -85,7 +85,7 @@ public enum SaveBackups {
 }
 ```
 
-- **No protocols.** A `grep` for `protocol` in `app/src/CellarKit` finds none. Side effects —
+- **No protocols.** A `grep` for `protocol` in `app/Packages/CellarKit/Sources/CellarKit` finds none. Side effects —
   `FileManager`, `Process` (6 sites), `URLSession` (5), Keychain, `ProcessInfo.environment` — are
   called where they are needed.
 - **Configuration is ambient.** `Paths.appSupport` reads `CELLAR_HOME` from the process environment,
@@ -397,56 +397,66 @@ point forgets to call `install()`. Every target is in Swift 6 language mode.
 The checkout splits at the top into the Mac app and the website, with what both use beside them:
 
 ```
-app/          the Mac app: a Swift package
-  Package.swift  Package.resolved
-  src/        one folder per module (below)
-  tests/      CellarKitTests, CellarUITests, CellarIntegrationTests
-  Resources/  icon, localizations, the update key
-  Shim/       the Dock shim and Cellar's SDL patches (C)
-  Scripts/    build, test, package, sign, release
-pages/        the GitHub Pages site: gen-site.py builds pages/dist/, check-site.py checks it
-profiles/     the game database: bundled into the app, and the site's game list
+app/                  the Mac app
+  Package.swift       the app shell: the two executables and the tests
+  Packages/           the libraries, each a local Swift package with its own Package.swift
+    CellarDomain/     depends on nothing
+    CellarKit/        depends on CellarDomain (CellarKit + CellarInfrastructure)
+    CellarUI/         depends on CellarDomain and CellarKit
+  src/                CellarApp, cellar
+  tests/              CellarKitTests, CellarUITests, CellarIntegrationTests
+  Resources/          icon, localizations, the update key
+  Shim/               the Dock shim and Cellar's SDL patches (C)
+  Scripts/            build, test, package, sign, release
+pages/                the GitHub Pages site: gen-site.py builds pages/dist/, check-site.py checks it
+profiles/             the game database: bundled into the app, and the site's game list
 docs/  .github/  licenses/  README, LICENSE, NOTICE …
 ```
 
-Inside `app/src/`, every target is grouped by feature, and every file holds one top-level type, named after it. An
-extension of a type that lives elsewhere goes in `Type+Topic.swift` (`GameStore+StoreStyle.swift`).
-Nested types stay with their parent. `ArchitectureTests.oneTypePerFile` and `featureFolders` fail
-the build when a file gains a second type or a file is left loose at a target's root (#133).
+**Boundaries are compile errors.** A layer can import only what its package's `Package.swift`
+declares, so CellarDomain cannot reach the engine and CellarUI cannot reach the adapters however a
+file is written. `ArchitectureTests.packageDependencies` pins each package's declared dependencies,
+so adding an arrow is a deliberate change to that test. Within a package, `public` is the only way
+out: everything else is `internal` to it.
+
+Inside each target, files are grouped by feature, and every file holds one top-level type, named
+after it. An extension of a type that lives elsewhere goes in `Type+Topic.swift`
+(`GameStore+StoreStyle.swift`). Nested types stay with their parent. `ArchitectureTests.oneTypePerFile`
+and `featureFolders` fail the build when a file gains a second type or a file is left loose at a
+target's root (#133).
 
 ```
-app/src/
-  CellarDomain/          pure types, Foundation only
-    Store/  Install/  Launch/  Events/
-  CellarKit/             the engine
-    Core/                errors, environment, paths, version, the CLI command contract
-    Game/                plans, facts, summaries, updates, play time
-    UseCases/            LoadLibrary, SetUpGame, InstallGame, LaunchGame, UninstallGame
-    Stores/              the StoreAdapter port and registry, the library verdict, store icons
-      Steam/  BattleNet/  GOG/
-    Runners/             Wine, runners, prefixes, preparation, app bundles, the Dock shim
-    Library/             the profile database and the library query
-    Settings/            performance, language, backend, controllers, wheels
-    Storage/             game storage, saves, backups, uninstall, reset
-    Credentials/         keychain, private files
-    Diagnostics/         log, diagnostics report, frame stats
-    System/              shell, processes, downloads, environment checks
-    Codecs/              VDF, protobuf, PE, CRC32, archives
-  CellarInfrastructure/  the concrete store adapters
-    Adapters/
-  CellarUI/              presentation primitives a test can import
-    Marks/  Progress/  Snapshot/
-  CellarApp/             the SwiftUI app; main.swift is the composition root
-    App/                 AppModel, AppDelegate, activity, updater
-    Features/            Library/  GameDetail/  Accounts/  Settings/  Welcome/  Launch/
-  cellar/                the CLI; Cellar.swift is the entry point
-    Commands/            Games/  Stores/  Maintenance/
-    Output/
+Packages/CellarDomain/Sources/CellarDomain/      pure types, Foundation only
+  Store/  Install/  Launch/  Events/
+Packages/CellarKit/Sources/CellarKit/            the engine
+  Core/                errors, environment, paths, version, the CLI command contract
+  Game/                plans, facts, summaries, updates, play time
+  UseCases/            LoadLibrary, SetUpGame, InstallGame, LaunchGame, UninstallGame
+  Stores/              the StoreAdapter port and registry, the library verdict, store icons
+    Steam/  BattleNet/  GOG/
+  Runners/             Wine, runners, prefixes, preparation, app bundles, the Dock shim
+  Library/             the profile database and the library query
+  Settings/            performance, language, backend, controllers, wheels
+  Storage/             game storage, saves, backups, uninstall, reset
+  Credentials/         keychain, private files
+  Diagnostics/         log, diagnostics report, frame stats
+  System/              shell, processes, downloads, environment checks
+  Codecs/              VDF, protobuf, PE, CRC32, archives
+Packages/CellarKit/Sources/CellarInfrastructure/ the concrete store adapters
+  Adapters/
+Packages/CellarUI/Sources/CellarUI/              presentation primitives a test can import
+  Marks/  Progress/  Snapshot/
+src/CellarApp/         the SwiftUI app; main.swift is the composition root
+  App/                 AppModel, AppDelegate, activity, updater
+  Features/            Library/  GameDetail/  Accounts/  Settings/  Welcome/  Launch/
+src/cellar/            the CLI; Cellar.swift is the entry point
+  Commands/            Games/  Stores/  Maintenance/
+  Output/
 ```
 
-Next step (#133): the libraries become local packages under `app/Packages/`, each with its own
-`Package.swift`, so a boundary is a package dependency and not only a target one. The full target
-tree is in the plan Kenneth reviewed (CellarDomain, CellarData, CellarUI; feature view models).
+Next steps (#133): the repository protocols and the use cases move into CellarDomain, and the I/O
+into a CellarData package (absorbing CellarKit and CellarInfrastructure); then each app feature
+gets an `@Observable` view model, a smart view and dumb subviews.
 
 ## Migration plan
 
@@ -516,7 +526,7 @@ test fails the build when the rule breaks, not that a reviewer has to notice.
 
 | Criterion | Cellar | Status |
 |---|---|---|
-| Dependencies point inward: domain ← engine ← infrastructure ← composition roots | SwiftPM targets `CellarDomain` → `CellarKit` → `CellarInfrastructure`; SwiftPM refuses an undeclared import | Pass, enforced (`Package.swift`, `ArchitectureTests`) |
+| Dependencies point inward: domain ← engine ← infrastructure ← composition roots | Local Swift packages: `CellarDomain` (no dependencies) ← `CellarKit` (engine + adapters) ← `CellarUI`; the app shell depends on all three. A package can only import what its manifest declares | Pass, enforced by the compiler (`app/Packages/*/Package.swift`) and pinned (`ArchitectureTests.packageDependencies`) |
 | The domain is pure: no I/O, no framework | `CellarDomain` imports Foundation only | Pass, enforced (`ArchitectureTests.domainIsPure`) |
 | Ports and adapters: the core depends on interfaces, not implementations | `StoreAdapter` port in CellarKit; Steam, Battle.net and GOG adapters in `CellarInfrastructure`; CellarKit never names one | Pass, enforced (`engineNamesNoConcreteAdapter`, `useCasesDoNotSwitchOnStore`) |
 | Composition root: wiring happens once, at the edge | `CellarInfrastructure.install()` in the CLI's `main`, the app's `main.swift` and the test homes; nowhere else in the app | Pass, enforced (`entryPointsInstallInfrastructure`, `onlyTheAppsRootImportsInfrastructure`) |

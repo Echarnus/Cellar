@@ -15,10 +15,10 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
 - Run `env -u DEVELOPER_DIR -u SDKROOT swift build -c release` — must be clean, no new warnings.
 - Run `sh app/Scripts/test.sh` — must pass. It is headless and takes under a second, so it is never
   skipped. A user-visible change that moved no test is a finding: say so.
-- A change to `app/src/**` with no test that fails without it is a finding, unless the PR's
+- A change to `app/src/**` or `app/Packages/*/Sources/**` with no test that fails without it is a finding, unless the PR's
   `No tests needed:` line holds up. Run `sh app/Scripts/test.sh --coverage`: a drop below
   `app/tests/coverage-baseline.json` is a finding too.
-- For a change to `app/src/CellarUI/**`, open `app/.build/ui-snapshots/store-marks-dark.png` and look at
+- For a change to `app/Packages/CellarUI/Sources/CellarUI/**`, open `app/.build/ui-snapshots/store-marks-dark.png` and look at
   it. That is the "verify by looking" demand, met without launching the app.
 - If `app/src/**` changed, run `swift run cellar selftest` — must pass.
 

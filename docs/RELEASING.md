@@ -44,7 +44,7 @@ Every piece of work starts as an issue, because the issues are what a release's 
    cannot launch the app or a game.
 3. Open a PR from the template. Its body says **`Closes #N`**, which is what links it to the
    issue and closes the issue when it merges, and says how the change was verified. A change to
-   `app/src/` carries its tests. The *PR checklist* check fails until all of that is true, and it
+   the Swift carries its tests. The *PR checklist* check fails until all of that is true, and it
    re-runs whenever the description is edited ([`docs/TESTING.md`](TESTING.md)).
 4. **Turn on auto-merge (squash).** The PR merges by itself once every required check is green.
 

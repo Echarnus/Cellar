@@ -23,18 +23,19 @@ Full picture: [`README.md`](README.md) · architecture: [`docs/ARCHITECTURE.md`]
 
 ## Repository structure
 
-Two halves and what they share: **`app/`** is the Mac app (a Swift package: `Package.swift`,
-`src/`, `tests/`, `Resources/`, `Shim/`, its build and release `Scripts/`), **`pages/`** is the
+Two halves and what they share: **`app/`** is the Mac app (the app shell's `Package.swift`, the
+libraries as local packages under `Packages/`, `src/`, `tests/`, `Resources/`, `Shim/`, its build
+and release `Scripts/`), **`pages/`** is the
 GitHub Pages site, and `profiles/`, `docs/`, `.github/` and the licence files sit at the top because
 both use them.
 
 | Path | What lives there |
 |---|---|
-| `app/src/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store/`), launch stages, install phases, `GameEvent`/`CommandEvent`. Imported explicitly (`import CellarDomain`); nothing re-exports it. |
-| `app/src/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the use cases (`UseCases/`), the `StoreAdapter` port and its registry (`StoreAdapter.swift`), the store plugins (`Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
-| `app/src/CellarInfrastructure/` | The concrete store adapters (`SteamAdapter`, `BattleNetAdapter`, `GOGAdapter`) behind CellarKit's `StoreAdapter` port. Only composition roots import it: the CLI's `main`, the app's `main.swift` and the tests' set-up call `CellarInfrastructure.install()`. No view or store may (`ArchitectureTests`). |
+| `app/Packages/CellarDomain/Sources/CellarDomain/` | Pure domain types, no I/O, Swift 6 mode — the store table (`Store/`), launch stages, install phases, `GameEvent`/`CommandEvent`. Imported explicitly (`import CellarDomain`); nothing re-exports it. |
+| `app/Packages/CellarKit/Sources/CellarKit/` | Core library — environment detection, bottles/prefixes, runners, profiles, the use cases (`UseCases/`), the `StoreAdapter` port and its registry (`StoreAdapter.swift`), the store plugins (`Steam.swift`, `BattleNet.swift`, `GOG.swift`/`GOGLibrary.swift`), sign-in (`Keychain.swift`, `SteamQRCode.swift`), downloading, app-bundle generation, the rolling log + diagnostics report (`Log.swift`, `Diagnostics.swift`). **All logic lives here.** |
+| `app/Packages/CellarKit/Sources/CellarInfrastructure/` | The concrete store adapters (`SteamAdapter`, `BattleNetAdapter`, `GOGAdapter`) behind CellarKit's `StoreAdapter` port. Only composition roots import it: the CLI's `main`, the app's `main.swift` and the tests' set-up call `CellarInfrastructure.install()`. No view or store may (`ArchitectureTests`). |
 | `app/src/cellar/` | Thin CLI over CellarKit (ArgumentParser). One file per command group under `Commands/`. |
-| `app/src/CellarUI/` | The app's presentation primitives — store marks, lockups, the generated cover, and `Snapshot`, which renders a SwiftUI view to pixels. A library rather than part of the app, because **a test cannot import an executable**. |
+| `app/Packages/CellarUI/Sources/CellarUI/` | The app's presentation primitives — store marks, lockups, the generated cover, and `Snapshot`, which renders a SwiftUI view to pixels. A library rather than part of the app, because **a test cannot import an executable**. |
 | `app/tests/CellarKitTests/` | Unit tests over the engine — parsing, the store table, launch routes, the readiness ladder and its copy, the profile database. Fast, hermetic, no Wine. |
 | `app/tests/CellarUITests/` | Store marks rendered offscreen and measured, plus the snapshot sheet. |
 | `app/tests/CellarIntegrationTests/` | Integration tests, tiered: bottles and app bundles always; a real runner, prefix and Windows game behind `CELLAR_IT=1`. See [`docs/TESTING.md`](docs/TESTING.md). |
@@ -119,7 +120,7 @@ The [verifier agent](agents/verifier.md) codifies these demands per kind of chan
 "It compiles" and a confident description are not verification. The author of a change, a person or
 an AI agent, is the one who proves it works, in the PR, before anyone else spends time on it:
 
-- **A PR that changes Swift under `app/src/` changes a test under `app/tests/`** — one that would fail
+- **A PR that changes Swift under `app/src/` or `app/Packages/*/Sources/` changes a test** — one that would fail
   without the change. A bug fix starts with a test that reproduces the bug. The only way out is a
   line in the PR body, `No tests needed: <reason>`, and the reason has to be about this change.
 - **Say what you ran, and show it.** The PR template's *How it was verified* section lists the
@@ -207,9 +208,9 @@ The differences are real, not cosmetic — the three that bite hardest:
   a store that can never answer (Battle.net) shows its games saying so. Adding a claim about the
   player's library without a store behind it is the one bug class `cellar selftest` covers directly.
 
-Encode any such difference in **`GameStore.descriptor`** (`app/src/CellarDomain/Store/StoreDescriptor.swift`), never as a
+Encode any such difference in **`GameStore.descriptor`** (`app/Packages/CellarDomain/Sources/CellarDomain/Store/StoreDescriptor.swift`), never as a
 special case inside a view or a command. Adding a store = a `GameStore` case, a `*Bottle` type, a
-`StoreAdapter` (`app/src/CellarInfrastructure/Adapters/`, registered in
+`StoreAdapter` (`app/Packages/CellarKit/Sources/CellarInfrastructure/Adapters/`, registered in
 `CellarInfrastructure.install()`), and a CLI command group. Nothing else should
 need to know: the use cases (`SetUpGame`, `InstallGame`, `LaunchGame`) ask the adapter.
 
@@ -275,7 +276,7 @@ Cellar is delivered through GitHub, end to end. Full strategy: [`docs/RELEASING.
   ruleset in `.github/rulesets/main.json` enforces it.
 - **The checks are a floor, not the ladder.** CI cannot launch the app or play a real game. Climb the
   verification ladder above before enabling auto-merge, and say in the PR which rung you reached —
-  *PR checklist* fails a PR that doesn't, or that changes `app/src/` without touching `app/tests/`.
+  *PR checklist* fails a PR that doesn't, or that changes Swift without touching a test.
 - **Releases are SemVer tags (`vMAJOR.MINOR.PATCH`) we push ourselves.** The tag runs
   `release.yml`, which builds the downloads, writes the notes from the issues the release closed
   (`app/Scripts/release-notes.py`) and publishes the GitHub Release.
