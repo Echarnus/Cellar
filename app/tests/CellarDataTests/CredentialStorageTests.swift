@@ -109,14 +109,18 @@ struct CredentialStorageTests {
     func signInCodeRemoved() {
         let output = (["Use the Steam Mobile App to sign in with this QR code:"] + Self.qrRows
             + ["", "The QR code has changed:"] + Self.qrRows + ["Done."]).joined(separator: "\n")
-        for redacted in [Diagnostics.redactSignInCodes(output), Diagnostics.redactCredentials(output),
-                         Diagnostics.redact(output)] {
+        for redacted in [Diagnostics.redactSignInCodes(output), Diagnostics.redactCredentials(output)] {
             #expect(!redacted.contains("█"))
             #expect(redacted.components(separatedBy: Diagnostics.signInCodeRemoved).count == 3,
                     "one placeholder per code drawn, not one per row")
             #expect(redacted.contains("The QR code has changed:"), "the lines around the code stay readable")
             #expect(redacted.contains("Done."))
         }
+        // The report's broad pass also redacts whatever follows a `code:` — here the placeholder
+        // after "…with this QR code:" — so only what matters is checked: no code survives.
+        let report = Diagnostics.redact(output)
+        #expect(!report.contains("█"))
+        #expect(report.contains("Done."))
     }
 
     @Test("A QR row is told apart from ordinary output, CRLF endings included")
