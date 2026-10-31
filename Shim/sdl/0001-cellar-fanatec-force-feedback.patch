@@ -1,0 +1,1273 @@
+diff -ruN a/src/haptic/darwin/SDL_cellar_fanatec.c b/src/haptic/darwin/SDL_cellar_fanatec.c
+--- a/src/haptic/darwin/SDL_cellar_fanatec.c
++++ b/src/haptic/darwin/SDL_cellar_fanatec.c
+@@ -0,0 +1,861 @@
++/*
++  Cellar: force feedback for Fanatec wheel bases on macOS, driven over USB HID.
++  Added to SDL by Cellar (https://github.com/Echarnus/Cellar); not part of upstream SDL.
++
++  SPDX-License-Identifier: GPL-2.0-or-later
++  The command encoding follows the Linux hid-fanatecff driver (https://github.com/gotzl/hid-fanatecff),
++  which declares MODULE_LICENSE("GPL"): GPL v2 or later, in the kernel's terms. The effect engine
++  follows SDL's lg4ff haptic driver (zlib).
++
++  How it works. A Fanatec base has no effect memory a host can program the way DirectInput expects.
++  It has five "slots" — constant force, spring, damper, inertia, friction — each set by a 7-byte
++  output report. So the engine keeps the game's effects itself, and every 2 ms sums what is playing
++  into those five slots and sends the slots that changed. Periodic and ramp effects are computed
++  into the constant-force slot.
++
++  Safety. Every force and coefficient is scaled by the game's gain and then by Cellar's cap
++  (CELLAR_FFB_MAX_PERCENT, default 50). Destroying the engine stops every effect and sends the
++  base's stop-all command, so no force outlives the game.
++*/
++
++#ifndef CELLAR_FFB_STANDALONE
++#include "SDL_internal.h"
++#endif
++
++#include "SDL_cellar_fanatec.h"
++
++#if defined(CELLAR_FFB_STANDALONE) || defined(SDL_HAPTIC_IOKIT)
++
++/* Product IDs, from hid-fanatecff's hid-ftec.h. */
++#define FTEC_CLUBSPORT_V2   0x0001
++#define FTEC_CLUBSPORT_V25  0x0004
++#define FTEC_CSL_ELITE_PS4  0x0005
++#define FTEC_PODIUM_DD1     0x0006
++#define FTEC_PODIUM_DD2     0x0007
++#define FTEC_CSR_ELITE      0x0011
++#define FTEC_CSL_DD         0x0020 /* also GT DD Pro and ClubSport DD in PC mode */
++#define FTEC_PORSCHE_911    0x0197
++#define FTEC_CSL_ELITE      0x0E03
++
++#define FF_EFFECT_STARTED 0
++#define FF_EFFECT_ALLSET 1
++#define FF_EFFECT_PLAYING 2
++#define FF_EFFECT_UPDATING 3
++
++#define SLOT_CONSTANT 0
++#define SLOT_SPRING 1
++#define SLOT_DAMPER 2
++#define SLOT_INERTIA 3
++#define SLOT_FRICTION 4
++#define SLOT_COUNT 5
++
++typedef struct cellar_effect_state
++{
++    SDL_HapticEffect effect;
++    Uint64 start_at;
++    Uint64 play_at;
++    Uint64 stop_at;
++    Uint32 flags;
++    Uint64 time_playing;
++    Uint64 updated_at;
++    Uint32 phase;
++    Uint32 phase_adj;
++    Uint32 count;
++    double direction_gain;
++    Sint32 slope;
++    bool allocated;
++} cellar_effect_state;
++
++typedef struct cellar_parameters
++{
++    Sint32 level;
++    Sint32 d1;
++    Sint32 d2;
++    Sint32 k1;
++    Sint32 k2;
++    Uint32 clip;
++} cellar_parameters;
++
++typedef struct cellar_slot
++{
++    int id;
++    Uint32 effect_type;
++    Uint8 cmd_op;
++    Uint8 current_cmd[CELLAR_FANATEC_CMD_SIZE];
++    bool is_updated;
++} cellar_slot;
++
++struct CellarFanatec
++{
++    Uint16 product_id;
++    bool highres;
++    CellarFanatec_SendFunc send;
++    void *userdata;
++
++    cellar_effect_state states[CELLAR_FANATEC_MAX_EFFECTS];
++    cellar_slot slots[SLOT_COUNT];
++    int effects_used;
++
++    int max_percent; /* Cellar's cap, 1..100 */
++    int app_gain;    /* the game's gain, 0..100 */
++    bool paused;
++
++    SDL_Mutex *mutex;
++    SDL_Thread *thread;
++    SDL_AtomicInt stop_thread;
++};
++
++#define test_bit(bit, field) (*(field) & (1u << (bit)))
++#define set_bit(bit, field) (*(field) |= (1u << (bit)))
++#define clear_bit(bit, field) (*(field) &= ~(1u << (bit)))
++#define STOP_EFFECT(state) ((state)->flags = 0)
++
++#define CLAMP_VALUE_U16(x) ((Uint16)((x) > 0xffff ? 0xffff : ((x) < 0 ? 0 : (x))))
++#define CLAMP_VALUE_S16(x) ((Sint32)((x) <= -0x8000 ? -0x8000 : ((x) > 0x7fff ? 0x7fff : (x))))
++#define TRANSLATE_FORCE(x, bits) ((Uint32)(CLAMP_VALUE_S16(x) + 0x8000) >> (16 - (bits)))
++#define SCALE_VALUE_U16(x, bits) (CLAMP_VALUE_U16(x) >> (16 - (bits)))
++#define SCALE_COEFF(x, bits) SCALE_VALUE_U16(abs32(x) * 2, bits)
++
++static Sint32 abs32(Sint32 x) { return x < 0 ? -x : x; }
++static Sint64 abs64(Sint64 x) { return x < 0 ? -x : x; }
++static double sin_deg(double degrees) { return SDL_sin(degrees * SDL_PI_D / 180.0); }
++
++/* ---- device table ------------------------------------------------------------------------- */
++
++bool CellarFanatec_IsSupported(Uint16 vendor_id, Uint16 product_id)
++{
++    if (vendor_id != CELLAR_FANATEC_VENDOR_ID) {
++        return false;
++    }
++    switch (product_id) {
++    case FTEC_CLUBSPORT_V2:
++    case FTEC_CLUBSPORT_V25:
++    case FTEC_CSL_ELITE_PS4:
++    case FTEC_PODIUM_DD1:
++    case FTEC_PODIUM_DD2:
++    case FTEC_CSR_ELITE:
++    case FTEC_CSL_DD:
++    case FTEC_PORSCHE_911:
++    case FTEC_CSL_ELITE:
++        return true;
++    default:
++        return false;
++    }
++}
++
++bool CellarFanatec_IsHighRes(Uint16 product_id)
++{
++    switch (product_id) {
++    case FTEC_CSL_ELITE:
++    case FTEC_CSL_ELITE_PS4:
++    case FTEC_PODIUM_DD1:
++    case FTEC_PODIUM_DD2:
++    case FTEC_CSL_DD:
++        return true;
++    default:
++        return false;
++    }
++}
++
++Uint16 CellarFanatec_AutoRange(Uint16 product_id)
++{
++    /* hid-fanatecff uses the maximum range plus ten as "auto": the base follows the game. */
++    switch (product_id) {
++    case FTEC_CLUBSPORT_V2:
++    case FTEC_CLUBSPORT_V25:
++    case FTEC_CSR_ELITE:
++    case FTEC_PORSCHE_911:
++        return 900;
++    case FTEC_PODIUM_DD1:
++    case FTEC_PODIUM_DD2:
++    case FTEC_CSL_DD:
++        return 2530;
++    default:
++        return 1090;
++    }
++}
++
++int CellarFanatec_MaxPercentFromEnv(void)
++{
++    const char *value = SDL_getenv("CELLAR_FFB_MAX_PERCENT");
++    int percent;
++    if (!value || !*value) {
++        return CELLAR_FANATEC_DEFAULT_MAX_PERCENT;
++    }
++    percent = SDL_atoi(value);
++    if (percent < 1) {
++        percent = 1;
++    }
++    if (percent > 100) {
++        percent = 100;
++    }
++    return percent;
++}
++
++/* ---- effect helpers (after SDL's lg4ff driver) --------------------------------------------- */
++
++static bool effect_is_periodic(const SDL_HapticEffect *effect)
++{
++    return effect->type == SDL_HAPTIC_SINE || effect->type == SDL_HAPTIC_SQUARE ||
++           effect->type == SDL_HAPTIC_TRIANGLE || effect->type == SDL_HAPTIC_SAWTOOTHUP ||
++           effect->type == SDL_HAPTIC_SAWTOOTHDOWN;
++}
++
++static bool effect_is_condition(const SDL_HapticEffect *effect)
++{
++    return effect->type == SDL_HAPTIC_SPRING || effect->type == SDL_HAPTIC_DAMPER ||
++           effect->type == SDL_HAPTIC_INERTIA || effect->type == SDL_HAPTIC_FRICTION;
++}
++
++/* An SDL direction as Linux's 0..0xFFFF polar angle, which the engine's maths uses. */
++static Uint16 to_polar(const SDL_HapticDirection *src)
++{
++    Uint32 tmp;
++    switch (src->type) {
++    case SDL_HAPTIC_POLAR:
++        return (Uint16)(((src->dir[0] % 36000) * 0x8000) / 18000);
++    case SDL_HAPTIC_SPHERICAL:
++        tmp = ((Uint32)(src->dir[0] + 9000)) % 36000;
++        return (Uint16)((tmp * 0x8000) / 18000);
++    case SDL_HAPTIC_CARTESIAN:
++        if (!src->dir[1]) {
++            return (Uint16)(src->dir[0] >= 0 ? 0x4000 : 0xC000);
++        } else if (!src->dir[0]) {
++            return (Uint16)(src->dir[1] >= 0 ? 0x8000 : 0);
++        } else {
++            double f = SDL_atan2(src->dir[1], src->dir[0]);
++            tmp = (Uint32)((((Sint32)(f * 18000.0 / SDL_PI_D)) + 45000) % 36000);
++            return (Uint16)((tmp * 0x8000) / 18000);
++        }
++    case SDL_HAPTIC_STEERING_AXIS:
++    default:
++        return 0x4000;
++    }
++}
++
++static Uint16 effect_direction(const SDL_HapticEffect *effect)
++{
++    if (effect_is_periodic(effect)) {
++        return to_polar(&effect->periodic.direction);
++    }
++    if (effect_is_condition(effect)) {
++        return to_polar(&effect->condition.direction);
++    }
++    if (effect->type == SDL_HAPTIC_RAMP) {
++        return to_polar(&effect->ramp.direction);
++    }
++    return to_polar(&effect->constant.direction);
++}
++
++static Uint32 effect_length(const SDL_HapticEffect *effect)
++{
++    Uint32 length;
++    if (effect_is_periodic(effect)) {
++        length = effect->periodic.length;
++    } else if (effect_is_condition(effect)) {
++        length = effect->condition.length;
++    } else if (effect->type == SDL_HAPTIC_RAMP) {
++        length = effect->ramp.length;
++    } else {
++        length = effect->constant.length;
++    }
++    return length == SDL_HAPTIC_INFINITY ? 0 : length;
++}
++
++static Uint16 effect_delay(const SDL_HapticEffect *effect)
++{
++    if (effect_is_periodic(effect)) {
++        return effect->periodic.delay;
++    }
++    if (effect_is_condition(effect)) {
++        return effect->condition.delay;
++    }
++    if (effect->type == SDL_HAPTIC_RAMP) {
++        return effect->ramp.delay;
++    }
++    return effect->constant.delay;
++}
++
++static void update_state(cellar_effect_state *state, Uint64 now)
++{
++    SDL_HapticEffect *effect = &state->effect;
++    Uint32 length = effect_length(effect);
++    Uint16 direction = effect_direction(effect);
++
++    if (!test_bit(FF_EFFECT_ALLSET, &state->flags)) {
++        state->play_at = state->start_at + effect_delay(effect);
++        if (!test_bit(FF_EFFECT_UPDATING, &state->flags)) {
++            state->updated_at = state->play_at;
++        }
++        state->direction_gain = sin_deg((double)direction * 360.0 / 0x10000);
++        if (effect_is_periodic(effect)) {
++            state->phase_adj = effect->periodic.phase * 360 / effect->periodic.period;
++        }
++        if (length) {
++            state->stop_at = state->play_at + length;
++        }
++    }
++    set_bit(FF_EFFECT_ALLSET, &state->flags);
++
++    if (test_bit(FF_EFFECT_UPDATING, &state->flags)) {
++        clear_bit(FF_EFFECT_PLAYING, &state->flags);
++        state->play_at = state->updated_at + effect_delay(effect);
++        state->direction_gain = sin_deg((double)direction * 360.0 / 0x10000);
++        if (length) {
++            state->stop_at = state->updated_at + length;
++        }
++        if (effect_is_periodic(effect)) {
++            state->phase_adj = state->phase;
++        }
++    }
++    clear_bit(FF_EFFECT_UPDATING, &state->flags);
++
++    state->slope = 0;
++    if (effect->type == SDL_HAPTIC_RAMP && effect->ramp.length &&
++        (Sint32)effect->ramp.length - effect->ramp.attack_length - effect->ramp.fade_length != 0) {
++        state->slope = ((effect->ramp.end - effect->ramp.start) * 65536) /
++                       ((Sint32)effect->ramp.length - effect->ramp.attack_length - effect->ramp.fade_length);
++    }
++
++    if (!test_bit(FF_EFFECT_PLAYING, &state->flags) && now >= state->play_at &&
++        (length == 0 || now < state->stop_at)) {
++        set_bit(FF_EFFECT_PLAYING, &state->flags);
++    }
++
++    if (test_bit(FF_EFFECT_PLAYING, &state->flags)) {
++        state->time_playing = now - state->play_at;
++        if (effect_is_periodic(effect)) {
++            Uint64 phase_time = now - state->updated_at;
++            state->phase = (Uint32)((phase_time % effect->periodic.period) * 360 / effect->periodic.period);
++            state->phase += state->phase_adj % 360;
++        }
++    }
++}
++
++static Sint32 calculate_constant(cellar_effect_state *state)
++{
++    const SDL_HapticConstant *constant = &state->effect.constant;
++    Sint32 level = constant->level;
++    Sint32 level_sign, d, t;
++
++    if (state->time_playing < constant->attack_length) {
++        level_sign = level < 0 ? -1 : 1;
++        d = level - level_sign * constant->attack_level;
++        level = (Sint32)(level_sign * constant->attack_level + d * (Sint64)state->time_playing / constant->attack_length);
++    } else if (constant->length && constant->length != SDL_HAPTIC_INFINITY && constant->fade_length) {
++        t = (Sint32)(state->time_playing - constant->length + constant->fade_length);
++        if (t > 0) {
++            level_sign = level < 0 ? -1 : 1;
++            d = level - level_sign * constant->fade_level;
++            level = level - d * t / constant->fade_length;
++        }
++    }
++    return (Sint32)(state->direction_gain * level);
++}
++
++static Sint32 calculate_ramp(cellar_effect_state *state)
++{
++    const SDL_HapticRamp *ramp = &state->effect.ramp;
++    Sint32 level, level_sign, d, t;
++
++    if (state->time_playing < ramp->attack_length) {
++        level = ramp->start;
++        level_sign = level < 0 ? -1 : 1;
++        t = (Sint32)(ramp->attack_length - state->time_playing);
++        d = level - level_sign * ramp->attack_level;
++        level = level_sign * ramp->attack_level + d * t / ramp->attack_length;
++    } else if (ramp->length && ramp->fade_length && state->time_playing >= (Uint64)(ramp->length - ramp->fade_length)) {
++        level = ramp->end;
++        level_sign = level < 0 ? -1 : 1;
++        t = (Sint32)(state->time_playing - ramp->length + ramp->fade_length);
++        d = level_sign * ramp->fade_level - level;
++        level = level - d * t / ramp->fade_length;
++    } else {
++        t = (Sint32)(state->time_playing - ramp->attack_length);
++        level = ramp->start + (Sint32)(((Sint64)t * state->slope) / 65536);
++    }
++    return (Sint32)(state->direction_gain * level);
++}
++
++static Sint32 calculate_periodic(cellar_effect_state *state)
++{
++    const SDL_HapticPeriodic *periodic = &state->effect.periodic;
++    Sint32 magnitude = periodic->magnitude;
++    Sint32 magnitude_sign = magnitude < 0 ? -1 : 1;
++    Sint32 level = periodic->offset;
++    Sint32 d, t;
++
++    if (state->time_playing < periodic->attack_length) {
++        d = magnitude - magnitude_sign * periodic->attack_level;
++        magnitude = (Sint32)(magnitude_sign * periodic->attack_level + d * (Sint64)state->time_playing / periodic->attack_length);
++    } else if (periodic->length && periodic->length != SDL_HAPTIC_INFINITY && periodic->fade_length) {
++        t = (Sint32)(state->time_playing - periodic->length + periodic->fade_length);
++        if (t > 0) {
++            d = magnitude - magnitude_sign * periodic->fade_level;
++            magnitude = magnitude - d * t / periodic->fade_length;
++        }
++    }
++
++    switch (periodic->type) {
++    case SDL_HAPTIC_SINE:
++        level += (Sint32)(sin_deg(state->phase) * magnitude);
++        break;
++    case SDL_HAPTIC_SQUARE:
++        level += (state->phase < 180 ? 1 : -1) * magnitude;
++        break;
++    case SDL_HAPTIC_TRIANGLE:
++        level += (Sint32)(abs64((Sint64)state->phase * magnitude * 2 / 360 - magnitude) * 2 - magnitude);
++        break;
++    case SDL_HAPTIC_SAWTOOTHUP:
++        level += (Sint32)((Sint64)state->phase * magnitude * 2 / 360 - magnitude);
++        break;
++    case SDL_HAPTIC_SAWTOOTHDOWN:
++        level += (Sint32)(magnitude - (Sint64)state->phase * magnitude * 2 / 360);
++        break;
++    default:
++        break;
++    }
++    return (Sint32)(state->direction_gain * level);
++}
++
++static void calculate_condition(cellar_effect_state *state, cellar_parameters *parameters)
++{
++    const SDL_HapticCondition *condition = &state->effect.condition;
++    parameters->d1 = ((Sint32)condition->center[0]) - condition->deadband[0] / 2;
++    parameters->d2 = ((Sint32)condition->center[0]) + condition->deadband[0] / 2;
++    parameters->k1 = condition->left_coeff[0];
++    parameters->k2 = condition->right_coeff[0];
++    parameters->clip = condition->right_sat[0];
++}
++
++/* ---- Fanatec slot encoding (after hid-fanatecff's ftecff_update_slot) ---------------------- */
++
++static void update_slot(cellar_slot *slot, const cellar_parameters *parameters, bool highres)
++{
++    Uint8 original[CELLAR_FANATEC_CMD_SIZE];
++    Uint32 d1, d2;
++
++    SDL_memcpy(original, slot->current_cmd, sizeof(original));
++    SDL_memset(slot->current_cmd, 0, sizeof(slot->current_cmd));
++
++    /* Select the slot, and the effect it carries. */
++    slot->current_cmd[0] = (Uint8)((slot->id << 4) | 0x1);
++    slot->current_cmd[1] = slot->cmd_op;
++
++    if ((slot->effect_type == SDL_HAPTIC_CONSTANT && parameters->level == 0) ||
++        (slot->effect_type != SDL_HAPTIC_CONSTANT && parameters->clip == 0)) {
++        /* Nothing to play: disable the slot. */
++        slot->current_cmd[0] |= 0x2;
++        if (slot->effect_type != SDL_HAPTIC_CONSTANT && slot->effect_type != SDL_HAPTIC_SPRING) {
++            slot->current_cmd[2] = 0x00;
++            slot->current_cmd[4] = 0x00;
++            slot->current_cmd[6] = 0xff;
++        }
++    } else {
++        switch (slot->effect_type) {
++        case SDL_HAPTIC_CONSTANT:
++            if (highres) {
++                d1 = TRANSLATE_FORCE(parameters->level, 16);
++                slot->current_cmd[2] = (Uint8)(d1 & 0xff);
++                slot->current_cmd[3] = (Uint8)((d1 >> 8) & 0xff);
++                slot->current_cmd[6] = 0x01;
++            } else {
++                slot->current_cmd[2] = (Uint8)TRANSLATE_FORCE(parameters->level, 8);
++            }
++            break;
++        case SDL_HAPTIC_SPRING:
++            d1 = SCALE_VALUE_U16((parameters->d1 + 0x8000) & 0xffff, 11);
++            d2 = SCALE_VALUE_U16((parameters->d2 + 0x8000) & 0xffff, 11);
++            slot->current_cmd[2] = (Uint8)(d1 >> 3);
++            slot->current_cmd[3] = (Uint8)(d2 >> 3);
++            slot->current_cmd[4] = (Uint8)((SCALE_COEFF(parameters->k2, 4) << 4) + SCALE_COEFF(parameters->k1, 4));
++            slot->current_cmd[6] = (Uint8)SCALE_VALUE_U16((Sint32)parameters->clip, 8);
++            break;
++        default: /* damper, inertia, friction */
++            slot->current_cmd[2] = (Uint8)SCALE_COEFF(parameters->k1, 4);
++            slot->current_cmd[4] = (Uint8)SCALE_COEFF(parameters->k2, 4);
++            slot->current_cmd[6] = (Uint8)SCALE_VALUE_U16((Sint32)parameters->clip, 8);
++            break;
++        }
++    }
++
++    if (SDL_memcmp(original, slot->current_cmd, sizeof(original)) != 0) {
++        slot->is_updated = true;
++    }
++}
++
++static bool send_cmd(CellarFanatec *dev, Uint8 b0, Uint8 b1, Uint8 b2, Uint8 b3, Uint8 b4, Uint8 b5, Uint8 b6)
++{
++    const Uint8 cmd[CELLAR_FANATEC_CMD_SIZE] = { b0, b1, b2, b3, b4, b5, b6 };
++    return dev->send(dev->userdata, cmd);
++}
++
++/* Scales by the game's gain, then by Cellar's cap. */
++static Sint32 scale(const CellarFanatec *dev, Sint64 value)
++{
++    return (Sint32)(value * dev->app_gain / 100 * dev->max_percent / 100);
++}
++
++int CellarFanatec_Tick(CellarFanatec *dev, Uint64 now)
++{
++    cellar_parameters parameters[SLOT_COUNT];
++    int status = 0;
++    int count = dev->effects_used;
++    int id, i;
++
++    SDL_zeroa(parameters);
++
++    for (id = 0; id < CELLAR_FANATEC_MAX_EFFECTS && count > 0; id++) {
++        cellar_effect_state *state = &dev->states[id];
++        if (!test_bit(FF_EFFECT_STARTED, &state->flags)) {
++            continue;
++        }
++        count--;
++
++        if (test_bit(FF_EFFECT_ALLSET, &state->flags) && effect_length(&state->effect) && now >= state->stop_at) {
++            STOP_EFFECT(state);
++            if (--state->count == 0) {
++                dev->effects_used--;
++                continue;
++            }
++            set_bit(FF_EFFECT_STARTED, &state->flags);
++            state->start_at = state->stop_at;
++        }
++
++        update_state(state, now);
++        if (!test_bit(FF_EFFECT_PLAYING, &state->flags) || dev->paused) {
++            continue;
++        }
++
++        if (effect_is_periodic(&state->effect)) {
++            parameters[SLOT_CONSTANT].level += calculate_periodic(state);
++        } else {
++            switch (state->effect.type) {
++            case SDL_HAPTIC_CONSTANT:
++                parameters[SLOT_CONSTANT].level += calculate_constant(state);
++                break;
++            case SDL_HAPTIC_RAMP:
++                parameters[SLOT_CONSTANT].level += calculate_ramp(state);
++                break;
++            case SDL_HAPTIC_SPRING:
++                calculate_condition(state, &parameters[SLOT_SPRING]);
++                break;
++            case SDL_HAPTIC_DAMPER:
++                calculate_condition(state, &parameters[SLOT_DAMPER]);
++                break;
++            case SDL_HAPTIC_INERTIA:
++                calculate_condition(state, &parameters[SLOT_INERTIA]);
++                break;
++            case SDL_HAPTIC_FRICTION:
++                calculate_condition(state, &parameters[SLOT_FRICTION]);
++                break;
++            default:
++                break;
++            }
++        }
++    }
++
++    /* Clamp the sum to full scale before the cap, so effects added together never get past it. */
++    parameters[SLOT_CONSTANT].level = scale(dev, CLAMP_VALUE_S16(parameters[SLOT_CONSTANT].level));
++    for (i = SLOT_SPRING; i < SLOT_COUNT; i++) {
++        parameters[i].k1 = scale(dev, parameters[i].k1);
++        parameters[i].k2 = scale(dev, parameters[i].k2);
++        parameters[i].clip = (Uint32)scale(dev, parameters[i].clip);
++    }
++
++    for (i = 0; i < SLOT_COUNT; i++) {
++        cellar_slot *slot = &dev->slots[i];
++        update_slot(slot, &parameters[i], dev->highres);
++        if (slot->is_updated) {
++            if (!dev->send(dev->userdata, slot->current_cmd)) {
++                status = -1;
++            }
++            slot->is_updated = false;
++        }
++    }
++    return status;
++}
++
++static int SDLCALL thread_main(void *userdata)
++{
++    CellarFanatec *dev = (CellarFanatec *)userdata;
++    while (!SDL_GetAtomicInt(&dev->stop_thread)) {
++        SDL_LockMutex(dev->mutex);
++        CellarFanatec_Tick(dev, SDL_GetTicks());
++        SDL_UnlockMutex(dev->mutex);
++        SDL_Delay(2);
++    }
++    return 0;
++}
++
++/* ---- lifecycle ------------------------------------------------------------------------------ */
++
++static bool init_base(CellarFanatec *dev)
++{
++    Uint16 range = CellarFanatec_AutoRange(dev->product_id);
++    bool ok = true;
++    int i;
++
++    /* hid-fanatecff's init sequence, then the "auto" range so the base drops its own centring. */
++    ok &= send_cmd(dev, 0xf8, 0x09, 0x01, 0x06, 0xff, 0x01, 0x00);
++    ok &= send_cmd(dev, 0xf8, 0x09, 0x01, 0x06, 0xff, 0x00, 0x00);
++    ok &= send_cmd(dev, 0xf8, 0x09, 0x01, 0x06, 0xff, 0x04, 0x00);
++    ok &= send_cmd(dev, 0xf5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
++    ok &= send_cmd(dev, 0xf8, 0x09, 0x01, 0x06, 0x01, 0x00, 0x00);
++    ok &= send_cmd(dev, 0xf8, 0x81, (Uint8)(range & 0xff), (Uint8)(range >> 8), 0x00, 0x00, 0x00);
++
++    /* Every slot starts disabled. */
++    for (i = 0; i < SLOT_COUNT; i++) {
++        cellar_parameters none;
++        SDL_zero(none);
++        dev->slots[i].id = i;
++        update_slot(&dev->slots[i], &none, dev->highres);
++        ok &= dev->send(dev->userdata, dev->slots[i].current_cmd);
++        dev->slots[i].is_updated = false;
++    }
++    return ok;
++}
++
++CellarFanatec *CellarFanatec_Create(Uint16 product_id, CellarFanatec_SendFunc send, void *userdata,
++                                    int max_percent, bool run_thread)
++{
++    CellarFanatec *dev = (CellarFanatec *)SDL_calloc(1, sizeof(*dev));
++    if (!dev) {
++        return NULL;
++    }
++    dev->product_id = product_id;
++    dev->highres = CellarFanatec_IsHighRes(product_id);
++    dev->send = send;
++    dev->userdata = userdata;
++    dev->max_percent = max_percent < 1 ? 1 : (max_percent > 100 ? 100 : max_percent);
++    dev->app_gain = 100;
++
++    dev->slots[SLOT_CONSTANT].effect_type = SDL_HAPTIC_CONSTANT;
++    dev->slots[SLOT_SPRING].effect_type = SDL_HAPTIC_SPRING;
++    dev->slots[SLOT_DAMPER].effect_type = SDL_HAPTIC_DAMPER;
++    dev->slots[SLOT_INERTIA].effect_type = SDL_HAPTIC_INERTIA;
++    dev->slots[SLOT_FRICTION].effect_type = SDL_HAPTIC_FRICTION;
++    dev->slots[SLOT_CONSTANT].cmd_op = 0x08;
++    dev->slots[SLOT_SPRING].cmd_op = 0x0b;
++    dev->slots[SLOT_DAMPER].cmd_op = 0x0c;
++    dev->slots[SLOT_INERTIA].cmd_op = 0x0c;
++    dev->slots[SLOT_FRICTION].cmd_op = 0x0c;
++
++    if (!init_base(dev)) {
++        SDL_free(dev);
++        SDL_SetError("Fanatec: the wheel base did not take its init commands");
++        return NULL;
++    }
++
++    dev->mutex = SDL_CreateMutex();
++    if (!dev->mutex) {
++        SDL_free(dev);
++        return NULL;
++    }
++    if (run_thread) {
++        SDL_SetAtomicInt(&dev->stop_thread, 0);
++        dev->thread = SDL_CreateThread(thread_main, "CellarFanatecFFB", dev);
++        if (!dev->thread) {
++            SDL_DestroyMutex(dev->mutex);
++            SDL_free(dev);
++            return NULL;
++        }
++    }
++    return dev;
++}
++
++void CellarFanatec_Destroy(CellarFanatec *dev)
++{
++    int i;
++    if (!dev) {
++        return;
++    }
++    if (dev->thread) {
++        SDL_SetAtomicInt(&dev->stop_thread, 1);
++        SDL_WaitThread(dev->thread, NULL);
++        dev->thread = NULL;
++    }
++    /* No force outlives the game: every slot off, then the base's own stop-all. */
++    for (i = 0; i < CELLAR_FANATEC_MAX_EFFECTS; i++) {
++        STOP_EFFECT(&dev->states[i]);
++    }
++    dev->effects_used = 0;
++    CellarFanatec_Tick(dev, 0);
++    send_cmd(dev, 0xf3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
++    SDL_DestroyMutex(dev->mutex);
++    SDL_free(dev);
++}
++
++Uint32 CellarFanatec_GetFeatures(void)
++{
++    return SDL_HAPTIC_CONSTANT | SDL_HAPTIC_SINE | SDL_HAPTIC_SQUARE | SDL_HAPTIC_TRIANGLE |
++           SDL_HAPTIC_SAWTOOTHUP | SDL_HAPTIC_SAWTOOTHDOWN | SDL_HAPTIC_RAMP | SDL_HAPTIC_SPRING |
++           SDL_HAPTIC_DAMPER | SDL_HAPTIC_INERTIA | SDL_HAPTIC_FRICTION | SDL_HAPTIC_GAIN |
++           SDL_HAPTIC_STATUS | SDL_HAPTIC_PAUSE;
++}
++
++int CellarFanatec_NumEffects(void)
++{
++    return CELLAR_FANATEC_MAX_EFFECTS;
++}
++
++/* ---- effect calls --------------------------------------------------------------------------- */
++
++static bool valid_id(CellarFanatec *dev, int id)
++{
++    return id >= 0 && id < CELLAR_FANATEC_MAX_EFFECTS && dev->states[id].allocated;
++}
++
++static bool supported(const SDL_HapticEffect *effect)
++{
++    if (!(CellarFanatec_GetFeatures() & effect->type)) {
++        return false;
++    }
++    if (effect_is_periodic(effect) && effect->periodic.period == 0) {
++        return false;
++    }
++    return true;
++}
++
++int CellarFanatec_NewEffect(CellarFanatec *dev, const SDL_HapticEffect *effect)
++{
++    int id = -1, i;
++    if (!supported(effect)) {
++        SDL_SetError("Fanatec: effect type not supported");
++        return -1;
++    }
++    SDL_LockMutex(dev->mutex);
++    for (i = 0; i < CELLAR_FANATEC_MAX_EFFECTS; i++) {
++        if (!dev->states[i].allocated) {
++            SDL_zero(dev->states[i]);
++            dev->states[i].allocated = true;
++            dev->states[i].effect = *effect;
++            id = i;
++            break;
++        }
++    }
++    SDL_UnlockMutex(dev->mutex);
++    if (id < 0) {
++        SDL_SetError("Fanatec: no free effect slot");
++    }
++    return id;
++}
++
++bool CellarFanatec_UpdateEffect(CellarFanatec *dev, int id, const SDL_HapticEffect *effect)
++{
++    cellar_effect_state *state;
++    if (!valid_id(dev, id) || !supported(effect)) {
++        return SDL_SetError("Fanatec: invalid effect");
++    }
++    SDL_LockMutex(dev->mutex);
++    state = &dev->states[id];
++    if (test_bit(FF_EFFECT_STARTED, &state->flags) && effect->type != state->effect.type) {
++        SDL_UnlockMutex(dev->mutex);
++        return SDL_SetError("Fanatec: an effect's type cannot change while it plays");
++    }
++    state->effect = *effect;
++    if (test_bit(FF_EFFECT_STARTED, &state->flags)) {
++        set_bit(FF_EFFECT_UPDATING, &state->flags);
++        state->updated_at = SDL_GetTicks();
++    }
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++bool CellarFanatec_RunEffect(CellarFanatec *dev, int id, Uint32 iterations)
++{
++    cellar_effect_state *state;
++    if (!valid_id(dev, id)) {
++        return SDL_SetError("Fanatec: invalid effect");
++    }
++    SDL_LockMutex(dev->mutex);
++    state = &dev->states[id];
++    if (test_bit(FF_EFFECT_STARTED, &state->flags)) {
++        STOP_EFFECT(state);
++    } else {
++        dev->effects_used++;
++    }
++    set_bit(FF_EFFECT_STARTED, &state->flags);
++    state->start_at = SDL_GetTicks();
++    state->count = (iterations == SDL_HAPTIC_INFINITY || iterations == 0) ? 0xffffffffu : iterations;
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++bool CellarFanatec_StopEffect(CellarFanatec *dev, int id)
++{
++    cellar_effect_state *state;
++    if (!valid_id(dev, id)) {
++        return SDL_SetError("Fanatec: invalid effect");
++    }
++    SDL_LockMutex(dev->mutex);
++    state = &dev->states[id];
++    if (test_bit(FF_EFFECT_STARTED, &state->flags)) {
++        STOP_EFFECT(state);
++        dev->effects_used--;
++    }
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++void CellarFanatec_DestroyEffect(CellarFanatec *dev, int id)
++{
++    if (!valid_id(dev, id)) {
++        return;
++    }
++    CellarFanatec_StopEffect(dev, id);
++    SDL_LockMutex(dev->mutex);
++    dev->states[id].allocated = false;
++    SDL_UnlockMutex(dev->mutex);
++}
++
++int CellarFanatec_GetEffectStatus(CellarFanatec *dev, int id)
++{
++    int playing;
++    if (!valid_id(dev, id)) {
++        SDL_SetError("Fanatec: invalid effect");
++        return -1;
++    }
++    SDL_LockMutex(dev->mutex);
++    playing = test_bit(FF_EFFECT_STARTED, &dev->states[id].flags) ? 1 : 0;
++    SDL_UnlockMutex(dev->mutex);
++    return playing;
++}
++
++bool CellarFanatec_SetGain(CellarFanatec *dev, int gain)
++{
++    SDL_LockMutex(dev->mutex);
++    dev->app_gain = gain < 0 ? 0 : (gain > 100 ? 100 : gain);
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++bool CellarFanatec_StopAll(CellarFanatec *dev)
++{
++    int i;
++    SDL_LockMutex(dev->mutex);
++    for (i = 0; i < CELLAR_FANATEC_MAX_EFFECTS; i++) {
++        STOP_EFFECT(&dev->states[i]);
++    }
++    dev->effects_used = 0;
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++bool CellarFanatec_Pause(CellarFanatec *dev)
++{
++    SDL_LockMutex(dev->mutex);
++    dev->paused = true;
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++bool CellarFanatec_Resume(CellarFanatec *dev)
++{
++    SDL_LockMutex(dev->mutex);
++    dev->paused = false;
++    SDL_UnlockMutex(dev->mutex);
++    return true;
++}
++
++#endif /* CELLAR_FFB_STANDALONE || SDL_HAPTIC_IOKIT */
+diff -ruN a/src/haptic/darwin/SDL_cellar_fanatec.h b/src/haptic/darwin/SDL_cellar_fanatec.h
+--- a/src/haptic/darwin/SDL_cellar_fanatec.h
++++ b/src/haptic/darwin/SDL_cellar_fanatec.h
+@@ -0,0 +1,69 @@
++/*
++  Cellar: force feedback for Fanatec wheel bases on macOS, driven over USB HID.
++  Added to SDL by Cellar (https://github.com/Echarnus/Cellar); not part of upstream SDL.
++
++  SPDX-License-Identifier: GPL-2.0-or-later
++  The command encoding follows the Linux hid-fanatecff driver (https://github.com/gotzl/hid-fanatecff),
++  which declares MODULE_LICENSE("GPL"): GPL v2 or later, in the kernel's terms. The effect engine
++  follows SDL's lg4ff haptic driver (zlib). This file and its .c are therefore distributed under the
++  GPL, version 2 or later, as part of Cellar's SDL build.
++*/
++
++#ifndef SDL_cellar_fanatec_h_
++#define SDL_cellar_fanatec_h_
++
++#ifdef CELLAR_FFB_STANDALONE
++#include <SDL3/SDL.h>
++#endif
++
++#define CELLAR_FANATEC_VENDOR_ID 0x0eb7
++#define CELLAR_FANATEC_MAX_EFFECTS 16
++#define CELLAR_FANATEC_CMD_SIZE 7
++/* Default strength cap, in percent of the base's maximum torque. A direct-drive base at full
++   strength can hurt a hand; the player raises it on purpose (CELLAR_FFB_MAX_PERCENT). */
++#define CELLAR_FANATEC_DEFAULT_MAX_PERCENT 50
++
++/* Writes one 7-byte Fanatec command to the base. Returns false on failure. */
++typedef bool (*CellarFanatec_SendFunc)(void *userdata, const Uint8 cmd[CELLAR_FANATEC_CMD_SIZE]);
++
++typedef struct CellarFanatec CellarFanatec;
++
++/* Whether a vendor/product pair is a Fanatec wheel base with force feedback. */
++bool CellarFanatec_IsSupported(Uint16 vendor_id, Uint16 product_id);
++
++/* Whether the base takes 16-bit constant force (the DD and CSL Elite generations). */
++bool CellarFanatec_IsHighRes(Uint16 product_id);
++
++/* The steering range that tells the base to follow the game ("auto"), per hid-fanatecff. */
++Uint16 CellarFanatec_AutoRange(Uint16 product_id);
++
++/* The strength cap from CELLAR_FFB_MAX_PERCENT, clamped to 1..100; the default when unset. */
++int CellarFanatec_MaxPercentFromEnv(void);
++
++/* Opens the engine: sends the base's init sequence, disables every slot, and (with run_thread)
++   starts the 2 ms update thread. Returns NULL and sets an SDL error on failure. */
++CellarFanatec *CellarFanatec_Create(Uint16 product_id, CellarFanatec_SendFunc send, void *userdata,
++                                    int max_percent, bool run_thread);
++
++/* Stops every effect, tells the base to stop, joins the thread and frees the engine. */
++void CellarFanatec_Destroy(CellarFanatec *dev);
++
++Uint32 CellarFanatec_GetFeatures(void);
++int CellarFanatec_NumEffects(void);
++
++/* Effect calls, mirroring SDL_SYS_Haptic*. Ids are slots in 0..CELLAR_FANATEC_MAX_EFFECTS-1. */
++int CellarFanatec_NewEffect(CellarFanatec *dev, const SDL_HapticEffect *effect);
++bool CellarFanatec_UpdateEffect(CellarFanatec *dev, int id, const SDL_HapticEffect *effect);
++bool CellarFanatec_RunEffect(CellarFanatec *dev, int id, Uint32 iterations);
++bool CellarFanatec_StopEffect(CellarFanatec *dev, int id);
++void CellarFanatec_DestroyEffect(CellarFanatec *dev, int id);
++int CellarFanatec_GetEffectStatus(CellarFanatec *dev, int id);
++bool CellarFanatec_SetGain(CellarFanatec *dev, int gain);
++bool CellarFanatec_StopAll(CellarFanatec *dev);
++bool CellarFanatec_Pause(CellarFanatec *dev);
++bool CellarFanatec_Resume(CellarFanatec *dev);
++
++/* One engine step at time now_ms: what the thread does every 2 ms. Exposed for tests. */
++int CellarFanatec_Tick(CellarFanatec *dev, Uint64 now_ms);
++
++#endif /* SDL_cellar_fanatec_h_ */
+diff -ruN a/src/haptic/darwin/SDL_syshaptic.c b/src/haptic/darwin/SDL_syshaptic.c
+--- a/src/haptic/darwin/SDL_syshaptic.c
++++ b/src/haptic/darwin/SDL_syshaptic.c
+@@ -18,6 +18,10 @@
+      misrepresented as being the original software.
+   3. This notice may not be removed or altered from any source distribution.
+ */
++/*
++  Altered by Cellar (https://github.com/Echarnus/Cellar): Fanatec wheel bases are driven over HID by
++  SDL_cellar_fanatec.c instead of ForceFeedback.framework. Not part of upstream SDL.
++*/
+ #include "SDL_internal.h"
+ 
+ #ifdef SDL_HAPTIC_IOKIT
+@@ -26,6 +30,7 @@
+ #include "../../joystick/SDL_sysjoystick.h"            // For the real SDL_Joystick
+ #include "../../joystick/darwin/SDL_iokitjoystick_c.h" // For joystick hwdata
+ #include "SDL_syshaptic_c.h"
++#include "SDL_cellar_fanatec.h" // Cellar: Fanatec force feedback over HID
+ 
+ #include <IOKit/IOKitLib.h>
+ #include <IOKit/hid/IOHIDKeys.h>
+@@ -62,6 +67,12 @@
+ {
+     FFDeviceObjectReference device; // Hardware device.
+     UInt8 axes[3];
++
++    /* Cellar: a Fanatec base has no ForceFeedback plug-in on Apple Silicon, so SDL_cellar_fanatec.c
++       drives it with HID output reports instead. Set only for such a base; `device` is then NULL. */
++    CellarFanatec *cellar_fanatec;
++    IOHIDDeviceRef cellar_device;
++    CFIndex cellar_report_id;
+ };
+ 
+ /*
+@@ -71,6 +82,7 @@
+ {
+     FFEffectObjectReference ref; // Reference.
+     struct FFEFFECT effect;      // Hardware effect.
++    int cellar_id;               // Cellar: the effect's id in the Fanatec engine
+ };
+ 
+ /*
+@@ -583,6 +595,109 @@
+ }
+ 
+ /*
++ * Cellar: Fanatec wheel bases, driven over HID by SDL_cellar_fanatec.c.
++ */
++#ifdef SDL_JOYSTICK_IOKIT
++static Uint16 CellarHIDProperty(IOHIDDeviceRef device, CFStringRef key)
++{
++    CFTypeRef ref = IOHIDDeviceGetProperty(device, key);
++    int value = 0;
++    if (ref && CFGetTypeID(ref) == CFNumberGetTypeID()) {
++        CFNumberGetValue((CFNumberRef)ref, kCFNumberIntType, &value);
++    }
++    return (Uint16)value;
++}
++
++static bool CellarIsFanatecJoystick(SDL_Joystick *joystick)
++{
++    IOHIDDeviceRef device;
++    if (joystick->driver != &SDL_DARWIN_JoystickDriver || !joystick->hwdata || !joystick->hwdata->deviceRef) {
++        return false;
++    }
++    if (SDL_GetHintBoolean("CELLAR_FFB_DISABLE", false)) {
++        return false;
++    }
++    device = joystick->hwdata->deviceRef;
++    return CellarFanatec_IsSupported(CellarHIDProperty(device, CFSTR(kIOHIDVendorIDKey)),
++                                     CellarHIDProperty(device, CFSTR(kIOHIDProductIDKey)));
++}
++
++// The report the base takes commands on: its first output report, as hid-fanatecff uses.
++static CFIndex CellarFanatecReportID(IOHIDDeviceRef device)
++{
++    CFIndex report_id = 1;
++    CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
++    if (elements) {
++        CFIndex i, count = CFArrayGetCount(elements);
++        for (i = 0; i < count; i++) {
++            IOHIDElementRef element = (IOHIDElementRef)CFArrayGetValueAtIndex(elements, i);
++            if (IOHIDElementGetType(element) == kIOHIDElementTypeOutput) {
++                report_id = (CFIndex)IOHIDElementGetReportID(element);
++                break;
++            }
++        }
++        CFRelease(elements);
++    }
++    return report_id;
++}
++
++static bool CellarFanatecSend(void *userdata, const Uint8 cmd[CELLAR_FANATEC_CMD_SIZE])
++{
++    struct haptic_hwdata *hwdata = (struct haptic_hwdata *)userdata;
++    Uint8 report[1 + CELLAR_FANATEC_CMD_SIZE];
++    const Uint8 *data = cmd;
++    CFIndex length = CELLAR_FANATEC_CMD_SIZE;
++
++    // With report IDs, macOS expects the ID as the first byte of the buffer.
++    if (hwdata->cellar_report_id != 0) {
++        report[0] = (Uint8)hwdata->cellar_report_id;
++        SDL_memcpy(&report[1], cmd, CELLAR_FANATEC_CMD_SIZE);
++        data = report;
++        length = sizeof(report);
++    }
++    return IOHIDDeviceSetReport(hwdata->cellar_device, kIOHIDReportTypeOutput, hwdata->cellar_report_id,
++                                data, length) == kIOReturnSuccess;
++}
++
++static bool CellarFanatecOpen(SDL_Haptic *haptic, SDL_Joystick *joystick)
++{
++    IOHIDDeviceRef device = joystick->hwdata->deviceRef;
++    struct haptic_hwdata *hwdata = (struct haptic_hwdata *)SDL_calloc(1, sizeof(*hwdata));
++    if (!hwdata) {
++        return false;
++    }
++    hwdata->cellar_device = (IOHIDDeviceRef)CFRetain(device);
++    hwdata->cellar_report_id = CellarFanatecReportID(device);
++    hwdata->cellar_fanatec = CellarFanatec_Create(CellarHIDProperty(device, CFSTR(kIOHIDProductIDKey)),
++                                                  CellarFanatecSend, hwdata,
++                                                  CellarFanatec_MaxPercentFromEnv(), true);
++    if (!hwdata->cellar_fanatec) {
++        CFRelease(hwdata->cellar_device);
++        SDL_free(hwdata);
++        return false;
++    }
++
++    haptic->effects = (struct haptic_effect *)SDL_calloc(CellarFanatec_NumEffects(), sizeof(struct haptic_effect));
++    if (!haptic->effects) {
++        CellarFanatec_Destroy(hwdata->cellar_fanatec);
++        CFRelease(hwdata->cellar_device);
++        SDL_free(hwdata);
++        return false;
++    }
++    haptic->hwdata = hwdata;
++    haptic->instance_id = SDL_GetNextObjectID();
++    haptic->name = SDL_strdup(joystick->name ? joystick->name : "Fanatec wheel base");
++    haptic->supported = CellarFanatec_GetFeatures();
++    haptic->neffects = CellarFanatec_NumEffects();
++    haptic->nplaying = haptic->neffects;
++    haptic->naxes = 1;
++    return true;
++}
++#endif // SDL_JOYSTICK_IOKIT
++
++#define CELLAR_FANATEC(haptic) ((haptic)->hwdata ? (haptic)->hwdata->cellar_fanatec : NULL)
++
++/*
+  * Checks to see if a joystick has haptic features.
+  */
+ bool SDL_SYS_JoystickIsHaptic(SDL_Joystick *joystick)
+@@ -591,6 +706,9 @@
+     if (joystick->driver != &SDL_DARWIN_JoystickDriver) {
+         return false;
+     }
++    if (CellarIsFanatecJoystick(joystick)) {
++        return true;
++    }
+     if (joystick->hwdata->ffservice != 0) {
+         return true;
+     }
+@@ -607,6 +725,9 @@
+     if (joystick->driver != &SDL_DARWIN_JoystickDriver) {
+         return false;
+     }
++    if (CELLAR_FANATEC(haptic)) {
++        return haptic->hwdata->cellar_device == joystick->hwdata->deviceRef;
++    }
+     if (IOObjectIsEqualTo((io_object_t)((size_t)haptic->hwdata->device),
+                           joystick->hwdata->ffservice)) {
+         return true;
+@@ -626,6 +747,9 @@
+     if (joystick->driver != &SDL_DARWIN_JoystickDriver) {
+         return false;
+     }
++    if (CellarIsFanatecJoystick(joystick)) {
++        return CellarFanatecOpen(haptic, joystick);
++    }
+     for (item = SDL_hapticlist; item; item = item->next) {
+         if (IOObjectIsEqualTo((io_object_t)item->dev,
+                               joystick->hwdata->ffservice)) {
+@@ -649,6 +773,17 @@
+  */
+ void SDL_SYS_HapticClose(SDL_Haptic *haptic)
+ {
++    if (CELLAR_FANATEC(haptic)) {
++        // Stops every effect and the base itself before anything is freed.
++        CellarFanatec_Destroy(haptic->hwdata->cellar_fanatec);
++        CFRelease(haptic->hwdata->cellar_device);
++        SDL_free(haptic->effects);
++        haptic->effects = NULL;
++        haptic->neffects = 0;
++        SDL_free(haptic->hwdata);
++        haptic->hwdata = NULL;
++        return;
++    }
+     if (haptic->hwdata) {
+ 
+         // Free Effects.
+@@ -1117,6 +1252,20 @@
+     HRESULT ret;
+     CFUUIDRef type;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        int id = CellarFanatec_NewEffect(haptic->hwdata->cellar_fanatec, base);
++        if (id < 0) {
++            return false;
++        }
++        effect->hweffect = (struct haptic_hweffect *)SDL_calloc(1, sizeof(struct haptic_hweffect));
++        if (!effect->hweffect) {
++            CellarFanatec_DestroyEffect(haptic->hwdata->cellar_fanatec, id);
++            return false;
++        }
++        effect->hweffect->cellar_id = id;
++        return true;
++    }
++
+     // Alloc the effect.
+     effect->hweffect = (struct haptic_hweffect *)
+         SDL_calloc(1, sizeof(struct haptic_hweffect));
+@@ -1165,6 +1314,10 @@
+     FFEffectParameterFlag flags;
+     FFEFFECT temp;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return CellarFanatec_UpdateEffect(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id, data);
++    }
++
+     // Get the effect.
+     SDL_zero(temp);
+     if (!SDL_SYS_ToFFEFFECT(haptic, &temp, data)) {
+@@ -1207,6 +1360,10 @@
+     HRESULT ret;
+     Uint32 iter;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return CellarFanatec_RunEffect(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id, iterations);
++    }
++
+     // Check if it's infinite.
+     if (iterations == SDL_HAPTIC_INFINITY) {
+         iter = FF_INFINITE;
+@@ -1231,6 +1388,10 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return CellarFanatec_StopEffect(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id);
++    }
++
+     ret = FFEffectStop(effect->hweffect->ref);
+     if (ret != FF_OK) {
+         return SDL_SetError("Haptic: Unable to stop the effect: %s.",
+@@ -1247,6 +1408,13 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        CellarFanatec_DestroyEffect(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id);
++        SDL_free(effect->hweffect);
++        effect->hweffect = NULL;
++        return;
++    }
++
+     ret = FFDeviceReleaseEffect(haptic->hwdata->device, effect->hweffect->ref);
+     if (ret != FF_OK) {
+         SDL_SetError("Haptic: Error removing the effect from the device: %s.",
+@@ -1267,6 +1435,10 @@
+     HRESULT ret;
+     FFEffectStatusFlag status;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return CellarFanatec_GetEffectStatus(haptic->hwdata->cellar_fanatec, effect->hweffect->cellar_id);
++    }
++
+     ret = FFEffectGetEffectStatus(effect->hweffect->ref, &status);
+     if (ret != FF_OK) {
+         SDL_SetError("Haptic: Unable to get effect status: %s.", FFStrError(ret));
+@@ -1287,6 +1459,10 @@
+     HRESULT ret;
+     Uint32 val;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return CellarFanatec_SetGain(haptic->hwdata->cellar_fanatec, gain);
++    }
++
+     val = gain * 100; // macOS uses 0 to 10,000
+     ret = FFDeviceSetForceFeedbackProperty(haptic->hwdata->device,
+                                            FFPROP_FFGAIN, &val);
+@@ -1305,6 +1481,10 @@
+     HRESULT ret;
+     Uint32 val;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return SDL_Unsupported(); // never advertised: the base's own centring stays off
++    }
++
+     // macOS only has 0 (off) and 1 (on)
+     if (autocenter == 0) {
+         val = 0;
+@@ -1329,6 +1509,10 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return CellarFanatec_Pause(haptic->hwdata->cellar_fanatec);
++    }
++
+     ret = FFDeviceSendForceFeedbackCommand(haptic->hwdata->device,
+                                            FFSFFC_PAUSE);
+     if (ret != FF_OK) {
+@@ -1345,6 +1529,10 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return CellarFanatec_Resume(haptic->hwdata->cellar_fanatec);
++    }
++
+     ret = FFDeviceSendForceFeedbackCommand(haptic->hwdata->device,
+                                            FFSFFC_CONTINUE);
+     if (ret != FF_OK) {
+@@ -1361,6 +1549,10 @@
+ {
+     HRESULT ret;
+ 
++    if (CELLAR_FANATEC(haptic)) {
++        return CellarFanatec_StopAll(haptic->hwdata->cellar_fanatec);
++    }
++
+     ret = FFDeviceSendForceFeedbackCommand(haptic->hwdata->device,
+                                            FFSFFC_STOPALL);
+     if (ret != FF_OK) {
