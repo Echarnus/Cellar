@@ -6,15 +6,17 @@ auto-discovered copy is `.claude/skills/cellar-ci/SKILL.md`. Read [`../AGENTS.md
 
 ## What runs, and when
 
-| Workflow | Trigger | Does |
-|---|---|---|
-| `ci.yml` | push to `main`, every PR, manual | Release build → `cellar selftest` → generate the site as a sanity check. On `macos-15`. |
-| `release.yml` | a `v*` tag, or manual with a version | `package.sh` (app + CLI zips) → `make-dmg.sh` → upload artifacts → publish a GitHub Release. |
-| `pages.yml` | push to `main` touching `profiles/**` or the generator | Regenerates the site and deploys to GitHub Pages. |
+The full table, and the delivery flow it serves (issue → PR → auto-merge → tag → release), is in
+[`../docs/RELEASING.md`](../docs/RELEASING.md) → *Checks*. In short: `ci.yml` (build, tests,
+self-test, lint), `codeql.yml`, `dependency-review.yml` and `scorecard.yml` guard every PR;
+`release.yml` turns a `v*` tag into a GitHub Release whose notes come from the issues it closed;
+`pages.yml` publishes the site; `labels.yml` applies `.github/labels.yml`;
+`dependabot-auto-merge.yml` merges patch and minor dependency bumps once they are green.
 
-The runners are **pinned to `macos-15`**, not `macos-latest`. Keep it that way — `-latest` moves and
-takes the Xcode/Swift toolchain with it, which is exactly the variable this project cannot afford to
-have drift silently. Bumping it is a deliberate change, verified by a green build.
+The runners are **pinned to `macos-15`/`macos-26`** and `ubuntu-24.04`, not `-latest`. Keep it that way —
+`-latest` moves and takes the Xcode/Swift toolchain with it, which is exactly the variable this
+project cannot afford to have drift silently. Bumping it is a deliberate change, verified by a
+green build.
 
 ## Security: the four things to get right
 
@@ -22,24 +24,20 @@ CI is the softest target in any repo — it holds a write-capable token and runs
 
 1. **Declare least-privilege `permissions:` on every workflow.** A workflow with no `permissions:`
    block inherits the repository default, which is frequently read *and write* for `GITHUB_TOKEN`.
-   `release.yml` correctly declares `contents: write`; `pages.yml` correctly declares
-   `contents: read` + `pages: write` + `id-token: write`. **`ci.yml` declares nothing** — it only
-   builds, so it should say `permissions: contents: read`. Elevate per-job, never globally.
+   Every workflow sets `contents: read` at the top and elevates per job: only `release.yml`'s
+   publish job holds `contents: write`, only `pages.yml`'s deploy job holds `pages: write`.
 2. **Pin third-party actions to a full commit SHA, not a tag.** Tags are mutable: an attacker who
    gets push access can move `v2` to malicious code and every pipeline picks it up on the next run.
    This is not theoretical — in March 2026 the `trivy-action` tags were force-pushed en masse to
-   exfiltrate secrets from every repo that ran them. **`softprops/action-gh-release@v2` in
-   `release.yml` is our third-party action and the one that matters most**, because it runs in the
-   job that holds `contents: write`. Pin it as
-   `softprops/action-gh-release@<40-char-sha>  # v2.x.y`, keeping the version in a comment so the
-   next person knows what they are updating. GitHub's own `actions/*` are lower risk but pinning them
-   costs nothing.
+   exfiltrate secrets from every repo that ran them. Every action here is pinned as
+   `owner/action@<40-char-sha> # vX.Y.Z`, and Dependabot moves SHA and comment together. The release
+   job publishes with the runner's own `gh` rather than a third-party action, so nothing outside
+   GitHub runs while `contents: write` is held. Tools a workflow downloads (actionlint) are fetched
+   by exact version and checked against a SHA-256.
 3. **Never interpolate `${{ … }}` directly into a `run:` block.** The expression is substituted into
-   the shell *before* it runs, so any quote or `;` in the value becomes code. `release.yml` does this
-   with `github.event.inputs.version` and with `steps.v.outputs.version`. Only someone who can
-   dispatch the workflow controls that input today, so this is a hardening fix rather than an open
-   hole — but it is the exact pattern that becomes a vulnerability the moment a value comes from a
-   PR title, branch name or issue body. Pass through the environment instead:
+   the shell *before* it runs, so any quote or `;` in the value becomes code — the exact pattern
+   that becomes a vulnerability the moment a value comes from a PR title, branch name or issue body.
+   None of the workflows do it; keep it that way. Pass through the environment instead:
 
    ```yaml
    - name: Package
@@ -56,23 +54,21 @@ CI is the softest target in any repo — it holds a write-capable token and runs
 ## Reliability
 
 - **Set `timeout-minutes` on every job.** The default is 6 hours; a hung `swift build` or a
-  `wineserver` that never exits will happily burn all of it. Ten to twenty minutes is generous here.
-- **`concurrency` is right for CI, wrong for deploys.** `ci.yml` cancelling superseded runs of the
-  same ref is exactly what you want. `pages.yml` currently sets `cancel-in-progress: true` on the
-  `pages` group — for a *deployment* that means a half-finished deploy can be cancelled mid-flight.
-  GitHub's own Pages guidance is `cancel-in-progress: false`: let the running deploy finish and queue
-  the next.
-- **`release.yml` has no `concurrency` group.** Two tags pushed close together race on the same
-  release artifacts. A group keyed on the tag is cheap insurance.
+  `wineserver` that never exits will happily burn all of it.
+- **`concurrency` is right for CI, wrong for deploys.** CI cancels superseded runs of a ref; Pages
+  and Release use `cancel-in-progress: false`, so a half-finished deploy or release is never cut off.
+- **Required check names are an interface.** `.github/rulesets/main.json` requires the jobs by name
+  (`Build & self-test (macos-15)`, `(macos-26)`, `Lint (workflows, shell, Python)`, `Analyze (swift)`, …). Renaming a
+  job without updating the ruleset leaves every PR waiting for a check that will never report.
 
 ## What CI does *not* check (and should)
 
 Be honest about the gate's real strength — it is "it compiled and a smoke test exited 0":
 
-- **`swift test` runs nothing** — there is no test target ([`swift.md`](swift.md)). `cellar selftest`
-  is a smoke test inside the CLI, not a suite.
-- **No `shellcheck`** on `Scripts/*.sh` ([`shell-and-packaging.md`](shell-and-packaging.md)).
-- **No lint** on `gen-site.py` ([`python.md`](python.md)).
+- **The Wine tiers never run in CI** — `Scripts/test.sh` runs the hermetic suite; `--integration`
+  and `--steam` are local rungs.
+- **ShellCheck runs at warning severity**, so style notes (`SC2012` and the like) do not fail it.
+- **Python is only compiled**, not linted ([`python.md`](python.md)).
 - **The site is generated but never inspected** — CI proves the generator doesn't crash, not that the
   page is correct. Only `tomllib` is exercised there, never the 3.9 fallback parser that this machine
   actually uses ([`profiles.md`](profiles.md)).
@@ -87,11 +83,13 @@ The release flow is documented in [`../docs/RELEASING.md`](../docs/RELEASING.md)
 (zip naming, versionless DMG, Info.plist) are in
 [`shell-and-packaging.md`](shell-and-packaging.md). Two CI-specific points:
 
-- **Artifacts are ad-hoc signed and unnotarised**, and the release body tells users to allow Cellar
+- **Artifacts are ad-hoc signed and unnotarised**, and the release notes tell users to allow Cellar
   under System Settings → Privacy & Security → Open Anyway.
-  If signing is ever added, its certificate and password are repository **secrets**, and secrets must
-  never be exposed to a `pull_request` run.
-- **The release body is user-facing copy.** It is held to the same bar as the app's text
+  Release secrets (the update-signing key now, a Developer ID later) live in the `release`
+  **environment**, which only the tag-triggered publish job enters — never in repository secrets a
+  `pull_request` run could reach.
+- **The release notes are user-facing copy.** They are written by `Scripts/release-notes.py` from
+  issue titles, so an issue title is release-note copy too. It is held to the same bar as the app's text
   ([`ux.md`](ux.md)) — say what happens, name what the player will see, no jargon.
 
 ## Verify

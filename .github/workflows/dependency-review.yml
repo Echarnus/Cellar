@@ -1,0 +1,24 @@
+name: Dependency review
+
+# Blocks a PR that adds a dependency with a known vulnerability or a licence Cellar cannot ship
+# under GPL-3.0.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          # Proprietary and non-commercial licences cannot be redistributed in a GPL-3.0 release.
+          deny-licenses: SSPL-1.0, BUSL-1.1, CC-BY-NC-4.0, CC-BY-NC-SA-4.0, CC-BY-NC-ND-4.0
