@@ -44,6 +44,9 @@ public struct VerifyGame {
     public var screenshots = true
     /// What is in the Dock right now. Replaced in tests, which have no Dock to read.
     public var dockApps: () -> [DockApps.App] = DockApps.current
+    /// Whether someone asked verify to stop (Ctrl-C). Checked between runs and every second of a
+    /// watch; the run under way is then closed down and the report written with what was done (#249).
+    public var isInterrupted: () -> Bool = { false }
 
     public init(_ plan: GamePlan, runs: Int = 1, surviveSeconds: Int = 300, sampleSeconds: TimeInterval = 10,
                 reportsRoot: URL = Paths.appSupport.appendingPathComponent("verify", isDirectory: true),
@@ -79,23 +82,61 @@ public struct VerifyGame {
                 say("Closing \(plan.store.descriptor.displayName) in the bottle first, so this run starts cold…")
                 adapter.shutDownClient(plan, wine: wine)
             }
+            // A report from the start, so even a verify that is killed outright leaves one.
+            write(makeReport(checks: [Self.judgeInterrupted(stoppedIn: nil, completed: 0, runs: runs, stillRunning: true)],
+                             attachments: [], started: started), to: folder)
             for number in 1...runs {
+                if isInterrupted() {
+                    checks.append(Self.judgeInterrupted(stoppedIn: nil, completed: number - 1, runs: runs))
+                    break
+                }
                 say("Run \(number) of \(runs): starting \(plan.name)…")
                 let (found, screenshot) = verifyOneLaunch(number: number, folder: folder, say: say)
                 checks += runs == 1 ? found : found.map { $0.inRun(number) }
                 if let screenshot { attachments.append(screenshot) }
+                if isInterrupted() {
+                    checks.append(Self.judgeInterrupted(stoppedIn: number, completed: number - 1, runs: runs))
+                    break
+                }
+                if number < runs {
+                    // What is done so far, in case verify never gets to the end (killed, the Mac
+                    // asleep): the evidence of a finished run is never lost.
+                    var sofar = checks
+                    sofar.append(Self.judgeInterrupted(stoppedIn: nil, completed: number, runs: runs, stillRunning: true))
+                    write(makeReport(checks: sofar, attachments: attachments, started: started), to: folder)
+                }
             }
         }
 
         let after = CellarSandbox.Fingerprint.of(runnersAt: Paths.runners)
         checks.append(Self.judgeRuntime(before: before, after: after))
 
-        let report = VerificationReport(
-            slug: plan.slug, name: plan.name, store: plan.store.rawValue, startedAt: started, finishedAt: Date(),
-            environment: environment(), checks: checks, attachments: attachments)
+        let report = makeReport(checks: checks, attachments: attachments, started: started)
         write(report, to: folder)
         CellarLog.info(.launch, "Verified \(plan.name): \(report.verdict.label). \(report.summary)", subject: plan.slug)
         return (report, folder)
+    }
+
+    private func makeReport(checks: [VerificationCheck], attachments: [String], started: Date) -> VerificationReport {
+        VerificationReport(slug: plan.slug, name: plan.name, store: plan.store.rawValue, startedAt: started,
+                           finishedAt: Date(), environment: environment(), checks: checks, attachments: attachments)
+    }
+
+    static let interruptedTitle = "Every run asked for was done"
+
+    /// The `interrupted` check: never a pass, because runs that weren't done prove nothing.
+    /// `stoppedIn` is the run that was cut short, nil when verify stopped between runs.
+    static func judgeInterrupted(stoppedIn: Int?, completed: Int, runs: Int, stillRunning: Bool = false) -> VerificationCheck {
+        let done = "\(completed) of \(runs) run\(runs == 1 ? "" : "s") finished"
+        let detail: String
+        if stillRunning {
+            detail = "Written while verify was still running: \(done). If this is the last report in the folder, verify never got to the end."
+        } else if let stoppedIn {
+            detail = "Verify was stopped during run \(stoppedIn), which was closed down without being watched to the end; \(done)."
+        } else {
+            detail = "Verify was stopped before run \(completed + 1) started; \(done)."
+        }
+        return VerificationCheck(id: "interrupted", title: interruptedTitle, verdict: .couldNotCheck, detail: detail)
     }
 
     // MARK: - One launch
@@ -127,7 +168,9 @@ public struct VerifyGame {
 
         // Watch it for as long as it has to stay up.
         var watch = Watch()
-        if launch.verdict == .pass {
+        if launch.verdict == .pass, isInterrupted() {
+            watch.interrupted = true
+        } else if launch.verdict == .pass {
             say("  Watching \(plan.name) for \(surviveSeconds / 60 > 0 ? "\(surviveSeconds / 60) min" : "\(surviveSeconds) s")…")
             watch = observe(plan, say: say)
         }
@@ -138,8 +181,10 @@ public struct VerifyGame {
         checks.append(launch)
         if launch.verdict == .pass {
             checks.append(Self.judgeStaysUp(watch, wineLog: wineLog, surviveSeconds: surviveSeconds, name: plan.name))
-            checks.append(Self.judgeOnline(watch, wineLog: wineLog, plan: plan))
-            checks.append(Self.judgeDock(watch, name: plan.name))
+            checks.append(Self.cutShort(Self.judgeOnline(watch, wineLog: wineLog, plan: plan), watch,
+                                        failedOnEvidence: !CrashSigns.tlsErrors(inWineLog: wineLog).isEmpty))
+            checks.append(Self.cutShort(Self.judgeDock(watch, name: plan.name), watch,
+                                        failedOnEvidence: !watch.dockIntruders.isEmpty))
         } else {
             for (id, title) in [("stays-up", Self.staysUpTitle), ("game-online", Self.onlineTitle), ("dock", Self.dockTitle)] {
                 checks.append(VerificationCheck(id: id, title: title, verdict: .couldNotCheck,
@@ -167,6 +212,17 @@ public struct VerifyGame {
         var gameInDock = false
         /// Dock icons that shouldn't have been there: "name (path)".
         var dockIntruders: [String] = []
+        /// Verify was stopped before the watch was over.
+        var interrupted = false
+    }
+
+    /// A failure that only means "not seen yet" is no failure when the watch was cut short: it
+    /// becomes could-not-check. One found on real evidence (a TLS error, Wine in the Dock) stands.
+    static func cutShort(_ check: VerificationCheck, _ watch: Watch, failedOnEvidence: Bool) -> VerificationCheck {
+        guard watch.interrupted, check.verdict == .fail, !failedOnEvidence else { return check }
+        return VerificationCheck(id: check.id, title: check.title, verdict: .couldNotCheck,
+                                 detail: "Verify was stopped after \(watch.watchedSeconds) s, before this could be seen. " + check.detail,
+                                 evidence: check.evidence)
     }
 
     private func observe(_ plan: GamePlan, say: (String) -> Void) -> Watch {
@@ -208,7 +264,18 @@ public struct VerifyGame {
             }
             for host in hosts { watch.hostAddresses[host, default: []].formUnion(GameConnections.addresses(of: host)) }
             if elapsed >= surviveSeconds { break }
-            Thread.sleep(forTimeInterval: sampleSeconds)
+            // A second at a time, so a Ctrl-C is answered within one.
+            var slept = 0.0
+            while slept < sampleSeconds, !isInterrupted() {
+                Thread.sleep(forTimeInterval: min(1, sampleSeconds - slept))
+                slept += 1
+            }
+            if isInterrupted() {
+                watch.interrupted = true
+                watch.watchedSeconds = Int(Date().timeIntervalSince(started))
+                say("  Stopping: closing \(plan.name)…")
+                break
+            }
         }
         return watch
     }
@@ -227,12 +294,23 @@ public struct VerifyGame {
             return check(.fail, "A crash reporter appeared after \(watch.watchedSeconds) s.",
                          watch.crashReporters + crashes.suffix(10))
         }
+        if watch.interrupted, !watch.gameSeenRunning {
+            return check(.couldNotCheck, "Verify was stopped after \(watch.watchedSeconds) s, before \(name)'s own process was seen.")
+        }
         if !watch.gameSeenRunning {
             return check(.fail, "\(name)'s own process never appeared, though Play reported it started.", crashes.suffix(10).map { $0 })
         }
         if let after = watch.exitedAfter, after < surviveSeconds {
             return check(.fail, "\(name) stopped after \(after) s, short of the \(surviveSeconds) s it had to stay up.",
                          crashes.suffix(10).map { $0 })
+        }
+        if !crashes.isEmpty, watch.interrupted {
+            return check(.fail, "Wine logged a crash before verify was stopped.", crashes.suffix(10).map { $0 })
+        }
+        if watch.interrupted {
+            // Up so far is not up for the whole run: never a pass.
+            return check(.couldNotCheck,
+                         "\(name) was still up when verify was stopped after \(watch.watchedSeconds) s, short of the \(surviveSeconds) s it had to stay up.")
         }
         if !crashes.isEmpty {
             return check(.fail, "\(name) stayed up, but Wine logged a crash while it ran.", crashes.suffix(10).map { $0 })

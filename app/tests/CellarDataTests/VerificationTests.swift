@@ -331,6 +331,31 @@ struct VerifyRunTests {
                 "verify turns on the TLS channels it reads")
     }
 
+    @Test("Stopped mid-watch, verify closes the game, writes the report it has, and passes nothing it didn't see")
+    func interruptedRun() throws {
+        let (plan, exeName) = try game(lifetime: 60)
+        defer {
+            ProcessWatch.kill([exeName])
+            try? FileManager.default.removeItem(at: plan.prefix)
+        }
+        var verify = verify(plan, surviveSeconds: 40)
+        verify.runs = 2
+        let start = Date()
+        verify.isInterrupted = { Date().timeIntervalSince(start) > 4 }
+        let (report, folder) = verify.run()
+        func verdict(_ id: String) -> VerificationVerdict? { report.checks.first { $0.id == id }?.verdict }
+
+        #expect(verdict("run-1.launch") == .pass)
+        #expect(verdict("run-1.stays-up") == .couldNotCheck, "up for 4 s is not up for 40 s")
+        #expect(verdict("run-1.clean-exit") == .pass, "the run under way is still closed down")
+        #expect(verdict("interrupted") == .couldNotCheck)
+        #expect(!report.checks.contains { $0.id.hasPrefix("run-2.") }, "run 2 never started")
+        #expect(!ProcessWatch.isRunning(exeName))
+        #expect(Date().timeIntervalSince(start) < 30, "a stop is answered within seconds, not at the end of the watch")
+        let markdown = try String(contentsOf: folder.appendingPathComponent("report.md"), encoding: .utf8)
+        #expect(markdown.contains("stopped during run 1"))
+    }
+
     @Test("A game that quits early fails stays-up, saying after how long")
     func earlyExit() throws {
         let (plan, exeName) = try game(lifetime: 6)
@@ -482,5 +507,43 @@ struct BaselineCheckTests {
                                              macLanguage: .english)
         #expect(dutch.verdict == .fail, "the Belgian-Terminal bug: Steam and the game in Dutch on an English Mac")
         #expect(dutch.evidence.first?.contains("every game") == true)
+    }
+}
+
+/// A verify that is stopped part-way (#249): what it says about the runs it did and didn't finish.
+struct InterruptedVerifyTests {
+    @Test("The interrupted check is never a pass, and says how far verify got")
+    func interruptedCheck() {
+        let during = VerifyGame.judgeInterrupted(stoppedIn: 3, completed: 2, runs: 3)
+        #expect(during.verdict == .couldNotCheck)
+        #expect(during.detail.contains("during run 3") && during.detail.contains("2 of 3 runs finished"))
+        #expect(VerifyGame.judgeInterrupted(stoppedIn: nil, completed: 1, runs: 3).detail.contains("before run 2 started"))
+        #expect(VerifyGame.judgeInterrupted(stoppedIn: nil, completed: 1, runs: 3, stillRunning: true)
+            .detail.contains("still running"))
+    }
+
+    @Test("A watch cut short is could-not-check for stays-up, unless a crash was already seen")
+    func staysUpWhenStopped() {
+        var watch = VerifyGame.Watch()
+        watch.interrupted = true
+        watch.watchedSeconds = 12
+        #expect(VerifyGame.judgeStaysUp(watch, wineLog: "", surviveSeconds: 300, name: "G").verdict == .couldNotCheck,
+                "stopped before the game appeared is not 'never appeared'")
+        watch.gameSeenRunning = true
+        let up = VerifyGame.judgeStaysUp(watch, wineLog: "", surviveSeconds: 300, name: "G")
+        #expect(up.verdict == .couldNotCheck)
+        #expect(up.detail.contains("12 s"))
+        watch.crashReporters = ["4242 C:\\Game\\CrashReporter.exe"]
+        #expect(VerifyGame.judgeStaysUp(watch, wineLog: "", surviveSeconds: 300, name: "G").verdict == .fail)
+    }
+
+    @Test("Not seen yet is could-not-check when stopped early; a failure on evidence stands")
+    func cutShort() {
+        let failed = VerificationCheck(id: "dock", title: "t", verdict: .fail, detail: "never in the Dock.")
+        var watch = VerifyGame.Watch()
+        #expect(VerifyGame.cutShort(failed, watch, failedOnEvidence: false).verdict == .fail, "a full watch keeps its verdict")
+        watch.interrupted = true
+        #expect(VerifyGame.cutShort(failed, watch, failedOnEvidence: false).verdict == .couldNotCheck)
+        #expect(VerifyGame.cutShort(failed, watch, failedOnEvidence: true).verdict == .fail)
     }
 }
