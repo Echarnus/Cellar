@@ -372,6 +372,7 @@
 "Signing out" = "Uitloggen";
 "Silent — there is nothing to click." = "Stil — er is niets om op te klikken.";
 "Skip for now" = "Sla nu over";
+"Some of its files were damaged, so Cellar is downloading a fresh copy. Your games and saves aren't touched." = "Een paar bestanden ervan waren beschadigd, dus Cellar downloadt een nieuwe kopie. Je games en opgeslagen games blijven onaangeroerd.";
 "Some games need their store's client open while they run; some don't. Cellar says which on the game's page rather than surprising you." = "Sommige games hebben de client van hun winkel nodig terwijl ze draaien, andere niet. Cellar zegt het op de pagina van de game, zodat het je niet verrast.";
 "Sort by" = "Sorteer op";
 "Sort by most recently played" = "Sorteer op laatst gespeeld";
@@ -489,6 +490,8 @@
 "Removing %@" = "%@ verwijderen";
 "Repair %@" = "Herstel %@";
 "Repairing %@" = "%@ herstellen";
+"Repairing" = "Herstellen";
+"Repairing the Windows runtime" = "De Windows-runtime herstellen";
 "Save Diagnostics Report…" = "Bewaar diagnoserapport…";
 "Save Game Settings As…" = "Bewaar game-instellingen als…";
 "Technical Details…" = "Technische details…";
