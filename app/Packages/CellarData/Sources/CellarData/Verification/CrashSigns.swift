@@ -45,7 +45,7 @@ public enum CrashSigns {
     public static let wineDebugChannels = "err+seh,err+secur32,err+schannel,err+crypt,err+chain,err+winhttp,err+wininet,err+bcrypt,err+ncrypt"
 
     /// `WINEDEBUG` for a verified run: the game's own value, with the channels above added.
-    public static func wineDebug(adding to current: String?) -> String {
+    public static func wineDebug(adding current: String?) -> String {
         guard let current, !current.isEmpty, current != "-all" else { return "-all," + wineDebugChannels }
         return current + "," + wineDebugChannels
     }

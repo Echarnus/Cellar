@@ -20,7 +20,7 @@ public enum GameConnections {
     /// The established connections of `pids`, as `lsof` reports them right now.
     public static func established(pids: [pid_t]) -> Set<Endpoint> {
         guard !pids.isEmpty else { return [] }
-        let list = pids.map(String.init).joined(separator: ",")
+        let list = pids.map { String($0) }.joined(separator: ",")
         let result = Shell.run("/usr/sbin/lsof", ["-nP", "-a", "-p", list, "-iTCP", "-sTCP:ESTABLISHED"])
         return remoteEndpoints(inLsof: result.stdout)
     }
