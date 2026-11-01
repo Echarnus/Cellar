@@ -46,6 +46,22 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
 
     public var defaultValue: String { self == .wineDebug ? "off" : "false" }
 
+    /// Whether a profile turns this on to keep a game from crashing, rather than for taste. A player
+    /// may still switch it off; when the game then dies as it starts, Cellar turns it back on
+    /// (`GamePlan.crashWorkaroundsSwitchedOff`) instead of retrying the same crash until it gives up.
+    public var isCrashWorkaround: Bool { self == .metalValidation }
+
+    /// The switch's name as the app shows it, for a sentence the player reads.
+    public var displayName: String {
+        switch self {
+        case .wineDebug:        return "Wine debug logging"
+        case .metalValidation:  return "Metal validation"
+        case .metalFXUpscaling: return "MetalFX upscaling"
+        case .metalHUD:         return "Show frame rate"
+        case .retina:           return "Retina resolution"
+        }
+    }
+
     /// One line for `cellar perf`, saying what the switch costs or buys.
     public var summary: String {
         switch self {

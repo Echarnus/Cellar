@@ -156,6 +156,7 @@ public struct SteamAdapter: StoreAdapter {
                                             game: plan.name, expectsSignIn: signsItself,
                                             start: plan.directStartExe,
                                             publisherLauncher: plan.publisherLauncher,
+                                            workaround: plan.launchWorkaround,
                                             progress: progress, stage: stage)
             return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
         }
@@ -170,6 +171,7 @@ public struct SteamAdapter: StoreAdapter {
         }
         try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: showHUD,
                                           gameEnv: plan.launchEnv, game: plan.name, expectsSignIn: signsItself,
+                                          workaround: plan.launchWorkaround,
                                           progress: progress, stage: stage)
         stage(.running)
         return .steam(appID: appID)

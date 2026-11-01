@@ -58,6 +58,9 @@ public struct GamePlan {
     /// runs, which hands off to Rockstar's launcher and exits. `launchExe` stays the game itself
     /// (`RDR2.exe`), because that is the process Cellar watches and shuts the layer down behind.
     public var startExe: String? = nil
+    /// `env` as it would be with the profile's crash workarounds the player switched off put back
+    /// (`PerformanceSettings.Resolved.crashWorkaroundsSwitchedOff`); nil when none were.
+    public var workaroundEnv: [String: String]? = nil
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
@@ -123,11 +126,45 @@ public struct GamePlan {
     /// `env`, plus what makes the running game show up as itself rather than as "wine" (`DockShim`).
     /// Every launch route starts its processes with this; opening the store client on its own
     /// uses `env`, because a client the player opened is not this game.
-    public var launchEnv: [String: String] {
+    public var launchEnv: [String: String] { launchEnv(over: env) }
+
+    /// `launchEnv` with the profile's crash workarounds back on, for a launch that died as it
+    /// started with them off. Nil when the player switched none off: then there is nothing to try.
+    public var launchEnvWithWorkarounds: [String: String]? { workaroundEnv.map { launchEnv(over: $0) } }
+
+    /// The crash workarounds the player switched off — what a launch that dies puts back.
+    public var crashWorkaroundsSwitchedOff: [PerformanceSetting] { performance.crashWorkaroundsSwitchedOff }
+
+    /// Give the profile back its say over the workarounds the player switched off, once a launch has
+    /// shown the game needs them: the bottle's lines go, so the app's switches and `cellar perf`
+    /// read "profile" again. The player can switch them off again; nothing else is touched.
+    public func restoreCrashWorkarounds() {
+        let file = BottleConfig.url(forBottle: bottleName)
+        for setting in crashWorkaroundsSwitchedOff {
+            do {
+                try BottleConfig.unset(setting, in: file)
+                CellarLog.warn(.launch, "\(name) died as it started with \(setting.key) off; "
+                    + "it stayed up with the profile's \(setting.key) on, so the bottle's override is removed.", subject: slug)
+            } catch {
+                CellarLog.failure(.launch, "Couldn't put \(setting.key) back for \(name)", error, subject: slug)
+            }
+        }
+    }
+
+    /// The sentence a launch shows when it puts the workarounds back.
+    public var restoringWorkaroundsMessage: String? {
+        let names = crashWorkaroundsSwitchedOff.map(\.displayName)
+        guard !names.isEmpty else { return nil }
+        let list = names.joined(separator: " and ")
+        return "\(name) crashed as it started with \(list) off. Its profile turns that on to stop exactly this crash, "
+            + "so Cellar is turning it back on and trying again."
+    }
+
+    private func launchEnv(over env: [String: String]) -> [String: String] {
         let exe = launchExe.map { [($0 as NSString).lastPathComponent] } ?? []
-        var env = DockShim.environment(naming: name, executables: exe)
-        for (key, value) in self.env { env[key] = value }
-        return env
+        var result = DockShim.environment(naming: name, executables: exe)
+        for (key, value) in env { result[key] = value }
+        return result
     }
 
     public var gameProcessNeedles: [String] {

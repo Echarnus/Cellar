@@ -519,3 +519,4 @@
 "Up next" = "Hierna aan de beurt";
 "Updating" = "Bijwerken";
 "… %lld earlier lines aren't shown." = "… %lld eerdere regels worden niet getoond.";
+"%@ needs this on: without it, it crashes as it starts. If you switch it off and that happens, Cellar switches it back on." = "%@ heeft dit nodig: zonder crasht het bij het starten. Zet je het uit en gebeurt dat, dan zet Cellar het weer aan.";

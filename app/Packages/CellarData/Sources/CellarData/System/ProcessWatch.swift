@@ -72,6 +72,8 @@ public enum ProcessWatch {
     ///   - keepWaiting: asked while waiting for the game to appear; false ends that wait early, as a
     ///     game that didn't appear. For a long wait that something else has to stay up for — the
     ///     Rockstar launcher while the player signs in — so a closed launcher is not waited out.
+    ///   - diedStarting: told the attempt number each time the game appeared and then died while
+    ///     settling, before the next attempt — where a caller changes what the next one starts with.
     ///   - stage: coarse step reporting for the app's launch window; a retry legitimately goes back
     ///     to `.starting`, which is what makes a second attempt visible rather than a stall.
     public static func superviseStart(attempts: Int,
@@ -82,6 +84,7 @@ public enum ProcessWatch {
                                       start: () throws -> Void,
                                       isUp: () -> Bool,
                                       keepWaiting: () -> Bool = { true },
+                                      diedStarting: (Int) -> Void = { _ in },
                                       progress: (String) -> Void = { _ in },
                                       stage: (LaunchStage) -> Void = { _ in }) throws {
         for attempt in 1...max(1, attempts) {
@@ -122,6 +125,7 @@ public enum ProcessWatch {
             progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
             CellarLog.warn(.launch, "Start attempt \(attempt) of \(attempts): the game appeared and then "
                 + "died inside \(settleSeconds)s — the D3DMetal startup race. Cleaning up and retrying.")
+            if attempt < attempts { diedStarting(attempt) }
         }
         CellarLog.error(.launch, "Gave up: the game would not stay up after \(attempts) attempts.")
         throw CellarError.ioFailure(
