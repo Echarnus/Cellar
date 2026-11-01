@@ -50,15 +50,15 @@ struct CrashWorkaroundTests {
 
     @Test("Switched off is when the profile turns it on and the bottle turns it off — nothing else")
     func switchedOffNeedsBothLayers() {
-        func off(_ profile: [String: String], _ profileEnv: [String: String] = [:],
-                 _ bottle: [String: String]) -> [PerformanceSetting] {
+        func off(_ profile: [String: String], _ bottle: [String: String],
+                 profileEnv: [String: String] = [:]) -> [PerformanceSetting] {
             PerformanceSettings.resolve(profileFields: profile, profileEnv: profileEnv,
                                         bottleFields: bottle, bottleEnv: [:]).crashWorkaroundsSwitchedOff
         }
         #expect(off(["metal_validation": "true"], ["metal_validation": "false"]) == [.metalValidation])
         #expect(off(["metal_validation": "true"], ["metal_validation": "off"]) == [.metalValidation],
                 "every spelling the CLI accepts counts")
-        #expect(off([:], ["MTL_DEBUG_LAYER": "1"], ["metal_validation": "false"]) == [.metalValidation],
+        #expect(off([:], ["metal_validation": "false"], profileEnv: ["MTL_DEBUG_LAYER": "1"]) == [.metalValidation],
                 "a profile that turns the layer on through [env] is turning the same switch on")
         #expect(off(["metal_validation": "true"], [:]).isEmpty, "the profile's own choice stands")
         #expect(off(["metal_validation": "true"], ["metal_validation": "true"]).isEmpty)
