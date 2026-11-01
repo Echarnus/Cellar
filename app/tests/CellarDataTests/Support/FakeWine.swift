@@ -34,6 +34,8 @@ enum FakeWine {
         }
         try write(script(tool: "wine"), to: install.wineBinary)
         try write(script(tool: "wineserver"), to: install.binDirectory.appendingPathComponent("wineserver"))
+        // The scripts are this sandbox's runner now; recorded so Play's integrity check accepts them.
+        try RunnerIntegrity.record(install)
         return install
     }
 
