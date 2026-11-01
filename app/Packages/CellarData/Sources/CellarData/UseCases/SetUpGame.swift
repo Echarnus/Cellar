@@ -87,6 +87,12 @@ public struct SetUpGame {
         }
 
         try adapter.setUpClient(plan, wine: wine, step: step, phase: phase)
+        // A publisher's launcher the game starts through, after the store's client: Steam's copy of
+        // a Rockstar game hands off to the Rockstar Games Launcher (`RockstarLauncher`).
+        if let launcher = plan.publisherLauncher {
+            if !launcher.isInstalled(in: plan.prefix) { phase(InstallProgress(.client)) }
+            try launcher.install(runner: wine, progress: step)
+        }
         CellarLog.info(.setup, "Setup finished for \(plan.name).", subject: plan.slug)
         return wine
     }

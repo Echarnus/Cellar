@@ -145,6 +145,31 @@ about the other. Adding a store is: a `GameStore` case, a `*Bottle` type, a `Sto
 (`app/Packages/CellarData/Sources/CellarInfrastructure/Adapters/`: client set-up, install, opening the client,
 launching through it, registered in `CellarInfrastructure.install()`), and a CLI command group.
 
+### A publisher's launcher behind the store: Rockstar
+
+Some games need a second program between the store and the game. Rockstar's Steam games (Red Dead
+Redemption, Red Dead Redemption 2, GTA V) do not start when Steam runs them: Steam runs a stub
+(`PlayRDR2.exe`) that hands off to the **Rockstar Games Launcher**, which signs the player in to a
+Rockstar Games account and only then starts the game (`RDR2.exe`). On Windows, Steam installs that
+launcher from the game's install script the first time it is played; a copy Cellar downloaded from the
+depot never runs that script.
+
+It is not a store, and it does not become one: the game is still owned, downloaded and updated through
+Steam, and the library is unchanged. A profile names it with `publisher_launcher = "rockstar"`
+(`PublisherLauncher`, in the domain), and `start_exe` names the stub to start while `exe` stays the
+game's own process, the one Cellar watches and shuts the layer down behind.
+
+- **Setup installs it** after the store's client (`SetUpGame` → `RockstarLauncher.install`), from
+  Rockstar's own download, run inside the bottle. Graft, don't bundle, as for the store clients.
+- **Its installer is treated as interactive**, like Battle.net's: no silent switch is documented, so
+  setup and the game page say a window will open before it does.
+- **Its sign-in is not observable**, like Battle.net's. Cellar never shows a ✓ or ✗ for it, and never
+  sees the Rockstar password: it is typed into Rockstar's window. The first Play says the launcher will
+  ask, then waits up to fifteen minutes for the game, but only while the launcher (or the stub) is
+  still up (`ProcessWatch.superviseStart`'s `keepWaiting`), so a closed launcher is not waited out.
+- **A bottle without it is a setup step** (`GameSummary.launcherSetupPending`), so an existing GTA V
+  bottle is sent to Set up rather than to a Play that cannot work.
+
 ### One Steam, every bottle
 
 A bottle is per-game on purpose: its own registry, its own runner, its own Wine version. The Steam

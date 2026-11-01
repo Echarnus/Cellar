@@ -359,6 +359,23 @@ The race sims to try first are `assetto-corsa` (DXVK by default) and `assetto-co
 (D3DMetal by default). Both ship `wheel = "untested"` and in-game binding steps in `wheel_setup`,
 which the game page shows; check that those steps match the menus you actually see.
 
+## Rockstar's games: the launcher behind Steam
+
+Red Dead Redemption, Red Dead Redemption 2 and GTA V start through the Rockstar Games Launcher, which
+setup installs into the bottle (`docs/ARCHITECTURE.md` → *A publisher's launcher behind the store*).
+CI covers the field, the installer run against `FakeWine`, the refusal of a download that isn't a
+Windows program, the readiness copy, and the shipped profiles end to end on real files
+(`RockstarLauncherTests`, `RedDeadTests`, `RockstarLauncherIntegrationTests`). What it cannot cover is
+Rockstar's own windows, so on a Mac, once per game:
+
+1. `cellar install <slug>`. Rockstar's installer opens after Steam: click Install. Setup should finish
+   on its own once `Launcher.exe` lands, and close the launcher.
+2. `cellar launch <slug>`. The launcher opens: sign in. It should start the game, and the launch
+   window should go to *running* once `RDR2.exe` (or `RDR.exe`, `GTA5.exe`) is up.
+3. Quit the game. The layer should go down behind it, launcher included.
+4. Record what happened in the profile: `status`, `notes` with the Mac and macOS, and fix `exe`,
+   `start_exe` or `install_dir` if Steam's files say otherwise (Red Dead Redemption's are unverified).
+
 ## Where this sits in the verification ladder
 
 `AGENTS.md` asks for the highest rung available before calling a change done. The suite maps onto it:

@@ -463,6 +463,11 @@
 "Zoom" = "Zoom";
 "· UNTESTED, CELLAR GUESSED" = "· NIET GETEST, DOOR CELLAR GERADEN";
 "• and %lld more" = "• en nog %lld";
+"Cellar sets up the %@ this game starts through. Its installer opens a window and needs a few clicks from you." = "Cellar installeert de %@ waarmee deze game start. Het installatieprogramma opent een venster en vraagt een paar klikken van je.";
+"Cellar first sets up the %@ this game starts through — its installer opens a window and needs a few clicks from you. Then it downloads the game from your %@ library, with nothing more to click." = "Cellar installeert eerst de %@ waarmee deze game start — het installatieprogramma opent een venster en vraagt een paar klikken van je. Daarna downloadt het de game uit je %@-bibliotheek, zonder nog iets te hoeven klikken.";
+"Installed. Play starts %@ quietly, then the %@ opens. Sign in with your %@ there the first time, and it starts the game." = "Geïnstalleerd. Spelen start %@ stil, daarna opent de %@. Log de eerste keer daar in met je %@, en die start de game.";
+"%@ also needs the %@" = "%@ heeft ook de %@ nodig";
+"Every copy starts through it, %@'s included. Cellar installs it in this game's bottle from the publisher's own download, and its installer needs a few clicks. The first time you press Play its window opens: sign in with your %@, and it starts the game. Cellar can't see that sign-in, so it never shows a ✓ for it." = "Elke kopie start ermee, ook die van %@. Cellar installeert hem in de bottle van deze game via de eigen download van de uitgever, en het installatieprogramma vraagt een paar klikken. De eerste keer dat je op Spelen drukt, opent zijn venster: log in met je %@, en hij start de game. Cellar kan die aanmelding niet zien, dus toont er nooit een ✓ voor.";
 "%@ goes back to the graphics setting Cellar recommends for it, from its next launch." = "%@ gaat vanaf de volgende start terug naar de grafische instelling die Cellar ervoor aanraadt.";
 "%@ is running. Quit the game and Cellar tidies up after it." = "%@ draait. Stop de game en Cellar ruimt daarna op.";
 "%@ — Technical Details" = "%@ — Technische details";

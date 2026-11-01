@@ -15,14 +15,14 @@ store         = "steam"
 
 [compatibility]
 anticheat                   = "BattlEye (GTA Online only)"
-drm                         = "Steamworks + Rockstar Social Club launcher"
+drm                         = "Steamworks + Rockstar Games Launcher (needs a Rockstar Games account)"
 # Heavy: launches via the Rockstar Games Launcher / Social Club, needs a live Steam session, and
 # GTA Online uses BattlEye (unsupported here). Story mode is the target. Expect setup friction.
 needs_live_steam            = true
-requires_account            = "Steam + Rockstar Social Club"
+requires_account            = "Steam + Rockstar Games account"
 online                      = "story mode only; GTA Online needs BattlEye (unsupported here)"
 status                      = "untested"
-notes                       = "RAGE/DX11. Rockstar launcher under Wine is finicky; WineForge lists Rockstar support. Validate."
+notes                       = "Not yet launched under Cellar. RAGE, DirectX 11. Needs the Rockstar Games Launcher, which Cellar installs in the bottle; the first Play opens its window to sign in to a Rockstar Games account, and that sign-in window is the step most often reported failing under Wine."
 
 [runner]
 id              = "wineforge"
@@ -36,8 +36,16 @@ fallback_backend  = "dxmt"
 MTL_HUD_ENABLED = "1"
 
 [install]
-method      = "windows-steam-in-bottle"
-steam_appid = 271590
+method             = "windows-steam-in-bottle"
+steam_appid        = 271590
+# Steam's copy starts through the Rockstar Games Launcher, which Steam installs on Windows the first
+# time the game runs. Cellar's setup installs it instead (RockstarLauncher.swift). PlayGTAV.exe is
+# Steam's launch target and hands off to the launcher; GTA5.exe is the game itself. The folder is
+# the one Steam used before the 2025 Legacy/Enhanced split: check it when Kenneth installs it.
+install_dir        = "Grand Theft Auto V"
+exe                = "GTA5.exe"
+start_exe          = "PlayGTAV.exe"
+publisher_launcher = "rockstar"
 
 [legal]
 drm_circumvention = "never"

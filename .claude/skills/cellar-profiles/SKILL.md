@@ -24,6 +24,8 @@ changing a profile. Key rules:
   code and why `metal_validation = true` is on. A profile is executable documentation.
 - **Don't add a fourth spelling** of "needs a live client": `needs_live_session` is canonical,
   `needs_live_steam` is legacy-but-read, `requires_live_steam_session` is read by nothing.
+- **A publisher's launcher is not a store.** `publisher_launcher = "rockstar"` makes setup install the
+  Rockstar Games Launcher into the bottle; `start_exe` is Steam's stub to start, `exe` the game to watch.
 - **Artwork:** Steam art is derived from the AppID; non-Steam profiles supply `art_portrait`
   themselves. Never bundle store or publisher artwork in the repo.
 - **Verify:** regenerate the site *and* check the app/CLI, with an awkward value through both parsers.

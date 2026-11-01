@@ -483,6 +483,7 @@ public extension SteamBottle {
                                 gameEnv: [String: String] = [:], bundledLoader: GameApp.Start? = nil,
                                 game: String = "the game", expectsSignIn: Bool = false,
                                 attempts: Int = 8,
+                                start: URL? = nil, publisherLauncher: PublisherLauncher? = nil,
                                 progress: (String) -> Void = { _ in },
                                 stage: (LaunchStage) -> Void = { _ in }) throws {
         SteamDRM.markAppDirectory(exe.deletingLastPathComponent(), appID: appID)
@@ -507,20 +508,52 @@ public extension SteamBottle {
         env["SteamAppId"] = "\(appID)"
         env["SteamGameId"] = "\(appID)"
         let log = Paths.logs.appendingPathComponent("game-\(exe.deletingPathExtension().lastPathComponent).log")
+        // What is started can differ from what is watched: a Rockstar game is started through the
+        // stub Steam itself runs (`PlayRDR2.exe`), which hands off to the publisher's launcher and
+        // exits, and the game's own process (`RDR2.exe`) comes up after that.
+        let started = start ?? exe
+        let watched = exe.lastPathComponent
+
+        // A publisher launcher sits between the stub and the game, and the first time it waits for
+        // the player to sign in to it. That can take minutes, so the wait for the game is long — but
+        // only for as long as the launcher (or the stub that starts it) is still up: a launcher the
+        // player closed, or that crashed, is not waited out for a quarter of an hour.
+        var attemptBegan = Date()
+        let keepWaiting: () -> Bool
+        if let publisherLauncher {
+            progress("\(publisherLauncher.displayName) opens next. If it asks, sign in with your \(publisherLauncher.accountNoun) — \(game) starts once you have. Cellar never sees that sign-in.")
+            keepWaiting = {
+                Date().timeIntervalSince(attemptBegan) < launcherStartupSeconds
+                    || publisherLauncher.isRunning
+                    || ProcessWatch.isRunning(started.lastPathComponent)
+            }
+        } else {
+            keepWaiting = { true }
+        }
 
         // The same supervision the client's own route gets, through the loop Battle.net already uses:
         // D3DMetal 3.0 drops a game a few seconds in, and with no retry here a single Play ended with
         // a dead game and a crash reporter.
-        progress("Launching \(exe.lastPathComponent)…")
+        progress("Launching \(started.lastPathComponent)…")
         try ProcessWatch.superviseStart(
-            attempts: attempts,
-            appearSeconds: 40,
-            cleanup: { ProcessWatch.kill([exe.lastPathComponent, "crash_reporter.exe"]) },
-            start: { try runner.spawn([exe.path], extraEnv: env, log: log, bundledLoader: bundledLoader) },
-            isUp: { ProcessWatch.isRunning(exe.lastPathComponent) },
+            attempts: publisherLauncher == nil ? attempts : min(attempts, 3),
+            appearSeconds: publisherLauncher == nil ? 40 : launcherSignInSeconds,
+            cleanup: { ProcessWatch.kill([watched, started.lastPathComponent, "crash_reporter.exe"]) },
+            start: {
+                attemptBegan = Date()
+                try runner.spawn([started.path], extraEnv: env, log: log, bundledLoader: bundledLoader)
+            },
+            isUp: { ProcessWatch.isRunning(watched) },
+            keepWaiting: keepWaiting,
             progress: progress,
             stage: stage)
     }
+
+    /// How long a launch through a publisher launcher waits for the game: long enough to sign in to
+    /// Rockstar for the first time, typing a password and a code from an email.
+    static let launcherSignInSeconds = 900
+    /// How long the launcher gets to come up before "it isn't running" means it closed.
+    static let launcherStartupSeconds: TimeInterval = 90
 }
 
 public extension SteamBottle {
