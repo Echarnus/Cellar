@@ -352,10 +352,7 @@ public enum SteamBottle {
             let mark = connectionLogMark(in: runner.prefix)
             try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv,
                              dock: .hidden)
-            for _ in 0..<20 {
-                Thread.sleep(forTimeInterval: 2)
-                if isRunning && isClientUpdated(in: runner.prefix) { break }
-            }
+            try waitForClientToComeUp(prefix: runner.prefix, game: game)
             if expectsSignIn {
                 try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
                                        gameEnv: gameEnv, progress: progress, stage: stage)
@@ -492,10 +489,7 @@ public extension SteamBottle {
             progress("Starting Steam (silent) and waiting for it to be ready…")
             let mark = connectionLogMark(in: runner.prefix)
             try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv)
-            for _ in 0..<20 {
-                Thread.sleep(forTimeInterval: 2)
-                if isRunning && isClientUpdated(in: runner.prefix) { break }
-            }
+            try waitForClientToComeUp(prefix: runner.prefix, game: game)
             if expectsSignIn {
                 try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
                                        gameEnv: gameEnv, progress: progress, stage: stage)
@@ -774,9 +768,9 @@ public extension SteamBottle {
         // the sign-in window by itself.
         try launchClient(runner: runner, extraArgs: isRunning ? ["steam://open/main"] : [],
                          showHUD: showHUD, gameEnv: gameEnv, dock: .visible)
-        let deadline = Date().addingTimeInterval(timeout)
-        var seenRunning = false
-        var goneFor = 0
+        let began = Date()
+        let deadline = began.addingTimeInterval(timeout)
+        var watch = ClientStartWatch()
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 2)
             if loggedInAccount(in: runner.prefix) != nil {
@@ -784,14 +778,100 @@ public extension SteamBottle {
                 Thread.sleep(forTimeInterval: 6)   // let the client finish logging on
                 return
             }
-            if isRunning { seenRunning = true; goneFor = 0 } else if seenRunning { goneFor += 1 }
-            // Several polls, not one: Steam restarts itself while it updates on first run.
-            if goneFor >= 10 {
+            switch watch.observe(running: isRunning, elapsed: Date().timeIntervalSince(began)) {
+            case .waiting:
+                continue
+            case .neverStarted:
+                // Not a sign-in nobody did: there was never a window to sign in to (#190).
+                throw clientDidNotStart(game: game)
+            case .closed:
                 throw CellarError.invalidArgument(
                     "Steam was closed before anyone signed in to it, so \(game) wasn't started. Press Play to try again.")
             }
         }
         throw CellarError.invalidArgument(
             "Nobody signed in to Steam, so \(game) wasn't started — its DRM needs the client signed in. Press Play to try again.")
+    }
+}
+
+public extension SteamBottle {
+    // MARK: - Did the client start at all?
+
+    /// How long a client Cellar has just started gets to show up as a process at all.
+    static let clientStartSeconds: TimeInterval = 40
+
+    /// What the polls of a client Cellar started have shown so far.
+    ///
+    /// Three answers, because "Steam isn't signed in" and "Steam isn't there" are different
+    /// failures with different fixes. A client that never appeared once was reported as nobody
+    /// signing in, after an eighteen-minute wait, while the player was signed in (#190).
+    struct ClientStartWatch: Equatable {
+        public enum Verdict: Equatable, Sendable {
+            /// Still worth waiting.
+            case waiting
+            /// Not one poll has seen the client since Cellar started it.
+            case neverStarted
+            /// It was up, and has been gone for long enough that it is not just restarting.
+            case closed
+        }
+
+        public var startTimeout: TimeInterval = SteamBottle.clientStartSeconds
+        /// Consecutive polls without the client, after it had been seen, that mean it was closed.
+        /// Several, not one: Steam restarts itself while it updates on first run.
+        public var closedAfterPolls = 10
+        public private(set) var seenRunning = false
+        public private(set) var goneFor = 0
+
+        public init(startTimeout: TimeInterval = SteamBottle.clientStartSeconds, closedAfterPolls: Int = 10) {
+            self.startTimeout = startTimeout
+            self.closedAfterPolls = closedAfterPolls
+        }
+
+        public mutating func observe(running: Bool, elapsed: TimeInterval) -> Verdict {
+            if running {
+                seenRunning = true
+                goneFor = 0
+            } else if seenRunning {
+                goneFor += 1
+            }
+            if goneFor >= closedAfterPolls { return .closed }
+            if !seenRunning, elapsed >= startTimeout { return .neverStarted }
+            return .waiting
+        }
+    }
+
+    /// The error for a client that never came up. It says what Cellar saw — Steam did not start —
+    /// and what it was not: the player's sign-in, which is what the old message blamed.
+    static func clientDidNotStart(game: String) -> CellarError {
+        CellarError.ioFailure(
+            "Steam didn't start in \(game)'s bottle, so \(game) wasn't started. This isn't about your Steam sign-in. "
+            + "Press Play to try again; if it happens again, Show logs has what Wine said.")
+    }
+
+    /// Wait for a cold-started client to be up and done updating, for up to `clientStartSeconds`.
+    ///
+    /// A client that is still updating at the end is waited on by what follows, as before. One
+    /// that was **never seen** ends the launch here, with that said: going on meant waiting
+    /// three minutes for a logon, then taking the bottle's remembered sign-in away
+    /// (`fallBackToClientWindow`) and waiting fifteen more for a window that was never there.
+    internal static func waitForClientToComeUp(prefix: URL, game: String,
+                                               poll: TimeInterval = 2,
+                                               running: () -> Bool = { SteamBottle.isRunning },
+                                               ready: (() -> Bool)? = nil,
+                                               sleep: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }) throws {
+        let isReady = ready ?? { isClientUpdated(in: prefix) }
+        var watch = ClientStartWatch()
+        var elapsed: TimeInterval = 0
+        while elapsed < clientStartSeconds {
+            sleep(poll)
+            elapsed += poll
+            let up = running()
+            if up && isReady() { return }
+            if watch.observe(running: up, elapsed: elapsed) == .neverStarted {
+                CellarLog.error(.session, "The bottle's Steam never started (\(prefix.lastPathComponent)); "
+                    + "nothing appeared in \(Int(clientStartSeconds))s.")
+                throw clientDidNotStart(game: game)
+            }
+        }
     }
 }
