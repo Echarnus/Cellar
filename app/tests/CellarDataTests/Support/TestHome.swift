@@ -95,19 +95,58 @@ enum TestHome {
     static func installStubRunner(id: String = RunnerCatalog.defaultID) -> RunnerInstall? {
         ensure()
         let spec = RunnerCatalog.spec(forID: id) ?? RunnerCatalog.wineforge
-        // Refuse to write anywhere but the sandbox. The integration target links real runners into
-        // its home, and dropping a stub into the player's runner tree would be a genuine mess.
-        guard Paths.appSupport.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(root.path)
-        else { return RunnerManager.find(id: spec.id) }
+        // Refuse to write anywhere but the sandbox. Handing back the runner found elsewhere is what
+        // once let `FakeWine` overwrite the player's real `wine` with a script that runs nothing —
+        // every Play after that "started" Steam and got nothing (#190). No runner is the answer.
+        guard isInside(Paths.appSupport) else { return nil }
 
-        let bin = Paths.runners.appendingPathComponent("\(spec.id)/wine/bin", isDirectory: true)
+        // The integration target links the machine's real runner trees into this same home
+        // (`IntegrationSupport.linkRealRunner`). A stub written through that link lands in the
+        // player's runner, so the link is taken away first — the link only, never what it points at.
+        let runnerDirectory = Paths.runners.appendingPathComponent(spec.id, isDirectory: true)
+        if isSymbolicLink(runnerDirectory) {
+            try? FileManager.default.removeItem(at: runnerDirectory)
+        }
+        let bin = runnerDirectory.appendingPathComponent("wine/bin", isDirectory: true)
         let binary = bin.appendingPathComponent(spec.wineBinaryName)
+        guard isInside(binary) else { return nil }
         if !FileManager.default.isExecutableFile(atPath: binary.path) {
             try? FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
             try? "#!/bin/sh\nexit 0\n".write(to: binary, atomically: true, encoding: .utf8)
             try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
         }
         return RunnerManager.find(id: spec.id)
+    }
+
+    /// Whether `url`, with every symbolic link on its way resolved, is inside the sandbox. A path
+    /// that merely *starts* in the sandbox can still lead out of it through a link.
+    ///
+    /// Both sides go through `realPath`: `test.sh` hands over `/var/…//cellar-tests.X` while a
+    /// resolved path reads `/private/var/…`, and a file not written yet has to be judged by where
+    /// its folder really is.
+    static func isInside(_ url: URL) -> Bool {
+        let path = realPath(url)
+        let home = realPath(root)
+        return path == home || path.hasPrefix(home + "/")
+    }
+
+    /// Where `url` really is: every link on the way followed, including the ones in folders above a
+    /// file that doesn't exist yet — which `resolvingSymlinksInPath` leaves alone, and which is
+    /// exactly the case of a script about to be written through a linked runner.
+    static func realPath(_ url: URL) -> String {
+        var existing = url.standardizedFileURL
+        var rest: [String] = []
+        while !FileManager.default.fileExists(atPath: existing.path), existing.path != "/" {
+            rest.insert(existing.lastPathComponent, at: 0)
+            existing = existing.deletingLastPathComponent()
+        }
+        guard let resolved = realpath(existing.path, nil) else { return url.standardizedFileURL.path }
+        defer { free(resolved) }
+        return rest.reduce(String(cString: resolved)) { ($0 as NSString).appendingPathComponent($1) }
+    }
+
+    static func isSymbolicLink(_ url: URL) -> Bool {
+        (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
     }
 
     /// Create the on-disk shape of a bottle that has `exe` sitting where the profile says it is,
