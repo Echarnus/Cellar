@@ -419,8 +419,7 @@ public enum SteamBottle {
                 killGameProcesses(in: runner.prefix, appID: appID)
                 shutdown(runner: runner)
                 stage(.client)
-                try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv,
-                                 dock: .hidden)
+                try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
                 try waitForClientToComeUp(prefix: runner.prefix, game: game)
                 Thread.sleep(forTimeInterval: 6)
             }
