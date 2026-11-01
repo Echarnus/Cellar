@@ -251,3 +251,32 @@ Levers looked at, and why they are or are not in:
 - 9to5Mac, CrossOver 25: https://9to5mac.com/2025/03/11/crossover-25-red-dead-redemption-2-macos/
 - AppleGamingWiki, Red Dead Redemption 2: https://applegamingwiki.com/wiki/Red_Dead_Redemption_2
 - KeenGamer, Red Dead Redemption PC troubleshooting (PlayRDR.exe): https://www.keengamer.com/articles/features/troubleshooting/6-ways-to-fix-red-dead-redemption-not-launching-on-windows-pcs
+
+## Update 2026-11-01 — Steam's top 20, and which of it Cellar can take (#213–#217)
+
+Source: [Steam Most Played](https://store.steampowered.com/charts/mostplayed), read 2026-11-01
+~19:50Z, plus each game's store page (platforms, anti-cheat notice) and SteamDB's config (install
+folder, launch exe). Each game falls into exactly one of these groups:
+
+| Outcome | Games |
+|---|---|
+| **Profile added, untested** | Counter-Strike 2 (#213), Team Fortress 2 (#214), Deadlock (#215), Phantom Blade Zero (#216), Probably Stolen (#217) |
+| Has a Mac version | Dota 2, Cyberpunk 2077, War Thunder, Warframe, Bongo Cat |
+| Already in Cellar | Stardew Valley |
+| Not a store game | Wallpaper Engine (an app), FiveM (a GTA V mod platform installed outside Steam: the store rule) |
+| Kernel-level anti-cheat, or Wine/Proton blocked | PUBG (BattlEye, not enabled for Proton), Apex Legends (EAC; EA blocked Linux in 2024), Call of Duty (Ricochet, kernel), Rust (EAC, not enabled for Proton), Delta Force (ACE, kernel; works on Steam Deck only), WARDOGS (the store page says "Uses Kernel Level Anti-Cheat") |
+| Not yet known | AION 2: the store page is behind an age gate and names no anti-cheat. Find out what NCSOFT ships before writing a profile. |
+
+The facts behind the choices:
+
+- **Valve's three use VAC**, which runs in user space, and Cellar runs it untouched. Valve does not
+  support playing through a translation layer, so each profile's `online` line says that online play
+  is at the player's own risk. The macOS launch options still in SteamDB for CS2 ("Limited Test") and
+  TF2 (`hl2_osx`) are leftovers: neither store page lists macOS, and TF2's Mac build went in 2024.
+- **Team Fortress 2 is DirectX 9**, which D3DMetal does not translate, so it is the first profile that
+  starts on DXVK with WineD3D as the fallback.
+- **Phantom Blade Zero** is UE5 and DirectX 12 only, with Denuvo. Like Kingdom Come II, it gets no
+  fallback. Steam's launch target is `steam\PBZ.exe` under `PBZ`, and the install-folder needle
+  catches the deeper UE binary.
+- **Deadlock** is a friend-invite playtest. Steam's ownership check is what decides whether a player
+  has it.
