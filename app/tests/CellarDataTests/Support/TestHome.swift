@@ -154,6 +154,37 @@ enum TestHome {
         (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
     }
 
+    /// Whether `url`, with every symbolic link on its way resolved, is inside the sandbox. A path
+    /// that merely *starts* in the sandbox can still lead out of it through a link.
+    ///
+    /// Both sides go through `realPath`: `test.sh` hands over `/var/…//cellar-tests.X` while a
+    /// resolved path reads `/private/var/…`, and a file not written yet has to be judged by where
+    /// its folder really is.
+    static func isInside(_ url: URL) -> Bool {
+        let path = realPath(url)
+        let home = realPath(root)
+        return path == home || path.hasPrefix(home + "/")
+    }
+
+    /// Where `url` really is: every link on the way followed, including the ones in folders above a
+    /// file that doesn't exist yet — which `resolvingSymlinksInPath` leaves alone, and which is
+    /// exactly the case of a script about to be written through a linked runner.
+    static func realPath(_ url: URL) -> String {
+        var existing = url.standardizedFileURL
+        var rest: [String] = []
+        while !FileManager.default.fileExists(atPath: existing.path), existing.path != "/" {
+            rest.insert(existing.lastPathComponent, at: 0)
+            existing = existing.deletingLastPathComponent()
+        }
+        guard let resolved = realpath(existing.path, nil) else { return url.standardizedFileURL.path }
+        defer { free(resolved) }
+        return rest.reduce(String(cString: resolved)) { ($0 as NSString).appendingPathComponent($1) }
+    }
+
+    static func isSymbolicLink(_ url: URL) -> Bool {
+        (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
+    }
+
     /// Create the on-disk shape of a bottle that has `exe` sitting where the profile says it is,
     /// so `directLaunchExe` and friends have something real to find.
     static func installFakeGame(into plan: GamePlan, at relativeExe: String) throws {
