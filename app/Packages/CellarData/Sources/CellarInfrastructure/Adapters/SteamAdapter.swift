@@ -140,6 +140,7 @@ public struct SteamAdapter: StoreAdapter {
             // window and wait for the player to sign in to it.
             // Handed over now, or already remembered from a previous launch: either way the
             // client signs itself in, and the game has to wait for that to land.
+            try SteamBottle.closeClientsElsewhere(runner: wine, game: plan.name, progress: progress)
             let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
             // The guard stays unconditional: a hand-over leaves `loginusers.vdf` naming the
             // account, so it costs nothing here — and it is the only thing that catches a client
@@ -163,6 +164,7 @@ public struct SteamAdapter: StoreAdapter {
             throw CellarError.invalidArgument(
                 "Windows Steam isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
         }
+        try SteamBottle.closeClientsElsewhere(runner: wine, game: plan.name, progress: progress)
         let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
         progress("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…")
         if let launcher = plan.publisherLauncher {
