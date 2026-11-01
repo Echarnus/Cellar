@@ -148,12 +148,18 @@ public enum GameApp {
             try fm.createDirectory(at: resources, withIntermediateDirectories: true)
             var changed = false
 
-            // A runner update replaces the loader; the copy must follow it, byte for byte.
-            let source = try Data(contentsOf: loader.file)
-            if (try? Data(contentsOf: executable)) != source {
+            // A runner update replaces the loader; the copy must follow it. The copy is re-signed
+            // below, so its bytes no longer match the runner's: what it was copied from is
+            // recorded beside the bundle, and that is what is compared.
+            let sourceHash = try Checksum.sha256(of: loader.file)
+            let stamp = loaderStamp(for: app)
+            if !fm.isExecutableFile(atPath: executable.path)
+                || (try? String(contentsOf: stamp, encoding: .utf8)) != sourceHash {
                 try? fm.removeItem(at: executable)
                 try fm.copyItem(at: loader.file, to: executable)
                 try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+                // Written once the copy is signed: a copy that failed to sign is copied again.
+                try? fm.removeItem(at: stamp)
                 changed = true
             }
 
@@ -175,6 +181,17 @@ public enum GameApp {
             }
 
             if changed {
+                // A signed loader (WineForge 0.6.0.6 and later is Developer-ID signed) carries a
+                // signature over Wine's own Info.plist. Inside this bundle that signature no longer
+                // matches, and macOS kills the process at exec ("Code Signature Invalid") before the
+                // game ever starts. So the bundle is signed again, ad hoc, as itself — what Xcode
+                // does for a local build. An unsigned loader gets the same, which costs nothing.
+                let signed = Shell.run(codesign, ["--force", "--sign", "-", app.path])
+                // A loader that isn't a Mach-O program (a test's script) has nothing for macOS to check.
+                guard signed.succeeded || !RunnerIntegrity.isMachO(executable) else {
+                    throw CellarError.ioFailure("codesign failed: \(signed.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
+                }
+                try sourceHash.write(to: stamp, atomically: true, encoding: .utf8)
                 Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", app.path])
                 let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
                 if fm.fileExists(atPath: lsregister) { Shell.run(lsregister, ["-f", app.path]) }
@@ -187,6 +204,13 @@ public enum GameApp {
             return nil
         }
     }
+
+    /// Where the copied loader's source hash is kept: beside the bundle, never in it, because
+    /// anything written inside a signed bundle after signing breaks its seal.
+    static func loaderStamp(for app: URL) -> URL {
+        app.deletingLastPathComponent().appendingPathComponent(".\(app.lastPathComponent).loader-sha256")
+    }
+    static let codesign = "/usr/bin/codesign"
 
     /// `prepare` for a plan and the runner about to start it.
     public static func prepare(for plan: GamePlan, runner: WineRunner) -> Start? {
