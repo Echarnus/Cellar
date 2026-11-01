@@ -3,19 +3,26 @@ import Foundation
 
 /// Read every profile and say how ready each game is — the app's library and `cellar library`.
 ///
-/// Its two dependencies are passed in: which profiles exist, and how one becomes a `GamePlan`. The
-/// defaults read the profile database; a test can hand it a fixed list.
+/// Its dependencies are passed in: which profiles exist, how one becomes a `GamePlan`, and which
+/// stores this build offers. The defaults read the profile database and `StoreAvailability`; a test
+/// can hand it a fixed list.
+///
+/// A game whose store is not offered is left out entirely — not withheld — so Battle.net and GOG
+/// games stay out of the library while the first release is Steam only (`StoreAvailability`).
 ///
 /// Never asks a store anything over the network: it runs on every library refresh. Ownership comes
 /// from `StoreLibrary`'s cache, which `StoreLibrary.refreshAll` is the one to fill.
 public struct LoadLibrary {
     public var slugs: () -> [String]
     public var plan: (String) throws -> GamePlan
+    public var stores: Set<GameStore>
 
     public init(slugs: @escaping () -> [String] = { ProfileStore.all().map(\.slug) },
-                plan: @escaping (String) throws -> GamePlan = { try Game.plan(slug: $0) }) {
+                plan: @escaping (String) throws -> GamePlan = { try Game.plan(slug: $0) },
+                stores: Set<GameStore> = StoreAvailability.offered) {
         self.slugs = slugs
         self.plan = plan
+        self.stores = stores
     }
 
     /// A readiness summary for every known profile — the GUI's data source.
@@ -23,7 +30,7 @@ public struct LoadLibrary {
         // Read once, closing any session a crash left open — unless that game is running now.
         let played = Playtime.all(isRunning: { slug in (try? plan(slug)).map(Uninstall.isGameRunning) ?? false })
         return slugs().compactMap { slug in
-            guard let plan = try? plan(slug) else { return nil }
+            guard let plan = try? plan(slug), stores.contains(plan.store) else { return nil }
             var summary = Self.summary(of: plan)
             summary.playtime = played[plan.slug]
             return summary

@@ -13,6 +13,6 @@ public struct DiskLibraryRepository: LibraryRepository {
         return LibrarySnapshot(games: all.filter(\.isVisible), withheld: all.filter { !$0.isVisible },
                                steam: SteamAccount.state, hasConnectedStore: StoreLibrary.hasConnectedStore,
                                gogSignedIn: GOGAuth.isSignedIn,
-                               connectedStores: GameStore.allCases.filter(StoreLibrary.isConnected))
+                               connectedStores: GameStore.offered.filter(StoreLibrary.isConnected))
     }
 }

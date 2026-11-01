@@ -38,8 +38,9 @@ struct AccountsView: View {
             steamRow
             steamQRPanel
             steamClientNote
-            gogRow
-            battleNetRow
+            // Hidden, not removed, while the first release is Steam only (`StoreAvailability`).
+            if GameStore.gog.isOffered { gogRow }
+            if GameStore.battlenet.isOffered { battleNetRow }
         }
     }
 

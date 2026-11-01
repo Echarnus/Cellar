@@ -100,6 +100,14 @@ bottle. Each profile names one with `store = "…"`, and that single field decid
 which installer `cellar setup` runs, what "installed" and "signed in" even mean, how a launch is
 issued, and what the app says to the player.
 
+**Which stores a build shows is one flag.** `StoreAvailability.offered` (CellarDomain) is Steam
+only for the first release (#221). Battle.net and GOG stay fully built — adapters, bottles,
+sign-ins, CLI groups — but a store that is not offered is hidden everywhere a player looks:
+`LoadLibrary` drops its games (not withheld: there would be no fix to offer), Accounts and the
+account button leave it out, copy that names the stores reads `StoreAvailability.phrase()`, and its
+CLI group leaves `cellar --help` while still working for the app. Turning a store back on is adding
+it to that set. `Game.summaries()` is the engine's view and still sees every store.
+
 | | **Steam** (`SteamBottle`) | **Battle.net** (`BattleNetBottle`) | **GOG** (`GOG*`) |
 |---|---|---|---|
 | Client in the bottle | yes — unless the game has no live-session DRM | yes | **none** |

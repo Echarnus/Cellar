@@ -6,8 +6,12 @@ import Foundation
 /// kept so callers that pass a closure per kind of progress don't all have to change at once.
 /// New code calls the use case.
 public enum Game {
-    /// A readiness summary for every known profile — the façade over `LoadLibrary`.
-    public static func summaries() -> [GameSummary] { LoadLibrary().summaries() }
+    /// A readiness summary for every known profile, from every store — the engine's view, whatever
+    /// this build offers. What a player sees goes through `LoadLibrary()`, which hides the stores
+    /// `StoreAvailability` doesn't offer.
+    public static func summaries() -> [GameSummary] {
+        LoadLibrary(stores: Set(GameStore.allCases)).summaries()
+    }
 
     /// The player's library — see `LoadLibrary.library()`.
     public static func library() -> [GameSummary] { LoadLibrary().library() }
