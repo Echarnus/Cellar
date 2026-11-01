@@ -32,8 +32,26 @@ public enum GameApp {
 
     /// Where the game apps live. Not `~/Applications`: these are runtime plumbing, not something
     /// to open from Finder — double-clicking one would run Wine with no program.
-    public static func bundleURL(slug: String) -> URL {
+    public static func bundleURL(name: String, slug: String) -> URL {
+        Paths.gameApps.appendingPathComponent("\(fileName(for: name, slug: slug)).app", isDirectory: true)
+    }
+
+    /// Where versions before the bundle took the game's name kept it: `<slug>.app`. The Dock names
+    /// a running app after its bundle's file name, so that one showed "fallout-shelter".
+    static func legacyBundleURL(slug: String) -> URL {
         Paths.gameApps.appendingPathComponent("\(slug).app", isDirectory: true)
+    }
+
+    /// The bundle's file name: the game's own name, exactly as the player reads it, because that is
+    /// what the Dock, ⌘-Tab and Activity Monitor show. A `/` cannot be in a file name and a `:` is
+    /// shown as `/` by Finder, so both become the look-alike characters macOS uses in their place.
+    static func fileName(for name: String, slug: String) -> String {
+        let cleaned = name
+            .replacingOccurrences(of: "/", with: "\u{2215}")   // ∕ division slash
+            .replacingOccurrences(of: ":", with: "\u{A789}")   // ꞉ modifier letter colon
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, !cleaned.hasPrefix(".") else { return slug }
+        return cleaned
     }
 
     /// How to start the game from its app: the loader to copy into it, the `argv[0]` to give that
@@ -117,7 +135,10 @@ public enum GameApp {
         if ProcessInfo.processInfo.environment[disableVariable] == "1" { return nil }
         guard let loader = loader(for: runnerBinary) else { return nil }
         let fm = FileManager.default
-        let app = bundleURL(slug: slug)
+        let app = bundleURL(name: name, slug: slug)
+        // A bundle from before it took the game's name is replaced by this one, not kept beside it.
+        let legacy = legacyBundleURL(slug: slug)
+        if legacy.standardizedFileURL != app.standardizedFileURL { try? fm.removeItem(at: legacy) }
         let contents = app.appendingPathComponent("Contents", isDirectory: true)
         let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
         let resources = contents.appendingPathComponent("Resources", isDirectory: true)
