@@ -10,7 +10,10 @@ it changes. It fails (exit 1), naming each problem, when the PR:
   - has no "How it was verified" section, or ticks nothing in it;
   - changes Swift under app/src/ but no test under app/tests/, unless it says why on a line of its own:
         No tests needed: <the reason>
-    A reason is a sentence about this change ("only reflows a comment"), not a shrug.
+    A reason is a sentence about this change ("only reflows a comment"), not a shrug;
+  - changes app code, a profile or the Dock shim without a "Delivery checklist" section, or leaves a
+    box in it unticked without saying why after "n/a:" (docs/DELIVERY-CHECKLIST.md);
+  - asks players to run a command in its "Notes for the release": Cellar repairs itself (check P1).
 
 Bots that open PRs from a template of their own (Dependabot) are exempt; their changes are covered
 by the build and tests like anyone else's.
@@ -29,6 +32,13 @@ NEXT_HEADING = re.compile(r"^#{1,3}\s", re.MULTILINE)
 TICKED = re.compile(r"^\s*[-*]\s*\[[xX]\]\s*\S", re.MULTILINE)
 NO_TESTS = re.compile(r"^\s*No tests needed:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+DELIVERY_HEADING = re.compile(r"^#{2,3}\s*Delivery checklist\s*$", re.IGNORECASE | re.MULTILINE)
+RELEASE_HEADING = re.compile(r"^#{2,3}\s*Notes for the release\s*$", re.IGNORECASE | re.MULTILINE)
+BOX = re.compile(r"^\s*[-*]\s*\[(?P<mark>[ xX])\]\s*(?P<text>.*)$", re.MULTILINE)
+NOT_APPLICABLE = re.compile(r"\bn/a:\s*(?P<reason>.*)$", re.IGNORECASE)
+# A command handed to the player: a fenced block, a "$ " prompt, or inline code that starts with a shell verb.
+SHELL_VERBS = r"(?:sh|bash|zsh|cd|sudo|cellar|curl|cp|mv|rm|defaults|xattr|chmod|open|python3?|swift|git)"
+PLAYER_COMMAND = re.compile(r"```|^\s*\$\s+\S|`" + SHELL_VERBS + r"\s[^`]*`", re.MULTILINE)
 
 # Words that are not a reason. The point of the line is to make the author think about it once.
 NON_REASONS = {"n/a", "na", "none", "no", "-", "trivial", "small change", "tbd", "todo"}
@@ -59,6 +69,32 @@ def touches_tests(files):
                for f in files)
 
 
+def touches_delivery(files):
+    """Anything that can change what a player gets: app code, a game profile, the Dock shim."""
+    return touches_code(files) or any(f.startswith(("profiles/", "app/Shim/")) for f in files)
+
+
+def delivery_problems(checklist):
+    """The unticked delivery boxes that do not say why they cannot apply, as one sentence."""
+    boxes = list(BOX.finditer(checklist))
+    if not boxes:
+        return ['The "Delivery checklist" section has no boxes. Copy them from the PR template.']
+    open_lines = []
+    for box in boxes:
+        if box.group("mark") != " ":
+            continue
+        text = box.group("text").strip()
+        reason = NOT_APPLICABLE.search(text)
+        if not reason or len(reason.group("reason").strip()) < 8:
+            open_lines.append(text.split(":")[0].strip() or text)
+    if not open_lines:
+        return []
+    return ["Delivery checklist: " + ", ".join(open_lines) + (" is" if len(open_lines) == 1 else " are")
+            + ' unticked. Tick each once its evidence is in this PR, or say on the same line why it '
+            'cannot apply after "n/a:" (docs/DELIVERY-CHECKLIST.md).']
+    return found
+
+
 def problems(body, files, author=""):
     """Every reason this PR is not ready, as sentences a contributor can act on."""
     if author in BOTS:
@@ -86,6 +122,19 @@ def problems(body, files, author=""):
             found.append("This changes Swift under app/src/ but no test under app/tests/. Add or update a test "
                          "that fails without the change, or explain on its own line: "
                          '"No tests needed: <why this change cannot be tested or is already covered>".')
+
+    if touches_delivery(files):
+        checklist = section(body, DELIVERY_HEADING)
+        if checklist is None:
+            found.append('Add the "## Delivery checklist" section from the PR template: this changes what a '
+                         "player gets, so every line in docs/DELIVERY-CHECKLIST.md is answered before it merges.")
+        else:
+            found.extend(delivery_problems(checklist))
+
+    notes = section(body, RELEASE_HEADING)
+    if notes and PLAYER_COMMAND.search(notes):
+        found.append('"Notes for the release" asks players to run a command. Players never need Terminal '
+                     "(check P1): make Cellar do it, and describe what the player sees instead.")
     return found
 
 

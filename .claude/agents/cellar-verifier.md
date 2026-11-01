@@ -62,6 +62,11 @@ definition [`agents/verifier.md`](../../agents/verifier.md) for the full checkli
   tested-hardware `notes` — and `status = "playable"` only where somebody actually played it.
   Parser-safe: scalars only, no `#` inside values, no duplicate key names across sections.
 
+## 2c. The delivery checklist
+- Every line of [`docs/DELIVERY-CHECKLIST.md`](../../docs/DELIVERY-CHECKLIST.md) that applies is
+  ticked in the PR with evidence (a `cellar verify` report for every G line), and every `n/a:` really
+  cannot apply. A G line ticked without a report, or a "please check" handed to Kenneth, is a finding.
+
 ## 3. Hard project rules (AGENTS.md → *Hard project rules*)
 No bundled D3DMetal or game files; no DRM/anti-cheat circumvention; nothing gitignored is being
 committed (`git status`); commit messages carry no attribution trailers.
