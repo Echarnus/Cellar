@@ -37,6 +37,12 @@ Closes #80
 - [x] Tests pass (`sh Scripts/test.sh`)
 - [ ] Wine tiers
 
+## Delivery checklist
+
+- [x] A1 proven: report linked above
+- [ ] G4 stays-up: n/a: this changes no launch path
+- [ ] P5 responsive — n/a: no screen changes in this PR
+
 ## Notes for the release
 """
 
@@ -56,7 +62,8 @@ class PRChecklistTests(unittest.TestCase):
         with open(os.path.join(os.path.dirname(ROOT), ".github", "pull_request_template.md"), encoding="utf-8") as handle:
             template = handle.read()
         found = check_pr.problems(template, ["app/Packages/CellarData/Sources/CellarData/Game.swift"])
-        self.assertEqual(len(found), 3, found)
+        self.assertEqual(len(found), 4, found)
+        self.assertTrue(any("A1 proven" in f and "P5 responsive" in f for f in found), found)
 
     def test_an_issue_link_is_required(self):
         found = check_pr.problems(GOOD.replace("Closes #80", "See the thread."), ["README.md"])
@@ -87,6 +94,40 @@ class PRChecklistTests(unittest.TestCase):
 
     def test_non_swift_changes_do_not_need_tests(self):
         self.assertEqual(check_pr.problems(GOOD, ["docs/TESTING.md", "profiles/witcher-3.toml"]), [])
+
+    def test_the_delivery_checklist_is_answered_for_anything_a_player_gets(self):
+        for path in ("app/src/CellarApp/App/AppModel.swift", "profiles/witcher-3.toml", "app/Shim/cellar-dock-shim.c"):
+            self.assertTrue(check_pr.touches_delivery([path]), path)
+        self.assertFalse(check_pr.touches_delivery(["docs/TESTING.md", ".github/workflows/ci.yml", "pages/gen-site.py"]))
+        body = GOOD[:GOOD.index("## Delivery checklist")] + "## Notes for the release\n"
+        found = check_pr.problems(body, ["profiles/witcher-3.toml"])
+        self.assertTrue(any("## Delivery checklist" in f for f in found), found)
+        self.assertEqual(check_pr.problems(body, ["docs/TESTING.md"]), [])
+
+    def test_an_unticked_delivery_line_needs_a_real_reason(self):
+        files = ["profiles/witcher-3.toml"]
+        for line in ("- [ ] G4 stays-up", "- [ ] G4 stays-up: n/a:", "- [ ] G4 stays-up: n/a: no"):
+            body = GOOD.replace("- [ ] G4 stays-up: n/a: this changes no launch path", line)
+            found = check_pr.problems(body, files)
+            self.assertEqual(len(found), 1, (line, found))
+            self.assertIn("G4 stays-up is unticked", found[0])
+        self.assertEqual(check_pr.problems(GOOD, files), [])
+
+    def test_a_delivery_checklist_without_boxes_fails(self):
+        body = GOOD.replace("- [x] A1 proven: report linked above\n", "").replace(
+            "- [ ] G4 stays-up: n/a: this changes no launch path\n", "").replace(
+            "- [ ] P5 responsive — n/a: no screen changes in this PR\n", "")
+        self.assertTrue(any("has no boxes" in f for f in check_pr.problems(body, ["profiles/witcher-3.toml"])))
+
+    def test_release_notes_never_hand_players_a_command(self):
+        for notes in ("Run `sh app/Scripts/restore.sh` first.", "```\ncellar repair\n```",
+                      "$ xattr -dr com.apple.quarantine Cellar.app", "Paste `cd ~ && cp a b` into Terminal."):
+            body = GOOD + notes + "\n"
+            self.assertTrue(any("Players never need Terminal" in f for f in check_pr.problems(body, [])), notes)
+        fine = GOOD + "Planet Coaster 2 shows all your DLC. The `Repairing` step takes a minute.\n"
+        self.assertEqual(check_pr.problems(fine, []), [])
+        # A command elsewhere in the PR (how it was verified) is evidence, not an instruction to players.
+        self.assertEqual(check_pr.problems(GOOD.replace("Fixes the launch.", "Ran `sh app/Scripts/test.sh`."), []), [])
 
     def test_dependabot_is_exempt(self):
         self.assertEqual(check_pr.problems("Bumps foo.", ["Package.resolved"], author="dependabot[bot]"), [])
