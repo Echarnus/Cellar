@@ -130,50 +130,75 @@ struct GameDetailView: View {
     ///
     /// A launch is not like the other commands: `cellar launch` stays alive for the whole session so
     /// it can close the layer afterwards, so a plain "busy" spinner would sit there saying
-    /// "Launching" for the length of the game. Playing is its own state, and it gets said.
+    /// "Launching" for the length of the game. Playing is its own state, and it gets said. And each
+    /// page speaks only for its own game (`GamePageStatus`): another game's launch is not this one's.
     @ViewBuilder private var status: some View {
-        if runner.phase == .playing, runner.launchingSlug == game.slug {
+        switch GamePageStatus.of(game.slug, runner: runner.forPages, queuePosition: queuePosition) {
+        case .playing:
             Label("Playing", systemImage: "play.circle.fill")
                 .font(.callout.weight(.medium)).foregroundStyle(.green)
                 .help("\(game.name) is running. Quit the game and Cellar tidies up after it.")
-        } else if runner.busy, runner.installingSlug == game.slug {
+        case .installing:
             InstallProgressBar(game: game.name, store: game.store, progress: runner.installProgress)
             Button("Cancel") { downloads.cancel(game.slug) }
                 .help("Stop installing \(game.name). What has downloaded stays, and Install picks up from there.")
-        } else if case .queued(let position) = activity {
+        case .queued(let position):
             Label(activity?.statusText ?? "", systemImage: "clock")
                 .font(.callout).foregroundStyle(.secondary)
                 .help(position == 1 ? Text("\(game.name) starts downloading when Cellar is done with what it is doing now.")
                                     : Text("\(game.name) starts downloading after the games ahead of it in the queue."))
             Button("Remove from queue") { downloads.cancel(game.slug) }
                 .buttonStyle(.link)
-        } else if runner.busy, runner.installingSlug != nil {
-            // Another game is downloading. This page is about this game: it says what Install will
-            // do now, not what the other game is doing (that is in the sidebar's downloads panel).
+        case .anotherGameDownloading:
+            // This page is about this game: it says what Install will do now, not what the other
+            // game is doing (that is in the sidebar's downloads panel).
             if queuesOnPress {
-                Text("Cellar is downloading another game. Install adds this one to the queue.")
-                    .font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                waitNote(Text("Cellar is downloading another game. Install adds this one to the queue."))
             } else if game.nextStep == .play {
-                Text("Play is available once the download in progress has finished.")
-                    .font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                waitNote(Text("Play is available once the download in progress has finished."))
             }
-        } else if runner.busy {
+        case .anotherGameRunning:
+            // Another game is starting or being played, and Cellar stays with it until it quits.
+            if queuesOnPress {
+                waitNote(Text("Another game is running. Install adds this one to the queue."))
+            } else if game.nextStep == .play {
+                waitNote(Text("Play is available once the other game has closed."))
+            }
+        case .anotherGameBusy:
+            if queuesOnPress {
+                waitNote(Text("Cellar is busy with another game. Install adds this one to the queue."))
+            } else if game.nextStep == .play {
+                waitNote(Text("Play is available once Cellar has finished with the other game."))
+            }
+        case .busy(let title, let launch):
             ProgressView().controlSize(.small)
-            Text(runner.busyTitle).font(.callout).foregroundStyle(.secondary)
-            if runner.launchingSlug == game.slug {
+            Text(title).font(.callout).foregroundStyle(.secondary)
+            if launch {
                 Button("Show progress") { LaunchSplashWindow.present(game: game, runner: runner) }
                     .buttonStyle(.link)
                     .help("Bring the launch window back.")
             }
-        } else if model.measuringRemoval {
-            // Measuring runs before the uninstall sheet appears, and it touches the disk, so the
-            // gap has to be accounted for rather than looking like a dead button.
-            ProgressView().controlSize(.small)
-            Text("Working out what would be deleted…")
-                .font(.callout).foregroundStyle(.secondary)
+        case .idle:
+            if model.measuringRemoval {
+                // Measuring runs before the uninstall sheet appears, and it touches the disk, so the
+                // gap has to be accounted for rather than looking like a dead button.
+                ProgressView().controlSize(.small)
+                Text("Working out what would be deleted…")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
         }
+    }
+
+    /// Where this game stands in the downloads queue, if it is waiting there.
+    private var queuePosition: Int? {
+        if case .queued(let position) = activity { return position }
+        return nil
+    }
+
+    /// Why this page's button is waiting on another game, in the page's own quiet voice.
+    private func waitNote(_ text: Text) -> some View {
+        text.font(.callout).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// The "…" menu: what a player reaches for, then a Troubleshooting submenu for everything that

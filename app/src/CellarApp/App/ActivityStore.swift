@@ -111,14 +111,14 @@ final class ActivityStore {
              observe: (@MainActor (String) -> Void)? = nil,
              then: (@MainActor () -> Void)? = nil) {
         run(arguments: command.arguments, title: title, stages: command.reportsStages,
-            observe: observe, then: then)
+            game: command.game, observe: observe, then: then)
     }
 
-    private func run(arguments args: [String], title: String, stages: Bool,
+    private func run(arguments args: [String], title: String, stages: Bool, game: String?,
                      observe: (@MainActor (String) -> Void)?,
                      then: (@MainActor () -> Void)?) {
         guard !busy else { return }
-        busy = true; busyTitle = title; phase = .working
+        busy = true; busyTitle = title; phase = .working; workingOn = game
         stage = nil; attempt = 0; exitCode = nil; cancelled = false; launchingSlug = nil
         installProgress = nil; installingSlug = nil; latestProgress = nil
         lines = OutputLines()
@@ -256,6 +256,17 @@ final class ActivityStore {
 
     /// The game currently being launched, if the running command is a launch.
     private(set) var launchingSlug: String?
+
+    /// The game the running command works on, nil for work that belongs to Cellar as a whole.
+    private(set) var workingOn: String?
+
+    /// The runner as a game's page sees it (`GamePageStatus`), so each page says only what is
+    /// happening to its own game.
+    var forPages: GamePageStatus.Runner {
+        GamePageStatus.Runner(busy: busy, game: workingOn, title: busyTitle,
+                              launching: launchingSlug != nil, installing: installingSlug != nil,
+                              playing: phase == .playing)
+    }
 
     /// Whether the last command was called off rather than failing on its own — a non-zero exit the
     /// player asked for is not an error to report back to them.

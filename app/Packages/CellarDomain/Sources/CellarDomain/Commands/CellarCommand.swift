@@ -109,6 +109,25 @@ public enum CellarCommand: Equatable, Sendable {
         }
     }
 
+    /// The game this command works on, or nil for work that belongs to Cellar as a whole (a
+    /// sign-in, the library, the shared runtime). A game's page shows only its own game's work:
+    /// Skyrim's page used to say "Launching" while Planet Coaster 2 started.
+    public var game: String? {
+        switch self {
+        case .prepare, .uninstallCellar, .refreshLibrary, .draftProfiles, .updateProfiles,
+             .steamSignIn, .steamSignOut, .gogSignIn, .gogSignOut, .gogStatus,
+             .battleNetAdd, .battleNetForget, .cleanStorage:
+            return nil
+        case .setUp(let slug), .install(let slug, _), .launch(let slug, _, _), .update(let slug),
+             .checkForUpdate(let slug), .uninstall(let slug, _), .addToApplications(let slug),
+             .backUpSaves(let slug), .restoreSaves(let slug, _), .moveToDrive(let slug, _),
+             .moveBack(let slug), .steamOpen(let slug), .steamInstall(let slug),
+             .steamAddShortcut(let slug), .battleNetOpen(let slug), .battleNetConfigure(let slug),
+             .gogInstall(let slug):
+            return slug
+        }
+    }
+
     /// One of every case, every optional part switched on and off — what `cellar selftest` parses
     /// with the CLI's own parser. Add a new case here too, or nothing checks the CLI accepts it.
     public static let examples: [CellarCommand] = [
