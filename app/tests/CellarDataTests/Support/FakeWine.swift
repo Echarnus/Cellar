@@ -83,6 +83,11 @@ enum FakeWine {
     }
 
     private static func write(_ script: String, to url: URL) throws {
+        // The last line of defence: whatever path is handed in, a fake Wine is never written
+        // outside the sandbox — not into the player's runner, not through a link (#190).
+        guard TestHome.isInside(url) else {
+            throw CellarError.ioFailure("Refusing to write a fake Wine outside the test sandbox: \(url.path)")
+        }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try script.write(to: url, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)

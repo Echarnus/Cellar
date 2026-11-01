@@ -68,7 +68,6 @@ enum IT {
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             if environment[key] != url.path { setenv(key, url.path, 1) }
         }
-        linkRealRunners()
         if steamTierEnabled { copyRealSteamSession() }
         return root
     }()
@@ -84,15 +83,24 @@ enum IT {
     ///
     /// Each runner is linked *individually*, so `Paths.runners` stays a real directory the sandbox
     /// owns; only the runner trees themselves are shared, and nothing a test does writes into them.
+    ///
+    /// Only done when a Wine tier asks for a runner (`resolveRunner`), never when the sandbox is
+    /// made: the unit suites share this home and put a fake Wine in the same place, and a link
+    /// made up front is what once let that fake land in the player's real runner (#190). A
+    /// sandbox stub found where the link belongs is the unit suites' and is replaced; the unit
+    /// suites likewise remove the link (never its target) before writing their stub.
     private static func linkRealRunners() {
         let fm = FileManager.default
-        let real = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("Cellar/runners", isDirectory: true)
+        let real = realHome.appendingPathComponent("runners", isDirectory: true)
         guard let entries = try? fm.contentsOfDirectory(at: real, includingPropertiesForKeys: nil) else { return }
         try? fm.createDirectory(at: Paths.runners, withIntermediateDirectories: true)
+        let sandboxRunners = Paths.runners.resolvingSymlinksInPath().standardizedFileURL.path
+        // Never replace anything outside the sandbox.
+        guard sandboxRunners.hasPrefix(home.resolvingSymlinksInPath().standardizedFileURL.path + "/") else { return }
         for runner in entries where RunnerCatalog.spec(forID: runner.lastPathComponent) != nil {
             let link = Paths.runners.appendingPathComponent(runner.lastPathComponent)
-            guard !fm.fileExists(atPath: link.path) else { continue }
+            if (try? fm.destinationOfSymbolicLink(atPath: link.path)) != nil { continue }
+            if fm.fileExists(atPath: link.path) { try? fm.removeItem(at: link) }
             try? fm.createSymbolicLink(at: link, withDestinationURL: runner)
         }
     }
@@ -185,6 +193,7 @@ enum IT {
     /// otherwise the catalog default, installed on demand.
     static func resolveRunner(progress: (String) -> Void = { _ in }) throws -> RunnerInstall {
         ensure()
+        linkRealRunners()
         if let preferred = value("CELLAR_IT_RUNNER") {
             if let found = RunnerManager.find(id: preferred) { return found }
             guard let spec = RunnerCatalog.spec(forID: preferred) else {
