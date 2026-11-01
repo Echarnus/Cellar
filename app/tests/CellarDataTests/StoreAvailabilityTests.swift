@@ -2,11 +2,16 @@ import CellarDomain
 import Foundation
 import Testing
 @testable import CellarData
+import CellarInfrastructure
 
 /// The first release is Steam only (#221). Battle.net and GOG stay built but hidden, behind one flag
 /// — these pin that the flag says Steam, and that everything a player reads follows it.
 @Suite("Store availability")
 struct StoreAvailabilityTests {
+
+    /// The snapshot test asks the store adapters, so wire them in here rather than relying on
+    /// another suite having run first (`--filter StoreAvailability` runs this one alone).
+    init() { CellarInfrastructure.install() }
 
     @Test("The first release offers Steam and nothing else")
     func steamOnly() {
@@ -49,9 +54,9 @@ struct StoreAvailabilityTests {
     @Test("The library's connected stores and 'any store connected' count offered stores only")
     func snapshotCountsOfferedStores() {
         let snapshot = DiskLibraryRepository().snapshot()
-        #expect(snapshot.connectedStores.allSatisfy(\.isOffered))
+        #expect(snapshot.connectedStores.allSatisfy { $0.isOffered })
         #expect(snapshot.games.allSatisfy { $0.store.isOffered })
         #expect(snapshot.withheld.allSatisfy { $0.store.isOffered })
-        #expect(StoreLibrary.hasConnectedStore == GameStore.offered.contains(where: StoreLibrary.isConnected))
+        #expect(StoreLibrary.hasConnectedStore == GameStore.offered.contains { StoreLibrary.isConnected($0) })
     }
 }

@@ -21,7 +21,8 @@ public enum StoreAvailability {
         let names = stores.sorted { $0.sortIndex < $1.sortIndex }.map(\.displayName)
         guard let last = names.last else { return "" }
         guard names.count > 1 else { return last }
-        return names.dropLast().joined(separator: ", ") + " or " + last
+        let rest = names.dropLast().joined(separator: ", ")
+        return String(localized: "\(rest) or \(last)")
     }
 }
 
