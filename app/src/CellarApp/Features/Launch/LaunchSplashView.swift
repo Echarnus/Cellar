@@ -197,11 +197,14 @@ struct LaunchSplashView: View {
     private var outcome: Outcome {
         if runner.busy {
             // `cellar launch` stays alive for the whole session so it can close the layer after.
-            // Reaching `playing` is the game being up, not the command being over.
-            return runner.phase == .playing ? .running : .working
+            // Reaching `playing` is the game being up, not the command being over — and `closing`
+            // is past it: the game came up and has quit, so there is no launch left to cancel.
+            if runner.phase == .playing || runner.stage == .closing { return .running }
+            return .working
         }
         if runner.cancelled { return .cancelled }
-        if runner.stage == .running || runner.stage == .playing || runner.stage == .closed { return .running }
+        if runner.stage == .running || runner.stage == .playing || runner.stage == .closing
+            || runner.stage == .closed { return .running }
         return (runner.exitCode ?? 0) == 0 ? .running : .failed
     }
 

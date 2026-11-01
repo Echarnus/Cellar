@@ -25,6 +25,9 @@ public enum LaunchStage: String, Sendable, CaseIterable {
     case running
     /// The player is playing; Cellar is waiting to close the layer behind them.
     case playing
+    /// The game has quit; Cellar is closing the store client and Wine behind it. Its own stage so
+    /// the app stops saying "Playing" the moment the game is gone, not when the teardown ends.
+    case closing
     /// The game was quit and the layer is down.
     case closed
 
@@ -49,6 +52,7 @@ public enum LaunchStage: String, Sendable, CaseIterable {
         case .waiting:   return String(localized: "Waiting for \(context.game) to appear")
         case .running:   return String(localized: "\(context.game) is running")
         case .playing:   return String(localized: "Playing")
+        case .closing:   return String(localized: "Closing down")
         case .closed:    return String(localized: "\(context.game) closed")
         }
     }
@@ -81,6 +85,10 @@ public enum LaunchStage: String, Sendable, CaseIterable {
             return String(localized: "Cellar closes everything it opened as soon as you quit.")
         case .playing:
             return String(localized: "Have fun. Cellar shuts the layer down when you quit the game.")
+        case .closing:
+            return context.throughClient
+                ? String(localized: "\(game) has quit. Cellar is closing \(context.store.displayName) and Wine behind it.")
+                : String(localized: "\(game) has quit. Cellar is closing Wine behind it.")
         case .closed:
             return String(localized: "The layer is shut down.")
         }
