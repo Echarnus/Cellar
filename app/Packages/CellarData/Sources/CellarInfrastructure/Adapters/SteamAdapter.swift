@@ -140,7 +140,8 @@ public struct SteamAdapter: StoreAdapter {
             // window and wait for the player to sign in to it.
             // Handed over now, or already remembered from a previous launch: either way the
             // client signs itself in, and the game has to wait for that to land.
-            let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
+            let readiness = SteamBottle.handOverSession(runner: wine, progress: progress)
+            let signsItself = readiness.signsInByItself
             // The guard stays unconditional: a hand-over leaves `loginusers.vdf` naming the
             // account, so it costs nothing here — and it is the only thing that catches a client
             // that is up but signed out, where the cold-start logon wait never runs.
@@ -154,6 +155,7 @@ public struct SteamAdapter: StoreAdapter {
                                             showHUD: showHUD, gameEnv: plan.launchEnv,
                                             bundledLoader: GameApp.prepare(for: plan, runner: wine),
                                             game: plan.name, expectsSignIn: signsItself,
+                                            rememberedSession: readiness == .remembered,
                                             start: plan.directStartExe,
                                             publisherLauncher: plan.publisherLauncher,
                                             workaround: plan.launchWorkaround,
@@ -164,13 +166,15 @@ public struct SteamAdapter: StoreAdapter {
             throw CellarError.invalidArgument(
                 "Windows Steam isn't installed in this bottle. Run: cellar setup --profile \(plan.slug)")
         }
-        let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
+        let readiness = SteamBottle.handOverSession(runner: wine, progress: progress)
+        let signsItself = readiness.signsInByItself
         progress("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…")
         if let launcher = plan.publisherLauncher {
             progress("Steam hands \(plan.name) to the \(launcher.displayName). If it asks, sign in with your \(launcher.accountNoun) there.")
         }
         try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: showHUD,
                                           gameEnv: plan.launchEnv, game: plan.name, expectsSignIn: signsItself,
+                                          rememberedSession: readiness == .remembered,
                                           workaround: plan.launchWorkaround,
                                           progress: progress, stage: stage)
         stage(.running)

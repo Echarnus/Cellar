@@ -258,6 +258,44 @@ struct SteamClientSessionTests {
         #expect(SteamClientSession.readiness(Self.snapshot(users: users)) == .canHandOver)
     }
 
+    @Test("A remembered session that doesn't sign in is retried with Cellar's own, after a shorter wait")
+    func rememberedSessionGetsAFreshHandOver() {
+        // Kenneth's Mac, 2026-11-01: the bottle remembered a session Steam no longer used, Steam never
+        // even tried it, and four launches waited three minutes and then blamed the sign-in.
+        #expect(SteamClientSession.retriesWithFreshSession(rememberedSession: true))
+        #expect(!SteamClientSession.retriesWithFreshSession(rememberedSession: false),
+                "a session Cellar just handed over is the one it holds: trying it twice proves nothing")
+        #expect(SteamClientSession.logonTimeout(rememberedSession: true) < SteamClientSession.logonTimeout(rememberedSession: false),
+                "the remembered try is cut shorter, because a fresh hand-over still follows it")
+        #expect(SteamClientSession.logonTimeout(rememberedSession: false) == 180)
+        #expect(SteamClientSession.logonTimeout(rememberedSession: true) + SteamClientSession.logonTimeout(rememberedSession: false) <= 300,
+                "both tries together stay within five minutes")
+    }
+
+    @Test("Taking a remembered session back makes the bottle one Cellar can hand its session to")
+    func forgettingARememberedSessionAllowsAHandOver() throws {
+        let dir = TestHome.scratch("remembered")
+        let prefix = dir.appendingPathComponent("prefix", isDirectory: true)
+        let steam = dir.appendingPathComponent("steam", isDirectory: true)
+        let local = SteamClientSession.localConfig(in: prefix, wineUser: "player")
+        let usersFile = SteamClientSession.loginUsersFile(steamDirectory: steam)
+        try FileManager.default.createDirectory(at: local.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: usersFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let key = SteamClientSession.connectCacheKey(account: "someaccount")
+        try "\"MachineUserConfigStore\"\n{\n\t\"Software\"\n\t{\n\t\t\"Valve\"\n\t\t{\n\t\t\t\"Steam\"\n\t\t\t{\n\t\t\t\t\"ConnectCache\"\n\t\t\t\t{\n\t\t\t\t\t\"\(key)\"\t\t\"00\"\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}\n"
+            .write(to: local, atomically: true, encoding: .utf8)
+        try "\"users\"\n{\n\t\"76561197960265728\"\n\t{\n\t\t\"AccountName\"\t\t\"someaccount\"\n\t\t\"MostRecent\"\t\t\"1\"\n\t}\n}\n"
+            .write(to: usersFile, atomically: true, encoding: .utf8)
+        func now() -> SteamClientSession.Readiness {
+            SteamClientSession.readiness(Self.snapshot(
+                local: try? String(contentsOf: local, encoding: .utf8),
+                users: try? String(contentsOf: usersFile, encoding: .utf8)))
+        }
+        #expect(now() == .remembered)
+        SteamClientSession.forget(account: "someaccount", prefix: prefix, steamDirectory: steam, wineUser: "player")
+        #expect(now() == .canHandOver, "the retry hands over Cellar's session instead of trusting the stale one again")
+    }
+
     @Test("Steam's verdict is read from connection_log.txt, the last logon winning")
     func logonResult() {
         let ok = """
