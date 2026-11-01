@@ -69,6 +69,9 @@ public enum ProcessWatch {
     ///   - isUp:    whether the game's own process is alive.
     ///   - appearSeconds: how long to wait for it to show up at all.
     ///   - settleSeconds: how long it must then stay up to count as launched.
+    ///   - keepWaiting: asked while waiting for the game to appear; false ends that wait early, as a
+    ///     game that didn't appear. For a long wait that something else has to stay up for — the
+    ///     Rockstar launcher while the player signs in — so a closed launcher is not waited out.
     ///   - stage: coarse step reporting for the app's launch window; a retry legitimately goes back
     ///     to `.starting`, which is what makes a second attempt visible rather than a stall.
     public static func superviseStart(attempts: Int,
@@ -78,6 +81,7 @@ public enum ProcessWatch {
                                       cleanup: () -> Void,
                                       start: () throws -> Void,
                                       isUp: () -> Bool,
+                                      keepWaiting: () -> Bool = { true },
                                       progress: (String) -> Void = { _ in },
                                       stage: (LaunchStage) -> Void = { _ in }) throws {
         for attempt in 1...max(1, attempts) {
@@ -93,6 +97,7 @@ public enum ProcessWatch {
             while Date() < appearDeadline {
                 Thread.sleep(forTimeInterval: 2)
                 if isUp() { appeared = true; break }
+                if !keepWaiting() { break }
             }
             if !appeared {
                 progress("Attempt \(attempt): the game didn't start; retrying…")

@@ -221,6 +221,56 @@ struct GameSummaryTests {
         #expect(summary().id == "fixture")
     }
 
+    // MARK: - A publisher's launcher behind the store
+
+    private func rockstar(installed: Bool, gameInstalled: Bool = true,
+                          clientSignsInByItself: Bool = true) -> GameSummary {
+        var game = summary(account: nil, gameInstalled: gameInstalled, clientSignsInByItself: clientSignsInByItself)
+        game.publisherLauncher = .rockstar
+        game.publisherLauncherInstalled = installed
+        return game
+    }
+
+    @Test("A missing publisher launcher is setup, and the copy says its installer opens a window")
+    func missingLauncherIsSetup() {
+        let game = rockstar(installed: false)
+        #expect(game.launcherSetupPending)
+        #expect(game.setupPending)
+        #expect(game.nextStep == .setup)
+        #expect(game.actionHint == "Cellar sets up the Rockstar Games Launcher this game starts through. Its installer opens a window and needs a few clicks from you.")
+    }
+
+    @Test("Install says the launcher's installer comes first and needs clicks, then the download needs none")
+    func installNamesTheLauncherFirst() {
+        let game = rockstar(installed: false, gameInstalled: false)
+        #expect(game.nextStep == .install)
+        #expect(game.actionHint.hasPrefix("Cellar first sets up the Rockstar Games Launcher"))
+        #expect(game.actionHint.contains("from your Steam library"))
+    }
+
+    @Test("Play names Rockstar's sign-in as the player's step, and never claims it is done")
+    func playNamesTheRockstarSignIn() {
+        let game = rockstar(installed: true)
+        #expect(!game.launcherSetupPending)
+        #expect(game.nextStep == .play)
+        #expect(game.actionHint == "Installed. Play starts Steam quietly, then the Rockstar Games Launcher opens. Sign in with your Rockstar Games account there the first time, and it starts the game.")
+    }
+
+    @Test("Steam's own sign-in, when Cellar can't hand it over, still comes first on Play")
+    func steamSignInStillComesFirst() {
+        let game = rockstar(installed: true, clientSignsInByItself: false)
+        #expect(game.clientSignInPending)
+        #expect(game.actionHint.contains("Steam's window"))
+    }
+
+    @Test("A game with no publisher launcher never mentions one")
+    func noLauncherNoMention() {
+        let game = summary()
+        #expect(game.publisherLauncher == nil)
+        #expect(!game.launcherSetupPending)
+        #expect(!game.actionHint.contains("Launcher"))
+    }
+
     // MARK: - Facts
 
     @Test("Facts list only what the profile actually states")

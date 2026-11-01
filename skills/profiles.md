@@ -65,6 +65,12 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   Optional `network_check` — space-separated `https://` addresses of the game's own online services
   (a workshop, an account server) that `cellar network <slug>` probes on top of the store's. Only
   addresses you have seen the game use or the publisher documents; a guessed host proves nothing.
+- **`publisher_launcher`** (optional) — a publisher's own launcher the game starts through as well as
+  its store. Only `"rockstar"` exists: Steam's Rockstar games hand off to the Rockstar Games Launcher,
+  which setup installs into the bottle (`RockstarLauncher`). With it, **`start_exe`** — the program to
+  start when it is not the game's own process (`PlayRDR2.exe`, Steam's stub); `exe` stays the game
+  (`RDR2.exe`), because that is what Cellar watches. An unknown launcher value is refused by
+  `Game.plan`. See `red-dead-redemption-2.toml`.
 - **`[runner]`** — `id`, `windows_version`. **`[graphics]`** — `backend`, `fallback_backend`.
   `fallback_backend` is live: when a launch starts the game but it never comes up, the launch window
   (and `cellar launch`) offers it once, and a switch that works is kept in the bottle as

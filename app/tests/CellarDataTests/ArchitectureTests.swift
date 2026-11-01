@@ -69,7 +69,7 @@ struct ArchitectureTests {
                       "CheckStatus", "DetectedGraphicsAPI", "PerformanceSetting", "GameLanguage",
                       "GameSummary", "GameFacts", "UpdateState", "PlayRecord", "LibraryVerdict",
                       "LibraryQuery", "LibrarySection", "LibrarySnapshot", "SteamSignInState",
-                      "LibraryRepository"])
+                      "LibraryRepository", "PublisherLauncher"])
     func modelsLiveInTheDomain(_ type: String) throws {
         func declares(_ folder: String) throws -> Bool {
             try Self.sources(in: folder).contains { $0.file == "\(type).swift" }

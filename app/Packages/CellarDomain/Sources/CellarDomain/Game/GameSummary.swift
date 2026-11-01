@@ -80,9 +80,19 @@ public struct GameSummary: Identifiable, Sendable {
     /// launches itself needs none, and demanding one would be an invented 1.4 GB step.
     public var setupPending: Bool {
         if !runnerInstalled { return true }
+        if launcherSetupPending { return true }
         guard store.descriptor.installsClientInBottle, !clientInstalled else { return false }
         return needsLiveSession || !store.descriptor.hasSilentInstaller
     }
+
+    /// A publisher's launcher the game starts through as well as its store — the Rockstar Games
+    /// Launcher for Steam's Rockstar games (`PublisherLauncher`). Nil for every other game.
+    public var publisherLauncher: PublisherLauncher? = nil
+    /// Whether that launcher is in the bottle. Meaningless without `publisherLauncher`.
+    public var publisherLauncherInstalled = true
+
+    /// Setup still has the publisher's launcher to install — an installer with a window of its own.
+    public var launcherSetupPending: Bool { publisherLauncher != nil && !publisherLauncherInstalled }
 
     /// The primary button's title. Store-specific on purpose: "Install" means something different
     /// in a client that installs games for you than in one Cellar drives itself.
@@ -113,6 +123,9 @@ public struct GameSummary: Identifiable, Sendable {
     public var actionHint: String {
         switch nextStep {
         case .setup:
+            if let publisherLauncher, launcherSetupPending {
+                return String(localized: "Cellar sets up the \(publisherLauncher.displayName) this game starts through. Its installer opens a window and needs a few clicks from you.")
+            }
             return store.descriptor.hasSilentInstaller
                 ? String(localized: "Cellar installs the Windows runtime and \(store.displayName) for this game. One click, a few minutes.")
                 : String(localized: "Cellar installs the Windows runtime, then opens Blizzard's installer — that one needs a few clicks from you, because Battle.net ships no silent install.")
@@ -123,6 +136,9 @@ public struct GameSummary: Identifiable, Sendable {
             // The first game on a Mac also fetches the Windows runtime. Saying so up front is what
             // keeps a few extra minutes from reading as a stall. Whole sentences either way, so a
             // translation never has to glue a clause onto another.
+            if let publisherLauncher, launcherSetupPending {
+                return String(localized: "Cellar first sets up the \(publisherLauncher.displayName) this game starts through — its installer opens a window and needs a few clicks from you. Then it downloads the game from your \(store.displayName) library, with nothing more to click.")
+            }
             switch (store, setupPending) {
             case (.steam, false):
                 return String(localized: "Cellar downloads it from your Steam library with the sign-in you already gave it. No Steam window, nothing to click.")
@@ -140,6 +156,11 @@ public struct GameSummary: Identifiable, Sendable {
         case .play:
             if updatePending {
                 return String(localized: "A newer version is out. Play downloads only what changed, then starts the game.")
+            }
+            if let publisherLauncher, needsClientAtRuntime, !clientSignInPending {
+                // Cellar can't see the launcher's sign-in, so this says what happens either way
+                // rather than promising there is nothing to do.
+                return String(localized: "Installed. Play starts \(store.displayName) quietly, then the \(publisherLauncher.displayName) opens. Sign in with your \(publisherLauncher.accountNoun) there the first time, and it starts the game.")
             }
             if clientSignInPending {
                 return String(localized: "Installed. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game.")

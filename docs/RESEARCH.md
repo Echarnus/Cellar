@@ -223,3 +223,31 @@ Levers looked at, and why they are or are not in:
   Game Mode is on; check it before and after any change to the game's process identity.
 - **MoltenVK knobs** (`MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS`, `MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS`)
   only matter on the DXVK fallback; not changed without a game that uses it to measure on.
+
+## Update 2026-10-31 — Rockstar's games: Red Dead Redemption 1 and 2, and the launcher (#183)
+
+- **Steam's copies start through the Rockstar Games Launcher.** Steam runs `PlayRDR2.exe`, which hands
+  off to the launcher; the launcher signs in to a Rockstar Games account and starts `RDR2.exe` with
+  `-useSteam` (a Windows log quoted in ValveSoftware/Proton issue 3291). Steam installs the launcher
+  itself on Windows; a depot download does not.
+- **The installer.** `https://gamedownloads.rockstargames.com/public/installer/Rockstar-Games-Launcher.exe`,
+  run without silent switches by Lutris's GTA V script, which then closes the launcher before sign-in.
+  The launcher lands in `C:\Program Files\Rockstar Games\Launcher\Launcher.exe`.
+- **The weak point is the sign-in window**, drawn by `SocialClubHelper.exe` (embedded Chromium). It is
+  most of the failures in Proton issue 3291; workarounds there are fragile and unconfirmed, so Cellar
+  applies none until one is seen to work on a Mac.
+- **RDR2 on Apple Silicon.** CrossOver 25 (March 2025) shipped RDR2 support. iphones.ru measured an M1
+  Pro at about 45 FPS (1080p, low), about 25 (medium), about 20 (ultra), with flickering cloud shadows
+  and memory growth that ends in swapping. An older AppleGamingWiki report (M2 Air) saw a Vulkan crash
+  after a few minutes; DirectX 12 is the renderer to pick for D3DMetal.
+- **RDR1 (2024 PC, Steam 2668510).** Steam's launch target is `PlayRDR.exe`. No Apple Silicon report
+  was found; the game exe name and folder in its profile are unverified until it is installed.
+
+### Sources
+
+- Lutris, *Grand Theft Auto V — Rockstar Games Launcher* installer: https://lutris.net/games/install/9386/view
+- ValveSoftware/Proton issue 3291 (Red Dead Redemption 2): https://github.com/ValveSoftware/Proton/issues/3291
+- iphones.ru, CrossOver 25 with RDR2 on M1 Pro: https://www.iphones.ru/iNotes/protestiroval-novuyu-programmu-crossover-25-dlya-zapuska-igr-na-mac-kak-rabotaet-red-dead-redemption-2-na-m1-i-m4
+- 9to5Mac, CrossOver 25: https://9to5mac.com/2025/03/11/crossover-25-red-dead-redemption-2-macos/
+- AppleGamingWiki, Red Dead Redemption 2: https://applegamingwiki.com/wiki/Red_Dead_Redemption_2
+- KeenGamer, Red Dead Redemption PC troubleshooting (PlayRDR.exe): https://www.keengamer.com/articles/features/troubleshooting/6-ways-to-fix-red-dead-redemption-not-launching-on-windows-pcs

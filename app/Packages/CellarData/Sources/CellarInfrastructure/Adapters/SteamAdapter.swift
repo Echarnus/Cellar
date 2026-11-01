@@ -128,6 +128,12 @@ public struct SteamAdapter: StoreAdapter {
                 throw CellarError.invalidArgument(
                     "\(plan.name) needs a running Steam client for its DRM, and this bottle has none. Run: cellar setup --profile \(plan.slug)")
             }
+            // Steam's stub hands off to the publisher's launcher; without it there is nothing to
+            // hand off to, and the game never appears.
+            if let launcher = plan.publisherLauncher, !launcher.isInstalled(in: plan.prefix) {
+                throw CellarError.invalidArgument(
+                    "\(plan.name) starts through the \(launcher.displayName), and this bottle doesn't have it yet. Run: cellar setup --profile \(plan.slug)")
+            }
             // A client nobody is signed in to would move the failure to the game's own licence
             // check, where it looks like the game is broken. So the client is handed the session
             // the player gave Cellar; only when that can't be done does Play open the client's
@@ -148,6 +154,8 @@ public struct SteamAdapter: StoreAdapter {
                                             showHUD: showHUD, gameEnv: plan.launchEnv,
                                             bundledLoader: GameApp.prepare(for: plan, runner: wine),
                                             game: plan.name, expectsSignIn: signsItself,
+                                            start: plan.directStartExe,
+                                            publisherLauncher: plan.publisherLauncher,
                                             progress: progress, stage: stage)
             return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
         }
@@ -157,6 +165,9 @@ public struct SteamAdapter: StoreAdapter {
         }
         let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
         progress("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…")
+        if let launcher = plan.publisherLauncher {
+            progress("Steam hands \(plan.name) to the \(launcher.displayName). If it asks, sign in with your \(launcher.accountNoun) there.")
+        }
         try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: showHUD,
                                           gameEnv: plan.launchEnv, game: plan.name, expectsSignIn: signsItself,
                                           progress: progress, stage: stage)
