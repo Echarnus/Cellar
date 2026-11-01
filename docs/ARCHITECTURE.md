@@ -306,7 +306,7 @@ whose bundle declares `LSApplicationCategoryType = public.app-category.games`, a
 the bundle the process's executable sits in. The player's launcher in `~/Applications` does not
 count — it is a shell script that hands off to `cellar`; the process on screen is bare `wine`.
 
-So `GameApp` keeps `Paths.gameApps/<slug>.app` (Application Support, not `~/Applications`: it is
+So `GameApp` keeps `Paths.gameApps/<Game Name>.app`, named as the player reads the game because the Dock labels a running app with its bundle's file name (in Application Support, not `~/Applications`: it is
 plumbing, and double-clicking it would run Wine with no program). Its executable is a byte-for-byte
 **copy** of the runner's loader — re-copied whenever the runner's changes — and its Info.plist carries
 the game's name, icon, the games category, `LSSupportsGameMode`, plus what Wine embeds in its own
