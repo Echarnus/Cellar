@@ -148,6 +148,17 @@ struct TopPlayedTests {
         #expect(!plan.canLaunchStoreFree, "the files being there does not make Steamworks go away")
     }
 
+    @Test("The 2026 releases bring their own cover, because Steam's legacy art path has none for them")
+    func coversForNewReleases() throws {
+        for slug in ["phantom-blade-zero", "probably-stolen"] {
+            let plan = try Self.plan(slug)
+            let portrait = try #require(plan.artPortraitURL, "'\(slug)' would fall back to a generated cover")
+            #expect(portrait.hasPrefix("https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/\(plan.appID ?? 0)/"))
+            #expect(portrait.hasSuffix("/library_capsule.jpg"))
+            #expect(plan.artHeroURL?.hasSuffix("/library_hero.jpg") == true)
+        }
+    }
+
     @Test("Every game gets its own bottle")
     func separateBottles() throws {
         let bottles = try Self.games.map { try Self.plan($0.slug).bottleName }

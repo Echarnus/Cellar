@@ -49,3 +49,10 @@ exe         = "Probably Stolen.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[art]
+# Released in 2026, so Steam keeps its art only under the hashed store_item_assets path; the
+# legacy /steam/apps/<id>/library_600x900.jpg the generator derives returns 404. library_capsule is
+# the same 600x900 portrait. Hotlinked from Steam's public CDN, never bundled.
+art_portrait = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4348910/5cb0a6457762778c2c3bcaaa06768bb77cc791a8/library_capsule.jpg"
+art_hero     = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4348910/5c4503e62e9ff9d138d93d972ebd1fe62af114bc/library_hero.jpg"
