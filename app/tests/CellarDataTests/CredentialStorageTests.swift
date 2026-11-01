@@ -268,4 +268,75 @@ struct CredentialStorageTests {
             #expect(!url.path.hasPrefix(DepotTool.root.path + "/"))
         }
     }
+
+    // MARK: - What a game inherits (#238)
+
+    /// The environment of an agent session or a developer's shell, as `cellar verify` would be
+    /// started from: the session basics a Mac process has, next to the secrets it must not pass on.
+    static let callerEnvironment: [String: String] = [
+        "HOME": "/Users/player", "USER": "player", "TMPDIR": "/var/folders/xy/T/", "LANG": "nl_BE.UTF-8",
+        "LC_CTYPE": "UTF-8", "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x2", "XPC_FLAGS": "0x0",
+        "SDL_HAPTIC_LG4FF_GAIN": "40000",
+        "CLAUDE_CODE_MESSAGING_TOKEN": compactToken, "CLAUDE_CODE_OAUTH_SCOPES": "user:inference user:sessions",
+        "ANTHROPIC_BASE_URL": "https://api.example.invalid", "ANTHROPIC_API_KEY": "sk-ant-api03-" + gogRefresh,
+        "GITHUB_TOKEN": "ghp_" + String(gogRefresh.prefix(36)), "AWS_SECRET_ACCESS_KEY": gogRefresh,
+        "SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.x/Listeners", "NPM_TOKEN": gogRefresh,
+        "HTTPS_PROXY": "http://user:pass@proxy.example.invalid:8080",
+    ]
+
+    static let secretNames = ["CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_OAUTH_SCOPES", "ANTHROPIC_BASE_URL",
+                              "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY", "SSH_AUTH_SOCK",
+                              "NPM_TOKEN", "HTTPS_PROXY"]
+
+    @Test("Only the session basics are inherited; no token, key, socket or proxy password is")
+    func childInheritsNoSecrets() {
+        let child = ChildEnvironment.inherited(from: Self.callerEnvironment)
+        for name in Self.secretNames { #expect(child[name] == nil, "\(name) would reach the game") }
+        #expect(child["TMPDIR"] == "/var/folders/xy/T/")
+        #expect(child["LANG"] == "nl_BE.UTF-8")
+        #expect(child["__CF_USER_TEXT_ENCODING"] == "0x1F5:0x0:0x2", "the basics a bare environment lacks stay")
+        #expect(child["SDL_HAPTIC_LG4FF_GAIN"] == "40000", "the player's own wheel setting stays")
+        for value in child.values {
+            #expect(!value.contains(Self.compactToken) && !value.contains(Self.gogRefresh))
+        }
+    }
+
+    @Test("The environment Wine is given holds none of the caller's secrets, and still runs the bottle")
+    func wineEnvironmentHasNoSecrets() throws {
+        let install = try #require(TestHome.installStubRunner())
+        let env = WineRunner(install: install, prefix: TestHome.scratch("wine-secrets"))
+            .environment(extra: ["FIXTURE_ENV_MARKER": "1"], inherited: Self.callerEnvironment)
+        for name in Self.secretNames { #expect(env[name] == nil, "\(name) would reach the game") }
+        #expect(env["WINEPREFIX"] != nil && env["FIXTURE_ENV_MARKER"] == "1", "Cellar's own variables still go on top")
+        #expect(env["TMPDIR"] == "/var/folders/xy/T/")
+    }
+
+    @Test("A token in the shell that started Cellar never reaches the Windows process", .serialized,
+          arguments: ["CLAUDE_CODE_MESSAGING_TOKEN", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY"])
+    func noTokenAtTheProcessBoundary(_ name: String) throws {
+        // The real path: a variable in Cellar's own process, a real `Process` started from the
+        // runner, and what that process actually saw, as recorded by the fake Wine.
+        let install = try FakeWine.install()
+        FakeWine.reset()
+        setenv(name, Self.compactToken, 1)
+        defer { unsetenv(name) }
+
+        let exe = TestHome.scratch("secret-game").appendingPathComponent("Game.exe")
+        WineRunner(install: install, prefix: TestHome.scratch("prefix-secrets")).run([exe.path])
+
+        let call = try #require(FakeWine.calls().last(where: { $0.tool == "wine" && $0.arguments.first == exe.path }))
+        #expect(call.environment["WINEPREFIX"] != nil, "the call was recorded with its environment")
+        #expect(call.environment[name] == nil, "\(name) reached the game")
+        #expect(!call.environment.values.contains(Self.compactToken))
+    }
+
+    @Test("DepotDownloader inherits no secret either, but keeps what .NET needs")
+    func depotToolInheritsNoSecrets() {
+        var caller = Self.callerEnvironment
+        caller["DOTNET_ROOT"] = "/usr/local/share/dotnet"
+        let child = ChildEnvironment.inherited(from: caller, alsoAllowing: ["DOTNET_"])
+        for name in Self.secretNames { #expect(child[name] == nil) }
+        #expect(child["DOTNET_ROOT"] == "/usr/local/share/dotnet")
+        #expect(ChildEnvironment.inherited(from: caller)["DOTNET_ROOT"] == nil, "only where asked for")
+    }
 }
