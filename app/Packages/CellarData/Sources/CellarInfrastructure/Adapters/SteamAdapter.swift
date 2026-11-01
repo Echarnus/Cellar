@@ -79,6 +79,13 @@ public struct SteamAdapter: StoreAdapter {
         try SteamBottle.launchClient(runner: wine, showHUD: showHUD, gameEnv: plan.env)
     }
 
+    /// Whether the client installed this copy itself. The entry Cellar writes for its own download
+    /// (`SteamLibraryEntry`) makes Steam count that copy as installed, but it is still Cellar's copy
+    /// and keeps Cellar's route: started beside the client, never through `rungameid`.
+    public static func isClientCopy(_ plan: GamePlan, appID: Int) -> Bool {
+        SteamBottle.isGameInstalled(in: plan.prefix, appID: appID) && !SteamLibraryEntry.isCellarEntry(plan)
+    }
+
     /// Whether Cellar starts the game's exe itself, beside the client, rather than asking the
     /// client to. Always for a copy the client doesn't have; for the client's own copy only when
     /// that buys Game Mode, and never when the player asked for the store route by name.
@@ -113,7 +120,7 @@ public struct SteamAdapter: StoreAdapter {
         // `rungameid` would find nothing), and also for the client's own copy whenever the game can
         // start from its game app: a game Steam starts is Steam's child, a bare `wine` that macOS
         // never gives Game Mode (`GameApp`).
-        let clientCopy = SteamBottle.isGameInstalled(in: plan.prefix, appID: appID)
+        let clientCopy = Self.isClientCopy(plan, appID: appID)
         if let exe = plan.directLaunchExe,
            Self.startsGameItself(clientCopy: clientCopy, forceStore: forceStore,
                                  gameAppAvailable: GameApp.isAvailable(runnerBinary: wine.binary)) {

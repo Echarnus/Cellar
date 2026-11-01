@@ -2,6 +2,7 @@ import CellarDomain
 import Foundation
 import Testing
 @testable import CellarData
+import CellarInfrastructure
 
 /// DLC for a game Cellar downloaded itself (#185).
 ///
@@ -154,6 +155,31 @@ struct SteamLibraryEntryTests {
         #expect(GameUpdates.managesUpdates(plan))
         SteamLibraryEntry.register(plan, clientRunning: false)
         #expect(GameUpdates.managesUpdates(plan))
+    }
+
+    @Test("Cellar's entry keeps Cellar's launch route: started beside the client, never via rungameid")
+    func keepsCellarsLaunchRoute() throws {
+        // Found on Kenneth's Mac: with the entry in place the launch took Steam's own route, waited
+        // for a client that never came up, and Planet Coaster 2 didn't start.
+        let plan = try downloadedGame()
+        SteamLibraryEntry.register(plan, clientRunning: false)
+        #expect(SteamBottle.isGameInstalled(in: plan.prefix, appID: 2_688_950))
+        #expect(!SteamAdapter.isClientCopy(plan, appID: 2_688_950))
+        #expect(SteamAdapter.startsGameItself(clientCopy: SteamAdapter.isClientCopy(plan, appID: 2_688_950),
+                                              forceStore: true, gameAppAvailable: false))
+    }
+
+    @Test("The client's own install is still the client's copy")
+    func clientsOwnCopyIsClientCopy() throws {
+        let plan = try downloadedGame()
+        let steam = SteamBottle.steamDirectory(in: plan.prefix)
+        let own = libraryFolder(plan)
+        try FileManager.default.createDirectory(at: own, withIntermediateDirectories: true)
+        try Data("MZ".utf8).write(to: own.appendingPathComponent("Game.exe"))
+        try "\"AppState\"\n{\n\t\"StateFlags\"\t\t\"4\"\n\t\"installdir\"\t\t\"Library Fixture\"\n}\n"
+            .write(to: SteamLibraryEntry.manifestURL(steamDirectory: steam, appID: 2_688_950), atomically: true, encoding: .utf8)
+        #expect(SteamAdapter.isClientCopy(plan, appID: 2_688_950))
+        #expect(!GameUpdates.managesUpdates(plan), "Steam keeps its own copy current")
     }
 
     // MARK: - When it must not
