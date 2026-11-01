@@ -297,6 +297,15 @@ public enum SteamBottle {
                          log: Paths.logs.appendingPathComponent("steam-\(runner.prefix.lastPathComponent).log"))
     }
 
+    /// Start the client quietly so a game can run beside it: tray only, and out of the Dock. The
+    /// player pressed Play on a game, not on Steam, so the Dock shows Cellar and the game and
+    /// nothing else. Every route that starts Steam for a game goes through here, so none of them
+    /// can forget `.hidden` (#200: the alongside route did, and Steam sat in the Dock as "wine").
+    static func startClientForGame(runner: WineRunner, showHUD: Bool, gameEnv: [String: String]) throws {
+        try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv,
+                         dock: .hidden)
+    }
+
     /// Open the install dialog for a specific app id inside the bottle's Steam.
     public static func installGame(runner: WineRunner, appID: Int) throws {
         try launchClient(runner: runner, extraArgs: ["steam://install/\(appID)"])
@@ -350,8 +359,7 @@ public enum SteamBottle {
             stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
             let mark = connectionLogMark(in: runner.prefix)
-            try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv,
-                             dock: .hidden)
+            try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
             try waitForClientToComeUp(prefix: runner.prefix, game: game)
             if expectsSignIn {
                 try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
@@ -488,7 +496,7 @@ public extension SteamBottle {
             stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
             let mark = connectionLogMark(in: runner.prefix)
-            try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv)
+            try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
             try waitForClientToComeUp(prefix: runner.prefix, game: game)
             if expectsSignIn {
                 try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,

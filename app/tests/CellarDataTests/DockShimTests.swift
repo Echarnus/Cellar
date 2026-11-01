@@ -69,4 +69,32 @@ struct DockShimTests {
         // Opening the client on its own is not this game, so the plain environment stays unnamed.
         #expect(plan.env["CELLAR_APP_NAME"] == nil)
     }
+
+    @Test("Steam started so a game can run beside it stays out of the Dock")
+    func clientStartedForAGameIsHidden() throws {
+        let shim = TestHome.scratch("dock-shim-client").appendingPathComponent("cellar-dock-shim.dylib")
+        try Data().write(to: shim)
+        setenv("CELLAR_DOCK_SHIM", shim.path, 1)
+        defer { unsetenv("CELLAR_DOCK_SHIM") }
+        let install = try FakeWine.install()
+        FakeWine.reset()
+
+        let runner = WineRunner(binary: install.wineBinary, prefix: TestHome.scratch("dock-shim-bottle"))
+        try SteamBottle.startClientForGame(runner: runner, showHUD: false,
+                                           gameEnv: ["CELLAR_APP_NAME": "Planet Coaster 2"])
+
+        // The client is started detached; give the fake Wine a moment to write down the call.
+        var call: FakeWine.Call?
+        for _ in 0..<50 where call == nil {
+            call = FakeWine.calls().last { $0.tool == "wine" && $0.arguments.contains("-silent") }
+            if call == nil { Thread.sleep(forTimeInterval: 0.1) }
+        }
+        let started = try #require(call, "Steam was never started")
+        let hidden = Set((started.environment["CELLAR_DOCK_HIDE"] ?? "").split(separator: ",").map(String.init))
+        for client in GameStore.steam.descriptor.clientProcessNames {
+            #expect(hidden.contains(client), "\(client) would take a Dock icon while the game plays")
+        }
+        #expect(started.environment["CELLAR_APP_NAME"] == "Planet Coaster 2",
+                "the game's name still travels with the client, for the game it starts")
+    }
 }
