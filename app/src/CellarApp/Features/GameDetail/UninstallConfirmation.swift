@@ -75,7 +75,7 @@ enum UninstallConfirmation {
     private static func title(for removal: RemovalPlan, game: GameSummary) -> String {
         switch removal.scope {
         case .bottle:
-            return String(localized: "Remove \(game.name) and its bottle?")
+            return String(localized: "Remove \(game.name) completely?")
         case .game:
             return removal.removesGameFiles
                 ? String(localized: "Uninstall \(game.name)?")

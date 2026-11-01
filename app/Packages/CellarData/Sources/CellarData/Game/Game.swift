@@ -134,6 +134,8 @@ public enum Game {
     /// Whether the game's files are on disk. A store that keeps a record of its own (Steam's
     /// appmanifest) is authoritative; otherwise the profile's exe is the answer.
     public static func isGameInstalled(_ plan: GamePlan) -> Bool {
+        // An install still running, or one that stopped partway, has files but not a game.
+        if UnfinishedInstall.isPending(plan) { return false }
         if plan.directLaunchExe != nil { return true }
         return plan.store.adapter.recordsGameInstalled(plan) ?? false
     }

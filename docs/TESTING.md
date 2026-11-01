@@ -148,6 +148,10 @@ Everything that decides behaviour without touching Wine:
   real runner and a real backend, carries what its store needs to launch, declares
   `drm_circumvention = "never"`, and states a `status` the app has vocabulary for — with notes to
   back a `playable` claim.
+- **`RaceSimTests`, `CitiesSkylinesTests`** — single games pinned in detail: AppID, install folder,
+  exe, backend and fallback, and an honest `untested`. Cities: Skylines II's also proves the profile
+  names `Cities2.exe`, so a copy Cellar downloaded starts the game beside Steam instead of the
+  Paradox Launcher that Steam's Play button runs.
 
 ### Test isolation
 

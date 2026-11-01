@@ -7,7 +7,12 @@ import CellarData
 /// seconds while it is open. Copy for a forum post, or the full diagnostics report for an issue.
 struct GameLogSection: View {
     let game: GameSummary
-    @State private var expanded = false
+    @State private var expanded: Bool
+
+    init(game: GameSummary, expanded: Bool = false) {
+        self.game = game
+        _expanded = State(initialValue: expanded)
+    }
     @State private var text = ""
     @State private var saved: URL?
     private let tick = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
@@ -43,6 +48,7 @@ struct GameLogSection: View {
             Label("Game log", systemImage: "doc.text.magnifyingglass").font(.callout)
         }
         .onChange(of: expanded) { open in if open { refresh() } }
+        .task { if expanded { refresh() } }
         .onReceive(tick) { _ in if expanded { refresh() } }
     }
 

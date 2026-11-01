@@ -9,7 +9,8 @@ extension GameSummary {
     var statusText: String {
         switch nextStep {
         case .setup:   return String(localized: "Needs repair")
-        case .install: return String(localized: "Not installed")
+        case .install:
+            return installInterrupted ? String(localized: "Download incomplete") : String(localized: "Not installed")
         case .play:    return String(localized: "Installed")
         }
     }
@@ -17,7 +18,7 @@ extension GameSummary {
     var statusSymbol: String {
         switch nextStep {
         case .setup:   return "wrench.and.screwdriver"
-        case .install: return "arrow.down.circle"
+        case .install: return installInterrupted ? "exclamationmark.arrow.circlepath" : "arrow.down.circle"
         case .play:    return "checkmark.circle.fill"
         }
     }
@@ -25,7 +26,7 @@ extension GameSummary {
     var statusTint: Color {
         switch nextStep {
         case .setup:   return .orange
-        case .install: return .secondary
+        case .install: return installInterrupted ? .orange : .secondary
         case .play:    return .green
         }
     }

@@ -76,7 +76,12 @@ struct Install: ParsableCommand {
             output.emit(.install(progress))
         }
         func show(_ event: GameEvent) {
-            event.deliver(progress: { print("  " + Term.dim($0)) }, install: report)
+            event.deliver(progress: { line in
+                // A per-file line from the depot download is what the app's bar is drawn from. Sent
+                // as prose as well, it was thousands of lines the app had to read and keep.
+                if output.isOn, DepotProgress.fraction(in: line) != nil { return }
+                print("  " + Term.dim(line))
+            }, install: report)
         }
         try SetUpGame(plan).run(show)
         try InstallGame(plan).run(show)

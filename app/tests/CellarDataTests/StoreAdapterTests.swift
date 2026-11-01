@@ -47,4 +47,16 @@ struct StoreAdapterTests {
                 "an appmanifest that isn't there is a no, not a don't-know")
         #expect(battlenet.store.adapter.recordsGameInstalled(battlenet) == nil)
     }
+
+    @Test("Steam: Cellar starts a copy the client doesn't have, and the client's own copy when that gets Game Mode")
+    func steamStartsGameItself() {
+        // Cellar's own download: rungameid would find nothing, whatever else is true.
+        #expect(SteamAdapter.startsGameItself(clientCopy: false, forceStore: false, gameAppAvailable: false))
+        #expect(SteamAdapter.startsGameItself(clientCopy: false, forceStore: true, gameAppAvailable: true))
+        // The client's copy: started by Cellar only when its game app can be used.
+        #expect(SteamAdapter.startsGameItself(clientCopy: true, forceStore: false, gameAppAvailable: true))
+        #expect(!SteamAdapter.startsGameItself(clientCopy: true, forceStore: false, gameAppAvailable: false))
+        // Asking for the store route by name gets it.
+        #expect(!SteamAdapter.startsGameItself(clientCopy: true, forceStore: true, gameAppAvailable: true))
+    }
 }
