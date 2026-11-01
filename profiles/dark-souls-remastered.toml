@@ -1,0 +1,48 @@
+# Cellar game profile — DARK SOULS: REMASTERED
+#
+# FromSoftware's 2018 remaster of the first Dark Souls. It replaced Prepare to Die Edition on Steam,
+# which was delisted in 2018, so this is the Dark Souls 1 a Steam player can buy today. Windows only.
+# DirectX 11, 64-bit. AppleGamingWiki rates it Perfect through DXVK in CrossOver and Wine on Apple
+# Silicon, and reports frequent crashes through GPTK's D3DMetal 1.0.2, so DXVK leads here and D3DMetal
+# is the second route. Its PC online service came back in late 2022 after the 2022 shutdown.
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "dark-souls-remastered"
+name          = "DARK SOULS: REMASTERED"
+developer     = "FromSoftware"
+publisher     = "Bandai Namco Entertainment"
+steam_appid   = 570940
+engine        = "Dantelion"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2018-05-23"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player, with online co-op, invasions and messages through FromSoftware's servers"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Players on Apple Silicon Macs report it running well through one way of drawing the game and crashing often through the other, so Cellar starts it on the steadier one."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "dxvk"
+fallback_backend  = "d3dmetal"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 570940
+install_dir = "DARK SOULS REMASTERED"
+exe         = "DarkSoulsRemastered.exe"
+
+[legal]
+drm_circumvention = "never"
