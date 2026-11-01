@@ -129,8 +129,8 @@ The baseline is the same for every game and never opt-in. The IDs are shared wit
 | `signed-in` | the store signed in by itself, as the player's account, with no sign-in window. Read from Steam's `connection_log.txt`. Battle.net can't be read, so it answers could-not-check |
 | `steam-online` | Steam logged on, stayed connected, and is not in offline mode (`loginusers.vdf`) |
 | `launch` | Play started the game |
-| `stays-up` | the game's process stayed up for the whole run, with no crash reporter and no Wine crash in its log |
-| `game-online` | the game's **own process** held connections to the internet (`lsof`), to every `online_hosts` server, with no Schannel or certificate errors in its Wine log. A bottle probe passing is not enough |
+| `stays-up` | the game's process stayed up for the whole run, with no crash reporter (looked for 15 s after an exit too), no crash dump written under the bottle's `drive_c/users`, and no Wine crash in its log. A quiet exit says so, with the end of the Wine log as evidence |
+| `game-online` | the game's **own process** held connections to the internet (`lsof`), to every `online_hosts` server, with no Schannel or certificate errors in its Wine log, and none of the profile's `online_errors` in that log or a crash dump's comment. A bottle probe passing is not enough |
 | `dlc` | (Steam) the bottle's Steam records the game fully installed (`appmanifest` `StateFlags 4`) and, for a copy Cellar downloaded, lists every depot that came down, so `BIsDlcInstalled` says yes. Could-not-check when the bottle has no Steam client |
 | `dock` | while the game ran (`lsappinfo list`), the Dock held the game under its own name from its own `.app`, and no `wine`, no Steam, nothing else started from the runner |
 | `settings-match` | the bottle overrides none of the profile's switches, and the game runs in the Mac's language. A player's own change fails it by name: then what was verified isn't what ships |
@@ -139,7 +139,7 @@ The baseline is the same for every game and never opt-in. The IDs are shared wit
 
 The report folder is `~/Library/Application Support/Cellar/verify/<slug>/<time>/`, holding
 `report.md`, `report.json` and a screenshot per launch. The command exits 0 only when every check
-passed, 1 on a failure and 2 when something could not be checked. The judgements are covered by
+passed, 1 on a failure and 2 when something could not be checked. Ctrl-C (or SIGTERM) stops it the tidy way: the run under way is closed down (game, store, Wine), and the report keeps every finished run plus an `interrupted` check that is never a pass; a second Ctrl-C quits at once. The report is also rewritten after each run, so even a verify that is killed outright leaves the runs it finished. The judgements are covered by
 `VerificationTests`, and one whole run against the fake Wine by `VerifyRunTests`.
 
 ## The tiers

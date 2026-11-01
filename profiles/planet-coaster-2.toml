@@ -33,6 +33,9 @@ network_check               = "https://www.frontierstore.net/ https://user.front
 # The server the game's own process talks to for the Workshop and its online features (#23): read
 # from the exe's online platform config. `cellar verify` fails unless the running game connects to it.
 online_hosts                = "css-api.zaonce.net"
+# What the game writes when its Frontier account call fails: the Lua callstack in its crash dump's
+# comment (verify pilot, 2026-11-01). `cellar verify` fails game-online when either shows up.
+online_errors               = "ShowNetworkError _ShowUnrecoverableError"
 online                      = "single-player core + online co-op / async multiplayer / cross-platform saves"
 status                      = "playable"        # M5 / macOS 26.5: main menu verified via D3DMetal 3.0 (2026-09-07); in-park validation pending
 notes                       = "Needs Wine ≥ 10.8 (GS-base switch) AND a D3DMetal-compatible Wine: WineForge. Menu ~53 FPS at 1512x982 with the Metal debug layer on (M5) — measured before MetalFX and WFUSync were switched on (2026-09-09); not yet re-run with them."

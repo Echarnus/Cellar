@@ -44,6 +44,9 @@ public struct VerifyGame {
     public var screenshots = true
     /// What is in the Dock right now. Replaced in tests, which have no Dock to read.
     public var dockApps: () -> [DockApps.App] = DockApps.current
+    /// Whether someone asked verify to stop (Ctrl-C). Checked between runs and every second of a
+    /// watch; the run under way is then closed down and the report written with what was done (#249).
+    public var isInterrupted: () -> Bool = { false }
 
     public init(_ plan: GamePlan, runs: Int = 1, surviveSeconds: Int = 300, sampleSeconds: TimeInterval = 10,
                 reportsRoot: URL = Paths.appSupport.appendingPathComponent("verify", isDirectory: true),
@@ -79,23 +82,61 @@ public struct VerifyGame {
                 say("Closing \(plan.store.descriptor.displayName) in the bottle first, so this run starts cold…")
                 adapter.shutDownClient(plan, wine: wine)
             }
+            // A report from the start, so even a verify that is killed outright leaves one.
+            write(makeReport(checks: [Self.judgeInterrupted(stoppedIn: nil, completed: 0, runs: runs, stillRunning: true)],
+                             attachments: [], started: started), to: folder)
             for number in 1...runs {
+                if isInterrupted() {
+                    checks.append(Self.judgeInterrupted(stoppedIn: nil, completed: number - 1, runs: runs))
+                    break
+                }
                 say("Run \(number) of \(runs): starting \(plan.name)…")
                 let (found, screenshot) = verifyOneLaunch(number: number, folder: folder, say: say)
                 checks += runs == 1 ? found : found.map { $0.inRun(number) }
                 if let screenshot { attachments.append(screenshot) }
+                if isInterrupted() {
+                    checks.append(Self.judgeInterrupted(stoppedIn: number, completed: number - 1, runs: runs))
+                    break
+                }
+                if number < runs {
+                    // What is done so far, in case verify never gets to the end (killed, the Mac
+                    // asleep): the evidence of a finished run is never lost.
+                    var sofar = checks
+                    sofar.append(Self.judgeInterrupted(stoppedIn: nil, completed: number, runs: runs, stillRunning: true))
+                    write(makeReport(checks: sofar, attachments: attachments, started: started), to: folder)
+                }
             }
         }
 
         let after = CellarSandbox.Fingerprint.of(runnersAt: Paths.runners)
         checks.append(Self.judgeRuntime(before: before, after: after))
 
-        let report = VerificationReport(
-            slug: plan.slug, name: plan.name, store: plan.store.rawValue, startedAt: started, finishedAt: Date(),
-            environment: environment(), checks: checks, attachments: attachments)
+        let report = makeReport(checks: checks, attachments: attachments, started: started)
         write(report, to: folder)
         CellarLog.info(.launch, "Verified \(plan.name): \(report.verdict.label). \(report.summary)", subject: plan.slug)
         return (report, folder)
+    }
+
+    private func makeReport(checks: [VerificationCheck], attachments: [String], started: Date) -> VerificationReport {
+        VerificationReport(slug: plan.slug, name: plan.name, store: plan.store.rawValue, startedAt: started,
+                           finishedAt: Date(), environment: environment(), checks: checks, attachments: attachments)
+    }
+
+    static let interruptedTitle = "Every run asked for was done"
+
+    /// The `interrupted` check: never a pass, because runs that weren't done prove nothing.
+    /// `stoppedIn` is the run that was cut short, nil when verify stopped between runs.
+    static func judgeInterrupted(stoppedIn: Int?, completed: Int, runs: Int, stillRunning: Bool = false) -> VerificationCheck {
+        let done = "\(completed) of \(runs) run\(runs == 1 ? "" : "s") finished"
+        let detail: String
+        if stillRunning {
+            detail = "Written while verify was still running: \(done). If this is the last report in the folder, verify never got to the end."
+        } else if let stoppedIn {
+            detail = "Verify was stopped during run \(stoppedIn), which was closed down without being watched to the end; \(done)."
+        } else {
+            detail = "Verify was stopped before run \(completed + 1) started; \(done)."
+        }
+        return VerificationCheck(id: "interrupted", title: interruptedTitle, verdict: .couldNotCheck, detail: detail)
     }
 
     // MARK: - One launch
@@ -109,6 +150,8 @@ public struct VerifyGame {
         let storeMark = adapter.verificationMark(plan)
 
         var steps: [String] = []
+        // A second back, so a dump written as the launch began still counts.
+        let launchedAt = Date().addingTimeInterval(-1)
         let launch: VerificationCheck
         do {
             let route = try LaunchGame(plan, checkUpdates: checkUpdates, adapter: adapter).run { event in
@@ -127,19 +170,24 @@ public struct VerifyGame {
 
         // Watch it for as long as it has to stay up.
         var watch = Watch()
-        if launch.verdict == .pass {
+        if launch.verdict == .pass, isInterrupted() {
+            watch.interrupted = true
+        } else if launch.verdict == .pass {
             say("  Watching \(plan.name) for \(surviveSeconds / 60 > 0 ? "\(surviveSeconds / 60) min" : "\(surviveSeconds) s")…")
             watch = observe(plan, say: say)
         }
         let screenshot = launch.verdict == .pass && screenshots ? takeScreenshot(run: number, folder: folder) : nil
 
         let wineLog = zip(logs, logMarks).map { VerificationLog.text(of: $0, since: $1) }.joined(separator: "\n")
+        watch.dumps = CrashDumps.written(in: plan.prefix, since: launchedAt)
         var checks = adapter.verificationChecks(plan, since: storeMark, launchSteps: steps)
         checks.append(launch)
         if launch.verdict == .pass {
             checks.append(Self.judgeStaysUp(watch, wineLog: wineLog, surviveSeconds: surviveSeconds, name: plan.name))
-            checks.append(Self.judgeOnline(watch, wineLog: wineLog, plan: plan))
-            checks.append(Self.judgeDock(watch, name: plan.name))
+            checks.append(Self.cutShort(Self.judgeOnline(watch, wineLog: wineLog, plan: plan), watch,
+                                        failedOnEvidence: !CrashSigns.tlsErrors(inWineLog: wineLog).isEmpty))
+            checks.append(Self.cutShort(Self.judgeDock(watch, name: plan.name), watch,
+                                        failedOnEvidence: !watch.dockIntruders.isEmpty))
         } else {
             for (id, title) in [("stays-up", Self.staysUpTitle), ("game-online", Self.onlineTitle), ("dock", Self.dockTitle)] {
                 checks.append(VerificationCheck(id: id, title: title, verdict: .couldNotCheck,
@@ -167,6 +215,19 @@ public struct VerifyGame {
         var gameInDock = false
         /// Dock icons that shouldn't have been there: "name (path)".
         var dockIntruders: [String] = []
+        /// Verify was stopped before the watch was over.
+        var interrupted = false
+        /// Crash dumps the game wrote during the run (#210).
+        var dumps: [CrashDumps.Dump] = []
+    }
+
+    /// A failure that only means "not seen yet" is no failure when the watch was cut short: it
+    /// becomes could-not-check. One found on real evidence (a TLS error, Wine in the Dock) stands.
+    static func cutShort(_ check: VerificationCheck, _ watch: Watch, failedOnEvidence: Bool) -> VerificationCheck {
+        guard watch.interrupted, check.verdict == .fail, !failedOnEvidence else { return check }
+        return VerificationCheck(id: check.id, title: check.title, verdict: .couldNotCheck,
+                                 detail: "Verify was stopped after \(watch.watchedSeconds) s, before this could be seen. " + check.detail,
+                                 evidence: check.evidence)
     }
 
     private func observe(_ plan: GamePlan, say: (String) -> Void) -> Watch {
@@ -191,6 +252,13 @@ public struct VerifyGame {
                 if watch.gameSeenRunning || elapsed > 90 {
                     watch.exitedAfter = elapsed
                     say("  \(plan.name) is no longer running after \(elapsed) s.")
+                    // A game's own reporter starts once the game is gone, often between two
+                    // samples (PC2's did, #210): look for one a little longer.
+                    for _ in 0..<15 where watch.crashReporters.isEmpty {
+                        Thread.sleep(forTimeInterval: 1)
+                        watch.crashReporters = CrashSigns.crashReporters(inProcessList: Self.processTable(),
+                                                                         extra: plan.crashProcesses)
+                    }
                     break
                 }
             } else {
@@ -208,7 +276,18 @@ public struct VerifyGame {
             }
             for host in hosts { watch.hostAddresses[host, default: []].formUnion(GameConnections.addresses(of: host)) }
             if elapsed >= surviveSeconds { break }
-            Thread.sleep(forTimeInterval: sampleSeconds)
+            // A second at a time, so a Ctrl-C is answered within one.
+            var slept = 0.0
+            while slept < sampleSeconds, !isInterrupted() {
+                Thread.sleep(forTimeInterval: min(1, sampleSeconds - slept))
+                slept += 1
+            }
+            if isInterrupted() {
+                watch.interrupted = true
+                watch.watchedSeconds = Int(Date().timeIntervalSince(started))
+                say("  Stopping: closing \(plan.name)…")
+                break
+            }
         }
         return watch
     }
@@ -223,16 +302,37 @@ public struct VerifyGame {
             VerificationCheck(id: "stays-up", title: staysUpTitle, verdict: verdict, detail: detail, evidence: evidence)
         }
         let crashes = CrashSigns.crashLines(inWineLog: wineLog)
+        if !watch.dumps.isEmpty {
+            let when = watch.exitedAfter.map { " and stopped after \($0) s" } ?? ""
+            return check(.fail, "\(name) wrote \(watch.dumps.count == 1 ? "a crash dump" : "\(watch.dumps.count) crash dumps")\(when).",
+                         dumpEvidence(watch.dumps) + watch.crashReporters + crashes.suffix(5))
+        }
         if !watch.crashReporters.isEmpty {
             return check(.fail, "A crash reporter appeared after \(watch.watchedSeconds) s.",
                          watch.crashReporters + crashes.suffix(10))
+        }
+        if watch.interrupted, !watch.gameSeenRunning {
+            return check(.couldNotCheck, "Verify was stopped after \(watch.watchedSeconds) s, before \(name)'s own process was seen.")
         }
         if !watch.gameSeenRunning {
             return check(.fail, "\(name)'s own process never appeared, though Play reported it started.", crashes.suffix(10).map { $0 })
         }
         if let after = watch.exitedAfter, after < surviveSeconds {
+            if crashes.isEmpty {
+                // Nothing to point at is itself the finding: say so, and show how the log ended.
+                return check(.fail, "\(name) exited quietly after \(after) s, short of the \(surviveSeconds) s it had to stay up: no crash reporter and no crash in the Wine log. The log's last lines are below.",
+                             lastLines(of: wineLog))
+            }
             return check(.fail, "\(name) stopped after \(after) s, short of the \(surviveSeconds) s it had to stay up.",
                          crashes.suffix(10).map { $0 })
+        }
+        if !crashes.isEmpty, watch.interrupted {
+            return check(.fail, "Wine logged a crash before verify was stopped.", crashes.suffix(10).map { $0 })
+        }
+        if watch.interrupted {
+            // Up so far is not up for the whole run: never a pass.
+            return check(.couldNotCheck,
+                         "\(name) was still up when verify was stopped after \(watch.watchedSeconds) s, short of the \(surviveSeconds) s it had to stay up.")
         }
         if !crashes.isEmpty {
             return check(.fail, "\(name) stayed up, but Wine logged a crash while it ran.", crashes.suffix(10).map { $0 })
@@ -247,6 +347,11 @@ public struct VerifyGame {
         let tls = CrashSigns.tlsErrors(inWineLog: wineLog)
         let reached = watch.endpoints.filter { GameConnections.isPublic($0.address) }
         let seen = reached.map(\.description).sorted()
+        let reported = onlineErrors(plan.onlineErrors, wineLog: wineLog, dumps: watch.dumps)
+        if !reported.isEmpty {
+            return check(.fail, "The game reported a failed online call, so connecting wasn't enough: " + plan.onlineErrors.joined(separator: ", ") + ".",
+                         reported + seen.prefix(10).map { "connected: \($0)" })
+        }
         if !tls.isEmpty {
             return check(.fail, "Wine logged \(tls.count) TLS or certificate error\(tls.count == 1 ? "" : "s") while the game ran, so at least one of its connections didn't get through.",
                          Array(tls.suffix(15)) + seen.prefix(10).map { "connected: \($0)" })
@@ -294,10 +399,45 @@ public struct VerifyGame {
 
     static let settingsTitle = "The bottle's settings match the profile, and the game runs in the Mac's language"
 
+    /// The lines, in the Wine log or a crash dump's comment, that name one of the game's own
+    /// online-error words.
+    static func onlineErrors(_ words: [String], wineLog: String, dumps: [CrashDumps.Dump]) -> [String] {
+        guard !words.isEmpty else { return [] }
+        let texts = [("Wine log", wineLog)] + dumps.map { ($0.path, $0.comment ?? "") }
+        var lines: [String] = []
+        for (source, text) in texts {
+            for line in text.split(whereSeparator: \.isNewline) where words.contains(where: { line.contains($0) }) {
+                lines.append("\((source as NSString).lastPathComponent): \(line.trimmingCharacters(in: .whitespaces))")
+            }
+        }
+        return Array(lines.prefix(20))
+    }
+
+    /// Each dump's path, then its comment's first lines.
+    static func dumpEvidence(_ dumps: [CrashDumps.Dump]) -> [String] {
+        dumps.flatMap { dump in
+            ["dump: " + dump.path] + (dump.comment ?? "").split(whereSeparator: \.isNewline).prefix(10).map { "  " + $0 }
+        }
+    }
+
+    /// The last lines a log ended on, blank ones left out.
+    static func lastLines(of log: String, count: Int = 20) -> [String] {
+        log.split(whereSeparator: \.isNewline).map(String.init)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.suffix(count).map { $0 }
+    }
+
+    /// Switches that change only what is drawn on top of the game, never how it runs. A player's
+    /// choice of these is named in settings-match but doesn't fail it.
+    static let displayOnlySettings: Set<PerformanceSetting> = [.metalHUD]
+
     static func judgeSettings(_ entries: [PerformanceSettings.Entry], language: LanguageChoice,
                               macLanguage: GameLanguage = .system()) -> VerificationCheck {
-        var differences = entries.filter { $0.source == .bottle }
+        let overridden = entries.filter { $0.source == .bottle }
+        var differences = overridden.filter { !displayOnlySettings.contains($0.setting) }
             .map { "\($0.setting.key) = \($0.value) is set for this bottle, over the profile" }
+        let cosmetic = overridden.filter { displayOnlySettings.contains($0.setting) }
+            .map { "\($0.setting.key) = \($0.value)" }
+        let aside = cosmetic.isEmpty ? "" : " The player's own display-only choice (\(cosmetic.joined(separator: ", "))) doesn't change how the game runs."
         if language.language != macLanguage {
             let whose = language.source == .thisGame ? "this game's language setting" : "the language setting for every game"
             differences.append("The game runs in \(language.language.nativeName) (\(whose)); the Mac is in \(macLanguage.nativeName)")
@@ -305,7 +445,7 @@ public struct VerifyGame {
         return VerificationCheck(
             id: "settings-match", title: settingsTitle, verdict: differences.isEmpty ? .pass : .fail,
             detail: differences.isEmpty
-                ? "Nothing in the bottle overrides the profile, and the game runs in \(language.language.nativeName), the Mac's language."
+                ? "Nothing in the bottle overrides the profile, and the game runs in \(language.language.nativeName), the Mac's language." + aside
                 : "What was verified isn't the profile as it ships: \(differences.count) setting\(differences.count == 1 ? " differs" : "s differ").",
             evidence: differences)
     }
