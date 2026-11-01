@@ -115,7 +115,12 @@ enum TestHome {
             try? "#!/bin/sh\nexit 0\n".write(to: binary, atomically: true, encoding: .utf8)
             try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
         }
-        return RunnerManager.find(id: spec.id)
+        guard let install = RunnerManager.find(id: spec.id) else { return nil }
+        // Recorded as the runner Cellar installed, the way `RunnerManager.install` records a real
+        // one — or Play's integrity check would see a script where `wine` belongs, call the runner
+        // damaged and set about downloading a fresh one (`RunnerIntegrity`).
+        try? RunnerIntegrity.record(install)
+        return install
     }
 
     /// Whether `url`, with every symbolic link on its way resolved, is inside the sandbox. A path
