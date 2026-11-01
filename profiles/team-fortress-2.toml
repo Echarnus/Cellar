@@ -25,9 +25,9 @@ anticheat                   = "VAC (Valve Anti-Cheat, user space, not kernel-lev
 drm                         = "Steamworks (needs a running Steam client)"
 needs_live_session          = true
 requires_account            = "Steam"
-online                      = "online multiplayer on Valve and community servers; Valve does not support translation layers, so playing online is at your own risk"
+online                      = "online multiplayer on Valve and community servers; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
-notes                       = "Not yet launched under Cellar. DirectX 9, which D3DMetal does not translate, so Cellar starts it on DXVK through MoltenVK and offers Wine's own WineD3D if that never brings the game up."
+notes                       = "Not yet launched under Cellar. A DirectX 9 game: Cellar starts it with the graphics translation made for older DirectX games, and offers a slower, more forgiving one if the game never comes up."
 
 [runner]
 id              = "wineforge"

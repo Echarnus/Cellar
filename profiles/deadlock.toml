@@ -26,7 +26,7 @@ anticheat                   = "none published by Valve"
 drm                         = "Steamworks (needs a running Steam client)"
 needs_live_session          = true
 requires_account            = "Steam, with access to the playtest (friend invite from a playtester)"
-online                      = "online only; Valve does not support translation layers, so playing online is at your own risk"
+online                      = "online only; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. AppleGamingWiki rates it playable through CrossOver 24.0.5 and through Whisky on Apple Silicon. It is still a playtest: Valve changes it often, and access is by friend invite only."
 

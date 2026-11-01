@@ -27,9 +27,9 @@ anticheat                   = "VAC (Valve Anti-Cheat, user space, not kernel-lev
 drm                         = "Steamworks (needs a running Steam client)"
 needs_live_session          = true
 requires_account            = "Steam"
-online                      = "online multiplayer on Valve servers; Valve does not support translation layers, so playing online is at your own risk"
+online                      = "online multiplayer on Valve servers; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
-notes                       = "Not yet launched under Cellar. CodeWeavers made CrossOver 23.6 run it out of the box on Apple Silicon, and community guides report it playable through CrossOver at lowered settings. Valve does not support it under Wine, so a game or macOS update can break it overnight."
+notes                       = "Not yet launched under Cellar. CodeWeavers made CrossOver 23.6 run it out of the box on Apple Silicon, and community guides report it playable through CrossOver at lowered settings. Valve does not support playing it on a Mac this way, so a game or macOS update can break it overnight."
 
 # WineForge, as for every Steam title: the current Steam client needs a modern Wine.
 [runner]

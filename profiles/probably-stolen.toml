@@ -27,7 +27,7 @@ needs_live_session          = true
 requires_account            = "Steam"
 online                      = "single-player"
 status                      = "untested"
-notes                       = "Not yet launched under Cellar. Steam lists DirectX 10 as the minimum. A small 2D game, so the GPU is not the concern; the first run should record which renderer it really uses."
+notes                       = "Not yet launched under Cellar. Steam lists DirectX 10 as the minimum. A small 2D pixel-art game, so the graphics card is not the concern."
 
 [runner]
 id              = "wineforge"

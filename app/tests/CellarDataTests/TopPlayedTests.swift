@@ -112,6 +112,16 @@ struct TopPlayedTests {
         #expect(facts.wheel == nil, "not a racing game: no wheel row")
     }
 
+    @Test("What the game page shows verbatim is in a player's words", arguments: TopPlayedTests.games)
+    func plainWords(_ game: Expected) throws {
+        let facts = try Self.plan(game.slug).facts
+        let shown = [facts.notes, facts.online].compactMap { $0 }.joined(separator: " ").lowercased()
+        // Delivery checklist P2: no bottle, runner, Wine, prefix, D3DMetal, log or profile on a player screen.
+        for word in ["bottle", "runner", "wine", "prefix", "d3dmetal", "dxvk", "moltenvk", "renderer", " log ", "profile"] {
+            #expect(!shown.contains(word), "'\(game.slug)' shows '\(word)' to the player")
+        }
+    }
+
     @Test("Denuvo is named as DRM on the one game that has it, and nowhere else", arguments: TopPlayedTests.games)
     func drm(_ game: Expected) throws {
         let drm = try #require(try Self.plan(game.slug).facts.drm)

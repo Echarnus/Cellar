@@ -27,7 +27,7 @@ needs_live_session          = true
 requires_account            = "Steam"
 online                      = "single-player"
 status                      = "untested"
-notes                       = "Not yet launched under Cellar. Unreal Engine 5 and DirectX 12 only, so D3DMetal is the one route that can run it. A 145 GB install. Denuvo counts hardware changes, so moving it between bottles or Macs can use up activations."
+notes                       = "Not yet launched under Cellar. DirectX 12 only, so Cellar has one way to run it and no second option to offer if it does not start. A 145 GB download. Denuvo counts hardware changes, so moving the game between Macs can use up activations."
 
 [runner]
 id              = "wineforge"
