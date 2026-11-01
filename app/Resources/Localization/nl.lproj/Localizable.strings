@@ -7,6 +7,8 @@
 "%@ closed" = "%@ is gesloten";
 "%@ didn't start" = "%@ startte niet";
 "%@ Help" = "%@-help";
+"%@ has quit. Cellar is closing %@ and Wine behind it." = "%@ is gestopt. Cellar sluit %@ en Wine daarachter af.";
+"%@ has quit. Cellar is closing Wine behind it." = "%@ is gestopt. Cellar sluit Wine daarachter af.";
 "%@ is on the drive “%@”, which isn't connected. Connect it to play." = "%@ staat op de schijf “%@”, die niet aangesloten is. Sluit hem aan om te spelen.";
 "%@ is running" = "%@ draait";
 "%@ isn't installed, and Cellar has nothing of its own left on disk." = "%@ is niet geïnstalleerd en Cellar heeft er niets meer van op schijf.";
@@ -142,6 +144,7 @@
 "Close the tour. You can sign in later from Accounts or Settings." = "Sluit de rondleiding. Je kunt later inloggen via Accounts of Instellingen.";
 "Close this window. %@ keeps starting." = "Sluit dit venster. %@ blijft starten.";
 "Close Window" = "Sluit venster";
+"Closing down" = "Afsluiten";
 "Collecting…" = "Verzamelen…";
 "Compatibility" = "Compatibiliteit";
 "Compatibility status: %@" = "Compatibiliteitsstatus: %@";

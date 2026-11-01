@@ -174,6 +174,10 @@ public enum Uninstall {
                 // The manifest is what Steam reads to decide the game is installed; leaving it
                 // behind next to no files is how a client ends up "validating" forever.
                 items.append(item("Steam manifest", steamapps.appendingPathComponent("appmanifest_\(appID).acf"), gameData: true))
+                // The link Cellar made so the client sees its download (`SteamLibraryEntry`).
+                if let link = SteamLibraryEntry.libraryLink(game) {
+                    items.append(item("Steam library link", link, gameData: true))
+                }
                 items.append(item("Part-downloaded files", steamapps.appendingPathComponent("downloading/\(appID)"), gameData: true))
                 items.append(item("Shader cache", steamapps.appendingPathComponent("shadercache/\(appID)")))
                 items.append(item("Workshop manifest", steamapps.appendingPathComponent("workshop/appworkshop_\(appID).acf"), gameData: true))
@@ -194,7 +198,7 @@ public enum Uninstall {
             items.append(item("Downloaded game files", game.depotGameDir, gameData: true))
         }
 
-        return items.filter { $0.bytes > 0 || FileManager.default.fileExists(atPath: $0.url.path) }
+        return items.filter { $0.bytes > 0 || FileManager.default.fileExists(atPath: $0.url.path) || isSymbolicLink($0.url) }
     }
 
     /// Where the game's files actually landed.

@@ -147,7 +147,7 @@ struct Launch: ParsableCommand {
             print(Term.dim("Playing… (Cellar will close \(plan.store.displayName) when you quit the game)"))
         }
         report(.playing)
-        launch.waitForExitThenShutDown(route)
+        launch.waitForExitThenShutDown(route) { report(.closing) }
         report(.closed)
         print(Term.green("\(plan.name) closed. Layer shut down."))
     }

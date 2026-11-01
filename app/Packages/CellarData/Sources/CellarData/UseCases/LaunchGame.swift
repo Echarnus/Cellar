@@ -149,7 +149,10 @@ public struct LaunchGame {
 
     /// Block until the player quits, then take the whole layer down — the behaviour that makes
     /// Cellar feel like a game launcher rather than a pile of Wine processes.
-    public func waitForExitThenShutDown(_ route: LaunchRoute) {
+    ///
+    /// `exited` is called the moment the game is gone, before the teardown starts: closing Steam
+    /// takes seconds, and the player should not be told they are still playing while it does.
+    public func waitForExitThenShutDown(_ route: LaunchRoute, exited: () -> Void = {}) {
         let wine = Game.wineRunner(plan)
         defer {
             Diagnostics.playSessionEnded(slug: plan.slug, name: plan.name,
@@ -159,17 +162,21 @@ public struct LaunchGame {
         switch route {
         case .direct(let exeName):
             ProcessWatch.waitToExit([exeName])
+            exited()
             wine?.shutDown()
         case .steamAlongside(let exeName, _):
             // Steam was started for the game's DRM, so it goes when the game does — asked to quit
             // first, the same as on the client route, rather than only losing its wineserver.
             ProcessWatch.waitToExit([exeName])
+            exited()
             if let wine { SteamBottle.shutdown(runner: wine) }
         case .steam(let appID):
             SteamBottle.waitForGameExit(in: plan.prefix, appID: appID)
+            exited()
             if let wine { SteamBottle.shutdown(runner: wine) }
         case .battlenet:
             ProcessWatch.waitToExit(plan.gameProcessNeedles)
+            exited()
             if let wine { BattleNetBottle.shutdown(runner: wine) }
         }
     }

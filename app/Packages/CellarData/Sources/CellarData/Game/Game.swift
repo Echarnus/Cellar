@@ -236,7 +236,8 @@ public enum Game {
     }
 
     /// Block until the player quits, then take the whole layer down — see `LaunchGame`.
-    public static func waitForExitThenShutDown(_ plan: GamePlan, route: LaunchRoute) {
-        LaunchGame(plan).waitForExitThenShutDown(route)
+    public static func waitForExitThenShutDown(_ plan: GamePlan, route: LaunchRoute,
+                                               exited: () -> Void = {}) {
+        LaunchGame(plan).waitForExitThenShutDown(route, exited: exited)
     }
 }
