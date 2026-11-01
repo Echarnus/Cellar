@@ -139,7 +139,7 @@ The baseline is the same for every game and never opt-in. The IDs are shared wit
 
 The report folder is `~/Library/Application Support/Cellar/verify/<slug>/<time>/`, holding
 `report.md`, `report.json` and a screenshot per launch. The command exits 0 only when every check
-passed, 1 on a failure and 2 when something could not be checked. The judgements are covered by
+passed, 1 on a failure and 2 when something could not be checked. Ctrl-C (or SIGTERM) stops it the tidy way: the run under way is closed down (game, store, Wine), and the report keeps every finished run plus an `interrupted` check that is never a pass; a second Ctrl-C quits at once. The report is also rewritten after each run, so even a verify that is killed outright leaves the runs it finished. The judgements are covered by
 `VerificationTests`, and one whole run against the fake Wine by `VerifyRunTests`.
 
 ## The tiers
