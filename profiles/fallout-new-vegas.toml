@@ -1,0 +1,55 @@
+# Cellar game profile — Fallout: New Vegas
+#
+# Obsidian's 2010 RPG on Bethesda's Gamebryo engine. Windows only. DirectX 9 and a 32-bit exe:
+# D3DMetal translates only DirectX 11 and 12, so DXVK leads and WineD3D is the fallback, as for Team
+# Fortress 2. WineForge is a WoW64 build, so the 32-bit exe runs in the same 64-bit prefix.
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "fallout-new-vegas"
+name          = "Fallout: New Vegas"
+developer     = "Obsidian Entertainment"
+publisher     = "Bethesda Softworks"
+steam_appid   = 22380
+engine        = "Gamebryo"
+graphics_api  = "DirectX 9"
+architecture  = "x86"
+released      = "2010-10-19"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Cellar sets up the game's settings file before its first start, the way its own launcher would."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "dxvk"
+fallback_backend  = "wined3d"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 22380
+install_dir = "Fallout New Vegas"
+exe         = "FalloutNV.exe"
+
+[launch]
+# Steam's own Play starts FalloutNVLauncher.exe, which on its first run copies Fallout_default.ini to
+# My Games/FalloutNV/Fallout.ini and writes FalloutPrefs.ini from the preset it picks. Cellar starts
+# FalloutNV.exe itself. Skyrim Special Edition crashed on every start without its launcher's files
+# (issue 245); New Vegas's engine is reported to recreate missing files, but Fallout.ini is the one
+# the launcher copies verbatim, so Cellar makes that copy, only where none exists, and leaves
+# FalloutPrefs.ini to the game. Read by FirstRunFiles (PR 246); until that lands the key is ignored.
+first_run_files = "Fallout_default.ini > Documents/My Games/FalloutNV/Fallout.ini"
+
+[legal]
+drm_circumvention = "never"

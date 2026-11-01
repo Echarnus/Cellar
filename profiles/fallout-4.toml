@@ -1,0 +1,55 @@
+# Cellar game profile — Fallout 4
+#
+# Bethesda's 2015 open-world RPG on the Creation Engine, the same engine family as Skyrim Special
+# Edition. Windows only. DirectX 11, 64-bit. Creations (paid and free add-ons) and Bethesda.net mods
+# are optional and need a Bethesda.net account; the game itself needs only Steam.
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "fallout-4"
+name          = "Fallout 4"
+developer     = "Bethesda Game Studios"
+publisher     = "Bethesda Softworks"
+steam_appid   = 377160
+engine        = "Creation Engine"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2015-11-10"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam; a Bethesda.net account only for Creations and mods"
+online                      = "single-player"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Cellar sets up the game's settings files before its first start, the way its own launcher would."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxmt"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 377160
+install_dir = "Fallout 4"
+exe         = "Fallout4.exe"
+
+[launch]
+# Steam's own Play starts Fallout4Launcher.exe, which on its first run copies Fallout4_Default.ini to
+# My Games/Fallout4/Fallout4.ini and the template Fallout4/Fallout4Prefs.ini beside it, then applies
+# a quality preset (STEP's Fallout 4 configuration guide documents this). Cellar starts Fallout4.exe
+# itself, and Skyrim Special Edition, the same engine, crashed on every start without its two files
+# (issue 245). So Cellar makes the same two copies, only where none exist; the preset step is left to
+# the game's own options menu. Read by FirstRunFiles (PR 246); until that lands the key is ignored.
+first_run_files = "Fallout4_Default.ini > Documents/My Games/Fallout4/Fallout4.ini; Fallout4/Fallout4Prefs.ini > Documents/My Games/Fallout4/Fallout4Prefs.ini"
+
+[legal]
+drm_circumvention = "never"

@@ -1,0 +1,47 @@
+# Cellar game profile — DARK SOULS II: Scholar of the First Sin
+#
+# FromSoftware's 2015 definitive edition of Dark Souls II, and the version Steam sells. The original
+# 2014 release (DirectX 9, 32-bit, AppID 236430) is a different program, and a player who owns only
+# that copy is not covered by this profile. Scholar of the First Sin is DirectX 11 and 64-bit, with the
+# exe under Game/. Windows only. Its PC online service came back in 2022 after that year's shutdown.
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "dark-souls-2"
+name          = "DARK SOULS II: Scholar of the First Sin"
+developer     = "FromSoftware"
+publisher     = "Bandai Namco Entertainment"
+steam_appid   = 335300
+engine        = "Dantelion"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2015-04-01"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player, with online co-op, invasions and messages through FromSoftware's servers"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. This is Scholar of the First Sin, the edition Steam sells; the original 2014 Dark Souls II is a separate game."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 335300
+install_dir = "Dark Souls II Scholar of the First Sin"
+exe         = "Game/DarkSoulsII.exe"
+
+[legal]
+drm_circumvention = "never"
