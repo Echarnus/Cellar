@@ -92,7 +92,6 @@ def delivery_problems(checklist):
     return ["Delivery checklist: " + ", ".join(open_lines) + (" is" if len(open_lines) == 1 else " are")
             + ' unticked. Tick each once its evidence is in this PR, or say on the same line why it '
             'cannot apply after "n/a:" (docs/DELIVERY-CHECKLIST.md).']
-    return found
 
 
 def problems(body, files, author=""):
