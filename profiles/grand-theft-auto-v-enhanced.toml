@@ -1,0 +1,51 @@
+# Cellar game profile — Grand Theft Auto V Enhanced
+#
+# The 2025 DirectX 12 edition of GTA V, a separate Steam app (3240220) from the Legacy one Cellar
+# already has (grand-theft-auto-v, 271590). Rank 26 on Steam's Most Played chart (66K players,
+# 2026-11-01). Like Legacy it starts through the Rockstar Games Launcher, and GTA Online is guarded by
+# BattlEye (BEService_x64.exe ships beside it), which Cellar cannot run, so story mode is the target.
+# Facts below are from the Steam store page and SteamDB's config, read 2026-11-01. Not yet run on a
+# Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "grand-theft-auto-v-enhanced"
+name          = "Grand Theft Auto V Enhanced"
+developer     = "Rockstar Games"
+steam_appid   = 3240220
+engine        = "RAGE"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2025-03-04"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "BattlEye (GTA Online only)"
+drm                         = "Steamworks + Rockstar Games Launcher (needs a Rockstar Games account)"
+needs_live_session          = true
+requires_account            = "Steam + Rockstar Games account"
+online                      = "story mode only; GTA Online needs BattlEye, which cannot run on a Mac"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 12 only, so Cellar has one way to run it and no second option to offer. It starts through the Rockstar Games Launcher, which Cellar sets up; the first Play opens its window to sign in to a Rockstar Games account."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DirectX 12 only: no fallback Cellar ships can start it (as for Kingdom Come II).
+backend           = "d3dmetal"
+
+[env]
+
+[install]
+method             = "windows-steam-in-bottle"
+steam_appid        = 3240220
+# PlayGTAV.exe is Steam's launch target and hands off to the launcher; GTA5_Enhanced.exe is the game.
+# The folder differs from Legacy's, so the two never claim each other's processes.
+install_dir        = "Grand Theft Auto V Enhanced"
+exe                = "GTA5_Enhanced.exe"
+start_exe          = "PlayGTAV.exe"
+publisher_launcher = "rockstar"
+
+[legal]
+drm_circumvention = "never"

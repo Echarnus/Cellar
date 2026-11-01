@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import CellarData
 
-/// Tier A: the five top-20 Steam games added on 2026-11-01, read from `profiles/` the way an installed
+/// Tier A: the top-50 Steam games added on 2026-11-01, read from `profiles/` the way an installed
 /// Cellar reads them, reach the library as untested Steam games with a Steam cover, and plan a launch
 /// that agrees with what the library shows. Real files, no Wine.
 @Suite(.serialized)
@@ -15,6 +15,13 @@ struct TopPlayedIntegrationTests {
         ("deadlock", 1422450),
         ("phantom-blade-zero", 4115450),
         ("probably-stolen", 4348910),
+        ("tbh-task-bar-hero", 3678970),
+        ("enshrouded", 1203620),
+        ("grand-theft-auto-v-enhanced", 3240220),
+        ("moon-sweepers", 5335510),
+        ("repo", 3241660),
+        ("overwatch", 2357570),
+        ("palworld", 1623730),
     ]
 
     @Test("Each reaches the library as an untested Steam game with its Steam cover")

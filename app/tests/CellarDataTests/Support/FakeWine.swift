@@ -74,7 +74,7 @@ enum FakeWine {
         {
           echo "--- call \(tool)"
           for arg in "$@"; do echo "arg=$arg"; done
-          env | grep -E '^(WINE|LANG=|LC_ALL=|GRAPHICS_BACKEND=|CELLAR_|FIXTURE_)'
+          env | grep -E '^(WINE|LANG=|LC_ALL=|GRAPHICS_BACKEND=|CELLAR_|FIXTURE_|CLAUDE_|ANTHROPIC_|GITHUB_|AWS_|SSH_AUTH_SOCK=)'
         } >> '\(log.path)'
         case "$1" in
           *.exe) if [ -f "$1.lifetime" ]; then sleep "$(cat "$1.lifetime")"; fi ;;

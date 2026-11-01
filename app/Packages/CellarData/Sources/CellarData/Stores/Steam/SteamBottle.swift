@@ -223,6 +223,134 @@ public enum SteamBottle {
         Shell.run("/bin/sh", ["-c", "ps -axo command | grep -qi '[s]team\\.exe'"], environment: [:]).succeeded
     }
 
+    /// Whether **this bottle's** client is running. The install is shared, so a client can be up in
+    /// another bottle; taking that one for this bottle's skipped the sign-in hand-over and started
+    /// the game beside a Steam it could not reach (2026-11-01, Skyrim behind Planet Coaster 2's).
+    public static func isRunning(in prefix: URL) -> Bool {
+        RunningClients.now().isRunning(in: prefix.path)
+    }
+
+    /// The Steam clients up on this Mac, by bottle.
+    ///
+    /// Wine rewrites a Windows process's command line and hides its environment from `ps`, so a
+    /// client is placed by what is left: Cellar starts `steam.exe` by its macOS path, which carries
+    /// the bottle; one Steam restarted itself under (`C:\…\steam.exe`) belongs to a bottle whose
+    /// `wineserver` is up — and `wineserver` does show its `WINEPREFIX`.
+    struct RunningClients: Equatable {
+        /// Command lines of the running `steam.exe` processes.
+        var clients: [String]
+        /// `WINEPREFIX` of every running `wineserver`.
+        var servers: [String]
+
+        static func now() -> RunningClients {
+            parse(ps: Shell.run("/bin/ps", ["-axwwE", "-o", "command="], environment: [:]).stdout)
+        }
+
+        /// Read `ps -axwwE -o command=`.
+        static func parse(ps: String) -> RunningClients {
+            var clients: [String] = [], servers: [String] = []
+            for line in ps.components(separatedBy: "\n") {
+                let command = line.trimmingCharacters(in: .whitespaces)
+                // The executable runs to the first `.exe`: the web helper names `steam.exe` only
+                // in a flag (`-steampath=…`), and is not the client.
+                let executable = command.range(of: ".exe", options: .caseInsensitive)
+                    .map { String(command[..<$0.upperBound]) } ?? ""
+                if executable.lowercased().hasSuffix("/steam.exe") || executable.lowercased().hasSuffix("\\steam.exe") {
+                    clients.append(command)
+                } else if command.range(of: #"/wineserver( |$)"#, options: .regularExpression) != nil,
+                          let prefix = environmentValue("WINEPREFIX", in: command) {
+                    servers.append(prefix)
+                }
+            }
+            return RunningClients(clients: clients, servers: servers)
+        }
+
+        /// One variable out of `ps -E`'s `KEY=value KEY=value` tail. Values can hold spaces
+        /// ("Application Support"), so a value runs to the next ` KEY=`.
+        static func environmentValue(_ key: String, in line: String) -> String? {
+            guard let start = line.range(of: " \(key)=") else { return nil }
+            let rest = line[start.upperBound...]
+            let end = rest.range(of: #" [A-Za-z_][A-Za-z0-9_]*="#, options: .regularExpression)?.lowerBound ?? rest.endIndex
+            return String(rest[..<end]).trimmingCharacters(in: .whitespaces)
+        }
+
+        private static func bottle(of client: String) -> String? {
+            client.range(of: "/drive_c/").map { String(client[..<$0.lowerBound]) }
+        }
+
+        private var unplaced: Bool { clients.contains { Self.bottle(of: $0) == nil } }
+
+        func isRunning(in prefix: String) -> Bool {
+            clients.contains { Self.bottle(of: $0) == prefix } || (unplaced && servers.contains(prefix))
+        }
+
+        /// Bottles other than `prefix` with a client up.
+        func otherBottles(than prefix: String) -> [String] {
+            var others = clients.compactMap(Self.bottle(of:)).filter { $0 != prefix }
+            if unplaced, !servers.contains(prefix) { others += servers.filter { $0 != prefix } }
+            return Array(Set(others)).sorted()
+        }
+    }
+
+    /// One shared install means one client at a time: a second one, started in another bottle,
+    /// writes the same files and sat at an anonymous sign-in Steam kept refusing (2026-11-01). So a
+    /// Steam left open in another bottle is closed first — it has no window, so the player could not
+    /// close it — unless a game is playing beside it there, which Cellar never takes down: then the
+    /// launch stops and says which game to quit.
+    public static func closeClientsElsewhere(runner: WineRunner, game: String,
+                                             progress: (String) -> Void = { _ in }) throws {
+        let clients = RunningClients.now()
+        guard !clients.otherBottles(than: runner.prefix.path).isEmpty else { return }
+        let playing = Set(playingSlugs(ps: Shell.run("/bin/ps", ["-axww", "-o", "command="], environment: [:]).stdout)
+            .compactMap { try? Game.plan(slug: $0).prefix.path })
+        switch elsewhere(prefix: runner.prefix.path, clients: clients, playing: playing) {
+        case .none:
+            return
+        case .refuse(let bottle):
+            let slug = URL(fileURLWithPath: bottle).lastPathComponent
+            let name = (try? Game.plan(slug: slug))?.name ?? slug
+            throw CellarError.invalidArgument(
+                "\(name) is playing beside Steam, and every Steam game shares that one Steam. "
+                + "Quit \(name), then press Play on \(game) again.")
+        case .stop(let bottles):
+            for bottle in bottles {
+                let slug = URL(fileURLWithPath: bottle).lastPathComponent
+                progress("Closing the Steam left open for \((try? Game.plan(slug: slug))?.name ?? slug)…")
+                CellarLog.info(.session, "Closing a Steam client nobody is playing beside (\(slug)).")
+                let other = runner.install.map { WineRunner(install: $0, prefix: URL(fileURLWithPath: bottle)) }
+                    ?? WineRunner(binary: runner.binary, prefix: URL(fileURLWithPath: bottle))
+                shutdown(runner: other)
+            }
+        }
+    }
+
+    /// What to do about clients up in other bottles.
+    enum Elsewhere: Equatable {
+        case none
+        /// Nobody is playing beside these; close them.
+        case stop([String])
+        /// A game is playing beside this bottle's client.
+        case refuse(String)
+    }
+
+    static func elsewhere(prefix: String, clients: RunningClients, playing: Set<String>) -> Elsewhere {
+        let others = clients.otherBottles(than: prefix)
+        if let busy = others.first(where: playing.contains) { return .refuse(busy) }
+        return others.isEmpty ? .none : .stop(others)
+    }
+
+    /// The games being played right now: each runs under a `cellar launch <slug>` that lives for as
+    /// long as the game does (the app starts the CLI for every Play).
+    static func playingSlugs(ps: String) -> [String] {
+        ps.components(separatedBy: "\n").compactMap { line in
+            let words = line.split(separator: " ").map(String.init)
+            guard let at = words.firstIndex(where: { $0 == "launch" }), at > 0,
+                  words[at - 1].hasSuffix("/cellar") || words[at - 1] == "cellar",
+                  at + 1 < words.count, !words[at + 1].hasPrefix("-") else { return nil }
+            return words[at + 1]
+        }
+    }
+
     /// Download SteamSetup.exe and silently install it into the bottle.
     public static func install(runner: WineRunner, progress: (String) -> Void = { _ in }) throws {
         // Link before installing: the bottle's Windows Steam path becomes the shared install, so the
@@ -366,7 +494,7 @@ public enum SteamBottle {
         // Warm the client first: launching the game into a not-yet-ready Steam makes the D3DMetal
         // race fire almost every time. Start Steam silently (tray only) with the game's env, wait
         // for it to come up, then drive the game into the warm client.
-        if !isRunning {
+        if !isRunning(in: runner.prefix) {
             stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
             let mark = connectionLogMark(in: runner.prefix)
@@ -448,7 +576,7 @@ public enum SteamBottle {
     /// Shut the whole bottle down: ask Steam to exit, then stop wineserver so nothing lingers.
     /// This is what makes "quit the game → the Steam layer closes too".
     public static func shutdown(runner: WineRunner) {
-        if isRunning {
+        if isRunning(in: runner.prefix) {
             // Spawned, never waited on. `Shell.run` reads the pipes to their end, and any Wine
             // process `steam.exe -shutdown` leaves running inherits them — so the session hung
             // here after Planet Coaster 2 quit, and the app went on saying "Playing" for good.
@@ -456,7 +584,7 @@ public enum SteamBottle {
             let log = Paths.logs.appendingPathComponent("steam-\(runner.prefix.lastPathComponent)-shutdown.log")
             do {
                 try runner.spawn([steamExecutable(in: runner.prefix).path, "-shutdown"], log: log)
-                for _ in 0..<15 { if !isRunning { break }; Thread.sleep(forTimeInterval: 2) }
+                for _ in 0..<15 { if !isRunning(in: runner.prefix) { break }; Thread.sleep(forTimeInterval: 2) }
             } catch {
                 CellarLog.warn(.session, "Couldn't ask Steam to quit (\(CellarLog.describe(error))); "
                     + "closing Wine under it instead.")
@@ -516,7 +644,7 @@ public extension SteamBottle {
                                 progress: (String) -> Void = { _ in },
                                 stage: (LaunchStage) -> Void = { _ in }) throws {
         SteamDRM.markAppDirectory(exe.deletingLastPathComponent(), appID: appID)
-        if !isRunning {
+        if !isRunning(in: runner.prefix) {
             stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
             let mark = connectionLogMark(in: runner.prefix)
@@ -618,7 +746,7 @@ public extension SteamBottle {
         let prefix = runner.prefix
         let readiness = clientSessionReadiness(in: prefix)
         guard readiness == .canHandOver else { return readiness }
-        guard !isRunning else { return .unavailable(.clientRunning) }
+        guard !isRunning(in: prefix) else { return .unavailable(.clientRunning) }
         let result = SteamClientSession.handOver(prefix: prefix, steamDirectory: steamDirectory(in: prefix),
                                                  wineUser: wineUser)
         guard result == .canHandOver, let account = SteamAccount.state.accountName else { return result }
@@ -742,13 +870,27 @@ public extension SteamBottle {
                                             timeout: TimeInterval = 180,
                                             progress: (String) -> Void,
                                             stage: (LaunchStage) -> Void) throws {
-        let deadline = Date().addingTimeInterval(timeout)
+        var mark = mark
         var announced = false
-        while Date() < deadline {
-            switch logonResult(in: runner.prefix, since: mark) {
-            case .loggedOn?:
-                return
-            case .refused(let reason)?:
+        try superviseLogon(
+            wait: {
+                awaitLogon(timeout: timeout, result: { logonResult(in: runner.prefix, since: mark) }) {
+                    if !announced {
+                        progress("Waiting for Steam to finish signing in — \(game)'s DRM needs it signed in, not just running.")
+                        announced = true
+                    }
+                    Thread.sleep(forTimeInterval: $0)
+                }
+            },
+            restart: {
+                progress("Steam hasn't signed in within \(Int(timeout / 60)) minutes, so Cellar is restarting it once…")
+                shutdown(runner: runner)
+                mark = connectionLogMark(in: runner.prefix)
+                try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
+                try waitForClientToComeUp(prefix: runner.prefix, game: game)
+            },
+            stop: { shutdown(runner: runner) },
+            refused: { reason in
                 progress("Steam didn't accept the sign-in Cellar gave it (\(reason)), so its own window opens instead.")
                 // Steam refusing a refresh token means that token is done, so the session is marked
                 // as refused too: the next launch asks rather than handing over a dead one again, and
@@ -758,25 +900,69 @@ public extension SteamBottle {
                                        progress: progress, stage: stage)
                 try waitForClientSignIn(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
                                         progress: progress)
-                return
+            },
+            game: game)
+    }
+
+    /// What one wait for the client's logon ended in.
+    enum LogonWait: Equatable {
+        case loggedOn
+        case refused(String)
+        /// Steam wrote no logon line at all before the time ran out.
+        case noAnswer
+    }
+
+    /// Poll `result` until Steam answers or `timeout` passes.
+    internal static func awaitLogon(timeout: TimeInterval, poll: TimeInterval = 2,
+                                    result: () -> SteamClientSession.LogonResult?,
+                                    sleep: (TimeInterval) -> Void) -> LogonWait {
+        var waited: TimeInterval = 0
+        while waited < timeout {
+            switch result() {
+            case .loggedOn?: return .loggedOn
+            case .refused(let reason)?: return .refused(reason)
             case nil:
-                if !announced {
-                    progress("Waiting for Steam to finish signing in — \(game)'s DRM needs it signed in, not just running.")
-                    announced = true
-                }
-                Thread.sleep(forTimeInterval: 2)
+                sleep(poll)
+                waited += poll
             }
         }
-        // No answer at all is the third outcome, and it is not "fine": Steam can decide to ask for a
-        // Steam Guard confirmation, or sit on a login window with no network, and neither writes a
-        // logon line. Starting the game into that gives "Unable to initialize SteamAPI", so this ends
-        // in the same place a refusal does — the client's own window, which is the one thing that can
-        // still fix it.
-        progress("Steam hasn't signed in within \(Int(timeout / 60)) minutes, so its own window opens — sign in there and \(game) starts.")
-        fallBackToClientWindow(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
-                               progress: progress, stage: stage)
-        try waitForClientSignIn(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
-                                progress: progress)
+        return .noAnswer
+    }
+
+    /// What Cellar does with each answer to a logon wait.
+    ///
+    /// Only a **refusal** says anything about the session, so only a refusal takes it back
+    /// (`refused`). No answer at all says the client is stuck — on 2026-11-01 its web helper never
+    /// came up, so it never even tried to sign in — and taking the session back then emptied the
+    /// shared `loginusers.vdf`, which turned one stuck start into a sign-in window for every Steam
+    /// game after it. So a silent client is restarted with the session left in place, and when the
+    /// restart is silent too it is shut down — not left running, where it made every later launch
+    /// think Steam was already up — and the launch ends saying what happened.
+    internal static func superviseLogon(attempts: Int = 2, wait: () -> LogonWait,
+                                        restart: () throws -> Void, stop: () -> Void,
+                                        refused: (String) throws -> Void, game: String) throws {
+        for attempt in 1...max(attempts, 1) {
+            switch wait() {
+            case .loggedOn:
+                return
+            case .refused(let reason):
+                try refused(reason)
+                return
+            case .noAnswer:
+                if attempt < attempts { try restart() }
+            }
+        }
+        CellarLog.error(.session, "Steam never signed in for \(game); nothing in its connection log after a restart.")
+        stop()
+        throw clientDidNotSignIn(game: game)
+    }
+
+    /// The error for a client that started but never answered a sign-in. It is not the player's
+    /// sign-in — that is kept — so it does not ask them to sign in again.
+    static func clientDidNotSignIn(game: String) -> CellarError {
+        CellarError.ioFailure(
+            "Steam started but never signed in, even after a restart, so \(game) wasn't started. "
+            + "Your Steam sign-in is kept. Press Play to try again; if it happens again, Show logs has what Steam said.")
     }
 
     /// Take the handed-over session back and put the sign-in step on screen, so `waitForClientSignIn`
@@ -809,7 +995,7 @@ public extension SteamBottle {
         progress("Opening Steam so you can sign in to it — once, for every Steam game…")
         // A client already up in the tray only needs its window brought forward; a cold start shows
         // the sign-in window by itself.
-        try launchClient(runner: runner, extraArgs: isRunning ? ["steam://open/main"] : [],
+        try launchClient(runner: runner, extraArgs: isRunning(in: runner.prefix) ? ["steam://open/main"] : [],
                          showHUD: showHUD, gameEnv: gameEnv, dock: .visible)
         let began = Date()
         let deadline = began.addingTimeInterval(timeout)
@@ -821,7 +1007,7 @@ public extension SteamBottle {
                 Thread.sleep(forTimeInterval: 6)   // let the client finish logging on
                 return
             }
-            switch watch.observe(running: isRunning, elapsed: Date().timeIntervalSince(began)) {
+            switch watch.observe(running: isRunning(in: runner.prefix), elapsed: Date().timeIntervalSince(began)) {
             case .waiting:
                 continue
             case .neverStarted:
@@ -899,10 +1085,11 @@ public extension SteamBottle {
     /// (`fallBackToClientWindow`) and waiting fifteen more for a window that was never there.
     internal static func waitForClientToComeUp(prefix: URL, game: String,
                                                poll: TimeInterval = 2,
-                                               running: () -> Bool = { SteamBottle.isRunning },
+                                               running: (() -> Bool)? = nil,
                                                ready: (() -> Bool)? = nil,
                                                sleep: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }) throws {
         let isReady = ready ?? { isClientUpdated(in: prefix) }
+        let running = running ?? { isRunning(in: prefix) }
         var watch = ClientStartWatch()
         var elapsed: TimeInterval = 0
         while elapsed < clientStartSeconds {

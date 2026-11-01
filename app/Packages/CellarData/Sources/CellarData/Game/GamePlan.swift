@@ -19,7 +19,8 @@ public struct GamePlan {
     public let fallbackBackend: String?
     /// The game's environment — the profile's `[env]` and switches, then the bottle's
     /// (`PerformanceSettings.resolve`) — applied to the game and to the store client that spawns it.
-    public let env: [String: String]
+    /// A `var` so `cellar verify` can turn on the Wine log channels it reads, for its own run.
+    public var env: [String: String]
     /// Install method: `windows-steam-in-bottle` (default), `battlenet-in-bottle`, or `depot`.
     public let installMethod: String
     /// Relative path (from the game's install dir) of the exe to run, e.g. `AoE2DE_s.exe`.
@@ -61,6 +62,13 @@ public struct GamePlan {
     /// `env` as it would be with the profile's crash workarounds the player switched off put back
     /// (`PerformanceSettings.Resolved.crashWorkaroundsSwitchedOff`); nil when none were.
     public var workaroundEnv: [String: String]? = nil
+    /// `online_hosts`: the servers the game itself talks to (`css-api.zaonce.net` for Planet Coaster
+    /// 2), which `cellar verify` expects the game's own process to connect to. Not the addresses
+    /// `network_check` probes from the bottle: those prove the bottle can reach a server, and only
+    /// these prove the game did (#203).
+    public var onlineHosts: [String] = []
+    /// `crash_processes`: crash reporters of the game's own, beyond the ones `CrashSigns` knows.
+    public var crashProcesses: [String] = []
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }

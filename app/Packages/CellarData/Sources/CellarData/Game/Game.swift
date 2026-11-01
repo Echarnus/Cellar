@@ -119,7 +119,9 @@ public enum Game {
             isDraft: fields["generated"]?.lowercased() == "true",
             publisherLauncher: launcher,
             startExe: fields["start_exe"],
-            workaroundEnv: workaroundEnv
+            workaroundEnv: workaroundEnv,
+            onlineHosts: (fields["online_hosts"] ?? "").split(separator: " ").map(String.init),
+            crashProcesses: (fields["crash_processes"] ?? "").split(separator: " ").map(String.init)
         )
     }
 

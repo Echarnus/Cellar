@@ -1,0 +1,53 @@
+# Cellar game profile — TBH: Task Bar Hero
+#
+# Nugem Studio's tiny idle RPG, rank 22 on Steam's Most Played chart (76K players, 2026-11-01).
+# Windows only. It is built to sit in the Windows taskbar; there is no taskbar on a Mac, so under
+# Cellar it is an ordinary window, and the notes tell the player that.
+# Facts below are from the Steam store page and SteamDB's config, read 2026-11-01. Not yet run on a
+# Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "tbh-task-bar-hero"
+name          = "TBH: Task Bar Hero"
+developer     = "Nugem Studio, Tesseract Studio"
+publisher     = "Nugem Studio"
+steam_appid   = 3678970
+engine        = "Unity"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2026-05-27"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. On Windows it docks into the taskbar; a Mac has no taskbar, so it opens as a small window of its own instead."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 3678970
+install_dir = "TaskbarHero"
+exe         = "TaskBarHero.exe"
+
+[art]
+# A 2026 release: Steam keeps its art only under the hashed store_item_assets path (the legacy
+# /steam/apps/<id>/library_600x900.jpg returns 404). library_capsule is the 600x900 portrait.
+art_portrait = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/3678970/1494396916eca09e4488d1a44fe427aa582e3b81/library_capsule.jpg"
+art_hero     = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/3678970/2ef6402fa80c682722b4090d283840d18f813d4f/library_hero.jpg"
+
+[legal]
+drm_circumvention = "never"
