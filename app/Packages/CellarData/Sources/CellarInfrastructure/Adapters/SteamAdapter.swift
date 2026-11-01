@@ -65,6 +65,8 @@ public struct SteamAdapter: StoreAdapter {
             }
         }
         SteamDRM.markAppDirectory(plan.depotGameDir, appID: appID)
+        // The DLC came down with the game; this is what lets the game see it (`SteamLibraryEntry`).
+        SteamLibraryEntry.register(plan)
         step("Downloaded to \(plan.depotGameDir.path)")
     }
 
@@ -101,6 +103,9 @@ public struct SteamAdapter: StoreAdapter {
         try SteamBottle.updateClient(runner: wine, progress: progress) {
             update(InstallProgress(.clientUpdate, fraction: $0))
         }
+        // Before the client starts: Steam reads its library once, at start-up. Also what brings a
+        // copy downloaded before Cellar did this into the library, DLC and all.
+        SteamLibraryEntry.register(plan)
         SteamBottle.alignGameLanguage(plan.language.language, in: plan.prefix, appID: appID)
         // The client is brought up quietly first and the exe is launched beside it — Steamworks
         // finds the running, signed-in client the same way it does for any game started outside
