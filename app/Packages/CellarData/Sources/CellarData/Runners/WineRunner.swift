@@ -195,13 +195,15 @@ public struct WineRunner {
 
     /// Start wine detached: returns immediately, the Windows process keeps running.
     ///
-    /// `bundledLoader` is a copy of this runner's loader inside the game's `.app` (`GameApp`). When
-    /// given, that copy is what runs — so macOS sees the game's bundle — with `argv[0]` still naming
-    /// the runner's own binary, which is where Wine's loader looks for the rest of itself.
+    /// `bundledLoader` starts the game from its own `.app` (`GameApp`): a copy of this runner's
+    /// loader inside the bundle is what runs — so macOS sees the game's bundle — with `argv[0]`
+    /// naming the runner's own loader, which is where Wine looks for the rest of itself.
     public func spawn(_ args: [String], extraEnv: [String: String] = [:], log: URL? = nil,
-                      bundledLoader: URL? = nil) throws {
+                      bundledLoader: GameApp.Start? = nil) throws {
         if let bundledLoader {
-            try spawnBundled(bundledLoader, args, environment: environment(extra: extraEnv), log: log)
+            var env = environment(extra: extraEnv)
+            for (key, value) in bundledLoader.environment { env[key] = value }
+            try spawnBundled(bundledLoader, args, environment: env, log: log)
             return
         }
         let process = Process()
@@ -224,8 +226,9 @@ public struct WineRunner {
     /// `Process` always passes the executable's own path as `argv[0]`, so the bundled start goes
     /// through `posix_spawn` directly — set up the way `Process` does it (signals reset, no stray
     /// descriptors inherited) — and is reaped in the background so it never lingers as a zombie.
-    private func spawnBundled(_ executable: URL, _ args: [String], environment: [String: String],
+    private func spawnBundled(_ start: GameApp.Start, _ args: [String], environment: [String: String],
                               log: URL?) throws {
+        let executable = start.executable
         let output = log?.path ?? "/dev/null"
         if let log {
             try FileManager.default.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -251,7 +254,7 @@ public struct WineRunner {
         sigemptyset(&none)
         posix_spawnattr_setsigmask(&attributes, &none)
 
-        let argv: [UnsafeMutablePointer<CChar>?] = ([binary.path] + args).map { strdup($0) } + [nil]
+        let argv: [UnsafeMutablePointer<CChar>?] = ([start.argv0] + args).map { strdup($0) } + [nil]
         let envp: [UnsafeMutablePointer<CChar>?] = environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
         defer {
             argv.forEach { free($0) }

@@ -130,6 +130,9 @@ public struct GameSummary: Identifiable, Sendable {
                 ? String(localized: "Cellar installs the Windows runtime and \(store.displayName) for this game. One click, a few minutes.")
                 : String(localized: "Cellar installs the Windows runtime, then opens Blizzard's installer — that one needs a few clicks from you, because Battle.net ships no silent install.")
         case .install:
+            if installInterrupted {
+                return String(localized: "The last download stopped before it finished. Install picks up where it left off.")
+            }
             // The first game on a Mac also fetches the Windows runtime. Saying so up front is what
             // keeps a few extra minutes from reading as a stall. Whole sentences either way, so a
             // translation never has to glue a clause onto another.
@@ -163,8 +166,8 @@ public struct GameSummary: Identifiable, Sendable {
                 return String(localized: "Installed. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game.")
             }
             return needsClientAtRuntime
-                ? String(localized: "Installed. Play starts \(store.displayName) quietly in the background and closes the whole layer when you quit.")
-                : String(localized: "Installed. Play starts the game directly, without opening \(store.displayName)'s client, and closes the layer when you quit.")
+                ? String(localized: "Installed. Play starts \(store.displayName) quietly in the background and closes it again when you quit.")
+                : String(localized: "Installed. Play starts the game directly, without opening \(store.displayName).")
         }
     }
 
@@ -201,6 +204,10 @@ public struct GameSummary: Identifiable, Sendable {
     public var isDraft = false
     /// The drive this game was moved to, when it isn't connected (`GameStorage`).
     public var missingDrive: String? = nil
+    /// An install started and never finished: it was cancelled, it failed, or the Mac went to sleep.
+    /// Whatever made it to disk is not a game, however complete it looks (`gameInstalled` is false).
+    /// Install picks up where it stopped, so the page says that instead of "Not installed".
+    public var installInterrupted = false
     /// Whether the game's files live on another drive.
     public var isOnOtherDrive = false
     /// How long and how recently it was played (`Playtime`); nil when it never was.

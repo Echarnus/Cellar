@@ -98,6 +98,43 @@ struct CredentialStorageTests {
         #expect(out.contains("1a2b3c4d1"), "the key is a CRC, not a secret — keep what makes the line readable")
     }
 
+    /// Three rows of a QR drawing as DepotDownloader prints it: two characters per module.
+    static let qrRows = [
+        "        ██████████████  ██    ██████████████",
+        "        ██          ██    ██  ██          ██",
+        "        ██  ██████  ██  ████  ██  ██████  ██",
+    ]
+
+    @Test("Steam's sign-in QR code never survives redaction, in a report or a log")
+    func signInCodeRemoved() {
+        let output = (["Use the Steam Mobile App to sign in with this QR code:"] + Self.qrRows
+            + ["", "The QR code has changed:"] + Self.qrRows + ["Done."]).joined(separator: "\n")
+        for redacted in [Diagnostics.redactSignInCodes(output), Diagnostics.redactCredentials(output)] {
+            #expect(!redacted.contains("█"))
+            #expect(redacted.components(separatedBy: Diagnostics.signInCodeRemoved).count == 3,
+                    "one placeholder per code drawn, not one per row")
+            #expect(redacted.contains("The QR code has changed:"), "the lines around the code stay readable")
+            #expect(redacted.contains("Done."))
+        }
+        // The report's broad pass also redacts whatever follows a `code:` — here the placeholder
+        // after "…with this QR code:" — so only what matters is checked: no code survives.
+        let report = Diagnostics.redact(output)
+        #expect(!report.contains("█"))
+        #expect(report.contains("Done."))
+    }
+
+    @Test("A QR row is told apart from ordinary output, CRLF endings included")
+    func signInCodeRows() {
+        for row in Self.qrRows {
+            #expect(Diagnostics.isSignInCodeRow(row))
+            #expect(Diagnostics.isSignInCodeRow(row + "\r"))
+        }
+        #expect(!Diagnostics.isSignInCodeRow(""))
+        #expect(!Diagnostics.isSignInCodeRow("        "))
+        #expect(!Diagnostics.isSignInCodeRow("Progress █████ 40%"))
+        #expect(!Diagnostics.redactSignInCodes(Self.qrRows.joined(separator: "\r\n")).contains("█"))
+    }
+
     @Test("Ordinary log lines come through write-time redaction untouched", arguments: [
         "DepotDownloader exited 3.",
         "Got manifest request code for depot 1222671 from app 1222670",

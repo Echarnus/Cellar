@@ -77,6 +77,13 @@ public struct SteamAdapter: StoreAdapter {
         try SteamBottle.launchClient(runner: wine, showHUD: showHUD, gameEnv: plan.env)
     }
 
+    /// Whether Cellar starts the game's exe itself, beside the client, rather than asking the
+    /// client to. Always for a copy the client doesn't have; for the client's own copy only when
+    /// that buys Game Mode, and never when the player asked for the store route by name.
+    public static func startsGameItself(clientCopy: Bool, forceStore: Bool, gameAppAvailable: Bool) -> Bool {
+        !clientCopy || (gameAppAvailable && !forceStore)
+    }
+
     public func launchThroughClient(_ plan: GamePlan, wine: WineRunner, showHUD: Bool, forceStore: Bool,
                                     progress: (String) -> Void, stage: (LaunchStage) -> Void,
                                     update: (InstallProgress) -> Void) throws -> LaunchRoute {
@@ -95,11 +102,16 @@ public struct SteamAdapter: StoreAdapter {
             update(InstallProgress(.clientUpdate, fraction: $0))
         }
         SteamBottle.alignGameLanguage(plan.language.language, in: plan.prefix, appID: appID)
-        // Cellar downloaded this copy, so Steam has no appmanifest for it and `rungameid` would
-        // find nothing. The game's own DRM still wants a live session, so the client is brought
-        // up quietly first and the exe is launched beside it — Steamworks finds the running,
-        // signed-in client the same way it does for any game started outside the library.
-        if !SteamBottle.isGameInstalled(in: plan.prefix, appID: appID), let exe = plan.directLaunchExe {
+        // The client is brought up quietly first and the exe is launched beside it — Steamworks
+        // finds the running, signed-in client the same way it does for any game started outside
+        // the library. Taken when Cellar downloaded this copy (Steam has no appmanifest for it, so
+        // `rungameid` would find nothing), and also for the client's own copy whenever the game can
+        // start from its game app: a game Steam starts is Steam's child, a bare `wine` that macOS
+        // never gives Game Mode (`GameApp`).
+        let clientCopy = SteamBottle.isGameInstalled(in: plan.prefix, appID: appID)
+        if let exe = plan.directLaunchExe,
+           Self.startsGameItself(clientCopy: clientCopy, forceStore: forceStore,
+                                 gameAppAvailable: GameApp.isAvailable(runnerBinary: wine.binary)) {
             guard SteamBottle.isInstalled(in: plan.prefix) else {
                 throw CellarError.invalidArgument(
                     "\(plan.name) needs a running Steam client for its DRM, and this bottle has none. Run: cellar setup --profile \(plan.slug)")

@@ -454,7 +454,9 @@ public enum DepotTool {
         defer { protectStoredSessions(); lease?.end() }
         let p = try process(args)
         try p.run()
+        ChildProcesses.track(p)
         p.waitUntilExit()
+        ChildProcesses.untrack(p)
         guard p.terminationStatus == 0 else {
             throw CellarError.ioFailure("DepotDownloader exited \(p.terminationStatus).")
         }
@@ -482,6 +484,8 @@ public enum DepotTool {
         // would never be reaped.
         p.standardInput = FileHandle.nullDevice
         try p.run()
+        ChildProcesses.track(p)
+        defer { ChildProcesses.untrack(p) }
 
         let deadline = timeout.map { Date().addingTimeInterval($0) }
         // The loop below blocks in `availableData`, so it only notices the deadline when the tool
@@ -499,11 +503,12 @@ public enum DepotTool {
             let chunk = handle.availableData
             if chunk.isEmpty { break }
             buffer.append(chunk)
-            // DepotDownloader draws progress with \r; treat both terminators as line ends.
-            while let idx = buffer.firstIndex(where: { $0 == UInt8(ascii: "\n") || $0 == UInt8(ascii: "\r") }) {
-                let line = String(data: buffer[buffer.startIndex..<idx], encoding: .utf8) ?? ""
-                buffer.removeSubrange(buffer.startIndex...idx)
-                if !line.trimmingCharacters(in: .whitespaces).isEmpty { output(line) }
+            // DepotDownloader draws progress with \r; treat both terminators as line ends. The
+            // buffer is cut once per read, not once per line: a read holds hundreds of lines, and
+            // removing each from the front copied the rest every time.
+            for line in Self.takeLines(from: &buffer)
+            where !line.trimmingCharacters(in: .whitespaces).isEmpty {
+                output(line)
             }
             if stopWhen() { stoppedEarly = true; break }
             if let deadline, Date() > deadline { stoppedEarly = true; break }
@@ -520,5 +525,23 @@ public enum DepotTool {
             throw CellarError.ioFailure("DepotDownloader exited \(p.terminationStatus).")
         }
         return false
+    }
+
+    /// The complete lines at the front of `buffer`, ended by `\n` or `\r`, removed from it. What
+    /// follows the last terminator stays for the next read.
+    static func takeLines(from buffer: inout Data) -> [String] {
+        let terminators: Set<UInt8> = [UInt8(ascii: "\n"), UInt8(ascii: "\r")]
+        var lines: [String] = []
+        var start = buffer.startIndex
+        var index = buffer.startIndex
+        while index < buffer.endIndex {
+            if terminators.contains(buffer[index]) {
+                lines.append(String(decoding: buffer[start..<index], as: UTF8.self))
+                start = buffer.index(after: index)
+            }
+            index = buffer.index(after: index)
+        }
+        if start > buffer.startIndex { buffer = Data(buffer[start...]) }
+        return lines
     }
 }

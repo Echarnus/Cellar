@@ -75,6 +75,7 @@ public struct LoadLibrary {
         summary.isDraft = plan.isDraft
         summary.publisherLauncher = plan.publisherLauncher
         summary.publisherLauncherInstalled = plan.publisherLauncher?.isInstalled(in: plan.prefix) ?? true
+        summary.installInterrupted = UnfinishedInstall.isPending(plan)
         summary.missingDrive = GameStorage.missingDrive(plan)
         summary.isOnOtherDrive = GameStorage.movedLocation(slug: plan.slug) != nil
         return summary
