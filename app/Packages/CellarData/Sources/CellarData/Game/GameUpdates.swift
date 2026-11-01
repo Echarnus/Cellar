@@ -4,8 +4,9 @@ import Foundation
 /// Keeping a game Cellar downloaded itself on the build Steam is serving.
 ///
 /// A copy Steam installed is Steam's to update — it does that on its own every time it starts. A
-/// copy Cellar fetched with DepotDownloader is invisible to Steam (there is no appmanifest for it),
-/// so nobody would ever update it: the game would sit on the build it was downloaded at until a
+/// copy Cellar fetched with DepotDownloader is not Steam's to update (Cellar enters it in the
+/// client's library only so its DLC is seen, `SteamLibraryEntry`, and asks Steam to leave it be),
+/// so nobody else would ever update it: the game would sit on the build it was downloaded at until a
 /// patch made it refuse to go online. This is the part that notices and catches it up.
 ///
 /// **Steam is the source of truth, both sides.** What is installed is what DepotDownloader recorded
@@ -20,7 +21,9 @@ public enum GameUpdates {
     /// not one Steam's own library also has (Steam updates those, and Play goes through Steam).
     public static func managesUpdates(_ plan: GamePlan) -> Bool {
         guard let appID = plan.appID, DepotManifests.installed(in: plan.depotGameDir) != nil else { return false }
-        return !SteamBottle.isGameInstalled(in: plan.prefix, appID: appID)
+        // The entry Cellar writes into the client's library for the DLC (`SteamLibraryEntry`)
+        // makes the copy look like Steam's own, but it is still Cellar's download to keep current.
+        return !SteamBottle.isGameInstalled(in: plan.prefix, appID: appID) || SteamLibraryEntry.isCellarEntry(plan)
     }
 
     /// The last answer, re-read against what is on disk now — so an update that has just finished
@@ -133,6 +136,8 @@ public enum GameUpdates {
            case .available = record.state(against: installed) {
             throw UpdateFailure.partial("Steam's download ended before every part of the game was current")
         }
+        // Steam's record of the copy follows the files: new manifests, new build.
+        SteamLibraryEntry.register(plan)
         CellarLog.info(.install, "\(plan.name) is up to date.", subject: plan.slug)
     }
 }
