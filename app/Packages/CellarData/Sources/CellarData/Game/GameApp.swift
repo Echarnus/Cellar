@@ -78,6 +78,12 @@ public enum GameApp {
         return nil
     }
 
+    /// Whether a launch with this runner can start the game from its game app at all — without
+    /// writing anything. What the Steam route asks before choosing to start a game itself.
+    public static func isAvailable(runnerBinary: URL) -> Bool {
+        ProcessInfo.processInfo.environment[disableVariable] != "1" && loader(for: runnerBinary) != nil
+    }
+
     /// The Info.plist of a game app. Mirrors what Wine embeds in its own loader (`LSUIElement`,
     /// `NSPrincipalClass`) so the Mac driver behaves exactly as it does unbundled — it starts as a
     /// background app and turns itself into a regular one when the game shows a window — and adds

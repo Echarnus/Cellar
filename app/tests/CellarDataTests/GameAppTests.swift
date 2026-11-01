@@ -53,6 +53,15 @@ struct GameAppTests {
         #expect(!found.noExec)
     }
 
+    @Test("A runner whose loader can be copied makes the game app available; one that can't does not")
+    func availability() throws {
+        let runner = try wineForgeRunner()
+        #expect(GameApp.isAvailable(runnerBinary: runner.binary))
+        let wine64 = TestHome.scratch("game-app-unavailable").appendingPathComponent("bin/wine64")
+        try executable(wine64)
+        #expect(!GameApp.isAvailable(runnerBinary: wine64))
+    }
+
     @Test("A runner with no ntdll.so where Wine looks for it is started the usual way")
     func skipsOtherLayouts() throws {
         let wine64 = TestHome.scratch("game-app-gptk").appendingPathComponent("bin/wine64")

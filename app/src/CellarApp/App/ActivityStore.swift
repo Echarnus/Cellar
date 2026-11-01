@@ -292,8 +292,16 @@ final class ActivityStore {
                 // From a newer CLI than this app knows: not for the player to read as JSON.
                 continue
             } else {
-                tail.append(line)
+                // The observer sees the line as printed — the Accounts QR panel is drawn from it —
+                // but the log never keeps a row of Steam's sign-in code (`isSignInCodeRow`).
                 lineObserver?(line)
+                if Diagnostics.isSignInCodeRow(line) {
+                    if tail.kept.last != Diagnostics.signInCodeRemoved {
+                        tail.append(Diagnostics.signInCodeRemoved)
+                    }
+                } else {
+                    tail.append(line)
+                }
             }
         }
         schedulePublish()
@@ -312,7 +320,9 @@ final class ActivityStore {
     /// Hand the views the log and the progress as they stand now.
     private func publish() {
         publishPending = false
-        let text = tail.text(partial: lines.partial)
+        // A partial line can be half a QR row; it is shown once it is whole, or not at all.
+        let partial = Diagnostics.isSignInCodeRow(lines.partial) ? "" : lines.partial
+        let text = tail.text(partial: partial)
         if text != log { log = text }
         if busy, installProgress != latestProgress { installProgress = latestProgress }
     }

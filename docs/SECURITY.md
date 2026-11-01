@@ -16,6 +16,7 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
 | Steam account name + dates | `shared/steam-account.json` | `0600` (`PrivateFiles.write`). Not a secret, but it says whose library this is. |
 | GOG username | `shared/gog-account` | `0600`. One file both binaries read, so the app never fetches the name with the token. |
 | Battle.net | — | Cellar holds nothing: Blizzard's client keeps its own session in the bottle. |
+| Steam sign-in QR code (live while shown) | Only the Accounts panel that draws it (`QRCodePanel`) | Never kept as text: `ActivityStore` and every redaction pass (`Diagnostics.redactSignInCodes`) swap its rows for one placeholder line, so it reaches no activity pane, log or diagnostics report. (#165) |
 
 ## The rules
 

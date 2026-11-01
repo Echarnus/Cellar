@@ -145,8 +145,8 @@ public struct GameSummary: Identifiable, Sendable {
                 return String(localized: "Installed. The first time, Play opens \(store.displayName)'s window so you can sign in to it, then starts the game.")
             }
             return needsClientAtRuntime
-                ? String(localized: "Installed. Play starts \(store.displayName) quietly in the background and closes the whole layer when you quit.")
-                : String(localized: "Installed. Play starts the game directly, without opening \(store.displayName)'s client, and closes the layer when you quit.")
+                ? String(localized: "Installed. Play starts \(store.displayName) quietly in the background and closes it again when you quit.")
+                : String(localized: "Installed. Play starts the game directly, without opening \(store.displayName).")
         }
     }
 
