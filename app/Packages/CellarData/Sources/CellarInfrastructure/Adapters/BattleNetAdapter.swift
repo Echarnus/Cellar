@@ -8,6 +8,7 @@ public struct BattleNetAdapter: StoreAdapter {
     public func isClientInstalled(_ plan: GamePlan) -> Bool { BattleNetBottle.isInstalled(in: plan.prefix) }
     public var isClientRunning: Bool { BattleNetBottle.isRunning }
     public func signedInAccount(_ plan: GamePlan) -> String? { BattleNetBottle.rememberedAccount(in: plan.prefix) }
+    public func shutDownClient(_ plan: GamePlan, wine: WineRunner) { BattleNetBottle.shutdown(runner: wine) }
     public func recordsGameInstalled(_ plan: GamePlan) -> Bool? { nil }
 
     public func setUpClient(_ plan: GamePlan, wine: WineRunner, step: (String) -> Void,

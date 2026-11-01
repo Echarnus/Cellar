@@ -110,7 +110,9 @@ public enum Game {
             performance: performance,
             isDraft: fields["generated"]?.lowercased() == "true",
             publisherLauncher: launcher,
-            startExe: fields["start_exe"]
+            startExe: fields["start_exe"],
+            onlineHosts: (fields["online_hosts"] ?? "").split(separator: " ").map(String.init),
+            crashProcesses: (fields["crash_processes"] ?? "").split(separator: " ").map(String.init)
         )
     }
 
