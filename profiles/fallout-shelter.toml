@@ -2,7 +2,7 @@
 #
 # The smallest honest end-to-end case in the database, and the one the Steam integration tier runs
 # by default: free-to-play, ~2 GB, Windows-only, single-player, no third-party DRM. Everything a
-# test wants — a real Steam depot, a real Windows PE, and no reason for a store client to be alive.
+# test wants — a real Steam depot, a real Windows PE, and a Steam client signed in beside it.
 
 [game]
 slug          = "fallout-shelter"
@@ -13,9 +13,9 @@ steam_appid   = 588430
 architecture  = "x86-64"
 released      = "2017-03-29"
 
-# A Steam game that needs no Steam client: `needs_live_session = false` below means the files come
-# from the Steam depot and the exe is run directly. Steam's own app record lists no DRM and no
-# third-party account, and the game is single-player, so nothing has to be running alongside it.
+# The files come from the Steam depot, and the exe runs beside the bottle's Steam client: the game's
+# online half (Steam Cloud saves, the timed events and offers) goes through Steamworks, and with no
+# client running the game logs `SteamAPI_Init() failed` and shows no connectivity (2026-11-01).
 store         = "steam"
 
 [compatibility]
@@ -23,11 +23,12 @@ store         = "steam"
 anticheat                   = "none"
 # Steam publishes `drm_notice` and `ext_user_account_notice` when a game carries third-party DRM or
 # needs a publisher account (Denuvo, Bethesda.net, …). For 588430 both are absent.
-drm                         = "none (no third-party DRM listed by Steam)"
+drm                         = "Steamworks (no third-party DRM listed by Steam)"
 # `needs_live_session` is the canonical spelling; `needs_live_steam` is only read for older files.
-needs_live_session          = false
-requires_account            = "none"
-online                      = "single-player (Steam Cloud + achievements only, both optional)"
+# True: it plays offline without Steam, but every online feature needs the client signed in.
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player (Steam Cloud, timed events and offers need Steam running)"
 status                      = "untested"
 notes                       = "Facts verified 2026-09-09 from Steam's own app record: appid 588430, installdir 'Fallout Shelter', launch executable 'FalloutShelter.exe', Windows-only (no macOS build), ~2 GB, free-to-play. Not yet launched on this Mac — the account it would download with is not signed in, so the Steam integration tier reports skipped rather than passing. Run `cellar steam login`, then `sh Scripts/test.sh --steam` to promote this."
 
@@ -40,8 +41,8 @@ backend           = "d3dmetal"
 fallback_backend  = "dxvk"
 
 [install]
-# `depot` = DepotDownloader fetches the Windows files with the one Steam sign-in; no Steam window
-# is ever opened, on this Mac or inside the bottle.
+# `depot` = DepotDownloader fetches the Windows files with the one Steam sign-in; the client is
+# started only to run beside the game, quietly and already signed in.
 method      = "depot"
 steam_appid = 588430
 # Both taken from Steam's app record, not guessed, so Cellar finds the game whichever way it was
