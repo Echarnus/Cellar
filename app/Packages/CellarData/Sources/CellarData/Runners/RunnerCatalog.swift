@@ -32,6 +32,34 @@ public enum RunnerCatalog {
         deprecated: nil
     )
 
+    /// WineForge 0.6.0.8 (Wine 11.21 + CrossOver patches) with Apple D3DMetal 4.0b3, from the
+    /// Sikarugir template 1.0.24 (which moved the renderer to `SharedSupport/`). Picked per game by a
+    /// profile's `[runner] id`, not the default, because D3DMetal 4 is still a beta: Planet Coaster 2
+    /// uses it because D3DMetal 3.0's startup race killed most of its starts (about 1 in 16 got up)
+    /// and 4.0b3 started it on the first attempt 3 times out of 3 (cellar verify, 2026-11-01).
+    /// Its loader is Developer-ID signed, so the game's app has to be signed again after the copy
+    /// (`GameApp`, #247), or macOS kills every start.
+    public static let wineforgeD3DMetal4 = RunnerSpec(
+        id: "wineforge-d3dmetal4",
+        displayName: "WineForge 0.6.0.8 (Wine 11.21 + CrossOver patches) + Apple D3DMetal 4.0b3",
+        artifacts: [
+            RunnerArtifact(
+                kind: .wineDMG,
+                url: "https://github.com/Alien4042x/WineForge/releases/download/0.6.0.8/WineForge.dmg",
+                payloadPath: "WineForge.app/Contents/Resources/Engine/WineForgeCore",
+                sha256: "a4566c654a80234d977b28090d24375e85c29e22d581433217268336addf1a43"),
+            RunnerArtifact(
+                kind: .d3dmetalFromTemplate,
+                url: "https://github.com/Sikarugir-App/Wrapper/releases/download/v1.0/Template-1.0.24.tar.xz",
+                payloadPath: "Template-1.0.24.app/Contents/SharedSupport/renderer/d3dmetal",
+                sha256: "4b5f89eeb9ef139936bdfad33d9b420b05ea4597cb7d63376674f7a8e171321c"),
+        ],
+        wineBinaryName: "wine",
+        hasD3DMetal: true,
+        license: "Wine: LGPL-2.1+ · D3DMetal: Apple proprietary (non-commercial)",
+        deprecated: nil
+    )
+
     public static let sikarugir = RunnerSpec(
         id: "sikarugir",
         displayName: "Wine 10 (Sikarugir) + Apple D3DMetal 3.0",
@@ -90,7 +118,7 @@ public enum RunnerCatalog {
     //      DXVK + VKD3D-Proton on MoltenVK rebuilt for arm64ec — the fully-free fallback.
     // `cellar doctor` reports which of these the installed runner already satisfies.
 
-    public static let all = [wineforge, sikarugir, gptk]
+    public static let all = [wineforge, wineforgeD3DMetal4, sikarugir, gptk]
     public static let defaultID = wineforge.id
     public static func spec(forID id: String) -> RunnerSpec? { all.first { $0.id == id } }
 }

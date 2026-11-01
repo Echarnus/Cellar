@@ -40,15 +40,18 @@ online                      = "single-player core + online co-op / async multipl
 status                      = "playable"        # M5 / macOS 26.5: main menu verified via D3DMetal 3.0 (2026-09-07); in-park validation pending
 notes                       = "Needs Wine ≥ 10.8 (GS-base switch) AND a D3DMetal-compatible Wine: WineForge. Menu ~53 FPS at 1512x982 with the Metal debug layer on (M5) — measured before MetalFX and WFUSync were switched on (2026-09-09); not yet re-run with them."
 
-# Runner: WineForge (Wine 11.17 + CrossOver macOS patches) + Apple D3DMetal 3.0.
+# Runner: WineForge 0.6.0.8 (Wine 11.21 + CrossOver macOS patches) + Apple D3DMetal 4.0b3.
 #  - GPTK (Wine 7.7): the current Steam client's web helper crash-loops.
 #  - Sikarugir Wine 10.0: Steam works, but PC2 inlines GetCurrentFiber() as `gs:[0x20]`, which on
 #    macOS Wine < 10.8 reads a Mach port instead of the fiber → access violation at startup.
 #  - Stock Wine 11: fibers fine, but D3DMetal's DLLs import the removed ntdll.__wine_unix_call.
-#  - WineForge: both fixed. D3DMetal comes from the Sikarugir template (renderer/d3dmetal), grafted
-#    into <runner>/wine/lib/d3dmetal and selected with GRAPHICS_BACKEND=d3dmetal.
+#  - WineForge 0.6.0.4 + D3DMetal 3.0 (the default runner): a D3DMetal startup race (read of 0x0
+#    in anonymous memory) killed most starts; about 1 in 16 got up on an M5 (2026-11-01).
+#  - WineForge 0.6.0.8 + D3DMetal 4.0b3: up on the first attempt 3 of 3, rendering ~52 FPS on the
+#    loading screen (cellar verify, M5 / macOS 27.0.1, 2026-11-01). D3DMetal comes from the
+#    Sikarugir template 1.0.24 (SharedSupport/renderer/d3dmetal), grafted at install time.
 [runner]
-id              = "wineforge"
+id              = "wineforge-d3dmetal4"
 windows_version = "win10"
 
 [graphics]
