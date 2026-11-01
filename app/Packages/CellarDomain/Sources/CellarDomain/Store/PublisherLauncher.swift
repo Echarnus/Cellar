@@ -45,11 +45,13 @@ public enum PublisherLauncher: String, CaseIterable, Sendable {
     /// Command-line fragments that identify the launcher's processes, for telling whether it is up
     /// and for closing it after setup. Wine reports Windows command lines, hence both separators.
     /// `Launcher.exe` alone would also match Battle.net's bootstrapper, so the folder is the needle.
+    /// No needle ends in a backslash: `ProcessWatch.isRunning` puts it inside a double-quoted shell
+    /// string, where a trailing `\` would escape the closing quote.
     public var processNeedles: [String] {
         switch self {
         case .rockstar:
             return [
-                #"\Rockstar Games\Launcher\"#, "/Rockstar Games/Launcher/",
+                #"\Rockstar Games\Launcher"#, "/Rockstar Games/Launcher/",
                 "RockstarService.exe", "SocialClubHelper.exe", "LauncherPatcher.exe",
             ]
         }

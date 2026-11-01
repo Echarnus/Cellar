@@ -188,6 +188,12 @@ struct RockstarLauncherTests {
         let blizzard = "C:\\Program Files (x86)\\Battle.net\\Battle.net Launcher.exe"
         #expect(folder.firstMatch(in: blizzard, range: NSRange(blizzard.startIndex..., in: blizzard)) == nil)
         #expect(!PublisherLauncher.rockstar.processNeedles.contains("Launcher.exe"))
+        // `isRunning` puts a needle inside a double-quoted `sh -c` string: a trailing backslash
+        // would escape the closing quote and the check would never match anything.
+        for needle in PublisherLauncher.rockstar.processNeedles {
+            #expect(!needle.hasSuffix("\\"), "'\(needle)' ends in a backslash")
+            #expect(!needle.contains("\""), "'\(needle)' contains a quote")
+        }
     }
 
     // MARK: - Waiting for the game behind it
