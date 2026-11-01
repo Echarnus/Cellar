@@ -38,14 +38,14 @@ micro-optimisation until you remove it:
 1. **Do not launch Wine through `/usr/bin/arch -x86_64`.** SIP strips `DYLD_*` from system binaries,
    so the runner's own dylibs (wineserver's `@rpath/libinotify`, D3DMetal's unix halves) fail to
    resolve. The x86_64-only Mach-O runs under Rosetta perfectly well on its own — invoke it directly.
-2. **Inherit the caller's environment, then overlay.** A *bare* environment makes Planet Coaster 2
-   exit silently ~4 s after launch. `WineRunner.environment` starts from
-   `ProcessInfo.processInfo.environment` (keeping `TMPDIR`, `USER`, `LANG`,
-   `__CF_USER_TEXT_ENCODING`) — the same approach Proton takes.
-3. **…but strip the caller's Wine/graphics variables first.** Any inherited `WINE*`, `DYLD_*`,
-   `D3DM*`, `MTL_*`, `DXMT_*`, `GST_*` or `GRAPHICS_BACKEND` is another runner's settings leaking in.
-   `environment()` deletes them before setting Cellar's own. If you add a new variable family, add it
-   to that strip list too.
+2. **Inherit the caller's session basics, then overlay.** A *bare* environment makes Planet Coaster 2
+   exit silently ~4 s after launch. `WineRunner.environment` starts from the caller's environment
+   (keeping `TMPDIR`, `USER`, `LANG`, `__CF_USER_TEXT_ENCODING`) — the same approach Proton takes.
+3. **…but only an allow-list of it** (`ChildEnvironment`, #238). Everything else in the caller's
+   shell stays out: another runner's `WINE*`/`DYLD_*`/`D3DM*`/`MTL_*`/`GST_*` settings, and every
+   secret (an agent session's tokens, `GITHUB_TOKEN`, cloud keys, `SSH_AUTH_SOCK`), which Wine, the
+   store client and the game could otherwise read. Never widen it to a deny-list; if a game really
+   needs another inherited variable, add that one name to `ChildEnvironment.names` with a test.
    The locale is the one inherited value Cellar always overrides: a runner built from a plan carries
    a `GameLanguage`, and `environment()` pins `LANG`/`LC_ALL` to it. Left inherited, a Terminal on a
    Belgian Mac (`nl_BE.UTF-8`) put Steam and every game in Dutch on an English Mac. The language is
