@@ -3,8 +3,8 @@ import Foundation
 import Testing
 @testable import CellarData
 
-/// The five games from Steam's Most Played top 20 (2026-11-01) that have no Mac version, no
-/// kernel-level anti-cheat, and were not already in the database, pinned in detail.
+/// The games from Steam's Most Played top 50 (2026-11-01) that have no Mac version a Steam owner can
+/// use, no kernel-level anti-cheat, and were not already in the database, pinned in detail.
 ///
 /// Three are Valve's own online games on VAC (Counter-Strike 2, Team Fortress 2, Deadlock), one is a
 /// Denuvo-protected DirectX 12 single-player game (Phantom Blade Zero), and one a small DirectX 10
@@ -52,6 +52,29 @@ struct TopPlayedTests {
         Expected(slug: "probably-stolen", name: "Probably Stolen - Cyberpunk Shopkeeper Sim", appID: 4348910,
                  installDir: "Probably Stolen", exe: "Probably Stolen.exe",
                  backend: .dxvk, fallback: .d3dmetal, vac: false),
+        // Ranks 21–50, added when the pass widened to Steam's top 50.
+        Expected(slug: "tbh-task-bar-hero", name: "TBH: Task Bar Hero", appID: 3678970,
+                 installDir: "TaskbarHero", exe: "TaskBarHero.exe",
+                 backend: .d3dmetal, fallback: .dxvk, vac: false),
+        // Vulkan only: no DirectX to translate, so the Vulkan-side backend leads, as DetectedGraphicsAPI picks.
+        Expected(slug: "enshrouded", name: "Enshrouded", appID: 1203620,
+                 installDir: "Enshrouded", exe: "enshrouded.exe",
+                 backend: .dxvk, fallback: .wined3d, vac: false),
+        Expected(slug: "grand-theft-auto-v-enhanced", name: "Grand Theft Auto V Enhanced", appID: 3240220,
+                 installDir: "Grand Theft Auto V Enhanced", exe: "GTA5_Enhanced.exe",
+                 backend: .d3dmetal, fallback: nil, vac: false),
+        Expected(slug: "moon-sweepers", name: "Moon Sweepers", appID: 5335510,
+                 installDir: "Moon Sweepers", exe: "MoonSweepers.exe",
+                 backend: .d3dmetal, fallback: .dxvk, vac: false),
+        Expected(slug: "repo", name: "R.E.P.O.", appID: 3241660,
+                 installDir: "REPO", exe: "REPO.exe",
+                 backend: .d3dmetal, fallback: .dxvk, vac: false),
+        Expected(slug: "overwatch", name: "Overwatch", appID: 2357570,
+                 installDir: "Overwatch", exe: "Overwatch.exe",
+                 backend: .d3dmetal, fallback: .dxvk, vac: false),
+        Expected(slug: "palworld", name: "Palworld", appID: 1623730,
+                 installDir: "Palworld", exe: "Palworld.exe",
+                 backend: .d3dmetal, fallback: .dxvk, vac: false),
     ]
 
     @Test("Each ships as a Steam game with the right AppID, install folder and exe", arguments: TopPlayedTests.games)
@@ -160,13 +183,41 @@ struct TopPlayedTests {
 
     @Test("The 2026 releases bring their own cover, because Steam's legacy art path has none for them")
     func coversForNewReleases() throws {
-        for slug in ["phantom-blade-zero", "probably-stolen"] {
+        for slug in ["phantom-blade-zero", "probably-stolen", "tbh-task-bar-hero", "moon-sweepers"] {
             let plan = try Self.plan(slug)
             let portrait = try #require(plan.artPortraitURL, "'\(slug)' would fall back to a generated cover")
             #expect(portrait.hasPrefix("https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/\(plan.appID ?? 0)/"))
             #expect(portrait.hasSuffix("/library_capsule.jpg"))
             #expect(plan.artHeroURL?.hasSuffix("/library_hero.jpg") == true)
         }
+    }
+
+    @Test("Online PvP games whose maker does not support a Mac say playing online is at the player's own risk")
+    func ownRiskOnline() throws {
+        for slug in ["counter-strike-2", "team-fortress-2", "deadlock", "overwatch"] {
+            let online = try #require(try Self.plan(slug).facts.online)
+            #expect(online.contains("at your own risk"), "'\(slug)'")
+        }
+        let overwatch = try Self.plan("overwatch").facts
+        #expect(overwatch.requiresAccount?.contains("Battle.net") == true,
+                "the Steam copy still signs in to Battle.net; the player must know before downloading")
+    }
+
+    @Test("GTA V Enhanced starts through the Rockstar launcher and never claims the Legacy game's processes")
+    func gtaEnhanced() throws {
+        let enhanced = try Self.plan("grand-theft-auto-v-enhanced")
+        let legacy = try Self.plan("grand-theft-auto-v")
+        #expect(enhanced.publisherLauncher == .rockstar)
+        #expect(enhanced.startExe == "PlayGTAV.exe")
+        #expect(enhanced.appID != legacy.appID)
+        #expect(enhanced.bottleName != legacy.bottleName)
+        let legacyProcess = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto V\\GTA5.exe"
+        let enhancedProcess = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto V Enhanced\\GTA5_Enhanced.exe"
+        #expect(!enhanced.gameProcessNeedles.contains { legacyProcess.contains($0) })
+        #expect(!legacy.gameProcessNeedles.contains { enhancedProcess.contains($0) })
+        #expect(enhanced.gameProcessNeedles.contains { enhancedProcess.contains($0) })
+        let online = try #require(enhanced.facts.online)
+        #expect(online.hasPrefix("story mode only"))
     }
 
     @Test("Every game gets its own bottle")

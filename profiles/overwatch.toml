@@ -1,0 +1,48 @@
+# Cellar game profile — Overwatch
+#
+# Blizzard's hero shooter on Steam (app 2357570), rank 42 on Steam's Most Played chart (50K players,
+# 2026-11-01). Windows only. The Steam copy runs without the Battle.net app, but the game itself
+# signs in to a Battle.net account linked to the Steam one. Online PvP only; Blizzard's anti-cheat
+# runs in the game's own process (no kernel driver on the store page).
+# Facts below are from the Steam store page and SteamDB's config, read 2026-11-01. Not yet run on a
+# Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "overwatch"
+name          = "Overwatch"
+developer     = "Blizzard Entertainment"
+publisher     = "Blizzard Entertainment"
+steam_appid   = 2357570
+engine        = "Blizzard in-house engine"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2023-08-10"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "Blizzard's own (in the game process, not kernel-level)"
+drm                         = "Steamworks + Battle.net account sign-in"
+needs_live_session          = true
+requires_account            = "Steam + a linked Battle.net account"
+online                      = "online only; Blizzard does not support playing it on a Mac this way, so playing online is at your own risk"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. AppleGamingWiki rates it Perfect through a CrossOver preview (2026-03-04) on macOS 26.4. The first start asks you to link a Battle.net account to Steam."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 2357570
+install_dir = "Overwatch"
+exe         = "Overwatch.exe"
+
+[legal]
+drm_circumvention = "never"

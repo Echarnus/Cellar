@@ -1,0 +1,49 @@
+# Cellar game profile — Enshrouded
+#
+# Keen Games' survival-crafting game, 1.0 on 2026-10-15 after Early Access, rank 23 on Steam's Most
+# Played chart (72K players, 2026-11-01). Windows only. Its Holistic engine renders through Vulkan
+# alone, so no DirectX translation is involved: Wine's Vulkan goes to MoltenVK whichever DirectX
+# backend is set, and DXVK is named only because it is Cellar's Vulkan-side backend.
+# Facts below are from the Steam store page and SteamDB's config, read 2026-11-01. Not yet run on a
+# Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "enshrouded"
+name          = "Enshrouded"
+developer     = "Keen Games"
+publisher     = "Keen Games"
+steam_appid   = 1203620
+engine        = "Holistic (Keen Games)"
+graphics_api  = "Vulkan"
+architecture  = "x86-64"
+released      = "2026-10-15"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player + online co-op for up to 16"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. It draws only through Vulkan, and players trying it through CrossOver on Apple Silicon report it stopping at start with a GPU not found error, so expect it not to start until that is solved."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# Vulkan-only: DetectedGraphicsAPI maps Vulkan to DXVK with WineD3D behind it, and so does this.
+backend           = "dxvk"
+fallback_backend  = "wined3d"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 1203620
+install_dir = "Enshrouded"
+exe         = "enshrouded.exe"
+
+[legal]
+drm_circumvention = "never"
