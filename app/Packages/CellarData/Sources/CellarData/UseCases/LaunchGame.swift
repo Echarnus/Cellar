@@ -80,6 +80,11 @@ public struct LaunchGame {
             try Self.updateBeforeLaunch(plan, progress: progress, update: update)
         }
 
+        // What the game's own launcher would have written on its first run, since Cellar starts the
+        // game itself (Skyrim crashed on every start without its INIs). After any update, so the
+        // files are copied from the build that is about to run.
+        FirstRunFiles.seed(plan, progress: progress)
+
         // No live-session DRM and the exe is on disk → run it directly, no client at all.
         if plan.canLaunchStoreFree && !forceStore {
             let exe = plan.directLaunchExe!

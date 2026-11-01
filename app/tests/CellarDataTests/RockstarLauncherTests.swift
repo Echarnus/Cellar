@@ -208,7 +208,7 @@ struct RockstarLauncherTests {
                 cleanup: {}, start: { starts += 1 }, isUp: { false },
                 keepWaiting: { false })
         })
-        #expect(error.contains("kept failing"))
+        #expect(error.contains("never started"), "it never appeared, so it never closed either")
         #expect(starts == 2)
         // Two 60-second waits would be two minutes; a closed launcher ends each in one poll.
         #expect(Date().timeIntervalSince(began) < 20)

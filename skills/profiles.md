@@ -88,6 +88,12 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
 - **`save_paths`** (optional) — where the game saves, relative to the Windows user folder, `;`-separated
   (`"Documents/My Games/X; AppData/Local/X"`). `SaveBackups` copies only these; without it, every
   folder `SaveGames` counts as a save in the bottle. Only record a path you have seen the game write.
+- **`first_run_files`** (optional, `[launch]`) — settings files the game's own launcher writes on its
+  first run and the game can't start without, since Cellar starts the game's exe rather than the
+  launcher. `;`-separated `source > destination` pairs: the source relative to the folder holding
+  `exe`, the destination relative to the Windows user folder, like `save_paths`. Copied before each
+  launch only where nothing exists yet (`FirstRunFiles`). Only for a game you have seen fail
+  without them: Skyrim SE crashed on every start until `Skyrim.ini` and `SkyrimPrefs.ini` existed.
 - **`generated = "true"`** — a draft Cellar wrote itself (`DraftProfile`, `cellar profiles draft`) from an
   installed game's PE header. Drafts live in the player's own profiles, are always `untested`, and the app
   lists them apart. Turning one into a shipped profile means testing it and deleting this line.

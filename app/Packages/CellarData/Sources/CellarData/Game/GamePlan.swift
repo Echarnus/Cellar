@@ -66,6 +66,9 @@ public struct GamePlan {
     public var onlineHosts: [String] = []
     /// `crash_processes`: crash reporters of the game's own, beyond the ones `CrashSigns` knows.
     public var crashProcesses: [String] = []
+    /// `first_run_files`: settings files the game's own launcher would write before its first run,
+    /// which Cellar writes instead because it starts the game itself (`FirstRunFiles`).
+    public var firstRunFiles: [FirstRunFiles.Copy] = []
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
