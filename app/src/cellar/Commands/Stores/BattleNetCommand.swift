@@ -10,6 +10,8 @@ struct BattleNetCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "battlenet",
         abstract: "The Battle.net plugin: open Blizzard's client in a bottle, install games, surface them natively.",
+        // Out of `cellar --help` while the release is Steam only; the app still drives it.
+        shouldDisplay: GameStore.battlenet.isOffered,
         subcommands: [Add.self, Forget.self, Open.self, Install.self, Status.self, App.self, Configure.self]
     )
 

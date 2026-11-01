@@ -28,8 +28,12 @@ public struct AccountSummary: Sendable, Equatable {
     /// - Parameters:
     ///   - connected: the stores Cellar may speak for (`StoreLibrary.isConnected`), in any order.
     ///   - steam: the one Steam sign-in, whose account name is the most recognisable one to show.
-    public init(connected: [GameStore], steam: SteamSignInState) {
-        let stores = GameStore.allCases.filter(connected.contains).sorted { $0.sortIndex < $1.sortIndex }
+    ///   - offered: the stores this build shows (`StoreAvailability`). A connected store that isn't
+    ///     offered is left off the button, and the signed-out line names only the offered ones.
+    public init(connected: [GameStore], steam: SteamSignInState,
+                offered: [GameStore] = GameStore.offered) {
+        let stores = GameStore.allCases.filter { connected.contains($0) && offered.contains($0) }
+            .sorted { $0.sortIndex < $1.sortIndex }
         self.stores = stores
         if case .expired(let account, _) = steam {
             title = account
@@ -37,7 +41,7 @@ public struct AccountSummary: Sendable, Equatable {
             tone = .needsAttention
         } else if stores.isEmpty {
             title = String(localized: "Sign in")
-            detail = String(localized: "Steam, GOG or Battle.net")
+            detail = StoreAvailability.phrase(offered)
             tone = .signedOut
         } else {
             // Steam's is the only account name Cellar reads without asking anyone. The others are

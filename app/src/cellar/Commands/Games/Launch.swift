@@ -6,7 +6,7 @@ import Foundation
 struct Launch: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "launch",
-        abstract: "Launch a game. Runs the exe directly when the game allows it, else through its store's client (Steam or Battle.net)."
+        abstract: "Launch a game. Runs the exe directly when the game allows it, else through its store's client."
     )
 
     @Argument(help: "Profile slug to launch, e.g. 'diablo-4'.")
