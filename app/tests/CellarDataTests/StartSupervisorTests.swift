@@ -39,7 +39,9 @@ struct StartSupervisorTests {
         // A retry goes back to "starting", which is what makes the second try visible, not a stall.
         #expect(stages == [.starting, .waiting, .starting, .waiting, .starting, .waiting])
         #expect(lines.contains { $0.contains("didn't start") })
-        #expect(lines.contains { $0.contains("startup race") })
+        #expect(lines.contains { $0.contains("closed within 1 s of starting") })
+        #expect(!lines.contains { $0.contains("D3DMetal") },
+                "Cellar saw a process go away, not why: Skyrim's missing settings were reported as D3DMetal's race")
         #expect(lines.contains { $0.contains("Up after 3 attempts") })
     }
 
@@ -63,11 +65,32 @@ struct StartSupervisorTests {
             Issue.record("a game that never came up was reported as launched")
         } catch let error as CellarError {
             #expect(error.description.contains("2 attempts"), "the message says how hard Cellar tried")
+            #expect(error.description.contains("never started"), "it never appeared, so it never closed either")
             #expect(error.description.contains("Try launching again"), "and what the player can do")
         } catch {
             Issue.record("unexpected error: \(error)")
         }
         #expect(starts == 2)
+    }
+
+    @Test("Giving up names the game it was starting and says what was seen, never a cause it can't know")
+    func givingUpNamesTheGame() {
+        var checks = 0
+        do {
+            // Appears, then goes away inside the settle window.
+            try ProcessWatch.superviseStart(attempts: 1, appearSeconds: 1, settleSeconds: 1, backoffSeconds: 0,
+                                            cleanup: {}, start: {}, isUp: { checks += 1; return checks == 1 },
+                                            game: "Skyrim")
+            Issue.record("a game that closed as it started was reported as launched")
+        } catch {
+            #expect("\(error)".contains("Skyrim kept closing as it started"))
+        }
+        let message = ProcessWatch.gaveUp(game: "The Elder Scrolls V: Skyrim Special Edition", attempts: 8)
+        #expect(message.hasPrefix("The Elder Scrolls V: Skyrim Special Edition kept closing as it started"))
+        #expect(message.contains("8 attempts"))
+        #expect(!message.contains("D3DMetal") && !message.contains("Planet Coaster"),
+                "every Steam game's failure used to read as Planet Coaster 2 hitting D3DMetal's race")
+        #expect(!message.contains("cellar "), "no Terminal command for the player")
     }
 
     @Test("A start that throws stops the supervision at once rather than retrying a broken command")

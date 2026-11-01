@@ -47,6 +47,12 @@ steam_appid = 489830
 
 [launch]
 exe = "SkyrimSE.exe"
+# Steam's own Play starts SkyrimSELauncher.exe, which on its first run copies Skyrim_Default.ini and
+# a quality preset into My Games before the player presses Play there. Cellar starts SkyrimSE.exe
+# itself, and without those two files it crashed (0xC0000005) on every start, on an M5 / macOS 27 on
+# 2026-11-01. So Cellar makes the same two copies, only where none exist. High is Cellar's choice of
+# preset (the launcher's own pick depends on the GPU it detects); a file that exists is never overwritten.
+first_run_files = "Skyrim_Default.ini > Documents/My Games/Skyrim Special Edition/Skyrim.ini; High.ini > Documents/My Games/Skyrim Special Edition/SkyrimPrefs.ini"
 
 [legal]
 drm_circumvention = "never"
