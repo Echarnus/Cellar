@@ -131,6 +131,9 @@ The baseline is the same for every game and never opt-in. The IDs are shared wit
 | `launch` | Play started the game |
 | `stays-up` | the game's process stayed up for the whole run, with no crash reporter and no Wine crash in its log |
 | `game-online` | the game's **own process** held connections to the internet (`lsof`), to every `online_hosts` server, with no Schannel or certificate errors in its Wine log. A bottle probe passing is not enough |
+| `dlc` | (Steam) the bottle's Steam records the game fully installed (`appmanifest` `StateFlags 4`) and, for a copy Cellar downloaded, lists every depot that came down, so `BIsDlcInstalled` says yes. Could-not-check when the bottle has no Steam client |
+| `dock` | while the game ran (`lsappinfo list`), the Dock held the game under its own name from its own `.app`, and no `wine`, no Steam, nothing else started from the runner |
+| `settings-match` | the bottle overrides none of the profile's switches, and the game runs in the Mac's language. A player's own change fails it by name: then what was verified isn't what ships |
 | `clean-exit` | after closing, nothing that runs the bottle's runner is left |
 | `real-install-untouched` | every runner file games start from has the checksum it had before |
 

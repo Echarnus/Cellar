@@ -294,6 +294,7 @@ struct VerifyRunTests {
                                 reportsRoot: TestHome.scratch("reports"))
         verify.checkUpdates = false
         verify.screenshots = false
+        verify.dockApps = { [] }
         return verify
     }
 
@@ -313,6 +314,9 @@ struct VerifyRunTests {
         #expect(verdict("game-online") == .pass, "the fixture says it has no online features")
         #expect(verdict("clean-exit") == .pass)
         #expect(verdict("real-install-untouched") == .pass)
+        #expect(verdict("dock") == .couldNotCheck, "this test has no Dock to read")
+        #expect(verdict("settings-match") == .pass)
+        #expect(verdict("dlc") == .couldNotCheck, "the fixture's bottle has no Steam client")
         #expect(verdict("signed-in") == .fail, "nobody signed this sandbox's Steam in, and the report must say so")
         #expect(verdict("steam-online") == .fail)
         #expect(report.verdict == .fail)
@@ -338,5 +342,145 @@ struct VerifyRunTests {
         let staysUp = try #require(report.checks.first { $0.id == "stays-up" })
         #expect(staysUp.verdict == .fail)
         #expect(staysUp.detail.contains("stopped after"))
+    }
+}
+
+/// `dlc`, `dock` and `settings-match` (#208): the three baseline checks that judge what the player
+/// would see after a launch rather than whether it started.
+struct BaselineCheckTests {
+    // MARK: - dlc
+
+    static func manifest(stateFlags: String = "4", depots: [UInt32]) -> String {
+        """
+        "AppState"
+        {
+        \t"appid"\t\t"2688950"
+        \t"StateFlags"\t\t"\(stateFlags)"
+        \t"InstalledDepots"
+        \t{
+        \(depots.map { "\t\t\"\($0)\"\n\t\t{\n\t\t\t\"manifest\"\t\t\"123\"\n\t\t}" }.joined(separator: "\n"))
+        \t}
+        }
+        """
+    }
+
+    @Test("No appmanifest, or one that isn't fully installed, fails: every DLC would read as missing")
+    func dlcNeedsAFullyInstalledRecord() {
+        #expect(SteamDLCCheck.check(manifest: nil, downloadedDepots: [2688951: 1]).verdict == .fail)
+        let partial = SteamDLCCheck.check(manifest: Self.manifest(stateFlags: "1026", depots: [2688951]), downloadedDepots: nil)
+        #expect(partial.verdict == .fail)
+        #expect(partial.detail.contains("1026"))
+    }
+
+    @Test("A depot Cellar downloaded but Steam doesn't list fails, naming the depot; redistributables don't count")
+    func dlcDepotsMustAllBeListed() {
+        let downloaded: [UInt32: UInt64] = [2688951: 1, 2688952: 2, 228989: 3]
+        let missing = SteamDLCCheck.check(manifest: Self.manifest(depots: [2688951]), downloadedDepots: downloaded)
+        #expect(missing.verdict == .fail)
+        #expect(missing.evidence == ["depot 2688952 downloaded, not in appmanifest"])
+        let complete = SteamDLCCheck.check(manifest: Self.manifest(depots: [2688951, 2688952]), downloadedDepots: downloaded)
+        #expect(complete.verdict == .pass)
+        #expect(SteamDLCCheck.check(manifest: Self.manifest(depots: [2688951]), downloadedDepots: nil).verdict == .pass,
+                "a copy Steam installed itself is Steam's to manage")
+    }
+
+    @Test("A Steam game whose bottle has no Steam client can't be judged on DLC, and says why")
+    func dlcWithoutAClient() throws {
+        let plan = try TestHome.plan("""
+        [game]
+        name  = "No Client"
+        store = "steam"
+
+        [install]
+        steam_appid = "480"
+        """, slug: "dlc-no-client")
+        let check = SteamDLCCheck.check(plan)
+        #expect(check.verdict == .couldNotCheck)
+        #expect(check.detail.contains("no Steam client"))
+    }
+
+    // MARK: - dock
+
+    static let gameBundle = "/Users/player/Applications/Cellar Games/Planet Coaster 2.app"
+    static let runner = "/Users/player/Library/Application Support/Cellar/runners/wineforge"
+
+    /// `lsappinfo list` as macOS prints it, cut down to the lines the check reads.
+    static func lsappinfo(_ apps: [(name: String, bundle: String?, exe: String, type: String)]) -> String {
+        apps.enumerated().map { index, app in
+            """
+             \(index + 1)) "\(app.name)" ASN:0x0-0x\(index)01a:
+                bundleID=[ NULL ]
+                bundle path=\(app.bundle.map { "\"\($0)\"" } ?? "[ NULL ]")
+                executable path="\(app.exe)"
+                pid = \(500 + index) type="\(app.type)" flavor=3 Version="1.0" fileType="APPL" creator="????" Arch=x86_64
+            """
+        }.joined(separator: "\n")
+    }
+
+    @Test("lsappinfo's list reads back as name, bundle, executable, pid and type; a NULL bundle is none")
+    func parsesLsappinfo() {
+        let apps = DockApps.apps(inLsappinfo: Self.lsappinfo([
+            ("Finder", "/System/Library/CoreServices/Finder.app", "/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder", "Foreground"),
+            ("wineserver", nil, Self.runner + "/wine/bin/wineserver", "BackgroundOnly"),
+        ]))
+        #expect(apps.count == 2)
+        #expect(apps[0] == DockApps.App(name: "Finder", bundlePath: "/System/Library/CoreServices/Finder.app",
+                                        executablePath: "/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder",
+                                        pid: 500, type: "Foreground"))
+        #expect(apps[1].bundlePath == nil)
+        #expect(!apps[1].isInDock)
+    }
+
+    @Test("Wine, Steam, or anything else started from the runner in the Dock is an intruder; the game's own app is not")
+    func dockIntruders() {
+        let apps = DockApps.apps(inLsappinfo: Self.lsappinfo([
+            ("Planet Coaster 2", Self.gameBundle, Self.gameBundle + "/Contents/MacOS/wine", "Foreground"),
+            ("wine", nil, Self.runner + "/wine/bin/wine", "Foreground"),
+            ("steamwebhelper.exe", nil, "/somewhere/else", "Foreground"),
+            ("PlanetCoaster2_Launcher.exe", nil, Self.runner + "/wine/bin/wine", "Foreground"),
+            ("Steam", nil, Self.runner + "/wine/bin/wine", "UIElement"),
+            ("Safari", "/Applications/Safari.app", "/Applications/Safari.app/Contents/MacOS/Safari", "Foreground"),
+            ("Steam", "/Applications/Steam.app", "/Applications/Steam.app/Contents/MacOS/steam_osx", "Foreground"),
+        ]))
+        let names = DockApps.intruders(in: apps, runnerRoot: Self.runner, gameBundle: Self.gameBundle).map(\.name)
+        #expect(names == ["wine", "steamwebhelper.exe", "PlanetCoaster2_Launcher.exe"],
+                "a hidden Steam (UIElement) and the player's own apps, Mac Steam included, are fine")
+        #expect(DockApps.game(in: apps, gameBundle: Self.gameBundle, name: "Planet Coaster 2") != nil)
+        #expect(DockApps.game(in: apps, gameBundle: Self.gameBundle, name: "planet-coaster-2") == nil,
+                "the slug is not the game's name (#220)")
+    }
+
+    @Test("dock passes only with the game in it by name and no intruder, and can't judge an empty list")
+    func judgesDock() {
+        var watch = VerifyGame.Watch()
+        watch.gameSeenRunning = true
+        #expect(VerifyGame.judgeDock(watch, name: "G").verdict == .couldNotCheck)
+        watch.dockSamples = 3
+        #expect(VerifyGame.judgeDock(watch, name: "G").verdict == .fail, "the game never showed under its name")
+        watch.gameInDock = true
+        #expect(VerifyGame.judgeDock(watch, name: "G").verdict == .pass)
+        watch.dockIntruders = ["wine (/runners/wineforge/wine/bin/wine)"]
+        let intruded = VerifyGame.judgeDock(watch, name: "G")
+        #expect(intruded.verdict == .fail)
+        #expect(intruded.evidence == ["wine (/runners/wineforge/wine/bin/wine)"])
+    }
+
+    // MARK: - settings-match
+
+    @Test("A switch the bottle overrides, or a language other than the Mac's, fails settings-match by name")
+    func judgesSettings() {
+        let profile = PerformanceSettings.Entry(setting: .metalValidation, value: "true", source: .profile)
+        let bottle = PerformanceSettings.Entry(setting: .metalHUD, value: "true", source: .bottle)
+        let mac = LanguageChoice(language: .english, source: .system)
+        #expect(VerifyGame.judgeSettings([profile], language: mac, macLanguage: .english).verdict == .pass)
+
+        let overridden = VerifyGame.judgeSettings([profile, bottle], language: mac, macLanguage: .english)
+        #expect(overridden.verdict == .fail)
+        #expect(overridden.evidence == ["metal_hud = true is set for this bottle, over the profile"])
+
+        let dutch = VerifyGame.judgeSettings([profile], language: LanguageChoice(language: .dutch, source: .allGames),
+                                             macLanguage: .english)
+        #expect(dutch.verdict == .fail, "the Belgian-Terminal bug: Steam and the game in Dutch on an English Mac")
+        #expect(dutch.evidence.first?.contains("every game") == true)
     }
 }

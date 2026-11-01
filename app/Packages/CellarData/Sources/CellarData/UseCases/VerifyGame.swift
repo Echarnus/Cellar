@@ -16,6 +16,9 @@ import Foundation
 /// | `launch` | Play started the game |
 /// | `stays-up` | the game stayed up for the whole run, with no crash reporter and no Wine crash |
 /// | `game-online` | the game's own process reached its servers, with no TLS errors on the way |
+/// | `dlc` | (Steam) Steam records the game fully installed with every depot, so its DLC is seen |
+/// | `dock` | only the game is in the Dock, under its own name; never Wine or the store client |
+/// | `settings-match` | the bottle overrides nothing in the profile, and the game runs in the Mac's language |
 /// | `clean-exit` | after quitting, nothing of the bottle's Wine is left running |
 /// | `real-install-untouched` | the Windows runtime is byte for byte what it was before |
 ///
@@ -39,6 +42,8 @@ public struct VerifyGame {
     public var checkUpdates = true
     /// Keep a picture of the screen from each launch (needs Screen Recording permission).
     public var screenshots = true
+    /// What is in the Dock right now. Replaced in tests, which have no Dock to read.
+    public var dockApps: () -> [DockApps.App] = DockApps.current
 
     public init(_ plan: GamePlan, runs: Int = 1, surviveSeconds: Int = 300, sampleSeconds: TimeInterval = 10,
                 reportsRoot: URL = Paths.appSupport.appendingPathComponent("verify", isDirectory: true),
@@ -134,12 +139,15 @@ public struct VerifyGame {
         if launch.verdict == .pass {
             checks.append(Self.judgeStaysUp(watch, wineLog: wineLog, surviveSeconds: surviveSeconds, name: plan.name))
             checks.append(Self.judgeOnline(watch, wineLog: wineLog, plan: plan))
+            checks.append(Self.judgeDock(watch, name: plan.name))
         } else {
-            for (id, title) in [("stays-up", Self.staysUpTitle), ("game-online", Self.onlineTitle)] {
+            for (id, title) in [("stays-up", Self.staysUpTitle), ("game-online", Self.onlineTitle), ("dock", Self.dockTitle)] {
                 checks.append(VerificationCheck(id: id, title: title, verdict: .couldNotCheck,
                                                 detail: "The game never started."))
             }
         }
+
+        checks.append(Self.judgeSettings(plan.performance.entries, language: plan.language))
 
         say("  Closing \(plan.name) and \(plan.store.descriptor.displayName)…")
         checks.append(closeEverything(plan))
@@ -154,12 +162,19 @@ public struct VerifyGame {
         var crashReporters: [String] = []
         var endpoints = Set<GameConnections.Endpoint>()
         var hostAddresses: [String: Set<String>] = [:]
+        /// Times the Dock was read while the game ran, and whether it ever held the game's icon.
+        var dockSamples = 0
+        var gameInDock = false
+        /// Dock icons that shouldn't have been there: "name (path)".
+        var dockIntruders: [String] = []
     }
 
     private func observe(_ plan: GamePlan, say: (String) -> Void) -> Watch {
         var watch = Watch()
         let started = Date()
         let hosts = plan.onlineHosts.map(GameConnections.hostName)
+        let gameBundle = GameApp.bundleURL(name: plan.name, slug: plan.slug).path
+        let runnerRoot = RunnerManager.find(id: plan.runnerID).map { RunnerProcesses.canonicalPath($0.root) }
         while true {
             let elapsed = Int(Date().timeIntervalSince(started))
             watch.watchedSeconds = elapsed
@@ -181,6 +196,15 @@ public struct VerifyGame {
             } else {
                 watch.gameSeenRunning = true
                 watch.endpoints.formUnion(GameConnections.established(pids: pids))
+                let dock = dockApps()
+                if !dock.isEmpty {
+                    watch.dockSamples += 1
+                    if DockApps.game(in: dock, gameBundle: gameBundle, name: plan.name) != nil { watch.gameInDock = true }
+                    for app in DockApps.intruders(in: dock, runnerRoot: runnerRoot, gameBundle: gameBundle) {
+                        let seen = "\(app.name) (\(app.bundlePath ?? app.executablePath ?? "no path"))"
+                        if !watch.dockIntruders.contains(seen) { watch.dockIntruders.append(seen) }
+                    }
+                }
             }
             for host in hosts { watch.hostAddresses[host, default: []].formUnion(GameConnections.addresses(of: host)) }
             if elapsed >= surviveSeconds { break }
@@ -245,6 +269,45 @@ public struct VerifyGame {
             return check(.fail, "The game never connected to anything on the internet while it ran.")
         }
         return check(.pass, "The game connected to \(reached.count) server\(reached.count == 1 ? "" : "s") with no TLS errors. The profile names no `online_hosts`, so which servers they were isn't checked.", seen)
+    }
+
+    static let dockTitle = "Only the game is in the Dock, under its own name, never Wine or Steam"
+
+    static func judgeDock(_ watch: Watch, name: String) -> VerificationCheck {
+        func check(_ verdict: VerificationVerdict, _ detail: String, _ evidence: [String] = []) -> VerificationCheck {
+            VerificationCheck(id: "dock", title: dockTitle, verdict: verdict, detail: detail, evidence: evidence)
+        }
+        guard watch.dockSamples > 0 else {
+            return check(.couldNotCheck, watch.gameSeenRunning
+                ? "macOS's list of running apps (lsappinfo) came back empty, so the Dock couldn't be read."
+                : "The game was never seen running, so there was no Dock to read.")
+        }
+        if !watch.dockIntruders.isEmpty {
+            return check(.fail, "The Dock showed \(watch.dockIntruders.count == 1 ? "an icon" : "icons") that shouldn't be there while \(name) ran.",
+                         watch.dockIntruders)
+        }
+        guard watch.gameInDock else {
+            return check(.fail, "\(name) never appeared in the Dock under its own name, from the app Cellar made for it.")
+        }
+        return check(.pass, "Across \(watch.dockSamples) look\(watch.dockSamples == 1 ? "" : "s") at the Dock, it showed \(name) under its own name and nothing of Wine or Steam.")
+    }
+
+    static let settingsTitle = "The bottle's settings match the profile, and the game runs in the Mac's language"
+
+    static func judgeSettings(_ entries: [PerformanceSettings.Entry], language: LanguageChoice,
+                              macLanguage: GameLanguage = .system()) -> VerificationCheck {
+        var differences = entries.filter { $0.source == .bottle }
+            .map { "\($0.setting.key) = \($0.value) is set for this bottle, over the profile" }
+        if language.language != macLanguage {
+            let whose = language.source == .thisGame ? "this game's language setting" : "the language setting for every game"
+            differences.append("The game runs in \(language.language.nativeName) (\(whose)); the Mac is in \(macLanguage.nativeName)")
+        }
+        return VerificationCheck(
+            id: "settings-match", title: settingsTitle, verdict: differences.isEmpty ? .pass : .fail,
+            detail: differences.isEmpty
+                ? "Nothing in the bottle overrides the profile, and the game runs in \(language.language.nativeName), the Mac's language."
+                : "What was verified isn't the profile as it ships: \(differences.count) setting\(differences.count == 1 ? " differs" : "s differ").",
+            evidence: differences)
     }
 
     /// Whether a profile's `online` describes a game with nothing online.
