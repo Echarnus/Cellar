@@ -94,9 +94,14 @@ enum IT {
         let real = realHome.appendingPathComponent("runners", isDirectory: true)
         guard let entries = try? fm.contentsOfDirectory(at: real, includingPropertiesForKeys: nil) else { return }
         try? fm.createDirectory(at: Paths.runners, withIntermediateDirectories: true)
-        let sandboxRunners = Paths.runners.resolvingSymlinksInPath().standardizedFileURL.path
-        // Never replace anything outside the sandbox.
-        guard sandboxRunners.hasPrefix(home.resolvingSymlinksInPath().standardizedFileURL.path + "/") else { return }
+        // Never replace anything outside the sandbox. `realpath` on both sides: `test.sh` hands over
+        // `/var/…//cellar-tests.X`, and Foundation's own resolving reads `/private/var/…` or not.
+        func real(_ url: URL) -> String {
+            guard let resolved = realpath(url.path, nil) else { return url.standardizedFileURL.path }
+            defer { free(resolved) }
+            return String(cString: resolved)
+        }
+        guard real(Paths.runners).hasPrefix(real(home) + "/") else { return }
         for runner in entries where RunnerCatalog.spec(forID: runner.lastPathComponent) != nil {
             let link = Paths.runners.appendingPathComponent(runner.lastPathComponent)
             if (try? fm.destinationOfSymbolicLink(atPath: link.path)) != nil { continue }
