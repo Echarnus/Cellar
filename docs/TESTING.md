@@ -56,6 +56,12 @@ behind protocols written only for tests:
 
 - **The sandbox** (`TestHome`, `app/Scripts/test.sh`) — `CELLAR_HOME`, `CELLAR_PROFILES_DIR` and
   `CELLAR_APPLICATIONS_DIR` move every byte Cellar writes into a throwaway directory.
+  It can never reach the player's real installation (#204), which `CellarSandbox` enforces three
+  ways. A sandbox that is, sits inside, or contains the real Cellar folder stops the run before
+  its first write. The Wine tiers borrow the machine's runners as **APFS clones**, never links,
+  because a link is how a fake `wine` once landed in the real WineForge (#190). And
+  `app/Scripts/runner-guard.sh` fingerprints the real runners before and after every
+  `test.sh` run, failing the run and naming each file if anything changed.
 - **Profile fixtures** (`TestHome.writeProfile`/`plan`) — a game is a TOML string, resolved through
   the same `Game.plan` the app uses.
 - **A fake game on disk** (`TestHome.installFakeGame`) — the bytes of a PE header where the profile
