@@ -263,8 +263,12 @@ the game down through **`Game.fetchDepot`**, and start it.
   running instead. Translation is the only way it can start on this Mac. This is the property that
   makes it evidence rather than a smoke test.
 - **Single-player, no third-party DRM** — Steam publishes no `drm_notice` and no
-  `ext_user_account_notice` for it — so it takes Cellar's store-free route and the test watches the
-  game's own process instead of a client that spawned it.
+  `ext_user_account_notice` for it. Its online half (Steam Cloud, the timed events) goes through
+  Steamworks, though, so it runs beside the bottle's Steam client, signed in with the session Cellar
+  hands over: the tier sets the client up, launches through the beside-Steam route
+  (`.steamAlongside`) and watches the game's own process, which puts the hand-over under test too.
+  A title pointed at with `CELLAR_IT_STEAM_SLUG` that needs no live session still takes the
+  store-free route.
 
 It runs the profile the repo actually ships (`profiles/fallout-shelter.toml`), not a fixture. That is
 the point: when this tier passes, that file is correct. Step 5 is the one worth knowing about — it

@@ -344,6 +344,15 @@ The shim is a universal dylib (a runner may be x86_64 under Rosetta or arm64), b
 returns nothing and launches behave exactly as they did before — a cosmetic feature must never be
 able to stop a game from starting.
 
+The same library carries one fix that is not about the Dock (`app/Shim/cellar-recvtos.c`, #243).
+Steam's networking, in `steam.exe` and in every game that loads steamclient, asks for each UDP
+packet's TOS byte (`IP_RECVTOS`) and asserts when it gets none, which brings Steam's error reporter
+up over the game. Wine translates the received byte only under Linux's label, `IP_TOS`; macOS labels
+it `IP_RECVTOS`, so Wine dropped it. The library interposes `recvmsg()` and relabels that one
+control message. It is there because the library is already in the processes that need it, and it
+reads none of the Dock variables. `app/Scripts/test-shim.sh` checks it over a real loopback packet, in
+CI.
+
 ### Removing a game
 
 `Uninstall.swift` is the mirror image of setup, and it is deliberately the most cautious code in the
