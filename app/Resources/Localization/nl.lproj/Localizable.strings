@@ -516,3 +516,7 @@
 "Up next" = "Hierna aan de beurt";
 "Updating" = "Bijwerken";
 "… %lld earlier lines aren't shown." = "… %lld eerdere regels worden niet getoond.";
+"Another game is running. Install adds this one to the queue." = "Er draait een andere game. Installeer zet deze in de wachtrij.";
+"Play is available once the other game has closed." = "Spelen kan zodra de andere game is afgesloten.";
+"Cellar is busy with another game. Install adds this one to the queue." = "Cellar is bezig met een andere game. Installeer zet deze in de wachtrij.";
+"Play is available once Cellar has finished with the other game." = "Spelen kan zodra Cellar klaar is met de andere game.";
