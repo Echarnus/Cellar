@@ -69,4 +69,34 @@ struct DockShimTests {
         // Opening the client on its own is not this game, so the plain environment stays unnamed.
         #expect(plan.env["CELLAR_APP_NAME"] == nil)
     }
+
+    @Test("Steam started so a game can run beside it stays out of the Dock")
+    func clientStartedForAGameIsHidden() throws {
+        let shim = TestHome.scratch("dock-shim-client").appendingPathComponent("cellar-dock-shim.dylib")
+        try Data().write(to: shim)
+        setenv("CELLAR_DOCK_SHIM", shim.path, 1)
+        defer { unsetenv("CELLAR_DOCK_SHIM") }
+
+        let game = SteamBottle.gameClientStart
+        #expect(game.dock == .hidden, "a client started for a game must not take a Dock icon")
+        #expect(game.extraArgs == ["-silent"], "and must not open its window either")
+
+        let runner = WineRunner(binary: URL(fileURLWithPath: "/nonexistent/wine"),
+                                prefix: TestHome.scratch("dock-shim-bottle"))
+        let start = SteamBottle.clientStart(runner: runner, extraArgs: game.extraArgs, showHUD: false,
+                                            gameEnv: ["CELLAR_APP_NAME": "Planet Coaster 2"], dock: game.dock)
+        #expect(start.arguments.last == "-silent")
+        #expect(start.environment["DYLD_INSERT_LIBRARIES"] == shim.path)
+        let hidden = Set((start.environment["CELLAR_DOCK_HIDE"] ?? "").split(separator: ",").map(String.init))
+        for client in GameStore.steam.descriptor.clientProcessNames {
+            #expect(hidden.contains(client), "\(client) would take a Dock icon while the game plays")
+        }
+        #expect(start.environment["CELLAR_APP_NAME"] == "Planet Coaster 2",
+                "the game's name still travels with the client, for the game it starts")
+
+        // Opening Steam on its own, to sign in, is the one time it belongs in the Dock.
+        let opened = SteamBottle.clientStart(runner: runner, extraArgs: [], showHUD: false, gameEnv: [:],
+                                             dock: .visible)
+        #expect(opened.environment["CELLAR_DOCK_HIDE"] == nil)
+    }
 }
