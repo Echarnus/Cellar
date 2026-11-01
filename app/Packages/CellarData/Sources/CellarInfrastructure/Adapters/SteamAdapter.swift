@@ -11,6 +11,11 @@ public struct SteamAdapter: StoreAdapter {
     public var store: GameStore { .steam }
     public func isClientInstalled(_ plan: GamePlan) -> Bool { SteamBottle.isInstalled(in: plan.prefix) }
     public var isClientRunning: Bool { SteamBottle.isRunning }
+    public func verificationMark(_ plan: GamePlan) -> UInt64 { SteamSessionCheck.mark(in: plan.prefix) }
+    public func verificationChecks(_ plan: GamePlan, since mark: UInt64, launchSteps: [String]) -> [VerificationCheck] {
+        SteamSessionCheck.checks(prefix: plan.prefix, since: mark, launchSteps: launchSteps)
+    }
+    public func shutDownClient(_ plan: GamePlan, wine: WineRunner) { SteamBottle.shutdown(runner: wine) }
     public func signedInAccount(_ plan: GamePlan) -> String? { SteamBottle.loggedInAccount(in: plan.prefix) }
     /// Steam's appmanifest is authoritative — and only counts when its folder holds files.
     public func recordsGameInstalled(_ plan: GamePlan) -> Bool? {

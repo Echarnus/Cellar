@@ -30,6 +30,9 @@ requires_account            = "Frontier"
 # The Frontier Workshop needs a Frontier account linked to the Steam one. Frontier does not publish
 # the Workshop's own API address; add it here once a run names it.
 network_check               = "https://www.frontierstore.net/ https://user.frontierstore.net/ https://www.frontier.co.uk/"
+# The server the game's own process talks to for the Workshop and its online features (#23): read
+# from the exe's online platform config. `cellar verify` fails unless the running game connects to it.
+online_hosts                = "css-api.zaonce.net"
 online                      = "single-player core + online co-op / async multiplayer / cross-platform saves"
 status                      = "playable"        # M5 / macOS 26.5: main menu verified via D3DMetal 3.0 (2026-09-07); in-park validation pending
 notes                       = "Needs Wine ≥ 10.8 (GS-base switch) AND a D3DMetal-compatible Wine: WineForge. Menu ~53 FPS at 1512x982 with the Metal debug layer on (M5) — measured before MetalFX and WFUSync were switched on (2026-09-09); not yet re-run with them."

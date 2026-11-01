@@ -109,6 +109,36 @@ becomes required once it has run green across a week of PRs. The required set li
 
 ---
 
+## `cellar verify`: does the game actually work?
+
+Every tier above proves Cellar's code. None of them proves that a game works on a Mac, and that
+gap is where broken deliveries came from (#203). `cellar verify <slug>` closes it. It starts the
+game through the real Play path, watches it, closes it, and writes a report with a **PASS**,
+**FAIL** or **COULD NOT CHECK** for each check. Nobody has to watch the run.
+
+```sh
+cellar verify planet-coaster-2                   # one launch, up for 5 minutes
+cellar verify planet-coaster-2 --runs 3 --minutes 10
+```
+
+The baseline is the same for every game and never opt-in. The IDs are shared with
+`docs/DELIVERY-CHECKLIST.md`:
+
+| ID | Passes when |
+|---|---|
+| `signed-in` | the store signed in by itself, as the player's account, with no sign-in window. Read from Steam's `connection_log.txt`. Battle.net can't be read, so it answers could-not-check |
+| `steam-online` | Steam logged on, stayed connected, and is not in offline mode (`loginusers.vdf`) |
+| `launch` | Play started the game |
+| `stays-up` | the game's process stayed up for the whole run, with no crash reporter and no Wine crash in its log |
+| `game-online` | the game's **own process** held connections to the internet (`lsof`), to every `online_hosts` server, with no Schannel or certificate errors in its Wine log. A bottle probe passing is not enough |
+| `clean-exit` | after closing, nothing that runs the bottle's runner is left |
+| `real-install-untouched` | every runner file games start from has the checksum it had before |
+
+The report folder is `~/Library/Application Support/Cellar/verify/<slug>/<time>/`, holding
+`report.md`, `report.json` and a screenshot per launch. The command exits 0 only when every check
+passed, 1 on a failure and 2 when something could not be checked. The judgements are covered by
+`VerificationTests`, and one whole run against the fake Wine by `VerifyRunTests`.
+
 ## The tiers
 
 | Tier | Switch | Cost | What it proves |
