@@ -66,9 +66,17 @@ public enum Game {
         let bottleName = fields["bottle"] ?? slug
         let bottleFile = BottleConfig.url(forBottle: bottleName)
         let profileBackend = fields["backend"] ?? "d3dmetal"
+        let bottleFields = BottleConfig.fields(bottleFile)
         let performance = PerformanceSettings.resolve(
             profileFields: fields, profileEnv: ProfileStore.env(ref),
-            bottleFields: BottleConfig.fields(bottleFile), bottleEnv: BottleConfig.env(bottleFile))
+            bottleFields: bottleFields, bottleEnv: BottleConfig.env(bottleFile))
+        // The same game with the bottle's say over the switched-off workarounds taken away: what a
+        // launch that dies as it starts tries next.
+        let switchedOff = Set(performance.crashWorkaroundsSwitchedOff.map(\.key))
+        let workaroundEnv = switchedOff.isEmpty ? nil : PerformanceSettings.resolve(
+            profileFields: fields, profileEnv: ProfileStore.env(ref),
+            bottleFields: bottleFields.filter { !switchedOff.contains($0.key) },
+            bottleEnv: BottleConfig.env(bottleFile)).env
         return GamePlan(
             slug: slug,
             name: fields["name"] ?? slug,
@@ -111,6 +119,7 @@ public enum Game {
             isDraft: fields["generated"]?.lowercased() == "true",
             publisherLauncher: launcher,
             startExe: fields["start_exe"],
+            workaroundEnv: workaroundEnv,
             onlineHosts: (fields["online_hosts"] ?? "").split(separator: " ").map(String.init),
             crashProcesses: (fields["crash_processes"] ?? "").split(separator: " ").map(String.init)
         )

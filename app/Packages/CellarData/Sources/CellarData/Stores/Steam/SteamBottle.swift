@@ -486,8 +486,11 @@ public enum SteamBottle {
     public static func runGameSupervised(runner: WineRunner, appID: Int, showHUD: Bool = false,
                                          gameEnv: [String: String] = [:], attempts: Int = 8,
                                          game: String = "the game", expectsSignIn: Bool = false,
+                                         workaround: LaunchWorkaround? = nil,
                                          progress: (String) -> Void = { _ in },
                                          stage: (LaunchStage) -> Void = { _ in }) throws {
+        var gameEnv = gameEnv
+        let fallback = LaunchWorkaroundSwitch(workaround)
         // Warm the client first: launching the game into a not-yet-ready Steam makes the D3DMetal
         // race fire almost every time. Start Steam silently (tray only) with the game's env, wait
         // for it to come up, then drive the game into the warm client.
@@ -533,12 +536,24 @@ public enum SteamBottle {
             }
             if survived {
                 if attempt > 1 { progress("Up after \(attempt) attempts.") }
+                fallback.stayedUp()
                 return
             }
             progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
+            // Steam is the game's parent, so the game has Steam's environment: putting a workaround
+            // back means starting the client again with it.
+            if attempt < attempts, let restored = fallback.diedStarting(progress: progress) {
+                gameEnv = restored
+                killGameProcesses(in: runner.prefix, appID: appID)
+                shutdown(runner: runner)
+                stage(.client)
+                try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
+                try waitForClientToComeUp(prefix: runner.prefix, game: game)
+                Thread.sleep(forTimeInterval: 6)
+            }
         }
         throw CellarError.ioFailure(
-            "Planet Coaster 2 kept hitting the D3DMetal startup race after \(attempts) attempts. Try `cellar launch` again.")
+            "\(game) kept hitting the D3DMetal startup race after \(attempts) attempts. Press Play to try again.")
     }
 
     /// Whether any process whose command line contains `needle` is running (case-insensitive).
@@ -625,6 +640,7 @@ public extension SteamBottle {
                                 game: String = "the game", expectsSignIn: Bool = false,
                                 attempts: Int = 8,
                                 start: URL? = nil, publisherLauncher: PublisherLauncher? = nil,
+                                workaround: LaunchWorkaround? = nil,
                                 progress: (String) -> Void = { _ in },
                                 stage: (LaunchStage) -> Void = { _ in }) throws {
         SteamDRM.markAppDirectory(exe.deletingLastPathComponent(), appID: appID)
@@ -640,11 +656,18 @@ public extension SteamBottle {
             }
             Thread.sleep(forTimeInterval: 6)   // let the sign-in settle before the game asks
         }
-        var env = WineRunner.d3dMetalEnv(showHUD: showHUD)
-        for (key, value) in gameEnv { env[key] = value }
-        // What steam_api looks at when a game was not started by the client.
-        env["SteamAppId"] = "\(appID)"
-        env["SteamGameId"] = "\(appID)"
+        func environment(_ gameEnv: [String: String]) -> [String: String] {
+            var env = WineRunner.d3dMetalEnv(showHUD: showHUD)
+            for (key, value) in gameEnv { env[key] = value }
+            // What steam_api looks at when a game was not started by the client.
+            env["SteamAppId"] = "\(appID)"
+            env["SteamGameId"] = "\(appID)"
+            return env
+        }
+        var env = environment(gameEnv)
+        // The game is started by Cellar, not by the client, so its environment is this launch's own
+        // and a workaround can go back on between one attempt and the next.
+        let fallback = LaunchWorkaroundSwitch(workaround)
         let log = Paths.logs.appendingPathComponent("game-\(exe.deletingPathExtension().lastPathComponent).log")
         // What is started can differ from what is watched: a Rockstar game is started through the
         // stub Steam itself runs (`PlayRDR2.exe`), which hands off to the publisher's launcher and
@@ -683,8 +706,12 @@ public extension SteamBottle {
             },
             isUp: { ProcessWatch.isRunning(watched) },
             keepWaiting: keepWaiting,
+            diedStarting: { _ in
+                if let restored = fallback.diedStarting(progress: progress) { env = environment(restored) }
+            },
             progress: progress,
             stage: stage)
+        fallback.stayedUp()
     }
 
     /// How long a launch through a publisher launcher waits for the game: long enough to sign in to

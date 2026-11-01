@@ -516,6 +516,7 @@
 "Up next" = "Hierna aan de beurt";
 "Updating" = "Bijwerken";
 "… %lld earlier lines aren't shown." = "… %lld eerdere regels worden niet getoond.";
+"%@ needs this on: without it, it crashes as it starts. If you switch it off and that happens, Cellar switches it back on." = "%@ heeft dit nodig: zonder crasht het bij het starten. Zet je het uit en gebeurt dat, dan zet Cellar het weer aan.";
 "%@ or %@" = "%@ of %@";
 "Everything installs from your own %@ account. Cellar doesn't host, sell or unlock anything." = "Alles installeert vanuit je eigen %@-account. Cellar host, verkoopt of ontgrendelt niets.";
 "A game comes from %@. One sign-in covers every game from that store — you are not asked again per game." = "Een game komt van %@. Eén keer inloggen dekt elke game van die winkel — je wordt het niet per game opnieuw gevraagd.";
