@@ -57,6 +57,10 @@ public struct LaunchGame {
         // A game moved to a drive that isn't plugged in: said by name, before anything reads as
         // "not installed" and offers to download it onto the disk the player was keeping free.
         if let error = GameStorage.missingDriveError(plan) { throw error }
+        // A runner whose files were changed runs nothing, and every game on it "starts" into
+        // silence (#190). Checked before anything starts, and repaired here rather than handed to
+        // the player as a Terminal command (#194).
+        try RunnerIntegrity.ensureIntact(runnerID: plan.runnerID, progress: progress, update: update)
         guard let wine = Game.wineRunner(plan) else {
             throw CellarError.invalidArgument(
                 "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(plan.slug)")

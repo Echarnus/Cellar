@@ -94,7 +94,15 @@ public enum RunnerManager {
             throw CellarError.ioFailure(
                 "Could not find '\(spec.wineBinaryName)' after installing \(spec.displayName).")
         }
-        return RunnerInstall(spec: spec, root: dest, wineBinary: bin)
+        let install = RunnerInstall(spec: spec, root: dest, wineBinary: bin)
+        // Fresh from checksummed downloads: what every later Play checks the runner against.
+        do {
+            try RunnerIntegrity.record(install)
+        } catch {
+            CellarLog.warn(.runner, "Couldn't record \(spec.displayName)'s checksums: \(CellarLog.describe(error))",
+                           subject: spec.id)
+        }
+        return install
     }
 
     // MARK: - Internals
