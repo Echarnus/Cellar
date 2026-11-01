@@ -1,4 +1,4 @@
-"""Tests for the Python that guards the repo: the PR checklist and the coverage ratchet.
+"""Tests for the scripts that guard the repo: the PR checklist, the coverage ratchet and the runner guard.
 
     python3 -m unittest discover -s app/tests/Scripts
 
@@ -8,6 +8,8 @@ both are exercised here on the shapes they meet in CI. Standard library only, li
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -128,6 +130,71 @@ class CoverageTests(unittest.TestCase):
     def test_the_committed_baseline_names_every_target(self):
         baseline = coverage.load_baseline()
         self.assertEqual(set(baseline), set(coverage.TARGETS))
+
+
+class RunnerGuardTests(unittest.TestCase):
+    """`Scripts/runner-guard.sh`: a test run that changes the real runners fails, by name (#204)."""
+
+    def setUp(self):
+        self.real = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.real)
+        self.bin = os.path.join(self.real, "runners", "wineforge", "wine", "bin")
+        unix = os.path.join(self.real, "runners", "wineforge", "wine", "lib", "wine", "x86_64-unix")
+        os.makedirs(self.bin)
+        os.makedirs(unix)
+        self.write(os.path.join(self.bin, "wine"), "the real wine")
+        self.write(os.path.join(self.bin, "wineserver"), "the real wineserver")
+        self.write(os.path.join(unix, "ntdll.so"), "the real ntdll")
+        self.write(os.path.join(unix, "user32.so"), "not guarded")
+        self.snapshot = os.path.join(self.real, "before")
+
+    @staticmethod
+    def write(path, text):
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+
+    def guard(self, mode):
+        env = dict(os.environ, CELLAR_REAL_HOME=self.real)
+        return subprocess.run(["sh", os.path.join(ROOT, "Scripts", "runner-guard.sh"), mode, self.snapshot],
+                              env=env, capture_output=True, text=True, check=False)
+
+    def test_an_untouched_runner_passes(self):
+        self.assertEqual(self.guard("snapshot").returncode, 0)
+        self.assertEqual(self.guard("compare").returncode, 0)
+
+    def test_the_190_write_fails_and_is_named(self):
+        self.guard("snapshot")
+        self.write(os.path.join(self.bin, "wine"), "#!/bin/sh\n# Cellar's fake Wine\nexit 0\n")
+        result = self.guard("compare")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("wineforge/wine/bin/wine\n", result.stderr)
+        self.assertNotIn("wineserver", result.stderr)
+
+    def test_added_and_removed_files_are_named(self):
+        self.guard("snapshot")
+        os.remove(os.path.join(self.bin, "wineserver"))
+        self.write(os.path.join(self.bin, "wine64"), "new")
+        result = self.guard("compare")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("wineforge/wine/bin/wineserver", result.stderr)
+        self.assertIn("wineforge/wine/bin/wine64", result.stderr)
+
+    def test_files_a_runner_is_not_started_from_are_not_guarded(self):
+        self.guard("snapshot")
+        self.write(os.path.join(self.real, "runners", "wineforge", "wine", "lib", "wine", "x86_64-unix", "user32.so"), "x")
+        self.assertEqual(self.guard("compare").returncode, 0)
+
+    def test_a_mac_with_no_cellar_passes(self):
+        shutil.rmtree(os.path.join(self.real, "runners"))
+        self.assertEqual(self.guard("snapshot").returncode, 0)
+        self.assertEqual(self.guard("compare").returncode, 0)
+
+    def test_the_test_runner_uses_the_guard(self):
+        with open(os.path.join(ROOT, "Scripts", "test.sh"), encoding="utf-8") as handle:
+            script = handle.read()
+        self.assertIn("runner-guard.sh snapshot", script)
+        self.assertIn("runner-guard.sh compare", script)
+        self.assertLess(script.index("runner-guard.sh snapshot"), script.index("swift test --no-parallel"))
 
 
 if __name__ == "__main__":

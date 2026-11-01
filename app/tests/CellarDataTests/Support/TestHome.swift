@@ -31,6 +31,11 @@ enum TestHome {
                                         isDirectory: true)
         try? FileManager.default.createDirectory(at: raw, withIntermediateDirectories: true)
         let base = raw.resolvingSymlinksInPath().standardizedFileURL
+        // A sandbox that is, or holds, the player's real installation would let every test below
+        // write there. Stop the whole run before the first write instead (#204).
+        if (try? CellarSandbox.requireSeparate(base)) == nil {
+            fatalError("The test sandbox \(base.path) overlaps the real Cellar installation; refusing to run.")
+        }
 
         for (key, url) in [("CELLAR_HOME", base.appendingPathComponent("home", isDirectory: true)),
                            ("CELLAR_PROFILES_DIR", base.appendingPathComponent("profiles", isDirectory: true)),
@@ -100,9 +105,10 @@ enum TestHome {
         // every Play after that "started" Steam and got nothing (#190). No runner is the answer.
         guard isInside(Paths.appSupport) else { return nil }
 
-        // The integration target links the machine's real runner trees into this same home
-        // (`IntegrationSupport.linkRealRunner`). A stub written through that link lands in the
-        // player's runner, so the link is taken away first — the link only, never what it points at.
+        // The integration target clones the machine's real runners into this same home
+        // (`IntegrationSupport.cloneRealRunners`); an older run may have left a link instead. A
+        // stub written through a link lands in the player's runner, so a link is taken away
+        // first — the link only, never what it points at.
         let runnerDirectory = Paths.runners.appendingPathComponent(spec.id, isDirectory: true)
         if isSymbolicLink(runnerDirectory) {
             try? FileManager.default.removeItem(at: runnerDirectory)

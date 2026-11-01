@@ -131,6 +131,11 @@ if [ "$COVERAGE" = "1" ]; then
     rm -f .build/*/debug/codecov/*.json .build/debug/codecov/*.json
 fi
 
+# Fingerprint the player's real runners before the run and compare after (#204). The sandbox above
+# keeps every write out of them, and a test that slips past it anyway fails the run, by name,
+# instead of leaving a Mac where every game "starts" and nothing appears (#190).
+sh Scripts/runner-guard.sh snapshot "$CELLAR_TEST_ROOT/real-runners.before"
+
 set +e
 # shellcheck disable=SC2086
 swift test --no-parallel \
@@ -141,6 +146,10 @@ swift test --no-parallel \
     $ARGS
 STATUS=$?
 set -e
+
+if ! sh Scripts/runner-guard.sh compare "$CELLAR_TEST_ROOT/real-runners.before"; then
+    STATUS=1
+fi
 
 # Coverage is judged only on a green run: a failing suite already says what is wrong, and the
 # numbers from a run that stopped early would read as a drop.

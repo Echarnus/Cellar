@@ -50,8 +50,8 @@ enum IT {
     // MARK: - Sandbox
 
     /// A throwaway Cellar home, so an integration run cannot damage the player's bottles.
-    /// Runners are the one exception: they are hundreds of megabytes, so an already-installed
-    /// runner tree is linked in read-only rather than downloaded again.
+    /// Runners are hundreds of megabytes, so an already-installed runner is cloned in (free on
+    /// APFS) rather than downloaded again — never linked (#190, #204).
     static let home: URL = {
         // A composition root, like the CLI's `main`: the real store adapters, wired in first.
         CellarInfrastructure.install()
@@ -62,6 +62,10 @@ enum IT {
                 .appendingPathComponent("cellar-it-\(ProcessInfo.processInfo.processIdentifier)",
                                         isDirectory: true)
 
+        // A sandbox that is, or holds, the real installation is no sandbox: stop before writing.
+        if (try? CellarSandbox.requireSeparate(root)) == nil {
+            fatalError("The integration sandbox \(root.path) overlaps the real Cellar installation; refusing to run.")
+        }
         for (key, url) in [("CELLAR_HOME", root.appendingPathComponent("home", isDirectory: true)),
                            ("CELLAR_PROFILES_DIR", root.appendingPathComponent("profiles", isDirectory: true)),
                            ("CELLAR_APPLICATIONS_DIR", root.appendingPathComponent("Applications", isDirectory: true))] {
@@ -81,40 +85,38 @@ enum IT {
 
     /// Reuse the machine's installed runners instead of re-downloading ~400 MB per test run.
     ///
-    /// Each runner is linked *individually*, so `Paths.runners` stays a real directory the sandbox
-    /// owns; only the runner trees themselves are shared, and nothing a test does writes into them.
+    /// Each runner is **cloned** into the sandbox (`CellarSandbox.clone`), never linked. On APFS a
+    /// clone is free and instant, and nothing a test writes into it can reach the player's runner.
+    /// A link is what once let the unit suites' fake Wine land in the real WineForge (#190); the
+    /// unit suites share this home and write their stub where the runner is, so the clone is the
+    /// only shape that is safe whichever suite runs first.
     ///
-    /// Only done when a Wine tier asks for a runner (`resolveRunner`), never when the sandbox is
-    /// made: the unit suites share this home and put a fake Wine in the same place, and a link
-    /// made up front is what once let that fake land in the player's real runner (#190). A
-    /// sandbox stub found where the link belongs is the unit suites' and is replaced; the unit
-    /// suites likewise remove the link (never its target) before writing their stub.
-    private static func linkRealRunners() {
+    /// Done when a Wine tier asks for a runner (`resolveRunner`). A sandbox copy that is no longer
+    /// intact (a unit suite's stub, or FakeWine written over the clone) is thrown away and cloned
+    /// again from the real runner.
+    private static func cloneRealRunners() {
         let fm = FileManager.default
-        let real = realHome.appendingPathComponent("runners", isDirectory: true)
+        let real = CellarSandbox.realHome.appendingPathComponent("runners", isDirectory: true)
         guard let entries = try? fm.contentsOfDirectory(at: real, includingPropertiesForKeys: nil) else { return }
+        // Never replace anything outside the sandbox.
+        guard (try? CellarSandbox.requireSeparate(Paths.appSupport)) != nil else { return }
         try? fm.createDirectory(at: Paths.runners, withIntermediateDirectories: true)
-        // Never replace anything outside the sandbox. `realpath` on both sides: `test.sh` hands over
-        // `/var/…//cellar-tests.X`, and Foundation's own resolving reads `/private/var/…` or not.
-        func resolved(_ url: URL) -> String {
-            guard let pointer = realpath(url.path, nil) else { return url.standardizedFileURL.path }
-            defer { free(pointer) }
-            return String(cString: pointer)
-        }
-        guard resolved(Paths.runners).hasPrefix(resolved(home) + "/") else { return }
         for runner in entries where RunnerCatalog.spec(forID: runner.lastPathComponent) != nil {
-            let link = Paths.runners.appendingPathComponent(runner.lastPathComponent)
-            if (try? fm.destinationOfSymbolicLink(atPath: link.path)) != nil { continue }
-            if fm.fileExists(atPath: link.path) { try? fm.removeItem(at: link) }
-            try? fm.createSymbolicLink(at: link, withDestinationURL: runner)
+            let copy = Paths.runners.appendingPathComponent(runner.lastPathComponent, isDirectory: true)
+            if fm.fileExists(atPath: copy.path), !CellarSandbox.isSymbolicLink(copy),
+               RunnerIntegrity.check(runnerID: runner.lastPathComponent) == .intact { continue }
+            // A link (from an older run) or a stub: the link only, never what it points at.
+            try? fm.removeItem(at: copy)
+            do {
+                try CellarSandbox.clone(runner, to: copy)
+            } catch {
+                log("couldn't clone \(runner.lastPathComponent) into the sandbox: \(error)")
+            }
         }
     }
 
     /// The real installation's root — what `Paths.appSupport` would be without `CELLAR_HOME`.
-    private static var realHome: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("Cellar", isDirectory: true)
-    }
+    private static var realHome: URL { CellarSandbox.realHome }
 
     /// Bring the machine's Steam session into the sandbox, so tier D can use it.
     ///
@@ -198,7 +200,7 @@ enum IT {
     /// otherwise the catalog default, installed on demand.
     static func resolveRunner(progress: (String) -> Void = { _ in }) throws -> RunnerInstall {
         ensure()
-        linkRealRunners()
+        cloneRealRunners()
         if let preferred = value("CELLAR_IT_RUNNER") {
             if let found = RunnerManager.find(id: preferred) { return found }
             guard let spec = RunnerCatalog.spec(forID: preferred) else {
