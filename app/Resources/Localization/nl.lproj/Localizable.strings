@@ -30,7 +30,6 @@
 "%lld supported games are waiting behind it." = "Er wachten %lld ondersteunde games achter.";
 "1 more game once you sign in" = "Nog 1 game zodra je inlogt";
 "1 supported game is waiting behind it." = "Er wacht 1 ondersteunde game achter.";
-"A game comes from Steam, Battle.net or GOG. One sign-in covers every game from that store — you are not asked again per game." = "Een game komt van Steam, Battle.net of GOG. Eén keer inloggen dekt elke game van die winkel — je wordt het niet per game opnieuw gevraagd.";
 "A newer version is out. Play downloads only what changed, then starts the game." = "Er is een nieuwere versie. Spelen downloadt alleen wat veranderd is en start dan de game.";
 "A one-time download, shared by every game you add." = "Een eenmalige download, gedeeld door elke game die je toevoegt.";
 "A running game holds some files open. Quit it, then choose Uninstall Cellar… again. What happened:" = "Een draaiende game houdt bestanden open. Stop hem en kies dan opnieuw 'Verwijder Cellar…'. Wat er gebeurde:";
@@ -171,7 +170,6 @@
 "Every wheel Cellar drives pushes at most the strength chosen above." = "Elk stuur dat Cellar aanstuurt, duwt hoogstens met de sterkte die je hierboven kiest.";
 "Everyone else Cellar stands on: Settings › About." = "Iedereen op wie Cellar verder steunt: Instellingen › Over.";
 "Everything every game shares is on this Mac." = "Alles wat elke game deelt, staat op deze Mac.";
-"Everything installs from your own Steam, Battle.net or GOG account. Cellar doesn't host, sell or unlock anything." = "Alles installeert vanuit je eigen Steam-, Battle.net- of GOG-account. Cellar host, verkoopt of ontgrendelt niets.";
 "Export diagnostics…" = "Exporteer diagnose…";
 "Export failed" = "Exporteren mislukt";
 "Fanatec bases start at half strength; Logitech and Thrustmaster wheels at full." = "Fanatec-bases beginnen op halve sterkte, Logitech- en Thrustmaster-sturen op volle sterkte.";
@@ -391,7 +389,6 @@
 "Steam sign-in expired" = "Steam-login verlopen";
 "Steam sign-in QR code" = "QR-code om in te loggen bij Steam";
 "Steam starts in the background with no window. %@ will not start reliably until it is ready, so Cellar waits." = "Steam start op de achtergrond zonder venster. %@ start niet betrouwbaar tot het klaar is, dus Cellar wacht.";
-"Steam, GOG or Battle.net" = "Steam, GOG of Battle.net";
 "Step %lld of %lld" = "Stap %lld van %lld";
 "Step %lld. %@. %@" = "Stap %lld. %@. %@";
 "Stop waiting for %@. Anything already open — %@, the game itself — stays open." = "Stop met wachten op %@. Wat al open is — %@, de game zelf — blijft open.";
@@ -520,3 +517,7 @@
 "Updating" = "Bijwerken";
 "… %lld earlier lines aren't shown." = "… %lld eerdere regels worden niet getoond.";
 "%@ needs this on: without it, it crashes as it starts. If you switch it off and that happens, Cellar switches it back on." = "%@ heeft dit nodig: zonder crasht het bij het starten. Zet je het uit en gebeurt dat, dan zet Cellar het weer aan.";
+"%@ or %@" = "%@ of %@";
+"Everything installs from your own %@ account. Cellar doesn't host, sell or unlock anything." = "Alles installeert vanuit je eigen %@-account. Cellar host, verkoopt of ontgrendelt niets.";
+"A game comes from %@. One sign-in covers every game from that store — you are not asked again per game." = "Een game komt van %@. Eén keer inloggen dekt elke game van die winkel — je wordt het niet per game opnieuw gevraagd.";
+"Every game comes from your %@ account. You sign in once, and it covers every game — you are not asked again per game." = "Elke game komt van je %@-account. Je logt één keer in, en dat geldt voor elke game — je wordt het niet per game opnieuw gevraagd.";

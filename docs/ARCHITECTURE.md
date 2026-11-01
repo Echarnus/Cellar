@@ -100,6 +100,14 @@ bottle. Each profile names one with `store = "…"`, and that single field decid
 which installer `cellar setup` runs, what "installed" and "signed in" even mean, how a launch is
 issued, and what the app says to the player.
 
+**Which stores a build shows is one flag.** `StoreAvailability.offered` (CellarDomain) is Steam
+only for the first release (#221). Battle.net and GOG stay fully built — adapters, bottles,
+sign-ins, CLI groups — but a store that is not offered is hidden everywhere a player looks:
+`LoadLibrary` drops its games (not withheld: there would be no fix to offer), Accounts and the
+account button leave it out, copy that names the stores reads `StoreAvailability.phrase()`, and its
+CLI group leaves `cellar --help` while still working for the app. Turning a store back on is adding
+it to that set. `Game.summaries()` is the engine's view and still sees every store.
+
 | | **Steam** (`SteamBottle`) | **Battle.net** (`BattleNetBottle`) | **GOG** (`GOG*`) |
 |---|---|---|---|
 | Client in the bottle | yes — unless the game has no live-session DRM | yes | **none** |
@@ -306,7 +314,7 @@ whose bundle declares `LSApplicationCategoryType = public.app-category.games`, a
 the bundle the process's executable sits in. The player's launcher in `~/Applications` does not
 count — it is a shell script that hands off to `cellar`; the process on screen is bare `wine`.
 
-So `GameApp` keeps `Paths.gameApps/<slug>.app` (Application Support, not `~/Applications`: it is
+So `GameApp` keeps `Paths.gameApps/<Game Name>.app`, named as the player reads the game because the Dock labels a running app with its bundle's file name (in Application Support, not `~/Applications`: it is
 plumbing, and double-clicking it would run Wine with no program). Its executable is a byte-for-byte
 **copy** of the runner's loader — re-copied whenever the runner's changes — and its Info.plist carries
 the game's name, icon, the games category, `LSSupportsGameMode`, plus what Wine embeds in its own

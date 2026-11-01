@@ -76,7 +76,9 @@ struct GameAppTests {
         let slug = "pc2-\(UUID().uuidString.prefix(6))".lowercased()
         let start = try #require(GameApp.prepare(name: "Planet Coaster 2", slug: slug,
                                                  runnerBinary: runner.binary, icon: nil))
-        let app = GameApp.bundleURL(slug: slug)
+        let app = GameApp.bundleURL(name: "Planet Coaster 2", slug: slug)
+        // The Dock names a running app after its bundle's file name, not CFBundleName.
+        #expect(app.lastPathComponent == "Planet Coaster 2.app")
         #expect(start.executable.path == app.appendingPathComponent("Contents/MacOS/wine").path)
         #expect(try Data(contentsOf: start.executable) == Data(contentsOf: runner.inner))
         #expect(FileManager.default.isExecutableFile(atPath: start.executable.path))
@@ -97,6 +99,28 @@ struct GameAppTests {
         #expect(info["NSPrincipalClass"] as? String == "WineApplication")
         // Not the player's launcher: Reset and Uninstall must never confuse the two.
         #expect(!AppBundle.isGenerated(app))
+    }
+
+    @Test("The bundle is named as the player reads the game, never after its slug")
+    func bundleTakesTheGamesName() {
+        #expect(GameApp.fileName(for: "Fallout Shelter", slug: "fallout-shelter") == "Fallout Shelter")
+        #expect(GameApp.fileName(for: "Kingdom Come: Deliverance II", slug: "kcd2") == "Kingdom Come\u{A789} Deliverance II",
+                "Finder shows a : in a file name as /")
+        #expect(GameApp.fileName(for: "Half/Life", slug: "hl") == "Half\u{2215}Life", "a / cannot be in a file name")
+        #expect(GameApp.fileName(for: "  ", slug: "blank") == "blank")
+        #expect(GameApp.fileName(for: ".hidden", slug: "dot") == "dot", "a leading dot would hide the bundle")
+    }
+
+    @Test("A bundle named after the slug, from before, is replaced by the one named after the game")
+    func replacesTheSlugNamedBundle() throws {
+        let runner = try wineForgeRunner()
+        let slug = "fallout-shelter-\(UUID().uuidString.prefix(6))".lowercased()
+        let legacy = GameApp.legacyBundleURL(slug: slug)
+        try FileManager.default.createDirectory(at: legacy.appendingPathComponent("Contents/MacOS"),
+                                                withIntermediateDirectories: true)
+        _ = try #require(GameApp.prepare(name: "Fallout Shelter", slug: slug, runnerBinary: runner.binary, icon: nil))
+        #expect(!FileManager.default.fileExists(atPath: legacy.path))
+        #expect(FileManager.default.fileExists(atPath: GameApp.bundleURL(name: "Fallout Shelter", slug: slug).path))
     }
 
     @Test("A runner update replaces the copied loader")

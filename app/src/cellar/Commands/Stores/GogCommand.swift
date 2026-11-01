@@ -20,6 +20,8 @@ struct GogCommand: ParsableCommand {
 
         Cellar only ever downloads games you own, and GOG's own API is the only thing it talks to.
         """,
+        // Out of `cellar --help` while the release is Steam only; the app still drives it.
+        shouldDisplay: GameStore.gog.isOffered,
         subcommands: [Login.self, Logout.self, Status.self, Library.self, Install.self]
     )
 

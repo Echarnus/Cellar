@@ -1,0 +1,53 @@
+# Cellar game profile — Team Fortress 2
+#
+# Valve's 2007 class shooter, still on Steam's Most Played chart (98K players, 2026-11-01). Valve
+# dropped the Mac version in 2024 with the 64-bit update: the store page now lists Windows and
+# SteamOS + Linux only, and the hl2_osx launch option in SteamDB's config no longer has a build.
+# Facts below are from the Steam store page and SteamDB's config for app 440, read 2026-11-01.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "team-fortress-2"
+name          = "Team Fortress 2"
+developer     = "Valve"
+publisher     = "Valve"
+steam_appid   = 440
+engine        = "Source"
+graphics_api  = "DirectX 9"
+architecture  = "x86-64"
+released      = "2007-10-10"
+store         = "steam"
+
+[compatibility]
+# VAC runs in user space, not in the kernel. Cellar runs it untouched.
+anticheat                   = "VAC (Valve Anti-Cheat, user space, not kernel-level)"
+drm                         = "Steamworks (needs a running Steam client)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "online multiplayer on Valve and community servers; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. A DirectX 9 game: Cellar starts it with the graphics translation made for older DirectX games, and offers a slower, more forgiving one if the game never comes up."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal only translates DirectX 11 and 12. DXVK covers DirectX 9; WineD3D (OpenGL) is the slow,
+# forgiving fallback the launch window offers once.
+backend           = "dxvk"
+fallback_backend  = "wined3d"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 440
+# tf_win64.exe is Steam's default Windows launch option since the 2024 64-bit update; the 32-bit
+# tf.exe is a second option. The install_dir needle catches either as "the game is running".
+install_dir = "Team Fortress 2"
+exe         = "tf_win64.exe"
+
+[legal]
+drm_circumvention = "never"

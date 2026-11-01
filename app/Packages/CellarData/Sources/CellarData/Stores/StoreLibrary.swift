@@ -54,8 +54,11 @@ public enum StoreLibrary {
 
     /// **Has the player connected at least one real store?** A player who has, has already found
     /// Accounts — asking them to "sign in" again reads as though that sign-in did not take.
+    ///
+    /// Offered stores only: a Battle.net account added before the first release went Steam-only
+    /// must not make an empty library say "nothing owned" instead of "sign in to Steam".
     public static var hasConnectedStore: Bool {
-        GameStore.allCases.contains { isConnected($0) }
+        GameStore.offered.contains { isConnected($0) }
     }
 
     /// What an empty library is telling the player.
@@ -350,7 +353,7 @@ public enum StoreLibrary {
             progress("Checking your Steam library…")
             _ = try? refreshSteam(progress: progress)
         }
-        if GOGAuth.isSignedIn {
+        if GameStore.gog.isOffered, GOGAuth.isSignedIn {
             progress("Checking your GOG library…")
             _ = try? refreshGOG()
         }
