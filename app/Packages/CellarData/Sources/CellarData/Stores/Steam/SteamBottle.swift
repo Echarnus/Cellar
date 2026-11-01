@@ -341,7 +341,6 @@ public enum SteamBottle {
     public static func runGameSupervised(runner: WineRunner, appID: Int, showHUD: Bool = false,
                                          gameEnv: [String: String] = [:], attempts: Int = 8,
                                          game: String = "the game", expectsSignIn: Bool = false,
-                                         rememberedSession: Bool = false,
                                          workaround: LaunchWorkaround? = nil,
                                          progress: (String) -> Void = { _ in },
                                          stage: (LaunchStage) -> Void = { _ in }) throws {
@@ -359,8 +358,7 @@ public enum SteamBottle {
             try waitForClientToComeUp(prefix: runner.prefix, game: game)
             if expectsSignIn {
                 try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
-                                       gameEnv: gameEnv, rememberedSession: rememberedSession,
-                                       progress: progress, stage: stage)
+                                       gameEnv: gameEnv, progress: progress, stage: stage)
             }
             Thread.sleep(forTimeInterval: 6) // let login settle
         }
@@ -497,7 +495,6 @@ public extension SteamBottle {
     public static func launchAlongside(runner: WineRunner, exe: URL, appID: Int, showHUD: Bool = false,
                                 gameEnv: [String: String] = [:], bundledLoader: GameApp.Start? = nil,
                                 game: String = "the game", expectsSignIn: Bool = false,
-                                rememberedSession: Bool = false,
                                 attempts: Int = 8,
                                 start: URL? = nil, publisherLauncher: PublisherLauncher? = nil,
                                 workaround: LaunchWorkaround? = nil,
@@ -512,8 +509,7 @@ public extension SteamBottle {
             try waitForClientToComeUp(prefix: runner.prefix, game: game)
             if expectsSignIn {
                 try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
-                                       gameEnv: gameEnv, rememberedSession: rememberedSession,
-                                       progress: progress, stage: stage)
+                                       gameEnv: gameEnv, progress: progress, stage: stage)
             }
             Thread.sleep(forTimeInterval: 6)   // let the sign-in settle before the game asks
         }
@@ -726,38 +722,11 @@ public extension SteamBottle {
     ///
     /// A refusal takes the session back and falls back to the client's own sign-in window, so the
     /// game never starts against a client nobody is signed in to.
-    ///
-    /// A session the bottle only *remembered* gets a second chance before that: Steam sometimes
-    /// starts with a remembered sign-in it no longer accepts and never even tries it (Kenneth's Mac,
-    /// 2026-11-01: four launches that day waited three minutes and ended with "Nobody signed in"
-    /// while Cellar held a good session all along). So when the remembered one gives no logon, or
-    /// is refused, Cellar quits the client, hands it the session it holds, and starts it again.
     internal static func waitForClientLogon(runner: WineRunner, since mark: UInt64, game: String,
                                             showHUD: Bool, gameEnv: [String: String],
-                                            rememberedSession: Bool = false,
-                                            timeout: TimeInterval? = nil,
+                                            timeout: TimeInterval = 180,
                                             progress: (String) -> Void,
                                             stage: (LaunchStage) -> Void) throws {
-        let timeout = timeout ?? SteamClientSession.logonTimeout(rememberedSession: rememberedSession)
-        func retryWithFreshSession(_ why: String) throws -> Bool {
-            guard SteamClientSession.retriesWithFreshSession(rememberedSession: rememberedSession) else { return false }
-            progress("Steam didn't sign in with the session it remembered (\(why)), so Cellar is giving it a fresh one and starting it again…")
-            CellarLog.warn(.store, "The bottle's remembered Steam session gave \(why); handing over Cellar's and restarting the client.",
-                           subject: runner.prefix.lastPathComponent)
-            shutdown(runner: runner)
-            if let account = SteamAccount.state.accountName {
-                SteamClientSession.forget(account: account, prefix: runner.prefix,
-                                          steamDirectory: steamDirectory(in: runner.prefix), wineUser: wineUser)
-            }
-            guard handOverSession(runner: runner, progress: progress) == .canHandOver else { return false }
-            stage(.client)
-            let fresh = connectionLogMark(in: runner.prefix)
-            try launchClient(runner: runner, extraArgs: ["-silent"], showHUD: showHUD, gameEnv: gameEnv, dock: .hidden)
-            try waitForClientToComeUp(prefix: runner.prefix, game: game)
-            try waitForClientLogon(runner: runner, since: fresh, game: game, showHUD: showHUD, gameEnv: gameEnv,
-                                   rememberedSession: false, progress: progress, stage: stage)
-            return true
-        }
         let deadline = Date().addingTimeInterval(timeout)
         var announced = false
         while Date() < deadline {
@@ -765,7 +734,6 @@ public extension SteamBottle {
             case .loggedOn?:
                 return
             case .refused(let reason)?:
-                if try retryWithFreshSession("Steam answered \(reason)") { return }
                 progress("Steam didn't accept the sign-in Cellar gave it (\(reason)), so its own window opens instead.")
                 // Steam refusing a refresh token means that token is done, so the session is marked
                 // as refused too: the next launch asks rather than handing over a dead one again, and
@@ -788,8 +756,7 @@ public extension SteamBottle {
         // Steam Guard confirmation, or sit on a login window with no network, and neither writes a
         // logon line. Starting the game into that gives "Unable to initialize SteamAPI", so this ends
         // in the same place a refusal does — the client's own window, which is the one thing that can
-        // still fix it. A remembered session gets its fresh hand-over first.
-        if try retryWithFreshSession("no sign-in within \(Int(timeout)) seconds") { return }
+        // still fix it.
         progress("Steam hasn't signed in within \(Int(timeout / 60)) minutes, so its own window opens — sign in there and \(game) starts.")
         fallBackToClientWindow(runner: runner, game: game, showHUD: showHUD, gameEnv: gameEnv,
                                progress: progress, stage: stage)

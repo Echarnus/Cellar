@@ -162,17 +162,6 @@ public extension SteamClientSession {
         case clientRunning
     }
 
-    /// How long a launch waits for the client's logon. A session Cellar just handed over gets the
-    /// full three minutes; one the bottle only remembered gets half that, because when it fails
-    /// there is still a fresh hand-over to try (`retriesWithFreshSession`).
-    static func logonTimeout(rememberedSession: Bool) -> TimeInterval { rememberedSession ? 90 : 180 }
-
-    /// Whether a launch whose client gave no logon, or was refused, hands over Cellar's own session
-    /// and starts the client again before opening Steam's window. Only for a session the bottle
-    /// remembered: one Cellar just handed over is the session it holds, so trying it twice proves
-    /// nothing, and the window is what is left.
-    static func retriesWithFreshSession(rememberedSession: Bool) -> Bool { rememberedSession }
-
     /// The Wine user whose `CryptProtectData` key the client will use: `GetUserNameA` in a bottle is
     /// the `USER` of the process that started Wine, falling back to the login name as Wine does.
     static func wineUser(environment: [String: String]) -> String {
