@@ -127,7 +127,9 @@ public enum RunnerIntegrity {
         let aside = Paths.cache.appendingPathComponent("\(spec.id)-damaged-\(UUID().uuidString.prefix(8))", isDirectory: true)
         try fm.moveItem(at: root, to: aside)
         do {
-            let fresh = try install(spec, progress)
+            // Two non-escaping closures may not be handed to each other (exclusivity); `progress`
+            // only lives for this call either way.
+            let fresh = try withoutActuallyEscaping(progress) { progress in try install(spec, progress) }
             guard check(fresh) == .intact else {
                 throw CellarError.ioFailure("the fresh copy didn't pass its own check")
             }
