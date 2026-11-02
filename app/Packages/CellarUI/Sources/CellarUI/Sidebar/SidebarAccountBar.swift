@@ -72,14 +72,15 @@ public struct SidebarAccountBar: View {
     }
 
     /// The account's own Steam picture when Cellar has it; otherwise a filled person once someone is
-    /// signed in, an outlined one with a plus while nobody is, and a small spinner while Cellar is
-    /// still finding out. An orange badge marks a Steam sign-in that needs renewing, so the trouble
+    /// signed in, an outlined one with a plus while nobody is, and a neutral placeholder while
+    /// Cellar is still finding out. An orange badge marks a Steam sign-in that needs renewing, so the trouble
     /// shows before the words do.
     private var avatar: some View {
         ZStack(alignment: .bottomTrailing) {
             if account.tone == .loading {
-                ProgressView().controlSize(.small)
-                    .frame(width: 28, height: 28)
+                // A placeholder the shape of the avatar, as a Mac list shows before its content
+                // arrives: neutral, so it can't be read as signed in or signed out.
+                Circle().fill(.quaternary).frame(width: 24, height: 24)
             } else if let file = account.avatar, let picture = NSImage(contentsOf: file) {
                 Image(nsImage: picture)
                     .resizable().interpolation(.high).aspectRatio(contentMode: .fill)

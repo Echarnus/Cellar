@@ -100,7 +100,8 @@ struct SteamAvatarTests {
         try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: shared) }
         #expect(SteamAvatar.file(for: "a", in: shared) != SteamAvatar.file(for: "b", in: shared))
-        #expect(SteamAvatar.file(for: "../x", in: shared).deletingLastPathComponent() == shared)
+        #expect(SteamAvatar.file(for: "../x", in: shared).deletingLastPathComponent().standardizedFileURL.path
+                == shared.standardizedFileURL.path, "an account name can't climb out of the folder")
         #expect(SteamAvatar.localFile(for: "a", in: shared) == nil)
         #expect(SteamAvatar.isStale(for: "a", in: shared))
         try Data([1]).write(to: SteamAvatar.file(for: "a", in: shared))
