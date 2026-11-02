@@ -1,4 +1,5 @@
 import CellarDomain
+import CryptoKit
 import Foundation
 import Testing
 @testable import CellarData
@@ -96,6 +97,59 @@ final class RunnerIntegrityTests {
             throw CellarError.ioFailure("should not be called")
         })
         #expect(!repaired && installs == 0)
+    }
+
+    // MARK: - Cellar's own wineserver (#23)
+
+    /// The runner on disk, but under a spec that pins Cellar's wineserver to `pinned`'s checksum.
+    private func pinningRunner(_ pinned: Data) throws -> RunnerInstall {
+        let base = try runner()
+        let digest = SHA256.hash(data: pinned).map { String(format: "%02x", $0) }.joined()
+        let spec = RunnerSpec(
+            id: Self.id, displayName: "Pinned",
+            artifacts: [RunnerArtifact(kind: .wineserver, url: "https://example.invalid/wineserver",
+                                       payloadPath: "", sha256: digest)],
+            wineBinaryName: "wine", hasD3DMetal: false, license: "", deprecated: nil)
+        return RunnerInstall(spec: spec, root: base.root, wineBinary: base.wineBinary)
+    }
+
+    @Test("A runner pinned to Cellar's wineserver is damaged while it runs the stock one, even with a clean manifest")
+    func stockWineserverIsDamage() throws {
+        let patched = Self.machO + Data("cellar patched".utf8)
+        let install = try pinningRunner(patched)
+        try RunnerIntegrity.record(install)   // the stock server, recorded: what an install from before the pin looks like
+        #expect(RunnerIntegrity.check(install) == .damaged(["wine/bin/wineserver"]))
+
+        // Once the pinned server is in place and recorded — what a repair's fresh install does — it checks out.
+        try RunnerManager.placeWineserver(try scratchFile(patched), in: install.root)
+        try RunnerIntegrity.record(install)
+        #expect(RunnerIntegrity.check(install) == .intact)
+    }
+
+    @Test("Without a manifest, the pinned wineserver is still required")
+    func pinnedWithoutManifest() throws {
+        let install = try pinningRunner(Self.machO + Data("cellar patched".utf8))
+        #expect(RunnerIntegrity.check(install) == .damaged(["wine/bin/wineserver"]))
+    }
+
+    @Test("Cellar's wineserver replaces the engine's, executable, and needs the engine in place first")
+    func placesWineserver() throws {
+        let install = try runner()
+        let patched = Self.machO + Data("cellar patched".utf8)
+        try RunnerManager.placeWineserver(try scratchFile(patched), in: install.root)
+        let server = install.binDirectory.appendingPathComponent("wineserver")
+        #expect(try Data(contentsOf: server) == patched)
+        #expect(FileManager.default.isExecutableFile(atPath: server.path))
+
+        let empty = TestHome.scratch("no-engine")
+        #expect(throws: CellarError.self) { try RunnerManager.placeWineserver(try scratchFile(patched), in: empty) }
+    }
+
+    private func scratchFile(_ data: Data) throws -> URL {
+        let url = TestHome.scratch("wineserver-download").appendingPathComponent("wineserver.bin")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url)
+        return url
     }
 
     // MARK: - Repairing

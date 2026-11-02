@@ -26,6 +26,9 @@ struct CreditsTests {
         for download in downloads {
             let url = try #require(URL(string: download))
             let owner = try #require(Self.githubOwner(url), "\(download) is not on GitHub — credit it by hand and extend this test")
+            // Cellar's own releases carry Cellar's builds of credited code (the patched WineForge
+            // wineserver, #23); the credit belongs to the code's authors, already named.
+            if owner == "echarnus" { continue }
             #expect(Self.creditedOwners.contains(owner), "\(download) comes from \(owner), whom Credits.all does not name")
         }
     }
