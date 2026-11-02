@@ -40,15 +40,24 @@ struct VerifyCommand: ParsableCommand {
         let plan = try Game.plan(slug: slug)
         var verify = VerifyGame(plan, runs: runs, surviveSeconds: Int(minutes * 60))
         // Ctrl-C (or a kill from whatever started us) stops verify the tidy way: the game, its
-        // store and Wine are closed and the report keeps the runs that were done (#249).
+        // store and Wine are closed and the report keeps the runs that were done (#249). A second
+        // one stops it at once, but still shuts the bottle's Wine down and rewrites the report
+        // first (#270): a harness that sends SIGTERM right after SIGINT used to leave the bottle's
+        // Steam and wineserver running and a report that said "still running".
         let stop = Stop()
+        verify.isInterrupted = { stop.requested }
+        let stopper = StopNow(verify)
         let sources = [SIGINT, SIGTERM].map { number -> DispatchSourceSignal in
             signal(number, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: number, queue: .global())
             source.setEventHandler {
                 if stop.request() {
-                    FileHandle.standardError.write(Data("\nStopping: closing the game and writing the report. Press Ctrl-C again to quit at once.\n".utf8))
+                    FileHandle.standardError.write(Data("\nStopping: closing the game and writing the report. Press Ctrl-C again to stop at once.\n".utf8))
                 } else {
+                    FileHandle.standardError.write(Data("\nStopping at once: shutting down the bottle's Wine…\n".utf8))
+                    if let folder = stopper.verify.stopNow() {
+                        FileHandle.standardError.write(Data("Report: \(folder.path)\n".utf8))
+                    }
                     Foundation.exit(130)
                 }
             }
@@ -56,7 +65,6 @@ struct VerifyCommand: ParsableCommand {
             return source
         }
         defer { sources.forEach { $0.cancel() } }
-        verify.isInterrupted = { stop.requested }
         let (report, folder) = verify.run { print(Term.dim($0)) }
 
         print("")
@@ -72,6 +80,13 @@ struct VerifyCommand: ParsableCommand {
         case .couldNotCheck: print(Term.yellow("\(plan.name): \(report.summary)"))
         }
         if report.verdict != .pass { throw ExitCode(report.verdict == .fail ? 1 : 2) }
+    }
+
+    /// The verify a second Ctrl-C stops at once, handed to the signal handler's thread.
+    /// `stopNow()` only reads the plan and the lock-guarded `VerifyProgress`.
+    final class StopNow: @unchecked Sendable {
+        let verify: VerifyGame
+        init(_ verify: VerifyGame) { self.verify = verify }
     }
 
     /// Whether a stop was asked for, readable from the verify loop while a signal handler sets it.
