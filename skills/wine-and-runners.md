@@ -205,3 +205,22 @@ A runner/backend/bottle change is verified by **a game actually starting**, neve
 
 Related: [`profiles.md`](profiles.md) · [`swift.md`](swift.md) · [`ux.md`](ux.md) ·
 [`../docs/RESEARCH.md`](../docs/RESEARCH.md) · [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
+
+## A game's online feature spins forever (#23)
+
+**Symptom:** a menu stuck on "loading..." or "Connecting...", with no TLS or DNS error and sockets left in CLOSE_WAIT. Planet Coaster 2's Workshop and Franchise looked like this.
+
+**Cause:** in an alertable wait, Windows runs a thread's queued user APCs before it looks at the objects. Wine's wineserver (`check_wait`, `server/thread.c`) checks the objects first, and in Wine a regular file handle is always signalled. Code that writes with `WriteFileEx` and then waits with `WaitForSingleObjectEx(hFile, t, TRUE)` until the completion routine runs therefore never sees that routine run. Frontier's `KeplerAPI.dll` does exactly this.
+
+**How to find it:**
+1. Take winedbg backtraces of the stuck thread.
+2. Map the `ntdll`/`kernelbase` offsets to their exports.
+3. Disassemble the game DLL at the return address with `xcrun llvm-objdump`. An alertable `WaitForSingleObjectEx` on a file handle after a `WriteFileEx` is this bug.
+
+**Fix:**
+- `app/RunnerPatches/wineforge/0001-…patch` is built by `app/Scripts/build-wineserver.sh` and the *Wineserver* workflow.
+- The build is published as a `wineserver-*` prerelease and installed over the runner as a `.wineserver` artifact.
+- `RunnerIntegrity` treats any other wineserver as damage, so older installs repair onto the fixed one.
+- A new WineForge version needs the patch rebuilt from that exact commit, because the server must match its `ntdll`.
+
+Other Frontier games (Planet Zoo, Jurassic World Evolution) share Kepler and are likely affected the same way. That is inferred, not yet checked game by game.

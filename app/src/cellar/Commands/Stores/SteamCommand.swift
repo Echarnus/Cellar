@@ -136,7 +136,8 @@ struct SteamCommand: ParsableCommand {
                     : "not installed")
             let account = SteamBottle.loggedInAccount(in: prefix)
             row("account", account != nil, account ?? "nobody logged in — cellar steam open \(slug)")
-            row("running", SteamBottle.isRunning, SteamBottle.isRunning ? "yes" : "no")
+            let running = SteamBottle.isRunning(in: prefix)
+            row("running", running, running ? "yes" : "no")
             if let appID = plan.appID {
                 let installed = SteamBottle.isGameInstalled(in: prefix, appID: appID)
                 row("game", installed, installed ? "\(plan.name) installed (AppID \(appID))" : "\(plan.name) not installed — cellar steam install \(slug)")

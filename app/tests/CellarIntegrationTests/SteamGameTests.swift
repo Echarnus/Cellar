@@ -11,8 +11,10 @@ import Testing
 /// exercised there *except* the part players actually do: authenticate to a store, pull a couple of
 /// gigabytes of somebody else's game, and run an engine that expects a GPU. That gap is what this
 /// tier closes, and Fallout Shelter is the cheapest title that closes it — free-to-play, ~2 GB,
-/// **Windows-only** (so a pass cannot secretly be a native macOS build), single-player and
-/// DRM-free, which is what lets Cellar take the store-free route and watch the game directly.
+/// **Windows-only** (so a pass cannot secretly be a native macOS build) and single-player. Its
+/// online half (Steam Cloud, the timed events) goes through Steamworks, so it runs beside the
+/// bottle's Steam client, signed in with the session Cellar hands over — which puts that hand-over
+/// under test as well. A title with no live-session DRM still takes the store-free route here.
 ///
 /// It skips far more often than it runs, so the skip is designed as carefully as the pass: the
 /// reason is a sentence naming the fix, and `reportsWhyItCannotRun` prints it on every run. A tier
@@ -53,8 +55,6 @@ struct SteamGameTests {
         #expect(plan.appID == game.appID)
         #expect(plan.launchExe == game.exe)
         #expect(plan.installDir == game.installDir)
-        #expect(plan.needsLiveSession == false,
-                "this tier watches the game's own process, which only works when no client is in the way")
     }
 
     // MARK: - The real thing
@@ -81,15 +81,18 @@ struct SteamGameTests {
         #expect(plan.directLaunchExe == nil)
         #expect(plan.canLaunchStoreFree == false)
 
-        // 3. Runner + bottle. No Steam client: this game does not need one, and saying so is the
-        //    difference between a 2 GB install and a 3.4 GB one.
+        // 3. Runner + bottle, and the Steam client only when the game's DRM needs it running.
         var progress: [String] = []
         _ = try Game.setUp(plan) { progress.append($0); IT.log($0) }
         #expect(fm.fileExists(atPath: plan.prefix.appendingPathComponent("system.reg").path),
                 "no registry hive — the bottle never initialised")
-        #expect(progress.contains { $0.contains("No Steam client needed") },
-                "a game with no live-session DRM must be told plainly that no client is being installed")
-        #expect(!SteamBottle.isInstalled(in: plan.prefix))
+        if plan.needsLiveSession {
+            #expect(SteamBottle.isInstalled(in: plan.prefix), "a game that runs beside Steam got no Steam")
+        } else {
+            #expect(progress.contains { $0.contains("No Steam client needed") },
+                    "a game with no live-session DRM must be told plainly that no client is being installed")
+            #expect(!SteamBottle.isInstalled(in: plan.prefix))
+        }
 
         // 4. The download, through Cellar's own call rather than a hand-rolled DepotDownloader
         //    command line — a test that drove the tool itself would pass while `fetchDepot` broke.
@@ -108,21 +111,26 @@ struct SteamGameTests {
         #expect(size > 100_000, "\(game.exe) is \(size) bytes — that is a stub, not the game")
         IT.log("installed \(exe.path)")
 
-        // 6. Readiness flips, and the copy now truthfully promises a launch with no client at all.
+        // 6. Readiness flips, and the copy promises only the launch it will really make.
         #expect(Game.isGameInstalled(plan))
-        #expect(plan.canLaunchStoreFree)
+        #expect(plan.canLaunchStoreFree == !plan.needsLiveSession)
         let ready = try #require(Game.summaries().first { $0.slug == plan.slug })
         #expect(ready.nextStep == .play)
         #expect(ready.actionTitle == "Play")
-        #expect(ready.actionHint.contains("without opening"))
+        #expect(ready.actionHint.contains("without opening") == !plan.needsLiveSession)
 
         // 7. Launch it, through the same call the Play button makes.
         let route = try Game.launch(plan, progress: { IT.log($0) })
-        guard case .direct(let launched) = route else {
-            Issue.record("expected the direct route for a DRM-free game, got \(route)")
+        switch route {
+        case .direct(let launched) where !plan.needsLiveSession:
+            #expect(launched == game.exe)
+        case .steamAlongside(let launched, let appID) where plan.needsLiveSession:
+            #expect(launched == game.exe)
+            #expect(appID == game.appID)
+        default:
+            Issue.record("expected the \(plan.needsLiveSession ? "beside-Steam" : "direct") route, got \(route)")
             return
         }
-        #expect(launched == game.exe)
 
         // 8. The proof: a Windows-only game is running on this Mac. Given generously — a Unity
         //    title compiles shaders on first start, which `winemine.exe` never made us wait for.

@@ -47,7 +47,10 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
   `CELLAR_STEAM_TOKEN_VAULT=0` turns sealing off, for diagnosing a keychain problem.
 - **An ad-hoc signed CLI asks for keychain access after each update.** The item trusts the binary
   that wrote it, and an ad-hoc signature changes with every build. A Developer ID signature fixes
-  this.
+  this for releases. A build from source (`install-app.sh`) is signed with the Mac's own
+  "Apple Development" identity when there is one (`Scripts/local-sign-identity.sh`), with the fixed
+  identifier `it.clercq.cellar.cli` on both copies of the CLI, so "Always Allow" is pressed once and
+  holds across rebuilds. Without that identity it stays ad-hoc and the script says how to make one.
 - **The app and the CLI do not share one keychain item.** On the login keychain an item trusts the
   binary that created it; a true shared item needs the data-protection keychain and a
   `keychain-access-groups` entitlement on both, signed with one Team ID. Until the Developer ID

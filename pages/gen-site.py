@@ -85,6 +85,28 @@ STORES = {  # profile store → how the site labels it
     "battlenet": "Battle.net",
     "gog": "GOG",
 }
+# The stores the site talks about. Mirrors StoreAvailability.offered in the app
+# (app/Packages/CellarDomain/Sources/CellarDomain/Store/StoreAvailability.swift): the first release
+# is Steam only (#221), so Battle.net and GOG games, copy and questions are left out — not deleted.
+# To bring a store back, add it here; every store-specific sentence below is written through
+# only()/stores_phrase() so it returns with it.
+OFFERED = ("steam",)
+OWNERS = {"steam": "Valve", "battlenet": "Blizzard", "gog": "GOG"}  # for the affiliation line
+
+
+def only(store, text):
+    """`text` when `store` is offered on the site, otherwise nothing."""
+    return text if store in OFFERED else ""
+
+
+def stores_phrase(last="and"):
+    """The offered stores as prose: "Steam", "Steam and GOG", "Steam, Battle.net and GOG"."""
+    names = [STORES[k] for k in OFFERED]
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} {last} {names[-1]}"
+
+
+def your_stores(plural, singular):
+    return plural if len(OFFERED) > 1 else singular
 
 STATUS = {  # profile status → (label, css class, what it means)
     "playable": ("Playable", "ok", "Someone ran it on named hardware; the profile says which Mac."),
@@ -528,6 +550,8 @@ def load_games():
             "portrait": str(portrait),
             "profile": f"profiles/{os.path.basename(path)}",
         })
+    # A store the site doesn't offer yet keeps its profiles valid (checked above) but off the page.
+    games = [g for g in games if g["store"] in OFFERED]
     if not games:
         sys.exit("error: no profiles found in profiles/")
     # Playable first, then by name.
@@ -673,7 +697,7 @@ def closing_band(release, base=""):
     return f'''<section class="band" aria-labelledby="band-h"><div class="wrap">
   <div>
     <h2 id="band-h">Bring your library over.</h2>
-    <p>Download Cellar, sign in to the stores you already use, and play the games you own.</p>
+    <p>Download Cellar, sign in to {your_stores("the stores you already use", "the Steam account you already have")}, and play the games you own.</p>
   </div>
   <a class="btn btn-light btn-big" href="{n(download_href(release))}">{icon("download")}<span class="lines">Download for Mac<small>{n(download_detail(release))}</small></span></a>
 </div></section>'''
@@ -702,7 +726,7 @@ def site_footer(games, base=""):
     </ul></div>
   </div>
   <p class="legal">{len(games)} profiled games, {playable} confirmed playable. Cellar is free software
-  under GPL-3.0 and is not affiliated with Apple, Valve, Blizzard, GOG, CodeWeavers or any game
+  under GPL-3.0 and is not affiliated with Apple, {", ".join(OWNERS[k] for k in OFFERED)}, CodeWeavers or any game
   publisher; their names appear only to say where a game comes from. Built on
   <a href="https://www.winehq.org/">Wine</a>, the Windows compatibility layer — Cellar is a launcher
   over it, and the hard part is theirs.</p>
@@ -720,9 +744,9 @@ FEATURES = [
     ("play", "One click from download to playing",
      "Cellar fetches the Wine runner, sets up the graphics layer and builds a bottle for each game. "
      "No Terminal, no Windows licence, no virtual machine."),
-    ("stores", "Your stores, your library",
-     "Steam, Battle.net and GOG. Sign in once per store, not once per game, and Cellar shows the "
-     "games you own there."),
+    ("stores", your_stores("Your stores, your library", "Your Steam library"),
+     f"{stores_phrase()}. Sign in once{your_stores(' per store', '')}, not once per game, and "
+     "Cellar shows the games you own there."),
     ("chip", "Apple's D3DMetal, or DXVK",
      "Direct3D is translated to Metal on the Apple GPU. Where a second backend can run a game, "
      "its profile names it as the fallback for when the first choice misbehaves."),
@@ -740,7 +764,8 @@ FEATURES = [
 STEPS = [
     ("Install Cellar", "Open the download and drag Cellar to Applications. It sets up what it needs the "
      "first time a game asks for it."),
-    ("Sign in to your stores", "Steam, Battle.net or GOG, with your own account. Once per store; you can "
+    (your_stores("Sign in to your stores", "Sign in to Steam"),
+     f"{stores_phrase('or')}, with your own account. Once{your_stores(' per store', '')}; you can "
      "also skip it and do it later."),
     ("Pick a game and play", "Choose a game you own, install it, and press Play. Cellar picks the runner "
      "and backend from the game's profile."),
@@ -790,7 +815,7 @@ def render_index(games, release):
     playable = sum(1 for g in games if g["status"] == "playable")
     stores_present = [k for k in STORES if any(g["store"] == k for g in games)]
     statuses_present = [k for k in STATUS if any(g["status"] == k for g in games)]
-    store_opts = [("all", "All stores", total)] + [
+    store_opts = [] if len(stores_present) < 2 else [("all", "All stores", total)] + [
         (k, STORES[k], sum(1 for g in games if g["store"] == k)) for k in stores_present]
     status_opts = [("all", "Any status", total)] + [
         (k, STATUS[k][0], sum(1 for g in games if g["status"] == k)) for k in statuses_present]
@@ -827,7 +852,7 @@ def render_index(games, release):
 
     return f'''{head("Cellar — Windows games on your Mac",
                  "Cellar runs the Windows games you own on Apple Silicon Macs: Wine with Apple's "
-                 "D3DMetal, per-game profiles, and your own Steam, Battle.net and GOG accounts. "
+                 f"D3DMetal, per-game profiles, and your own {stores_phrase()} {your_stores('accounts', 'account')}. "
                  "Free and open source.", "index.html")}
 {topbar("home", release)}
 <main id="main">
@@ -836,7 +861,7 @@ def render_index(games, release):
     <p class="eyebrow">Free and open source · For Apple Silicon</p>
     <h1 id="hero-h">Your Windows games, on your Mac.</h1>
     <p class="lede">Cellar runs the Windows games you already own on Apple Silicon. It sets up Wine and
-    Apple&rsquo;s D3DMetal for each game, signs in to your stores once, and gets out of the way.</p>
+    Apple&rsquo;s D3DMetal for each game, {your_stores("signs in to your stores once", "signs in to Steam once")}, and gets out of the way.</p>
     <div class="ctas">
       <a class="btn btn-light btn-big" href="{n(download_href(release))}">{icon("download")}<span class="lines">Download for Mac<small>{n(download_detail(release))}</small></span></a>
       <a class="btn btn-ghost btn-big" href="#games">See supported games</a>
@@ -851,7 +876,7 @@ def render_index(games, release):
   <dl class="stats">
     <div><dt class="sr-only">Game profiles</dt><dd style="margin:0"><b>{total}</b><span>game profiles</span></dd></div>
     <div><dt class="sr-only">Confirmed playable</dt><dd style="margin:0"><b>{playable}</b><span>confirmed playable</span></dd></div>
-    <div><dt class="sr-only">Stores</dt><dd style="margin:0"><b>{len(STORES)}</b><span>stores: {", ".join(STORES.values())}</span></dd></div>
+    <div><dt class="sr-only">Stores</dt><dd style="margin:0"><b>{len(OFFERED) if len(OFFERED) > 1 else stores_phrase()}</b><span>{"stores: " + stores_phrase() if len(OFFERED) > 1 else "your own library"}</span></dd></div>
     <div><dt class="sr-only">Price</dt><dd style="margin:0"><b>Free</b><span>GPL-3.0, no telemetry</span></dd></div>
   </dl>
 
@@ -878,7 +903,7 @@ def render_index(games, release):
     <div class="toolbar" role="search" aria-label="Filter games">
       <div class="search">{icon("search")}<label class="sr-only" for="q">Search games</label>
         <input id="q" type="search" placeholder="Search games" autocomplete="off"></div>
-      {seg("store", "Store", store_opts)}
+      {seg("store", "Store", store_opts) if store_opts else ""}
       {seg("status", "Status", status_opts)}
     </div>
     <p class="count" id="count" role="status" aria-live="polite">Showing all {total} games</p>
@@ -902,7 +927,7 @@ def render_index(games, release):
       <li><b>Apple Silicon</b><span>M1 or later. Intel Macs are not supported.</span></li>
       <li><b>macOS {MIN_MACOS} or later</b><span>Every M1 Mac can run it; Software Update has it.</span></li>
       <li><b>Rosetta 2</b><span>Wine runs as an Intel app under Rosetta; macOS installs it on request.</span></li>
-      <li><b>A game you own</b><span>On Steam, Battle.net or GOG, from your own account.</span></li>
+      <li><b>A game you own</b><span>On {stores_phrase("or")}, from your own account.</span></li>
     </ul>
   </section>
 
@@ -955,7 +980,7 @@ FAQ_SECTIONS = [
         ("How do I install it?",
          "<p>Download the DMG, drag Cellar to Applications, and open it. On first launch it "
          "introduces itself, asks once for the folders where Windows games keep their saves, and "
-         "offers to sign you in to your stores. You can skip signing in — Cellar still opens, and "
+         f"offers to sign you in to {your_stores('your stores', 'Steam')}. You can skip signing in — Cellar still opens, and "
          "signing in later works identically from <b>Accounts</b> (⌘⇧A) or <b>Settings → Manage "
          "accounts</b>.</p>"
          "<p>Cellar downloads the Wine runner itself the first time a game needs one. No Terminal "
@@ -993,24 +1018,29 @@ FAQ_SECTIONS = [
          "ours.</p>"),
         ("Is it free? Do I need an account with you?",
          "<p>Free, GPL-3.0, and there is no Cellar account, no sign-up and no telemetry. The only "
-         "accounts involved are the game stores you already have.</p>"),
+         f"{your_stores('accounts involved are the game stores you already have', 'account involved is the Steam account you already have')}.</p>"),
     ]),
 
     ("Accounts and signing in", "accounts",
      "Why Cellar asks, what it can see, and what it deliberately won't claim.", [
         ("Why do I have to sign in at all?",
          "<p>Because the games are <b>yours</b>. Cellar does not host or distribute game files — it "
-         "installs from your own Steam, Battle.net or GOG account, the way those clients would on a "
+         f"installs from your own {stores_phrase('or')} account, the way those clients would on a "
          "PC. No sign-in, no library.</p>"),
-        ("Once per store, or once per game?",
-         "<p><b>Once per store.</b> One Steam sign-in covers your whole Steam library — both what "
-         "you own and downloading it. GOG is one token Cellar holds for the account. That is why "
+        (your_stores("Once per store, or once per game?", "Once, or once per game?"),
+         f"<p><b>Once{your_stores(' per store', '')}.</b> One Steam sign-in covers your whole Steam library — both what "
+         "you own and downloading it. "
+         + only("gog", "GOG is one token Cellar holds for the account. ") + "That is why "
          "signing in lives on the <b>Accounts</b> screen — your account at the bottom of the sidebar, ⌘⇧A, or "
          "Settings → Manage accounts — and not on each game's page.</p>"),
         ("Does Cellar see my password?",
          "<p>No. Steam's sign-in is Steam's own QR device flow: you approve it in the Steam mobile "
-         "app. GOG uses its normal login page and hands back an OAuth token, which Cellar keeps in "
-         "your macOS Keychain. Battle.net's sign-in happens entirely inside Blizzard's client.</p>"),
+         "app. "
+         + only("gog", "GOG uses its normal login page and hands back an OAuth token, which Cellar "
+                "keeps in your macOS Keychain. ")
+         + only("battlenet", "Battle.net's sign-in happens entirely inside Blizzard's client.")
+         + "</p>"),
+    ] + ([] if "battlenet" not in OFFERED else [
         ("Why does Battle.net say “Add” instead of “Sign in”?",
          "<p>Because Blizzard writes nothing readable that says who is signed in, or which games "
          "that account owns. Steam and GOG both answer those questions; Battle.net does not.</p>"
@@ -1018,6 +1048,7 @@ FAQ_SECTIONS = [
          "shows its games, saying plainly that it cannot check you own them. You sign in inside "
          "Blizzard's own window when you open it. Where Cellar looks oddly modest about what it "
          "knows, this is usually why.</p>"),
+    ]) + [
         ("Why does a Windows Steam run inside the bottle?",
          "<p>Cellar downloads Steam games with your one sign-in, without starting a Steam window. "
          "But many Steamworks games check for a <i>running</i> Steam while they play, so for those "
@@ -1026,9 +1057,11 @@ FAQ_SECTIONS = [
          "under While playing skip it: the game still comes from your Steam account, it just "
          "doesn't need Steam running to play.</p>"),
         ("Can I sign out?",
-         "<p>Yes. Accounts offers Sign out for each session Cellar itself holds. The Steam client "
-         "and Battle.net are signed out from inside their own windows, because that is where those "
-         "sessions actually live.</p>"),
+         "<p>Yes. Accounts offers Sign out for each session Cellar itself holds. "
+         + ("The Steam client and Battle.net are signed out from inside their own windows, because "
+            "that is where those sessions actually live.</p>" if "battlenet" in OFFERED else
+            "The Steam client inside a bottle is signed out from its own window, because that is "
+            "where that session actually lives.</p>")),
     ]),
 
     ("Games and compatibility", "games", "What the ratings mean, and why a game might be missing.", [
@@ -1056,7 +1089,7 @@ FAQ_SECTIONS = [
          "after a 60&nbsp;GB download.</p>"),
         ("Does the store's client have to be running while I play?",
          "<p>It depends on the game, and its card says which. Steamworks titles usually want a live "
-         "Steam session. GOG's games are DRM-free, so nothing needs to run beside them. Either "
+         "Steam session. " + only("gog", "GOG's games are DRM-free, so nothing needs to run beside them. ") + "Either "
          "way the game is installed from your own store account; cards that say <b>Just the "
          "game</b> under While playing simply don't need the store's app running beside it.</p>"),
     ]),
@@ -1172,10 +1205,12 @@ FAQ_SECTIONS = [
          "takes a few minutes on a good connection; later games reuse the runner and are much "
          "quicker. Cellar shows what it is running while it works — if the activity log is still "
          "moving, let it finish.</p>"),
+    ] + ([] if "battlenet" not in OFFERED else [
         ("A store window opened and is waiting for me.",
          "<p>Expected, for Battle.net: Blizzard's installer has no silent mode, so its window "
          "genuinely needs a few clicks. Cellar warns you before opening one rather than appearing "
          "to hang and being force-quit. Steam's installer does run silently.</p>"),
+    ]) + [
         ("The game won't start.",
          "<ul>"
          "<li>Read the game's page — it names the step it is actually waiting on.</li>"
@@ -1203,7 +1238,7 @@ FAQ_SECTIONS = [
          "<p>To remove Cellar entirely, <code>cellar reset --everything</code>. Cellar does not "
          "live in one folder — besides <code>~/Library/Application&nbsp;Support/Cellar</code> it "
          "writes launcher apps into <code>~/Applications</code>, adds entries to your Steam "
-         "library, and keeps a GOG sign-in in your login keychain. That command takes all of it, "
+         "library" + only("gog", ", and keeps a GOG sign-in in your login keychain") + ". That command takes all of it, "
          "plus the app and the <code>cellar</code> command themselves, and shows you the list "
          "first. Without <code>--everything</code> it stops short of the app and the command, so "
          "you can carry on using Cellar.</p>"),
@@ -1220,7 +1255,7 @@ FAQ_SECTIONS = [
          "from components already there. The same rule covers the store icons in the app: they are "
          "borrowed from the copies already on your Mac, or drawn in code — never shipped as logo "
          "files.</p>"),
-        ("Is Cellar affiliated with Valve, Blizzard, GOG or Apple?",
+        (f"Is Cellar affiliated with {', '.join(OWNERS[k] for k in OFFERED)} or Apple?",
          "<p>No. Cellar is an independent project. Store and product names appear only to say where "
          "a game came from.</p>"),
         ("What licence is it under?",

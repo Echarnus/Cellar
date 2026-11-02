@@ -66,6 +66,10 @@ public struct GamePlan {
     public var onlineHosts: [String] = []
     /// `crash_processes`: crash reporters of the game's own, beyond the ones `CrashSigns` knows.
     public var crashProcesses: [String] = []
+    /// `online_errors`: words the game writes when an online call fails (Frontier's
+    /// `ShowNetworkError`). `cellar verify` fails `game-online` when one shows up in the Wine log or
+    /// a crash dump's comment: a connection that opened is not a call that worked (#210).
+    public var onlineErrors: [String] = []
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }

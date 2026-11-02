@@ -35,3 +35,5 @@ receipts there. Key rules:
   never by a clean build. Record the hardware and OS in the profile's `notes`.
 
 Before reporting done, run the **cellar-verifier** agent.
+
+- **An online feature spins forever** (Workshop "loading...", no TLS error): Wine skips queued APCs in alertable waits on always-signalled file handles. See `skills/wine-and-runners.md` → *A game's online feature spins forever* (#23).

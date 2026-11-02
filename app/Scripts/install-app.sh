@@ -108,6 +108,11 @@ install_file "$SHIM" "$HOME/Library/Application Support/Cellar/cellar-dock-shim.
 # none), so installing the app alone leaves it driving whatever older CLI is there. Same layout as
 # package.sh's CLI zip: <prefix>/bin/cellar beside <prefix>/share/cellar/{profiles,dock shim}, which
 # is where the CLI looks for both — an old share/ is an old game list, not just an old binary.
+# Signed before it is copied anywhere, so ~/.local/bin and the app carry the same signature — the
+# one the keychain is told to trust (Scripts/local-sign-identity.sh).
+. Scripts/local-sign-identity.sh
+local_sign .build/release/cellar "$CELLAR_CLI_IDENTIFIER"
+
 PREFIX="$HOME/.local"
 mkdir -p "$PREFIX/bin" "$PREFIX/share/cellar/profiles"
 install_file .build/release/cellar "$PREFIX/bin/cellar"
@@ -122,9 +127,14 @@ echo "Installed the cellar CLI at $PREFIX/bin/cellar (profiles in $PREFIX/share/
 # from source must never replace itself with a release, so its updater stays off and Settings says so.
 sh Scripts/bundle-app.sh "$APP" .build/release
 
-# Same ad-hoc seal as package.sh: the Info.plist and resources were added after the linker signed
-# the binary, and an unsealed bundle is one macOS may refuse to open.
-codesign --force --deep --sign - "$APP"
+# The seal: the Info.plist and resources were added after the linker signed the binary, and an
+# unsealed bundle is one macOS may refuse to open. Ad-hoc, like package.sh, unless this Mac has a
+# local identity. `--deep` re-signs the bundled CLI without its identifier, so it is signed again
+# as the same `cellar` as ~/.local/bin, and then the bundle is sealed over it.
+codesign --force --deep --sign "$LOCAL_SIGN_IDENTITY" "$APP"
+local_sign "$APP/Contents/MacOS/cellar" "$CELLAR_CLI_IDENTIFIER"
+local_sign "$APP"
+codesign --verify --deep --strict "$APP"
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
 echo "Installed $APP  —  open it with:  open \"$APP\""
