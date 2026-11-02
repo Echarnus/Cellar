@@ -16,6 +16,11 @@ public struct RunnerArtifact: Sendable {
         /// A Sikarugir/Wineskin wrapper template whose `Contents/Frameworks/renderer/d3dmetal` is
         /// grafted into `<runner>/wine/lib/d3dmetal` — the layout WineForge reads via D3DMETAL_RUNTIME_DIR.
         case d3dmetalFromTemplate
+        /// Cellar's own build of the engine's `wineserver`, with the fixes in `app/RunnerPatches/`
+        /// (#23). A single Mach-O, not an archive; it replaces `<runner>/wine/bin/wineserver`, so it
+        /// comes after the engine artifact. Built from the engine's exact commit, because the server
+        /// has to speak the protocol of the `ntdll` it ships with.
+        case wineserver
     }
     public let kind: Kind
     public let url: String

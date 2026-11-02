@@ -60,6 +60,24 @@ struct RunnerTests {
                 "'\(id)' claims hasD3DMetal = \(spec.hasD3DMetal) but its artifacts say otherwise")
     }
 
+    @Test("Cellar's own wineserver comes last, after the engine it replaces, from Cellar's own releases",
+          arguments: RunnerCatalog.all.map(\.id))
+    func wineserverOverlay(_ id: String) throws {
+        let spec = try #require(RunnerCatalog.spec(forID: id))
+        for (index, artifact) in spec.artifacts.enumerated() where artifact.kind == .wineserver {
+            #expect(index == spec.artifacts.count - 1, "'\(id)': the wineserver goes over an engine that is already there")
+            #expect(spec.artifacts.contains { $0.kind == .wineDMG || $0.kind == .wineEngine })
+            #expect(artifact.url.hasPrefix("https://github.com/Echarnus/Cellar/releases/download/wineserver-"),
+                    "built and published by Cellar's Wineserver workflow, never someone else's binary")
+            #expect(artifact.sha256.count == 64)
+        }
+    }
+
+    @Test("The runner Planet Coaster 2 uses carries the wineserver that lets Frontier's Workshop load (#23)")
+    func pc2RunnerHasPatchedWineserver() {
+        #expect(RunnerCatalog.wineforgeD3DMetal4.artifacts.contains { $0.kind == .wineserver })
+    }
+
     // MARK: - Installed-runner layout
 
     @Test("A runner is only 'installed' once its wine binary is executable")

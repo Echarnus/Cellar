@@ -53,6 +53,15 @@ public enum RunnerCatalog {
                 url: "https://github.com/Sikarugir-App/Wrapper/releases/download/v1.0/Template-1.0.24.tar.xz",
                 payloadPath: "Template-1.0.24.app/Contents/SharedSupport/renderer/d3dmetal",
                 sha256: "4b5f89eeb9ef139936bdfad33d9b420b05ea4597cb7d63376674f7a8e171321c"),
+            // WineForge 0.6.0.8's own wineserver, rebuilt by Cellar from the same commit with the fix
+            // in app/RunnerPatches/wineforge/ (#23): without it Frontier's online code (Planet Coaster
+            // 2's Workshop and Franchise) hangs on its first cache write. The binary tested on a real
+            // PC2 (Wineserver workflow run 41412807646), published unchanged.
+            RunnerArtifact(
+                kind: .wineserver,
+                url: "https://github.com/Echarnus/Cellar/releases/download/wineserver-wineforge-0.6.0.8-cellar.1/wineserver",
+                payloadPath: "",
+                sha256: "ef94ecf0ecf90671308ff46e8127e9ba6d994a953807effdf564672302eaabe3"),
         ],
         wineBinaryName: "wine",
         hasD3DMetal: true,
