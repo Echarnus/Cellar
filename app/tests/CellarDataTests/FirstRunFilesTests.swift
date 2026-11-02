@@ -169,5 +169,8 @@ struct FirstRunFilesTests {
 
         #expect(plan.launchExe == "SkyrimSE.exe", "Cellar starts the game, not SkyrimSELauncher.exe")
         #expect(plan.firstRunFiles == Self.skyrimCopies)
+        // D3DMetal 3.0 (runner "wineforge") crashed it on every start even with the settings in
+        // place (0xC0000094, 2026-11-02); D3DMetal 4.0b3 kept it up.
+        #expect(plan.runnerID == "wineforge-d3dmetal4")
     }
 }
