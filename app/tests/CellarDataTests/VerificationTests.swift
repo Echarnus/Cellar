@@ -294,6 +294,7 @@ struct VerifyRunTests {
                                 reportsRoot: TestHome.scratch("reports"))
         verify.checkUpdates = false
         verify.screenshots = false
+        verify.dockApps = { [] }
         return verify
     }
 
@@ -313,6 +314,9 @@ struct VerifyRunTests {
         #expect(verdict("game-online") == .pass, "the fixture says it has no online features")
         #expect(verdict("clean-exit") == .pass)
         #expect(verdict("real-install-untouched") == .pass)
+        #expect(verdict("dock") == .couldNotCheck, "this test has no Dock to read")
+        #expect(verdict("settings-match") == .pass)
+        #expect(verdict("dlc") == .couldNotCheck, "the fixture's bottle has no Steam client")
         #expect(verdict("signed-in") == .fail, "nobody signed this sandbox's Steam in, and the report must say so")
         #expect(verdict("steam-online") == .fail)
         #expect(report.verdict == .fail)
@@ -327,6 +331,31 @@ struct VerifyRunTests {
                 "verify turns on the TLS channels it reads")
     }
 
+    @Test("Stopped mid-watch, verify closes the game, writes the report it has, and passes nothing it didn't see")
+    func interruptedRun() throws {
+        let (plan, exeName) = try game(lifetime: 60)
+        defer {
+            ProcessWatch.kill([exeName])
+            try? FileManager.default.removeItem(at: plan.prefix)
+        }
+        var verify = verify(plan, surviveSeconds: 40)
+        verify.runs = 2
+        let start = Date()
+        verify.isInterrupted = { Date().timeIntervalSince(start) > 4 }
+        let (report, folder) = verify.run()
+        func verdict(_ id: String) -> VerificationVerdict? { report.checks.first { $0.id == id }?.verdict }
+
+        #expect(verdict("run-1.launch") == .pass)
+        #expect(verdict("run-1.stays-up") == .couldNotCheck, "up for 4 s is not up for 40 s")
+        #expect(verdict("run-1.clean-exit") == .pass, "the run under way is still closed down")
+        #expect(verdict("interrupted") == .couldNotCheck)
+        #expect(!report.checks.contains { $0.id.hasPrefix("run-2.") }, "run 2 never started")
+        #expect(!ProcessWatch.isRunning(exeName))
+        #expect(Date().timeIntervalSince(start) < 30, "a stop is answered within seconds, not at the end of the watch")
+        let markdown = try String(contentsOf: folder.appendingPathComponent("report.md"), encoding: .utf8)
+        #expect(markdown.contains("stopped during run 1"))
+    }
+
     @Test("A game that quits early fails stays-up, saying after how long")
     func earlyExit() throws {
         let (plan, exeName) = try game(lifetime: 6)
@@ -337,6 +366,298 @@ struct VerifyRunTests {
         let (report, _) = verify(plan, surviveSeconds: 20).run()
         let staysUp = try #require(report.checks.first { $0.id == "stays-up" })
         #expect(staysUp.verdict == .fail)
-        #expect(staysUp.detail.contains("stopped after"))
+        #expect(staysUp.detail.contains("exited quietly after"), "the fake game exits with no crash")
+    }
+}
+
+/// `dlc`, `dock` and `settings-match` (#208): the three baseline checks that judge what the player
+/// would see after a launch rather than whether it started.
+struct BaselineCheckTests {
+    // MARK: - dlc
+
+    static func manifest(stateFlags: String = "4", depots: [UInt32]) -> String {
+        """
+        "AppState"
+        {
+        \t"appid"\t\t"2688950"
+        \t"StateFlags"\t\t"\(stateFlags)"
+        \t"InstalledDepots"
+        \t{
+        \(depots.map { "\t\t\"\($0)\"\n\t\t{\n\t\t\t\"manifest\"\t\t\"123\"\n\t\t}" }.joined(separator: "\n"))
+        \t}
+        }
+        """
+    }
+
+    @Test("No appmanifest, or one that isn't fully installed, fails: every DLC would read as missing")
+    func dlcNeedsAFullyInstalledRecord() {
+        #expect(SteamDLCCheck.check(manifest: nil, downloadedDepots: [2688951: 1]).verdict == .fail)
+        let partial = SteamDLCCheck.check(manifest: Self.manifest(stateFlags: "1026", depots: [2688951]), downloadedDepots: nil)
+        #expect(partial.verdict == .fail)
+        #expect(partial.detail.contains("1026"))
+    }
+
+    @Test("A depot Cellar downloaded but Steam doesn't list fails, naming the depot; redistributables don't count")
+    func dlcDepotsMustAllBeListed() {
+        let downloaded: [UInt32: UInt64] = [2688951: 1, 2688952: 2, 228989: 3]
+        let missing = SteamDLCCheck.check(manifest: Self.manifest(depots: [2688951]), downloadedDepots: downloaded)
+        #expect(missing.verdict == .fail)
+        #expect(missing.evidence == ["depot 2688952 downloaded, not in appmanifest"])
+        let complete = SteamDLCCheck.check(manifest: Self.manifest(depots: [2688951, 2688952]), downloadedDepots: downloaded)
+        #expect(complete.verdict == .pass)
+        #expect(SteamDLCCheck.check(manifest: Self.manifest(depots: [2688951]), downloadedDepots: nil).verdict == .pass,
+                "a copy Steam installed itself is Steam's to manage")
+    }
+
+    @Test("A Steam game whose bottle has no Steam client can't be judged on DLC, and says why")
+    func dlcWithoutAClient() throws {
+        let plan = try TestHome.plan("""
+        [game]
+        name  = "No Client"
+        store = "steam"
+
+        [install]
+        steam_appid = "480"
+        """, slug: "dlc-no-client")
+        let check = SteamDLCCheck.check(plan)
+        #expect(check.verdict == .couldNotCheck)
+        #expect(check.detail.contains("no Steam client"))
+    }
+
+    // MARK: - dock
+
+    static let gameBundle = "/Users/player/Applications/Cellar Games/Planet Coaster 2.app"
+    static let runner = "/Users/player/Library/Application Support/Cellar/runners/wineforge"
+
+    /// `lsappinfo list` as macOS prints it, cut down to the lines the check reads.
+    static func lsappinfo(_ apps: [(name: String, bundle: String?, exe: String, type: String)]) -> String {
+        apps.enumerated().map { index, app in
+            """
+             \(index + 1)) "\(app.name)" ASN:0x0-0x\(index)01a:
+                bundleID=[ NULL ]
+                bundle path=\(app.bundle.map { "\"\($0)\"" } ?? "[ NULL ]")
+                executable path="\(app.exe)"
+                pid = \(500 + index) type="\(app.type)" flavor=3 Version="1.0" fileType="APPL" creator="????" Arch=x86_64
+            """
+        }.joined(separator: "\n")
+    }
+
+    @Test("lsappinfo's list reads back as name, bundle, executable, pid and type; a NULL bundle is none")
+    func parsesLsappinfo() {
+        let apps = DockApps.apps(inLsappinfo: Self.lsappinfo([
+            ("Finder", "/System/Library/CoreServices/Finder.app", "/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder", "Foreground"),
+            ("wineserver", nil, Self.runner + "/wine/bin/wineserver", "BackgroundOnly"),
+        ]))
+        #expect(apps.count == 2)
+        #expect(apps[0] == DockApps.App(name: "Finder", bundlePath: "/System/Library/CoreServices/Finder.app",
+                                        executablePath: "/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder",
+                                        pid: 500, type: "Foreground"))
+        #expect(apps[1].bundlePath == nil)
+        #expect(!apps[1].isInDock)
+    }
+
+    @Test("Wine, Steam, or anything else started from the runner in the Dock is an intruder; the game's own app is not")
+    func dockIntruders() {
+        let apps = DockApps.apps(inLsappinfo: Self.lsappinfo([
+            ("Planet Coaster 2", Self.gameBundle, Self.gameBundle + "/Contents/MacOS/wine", "Foreground"),
+            ("wine", nil, Self.runner + "/wine/bin/wine", "Foreground"),
+            ("steamwebhelper.exe", nil, "/somewhere/else", "Foreground"),
+            ("PlanetCoaster2_Launcher.exe", nil, Self.runner + "/wine/bin/wine", "Foreground"),
+            ("Steam", nil, Self.runner + "/wine/bin/wine", "UIElement"),
+            ("Safari", "/Applications/Safari.app", "/Applications/Safari.app/Contents/MacOS/Safari", "Foreground"),
+            ("Steam", "/Applications/Steam.app", "/Applications/Steam.app/Contents/MacOS/steam_osx", "Foreground"),
+        ]))
+        let names = DockApps.intruders(in: apps, runnerRoot: Self.runner, gameBundle: Self.gameBundle).map(\.name)
+        #expect(names == ["wine", "steamwebhelper.exe", "PlanetCoaster2_Launcher.exe"],
+                "a hidden Steam (UIElement) and the player's own apps, Mac Steam included, are fine")
+        #expect(DockApps.game(in: apps, gameBundle: Self.gameBundle, name: "Planet Coaster 2") != nil)
+        #expect(DockApps.game(in: apps, gameBundle: Self.gameBundle, name: "planet-coaster-2") == nil,
+                "the slug is not the game's name (#220)")
+    }
+
+    @Test("dock passes only with the game in it by name and no intruder, and can't judge an empty list")
+    func judgesDock() {
+        var watch = VerifyGame.Watch()
+        watch.gameSeenRunning = true
+        #expect(VerifyGame.judgeDock(watch, name: "G").verdict == .couldNotCheck)
+        watch.dockSamples = 3
+        #expect(VerifyGame.judgeDock(watch, name: "G").verdict == .fail, "the game never showed under its name")
+        watch.gameInDock = true
+        #expect(VerifyGame.judgeDock(watch, name: "G").verdict == .pass)
+        watch.dockIntruders = ["wine (/runners/wineforge/wine/bin/wine)"]
+        let intruded = VerifyGame.judgeDock(watch, name: "G")
+        #expect(intruded.verdict == .fail)
+        #expect(intruded.evidence == ["wine (/runners/wineforge/wine/bin/wine)"])
+    }
+
+    // MARK: - settings-match
+
+    @Test("A switch the bottle overrides, or a language other than the Mac's, fails settings-match by name")
+    func judgesSettings() {
+        let profile = PerformanceSettings.Entry(setting: .metalValidation, value: "true", source: .profile)
+        let bottle = PerformanceSettings.Entry(setting: .retina, value: "true", source: .bottle)
+        let mac = LanguageChoice(language: .english, source: .system)
+        #expect(VerifyGame.judgeSettings([profile], language: mac, macLanguage: .english).verdict == .pass)
+
+        let overridden = VerifyGame.judgeSettings([profile, bottle], language: mac, macLanguage: .english)
+        #expect(overridden.verdict == .fail)
+        #expect(overridden.evidence == ["retina = true is set for this bottle, over the profile"])
+
+        let hud = VerifyGame.judgeSettings([profile, PerformanceSettings.Entry(setting: .metalHUD, value: "true", source: .bottle)],
+                                           language: mac, macLanguage: .english)
+        #expect(hud.verdict == .pass, "the HUD only draws on top of the game: the PC2 pilot's false failure")
+        #expect(hud.detail.contains("metal_hud = true"), "but it is still named")
+
+        let dutch = VerifyGame.judgeSettings([profile], language: LanguageChoice(language: .dutch, source: .allGames),
+                                             macLanguage: .english)
+        #expect(dutch.verdict == .fail, "the Belgian-Terminal bug: Steam and the game in Dutch on an English Mac")
+        #expect(dutch.evidence.first?.contains("every game") == true)
+    }
+}
+
+/// A verify that is stopped part-way (#249): what it says about the runs it did and didn't finish.
+struct InterruptedVerifyTests {
+    @Test("The interrupted check is never a pass, and says how far verify got")
+    func interruptedCheck() {
+        let during = VerifyGame.judgeInterrupted(stoppedIn: 3, completed: 2, runs: 3)
+        #expect(during.verdict == .couldNotCheck)
+        #expect(during.detail.contains("during run 3") && during.detail.contains("2 of 3 runs finished"))
+        #expect(VerifyGame.judgeInterrupted(stoppedIn: nil, completed: 1, runs: 3).detail.contains("before run 2 started"))
+        #expect(VerifyGame.judgeInterrupted(stoppedIn: nil, completed: 1, runs: 3, stillRunning: true)
+            .detail.contains("still running"))
+    }
+
+    @Test("A watch cut short is could-not-check for stays-up, unless a crash was already seen")
+    func staysUpWhenStopped() {
+        var watch = VerifyGame.Watch()
+        watch.interrupted = true
+        watch.watchedSeconds = 12
+        #expect(VerifyGame.judgeStaysUp(watch, wineLog: "", surviveSeconds: 300, name: "G").verdict == .couldNotCheck,
+                "stopped before the game appeared is not 'never appeared'")
+        watch.gameSeenRunning = true
+        let up = VerifyGame.judgeStaysUp(watch, wineLog: "", surviveSeconds: 300, name: "G")
+        #expect(up.verdict == .couldNotCheck)
+        #expect(up.detail.contains("12 s"))
+        watch.crashReporters = ["4242 C:\\Game\\CrashReporter.exe"]
+        #expect(VerifyGame.judgeStaysUp(watch, wineLog: "", surviveSeconds: 300, name: "G").verdict == .fail)
+    }
+
+    @Test("Not seen yet is could-not-check when stopped early; a failure on evidence stands")
+    func cutShort() {
+        let failed = VerificationCheck(id: "dock", title: "t", verdict: .fail, detail: "never in the Dock.")
+        var watch = VerifyGame.Watch()
+        #expect(VerifyGame.cutShort(failed, watch, failedOnEvidence: false).verdict == .fail, "a full watch keeps its verdict")
+        watch.interrupted = true
+        #expect(VerifyGame.cutShort(failed, watch, failedOnEvidence: false).verdict == .couldNotCheck)
+        #expect(VerifyGame.cutShort(failed, watch, failedOnEvidence: true).verdict == .fail)
+    }
+}
+
+/// What the PC2 pilot (#210) showed verify should say better.
+struct PilotFindingsTests {
+    @Test("A quiet exit says it was quiet and carries the end of the Wine log as evidence")
+    func quietExit() {
+        var watch = VerifyGame.Watch()
+        watch.gameSeenRunning = true
+        watch.exitedAfter = 73
+        watch.watchedSeconds = 73
+        let log = (1...30).map { "0124:trace:line \($0)" }.joined(separator: "\n") + "\n\n"
+        let check = VerifyGame.judgeStaysUp(watch, wineLog: log, surviveSeconds: 300, name: "G")
+        #expect(check.verdict == .fail)
+        #expect(check.detail.contains("exited quietly after 73 s"))
+        #expect(check.evidence.count == 20)
+        #expect(check.evidence.last == "0124:trace:line 30")
+    }
+}
+
+/// Crash dumps and the online errors in them (#210): what the PC2 pilot's run 1 left behind.
+struct CrashDumpTests {
+    static let pc2Comment = """
+        GameMain\\Lua\\Managers\\DialogStackManager.lua:259: attempt to index a nil value (field 'ui')
+        LUA[2]@GameMain\\Lua\\Managers\\WebRequestManager.lua(285): method ShowNetworkError:
+        LUA[3]@GameMain\\Lua\\Managers\\FrontierAccountManager.lua(1396): method _ShowUnrecoverableError:
+        LUA[4]@GameMain\\Lua\\Managers\\FrontierAccountManager.lua(968): method _ProcessUpdateUserResult:
+        """
+
+    /// A minidump with a thread-list stream and then a comment stream, laid out as Windows writes them.
+    static func minidump(comment: String?) -> Data {
+        func le(_ value: UInt32) -> [UInt8] { (0..<4).map { UInt8((value >> (8 * $0)) & 0xFF) } }
+        var streams: [(UInt32, [UInt8])] = [(3, [UInt8](repeating: 0, count: 8))]
+        if let comment { streams.append((10, Array(comment.utf8) + [0])) }
+        let directory: UInt32 = 32
+        var data = Array("MDMP".utf8) + le(0xA793) + le(UInt32(streams.count)) + le(directory)
+        data += [UInt8](repeating: 0, count: 16)
+        var rva = directory + UInt32(streams.count * 12)
+        var payload: [UInt8] = []
+        for (type, bytes) in streams {
+            data += le(type) + le(UInt32(bytes.count)) + le(rva)
+            payload += bytes
+            rva += UInt32(bytes.count)
+        }
+        return Data(data + payload)
+    }
+
+    @Test("A minidump's comment stream reads back; one without, or a file that isn't a dump, has none")
+    func readsTheComment() {
+        #expect(CrashDumps.comment(ofMinidump: Self.minidump(comment: Self.pc2Comment)) == Self.pc2Comment)
+        #expect(CrashDumps.comment(ofMinidump: Self.minidump(comment: nil)) == nil)
+        #expect(CrashDumps.comment(ofMinidump: Data("not a dump at all, just some text".utf8)) == nil)
+        var cut = Self.minidump(comment: Self.pc2Comment)
+        cut.removeLast(40)
+        #expect(CrashDumps.comment(ofMinidump: cut) == nil, "a truncated dump is not read past its end")
+    }
+
+    @Test("Only dumps written during the run are found, wherever under the bottle's users they are")
+    func findsNewDumps() throws {
+        let prefix = TestHome.scratch("dump-prefix")
+        let folder = prefix.appendingPathComponent(
+            "drive_c/users/player/AppData/Local/Temp/Frontier Developments/Planet Coaster 2/CrashDumps")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let old = folder.appendingPathComponent("old.dmp")
+        try Self.minidump(comment: "an earlier crash").write(to: old)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: old.path)
+        let since = Date(timeIntervalSinceNow: -5)
+        try Self.minidump(comment: Self.pc2Comment).write(to: folder.appendingPathComponent("f38604a6.dmp"))
+
+        let dumps = CrashDumps.written(in: prefix, since: since)
+        #expect(dumps.map { ($0.path as NSString).lastPathComponent } == ["f38604a6.dmp"])
+        #expect(dumps.first?.comment == Self.pc2Comment)
+    }
+
+    @Test("A crash dump fails stays-up with the dump and its comment as evidence")
+    func dumpFailsStaysUp() {
+        var watch = VerifyGame.Watch()
+        watch.gameSeenRunning = true
+        watch.exitedAfter = 136
+        watch.dumps = [CrashDumps.Dump(path: "/b/CrashDumps/f386.dmp", comment: Self.pc2Comment)]
+        let check = VerifyGame.judgeStaysUp(watch, wineLog: "", surviveSeconds: 300, name: "PC2")
+        #expect(check.verdict == .fail)
+        #expect(check.detail.contains("crash dump") && check.detail.contains("136 s"))
+        #expect(check.evidence.first == "dump: /b/CrashDumps/f386.dmp")
+        #expect(check.evidence.contains { $0.contains("ShowNetworkError") })
+    }
+
+    @Test("game-online fails on the game's own online-error words, even with every host connected")
+    func onlineErrorsFailGameOnline() throws {
+        let plan = try TestHome.plan("""
+        [game]
+        name  = "Online Errors"
+        store = "steam"
+
+        [compatibility]
+        online_hosts  = "css-api.zaonce.net"
+        online_errors = "ShowNetworkError _ShowUnrecoverableError"
+        """, slug: "online-errors")
+        #expect(plan.onlineErrors == ["ShowNetworkError", "_ShowUnrecoverableError"])
+
+        var watch = VerifyGame.Watch()
+        watch.endpoints = [GameConnections.Endpoint(address: "34.248.10.1", port: 443)]
+        watch.hostAddresses = ["css-api.zaonce.net": ["34.248.10.1"]]
+        #expect(VerifyGame.judgeOnline(watch, wineLog: "", plan: plan).verdict == .pass, "connected, and nothing reported")
+
+        watch.dumps = [CrashDumps.Dump(path: "/b/f386.dmp", comment: Self.pc2Comment)]
+        let failed = VerifyGame.judgeOnline(watch, wineLog: "", plan: plan)
+        #expect(failed.verdict == .fail, "the PC2 pilot: connected to css-api, and its account call still failed")
+        #expect(failed.evidence.filter { $0.hasPrefix("f386.dmp:") }.count == 2)
     }
 }

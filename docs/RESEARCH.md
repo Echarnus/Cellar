@@ -280,3 +280,23 @@ The facts behind the choices:
   catches the deeper UE binary.
 - **Deadlock** is a friend-invite playtest. Steam's ownership check is what decides whether a player
   has it.
+
+### Ranks 21–50 (#228–#234)
+
+The same chart snapshot, widened at Kenneth's request:
+
+| Outcome | Games |
+|---|---|
+| **Profile added, untested** | TBH: Task Bar Hero (#228), Enshrouded (#229), GTA V Enhanced (#230, story mode), Moon Sweepers (#231), R.E.P.O. (#232), Overwatch (#233), Palworld (#234) |
+| Has a Mac version | Slay the Spire 2, Valheim, Don't Starve Together, Project Zomboid, Hearts of Iron IV, The Binding of Isaac: Rebirth, Farming Simulator 25, Geometry Dash, Euro Truck Simulator 2, Total War: WARHAMMER III, Baldur's Gate 3, Civilization VI |
+| Already in Cellar | GTA V Legacy (`grand-theft-auto-v`), The Witcher 3 (`witcher-3`, through GOG) |
+| Kernel-level anti-cheat | Dead by Daylight (EAC), ARC Raiders and Aniimo and VRChat (store pages say "Uses Kernel Level Anti-Cheat"), NARAKA (needs Windows memory integrity off: a kernel driver), DayZ and Rainbow Six Siege (BattlEye), EA SPORTS FC 27 (EA Javelin) |
+| Reported not to run | Helldivers 2: CodeWeavers rates it *Installs, Will Not Run* on Mac (CrossOver 26.1), and it ships nProtect GameGuard |
+
+The facts behind the choices:
+
+- **Palworld** has a Mac edition, but only on the Mac App Store as a separate purchase. A Steam owner has no Mac build, so it gets a profile, and its notes say so.
+- **Enshrouded** draws through Vulkan alone. CrossOver users report a *GPU not found* stop at start, and its notes warn the player.
+- **Overwatch on Steam** still signs in to a linked Battle.net account. It is a `steam` game with Battle.net named in `requires_account`, not a `battlenet` one.
+- **GTA V Enhanced** is its own AppID and folder. Its needles (`GTA5_Enhanced.exe`, `\Grand Theft Auto V Enhanced\`) and Legacy's never match each other's processes, and `TopPlayedTests.gtaEnhanced` holds that.
+- **TBH** docks into the Windows taskbar. On a Mac it is an ordinary window, and its notes say so.

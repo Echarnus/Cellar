@@ -14,6 +14,7 @@ public struct SteamAdapter: StoreAdapter {
     public func verificationMark(_ plan: GamePlan) -> UInt64 { SteamSessionCheck.mark(in: plan.prefix) }
     public func verificationChecks(_ plan: GamePlan, since mark: UInt64, launchSteps: [String]) -> [VerificationCheck] {
         SteamSessionCheck.checks(prefix: plan.prefix, since: mark, launchSteps: launchSteps)
+            + [SteamDLCCheck.check(plan)]
     }
     public func shutDownClient(_ plan: GamePlan, wine: WineRunner) { SteamBottle.shutdown(runner: wine) }
     public func signedInAccount(_ plan: GamePlan) -> String? { SteamBottle.loggedInAccount(in: plan.prefix) }

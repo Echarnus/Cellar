@@ -1,0 +1,102 @@
+name: Wineserver
+
+# Builds WineForge's wineserver with Cellar's patches (app/RunnerPatches/wineforge/) from the exact
+# WineForge commit pinned in app/Scripts/build-wineserver.sh, and keeps the binary as an artifact.
+on:
+  pull_request:
+    paths:
+      - app/RunnerPatches/**
+      - app/Scripts/build-wineserver.sh
+      - .github/workflows/wineserver.yml
+  push:
+    branches: [main]
+    paths:
+      - app/RunnerPatches/**
+      - app/Scripts/build-wineserver.sh
+      - .github/workflows/wineserver.yml
+  # Publishing: a build that was tested on a real game is published as-is, never rebuilt, so the
+  # SHA-256 pinned in RunnerCatalog is the binary that was tested. Run from main with the build's
+  # run id and that pin; the job refuses anything else.
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run id of the Wineserver build to publish (empty: build only)"
+        required: false
+        default: ""
+      sha256:
+        description: "Expected SHA-256 of that build's wineserver (the RunnerCatalog pin)"
+        required: false
+        default: ""
+      tag:
+        description: "Release tag, e.g. wineserver-wineforge-0.6.0.8-cellar.1"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wineserver-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build patched wineserver
+    if: github.event_name != 'workflow_dispatch' || inputs.run_id == ''
+    runs-on: xcode-27
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The runner's wineserver is x86_64; configure and make run under Rosetta.
+      - name: Install Rosetta 2
+        run: softwareupdate --install-rosetta --agree-to-license
+      # Wine's configure needs bison 3 (macOS ships 2.3) and, on macOS, a MinGW cross compiler.
+      - name: Install bison and MinGW
+        run: |
+          brew install bison mingw-w64
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+      - name: Build
+        run: sh Scripts/build-wineserver.sh .build/wineserver/wineserver
+      - name: Upload wineserver
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wineserver-wineforge-0.6.0.8-cellar
+          path: app/.build/wineserver/wineserver
+          if-no-files-found: error
+
+  publish:
+    name: Publish a tested wineserver
+    if: github.event_name == 'workflow_dispatch' && inputs.run_id != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write   # create the release
+      actions: read     # download the build's artifact
+    steps:
+      - name: Download, check and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ inputs.run_id }}
+          EXPECTED: ${{ inputs.sha256 }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          case "$TAG" in wineserver-*) ;; *) echo "Tag must start with wineserver-" >&2; exit 1 ;; esac
+          gh run download "$RUN_ID" -R "$REPO" -n wineserver-wineforge-0.6.0.8-cellar -D out
+          actual="$(sha256sum out/wineserver | cut -d' ' -f1)"
+          if [ "$actual" != "$EXPECTED" ]; then
+            echo "Build $RUN_ID is $actual, expected $EXPECTED; not publishing." >&2
+            exit 1
+          fi
+          # A prerelease that is never "latest": releases/latest/download/... must keep pointing at
+          # Cellar's own release (profiles.json, the site's download button).
+          gh release create "$TAG" out/wineserver -R "$REPO" --target "$GITHUB_SHA" \
+            --prerelease --latest=false \
+            --title "$TAG" \
+            --notes "WineForge 0.6.0.8's wineserver with Cellar's patches (app/RunnerPatches/wineforge/), built by run $RUN_ID. SHA-256 $actual. Installed by Cellar over the runner; not for direct download."

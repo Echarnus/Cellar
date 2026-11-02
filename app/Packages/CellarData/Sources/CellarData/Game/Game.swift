@@ -112,7 +112,8 @@ public enum Game {
             publisherLauncher: launcher,
             startExe: fields["start_exe"],
             onlineHosts: (fields["online_hosts"] ?? "").split(separator: " ").map(String.init),
-            crashProcesses: (fields["crash_processes"] ?? "").split(separator: " ").map(String.init)
+            crashProcesses: (fields["crash_processes"] ?? "").split(separator: " ").map(String.init),
+            onlineErrors: (fields["online_errors"] ?? "").split(separator: " ").map(String.init)
         )
     }
 

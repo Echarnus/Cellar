@@ -134,6 +134,35 @@ struct GameAppTests {
         #expect(try String(contentsOf: second.executable, encoding: .utf8).contains("updated"))
     }
 
+    @Test("A signed loader's copy is signed again as the game's app, so macOS lets it run")
+    func resignsTheCopiedLoader() throws {
+        // WineForge 0.6.0.8's loader is Developer-ID signed over Wine's own Info.plist. Copied into
+        // the game's bundle unchanged, `codesign --verify` said "invalid Info.plist" and macOS
+        // killed every start at exec (Code Signature Invalid): Planet Coaster 2 never appeared,
+        // eight times in a row, on Kenneth's Mac (2026-11-01). Any signed Mach-O stands in for it.
+        let runner = try wineForgeRunner()
+        try FileManager.default.removeItem(at: runner.inner)
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: runner.inner)
+        let slug = "signed-\(UUID().uuidString.prefix(6))".lowercased()
+        let start = try #require(GameApp.prepare(name: "Signed Game", slug: slug, runnerBinary: runner.binary, icon: nil))
+        let app = GameApp.bundleURL(name: "Signed Game", slug: slug)
+
+        let verify = Shell.run(GameApp.codesign, ["--verify", "--strict", app.path])
+        #expect(verify.succeeded, "the bundle's signature holds: \(verify.stderr)")
+        let info = Shell.run(GameApp.codesign, ["-dv", app.path])
+        let details = info.stdout + info.stderr
+        #expect(details.contains("Signature=adhoc"), "signed as the game's app, not the runner's: \(details)")
+        #expect(details.contains("Identifier=it.clercq.cellar.game.\(slug)"))
+        // And it really runs.
+        #expect(Shell.run(start.executable.path, []).succeeded)
+
+        // Signing changes the copy's bytes; that must not read as a runner update on the next Play.
+        let modified = try FileManager.default.attributesOfItem(atPath: start.executable.path)[.modificationDate] as? Date
+        _ = try #require(GameApp.prepare(name: "Signed Game", slug: slug, runnerBinary: runner.binary, icon: nil))
+        #expect(try FileManager.default.attributesOfItem(atPath: start.executable.path)[.modificationDate] as? Date == modified,
+                "an unchanged runner is not copied and signed again on every Play")
+    }
+
     @Test("The bundled loader starts with the game's arguments, no re-exec, and its output in the log")
     func spawnsFromTheBundle() throws {
         let runner = try wineForgeRunner()

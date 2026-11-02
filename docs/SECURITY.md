@@ -47,7 +47,10 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
   `CELLAR_STEAM_TOKEN_VAULT=0` turns sealing off, for diagnosing a keychain problem.
 - **An ad-hoc signed CLI asks for keychain access after each update.** The item trusts the binary
   that wrote it, and an ad-hoc signature changes with every build. A Developer ID signature fixes
-  this.
+  this for releases. A build from source (`install-app.sh`) is signed with the Mac's own
+  "Apple Development" identity when there is one (`Scripts/local-sign-identity.sh`), with the fixed
+  identifier `it.clercq.cellar.cli` on both copies of the CLI, so "Always Allow" is pressed once and
+  holds across rebuilds. Without that identity it stays ad-hoc and the script says how to make one.
 - **The app and the CLI do not share one keychain item.** On the login keychain an item trusts the
   binary that created it; a true shared item needs the data-protection keychain and a
   `keychain-access-groups` entitlement on both, signed with one Team ID. Until the Developer ID
@@ -71,6 +74,7 @@ the player's rights, the way it would on Windows.
 | Transport | ✅ | Every `curl` is HTTPS-only, redirects included (`Downloader.httpsOnly`). (#121) |
 | Secrets on command lines | ✅ | Tokens and refresh tokens go to curl on stdin (`--config -`), never argv, which every process can read. DepotDownloader never gets a password on argv. Cellar's own command lines are logged redacted, fail-closed. (#121) |
 | Game database (#32) | ✅, off until keyed | Ed25519-signed bundle, key compiled in, refused without one; file names held to the slug alphabet; an older set can't replace a newer one. (#122, #124, #128) |
+| What a child process inherits | ✅ | Wine, the store client, the game and DepotDownloader get an allow-list of the environment Cellar was started from (`ChildEnvironment`: `HOME`, `USER`, `TMPDIR`, the locale, `__CF_USER_TEXT_ENCODING`, `XPC_*`, `SDL_*`), never the rest, so a token in the shell or agent session that ran `cellar` can't reach a Windows program or `--print-env`. Tested at the process boundary in `CredentialStorageTests`. (#238) |
 | What a profile may do | ✅ | `[env]` cannot set `DYLD_*`, `LD_*`, `WINELOADER`, `WINEDLLPATH*`, `PATH`, `HOME` and the like (`ProfileStore.isAllowedEnvKey`), so a profile can't load native code into Wine. (#123) |
 | Generated launchers | ✅ | Every shell word single-quoted, plist values XML-escaped, the name a safe file name (`AppBundle.launcherScript`, `bundleName`). (#122) |
 | Self-update (Sparkle 2.10) | ✅, off until keyed | EdDSA-signed zip, checked before extraction (`SUVerifyUpdateBeforeExtraction`); never installs on its own (`SUAllowsAutomaticUpdates` off). Signed feed (`SURequireSignedFeed`) once the key exists. (#125, #128) |

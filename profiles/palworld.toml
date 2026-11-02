@@ -1,0 +1,50 @@
+# Cellar game profile — Palworld
+#
+# Pocketpair's creature-survival game, 1.0 on 2026-07-09, rank 45 on Steam's Most Played chart (48K
+# players, 2026-11-01). The Steam copy is Windows only: Palworld's Mac version is sold separately on
+# the Mac App Store and does not come with a Steam purchase, which is why it has a profile here.
+# Steam starts DirectX 11 by default; a -dx12 launch option exists.
+# Facts below are from the Steam store page and SteamDB's config, read 2026-11-01. Not yet run on a
+# Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "palworld"
+name          = "Palworld"
+developer     = "Pocketpair"
+publisher     = "Pocketpair"
+steam_appid   = 1623730
+engine        = "Unreal Engine 5"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2026-07-09"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player + online co-op for up to 4, dedicated servers up to 32"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. There is a Mac edition on the Mac App Store, but it is a separate purchase; this runs the Windows copy you own on Steam."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 1623730
+# UE5: Palworld.exe at the root is Steam's launch target and starts the Shipping binary under
+# Pal/Binaries/Win64; the install_dir needle catches either.
+install_dir = "Palworld"
+exe         = "Palworld.exe"
+
+[legal]
+drm_circumvention = "never"
