@@ -70,6 +70,36 @@ struct DockShimTests {
         #expect(plan.env["CELLAR_APP_NAME"] == nil)
     }
 
+    @Test("A game started through a publisher launcher names the stub and the launcher too, never \"wine\" (#266)")
+    func launcherWearsTheGamesName() throws {
+        let shim = TestHome.scratch("dock-shim-launcher").appendingPathComponent("cellar-dock-shim.dylib")
+        try Data().write(to: shim)
+        setenv("CELLAR_DOCK_SHIM", shim.path, 1)
+        defer { unsetenv("CELLAR_DOCK_SHIM") }
+
+        let plan = try TestHome.plan("""
+        [game]
+        name  = "Grand Theft Auto V Enhanced"
+        store = "steam"
+
+        [install]
+        steam_appid = "3240220"
+
+        [launch]
+        exe                = "GTA5_Enhanced.exe"
+        start_exe          = "PlayGTAV.exe"
+        publisher_launcher = "rockstar"
+        """, slug: "gta-named")
+
+        let env = plan.launchEnv
+        #expect(env["CELLAR_APP_NAME"] == "Grand Theft Auto V Enhanced")
+        let named = Set(try #require(env["CELLAR_APP_EXE"]).split(separator: ",").map(String.init))
+        for exe in ["GTA5_Enhanced.exe", "PlayGTAV.exe"] + PublisherLauncher.rockstar.windowedExecutables {
+            #expect(named.contains(exe), "\(exe) would show as wine in the Dock")
+        }
+        #expect(PublisherLauncher.rockstar.windowedExecutables.contains("Launcher.exe"))
+    }
+
     @Test("Steam started so a game can run beside it stays out of the Dock")
     func clientStartedForAGameIsHidden() throws {
         let shim = TestHome.scratch("dock-shim-client").appendingPathComponent("cellar-dock-shim.dylib")

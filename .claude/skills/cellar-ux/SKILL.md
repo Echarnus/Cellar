@@ -5,7 +5,7 @@ description: The UX/UI bar for Cellar — non-negotiable, because the interface 
 
 # Cellar — UX / UI
 
-The full guide is [`skills/ux.md`](../../../skills/ux.md); read it before changing anything a player
+Read [`docs/DESIGN.md`](../../../docs/DESIGN.md) first (mandatory: the principles and product rules). The full guide is [`skills/ux.md`](../../../skills/ux.md); read it before changing anything a player
 sees. **The interface is the product** — a change that works but reads like a developer tool has not
 landed. Key rules:
 

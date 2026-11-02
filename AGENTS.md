@@ -44,7 +44,7 @@ both use them.
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
 | `app/Shim/` | `cellar-dock-shim.c` — the one piece of C in the repo. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts. Built by `app/Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
 | `app/Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `release-notes.py` (a release's notes, from the issues it closed), `test.sh` (the test runner), `coverage.py` (the coverage ratchet), `check-pr.py` (the PR checklist). |
-| `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`, `TESTING.md`, `DELIVERY-CHECKLIST.md`. |
+| `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `DESIGN.md` (design principles, mandatory for UI work), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`, `TESTING.md`, `DELIVERY-CHECKLIST.md`. |
 | `.github/` | Workflows (`ci`, `pr-checklist`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
 
@@ -225,6 +225,10 @@ special case inside a view or a command. Adding a store = a `GameStore` case, a 
 need to know: the use cases (`SetUpGame`, `InstallGame`, `LaunchGame`) ask the adapter.
 
 ## UX/UI is a requirement, not a finishing touch
+
+**[`docs/DESIGN.md`](docs/DESIGN.md) is mandatory reading before any UI work**: Cellar's design
+principles (Apple's HIG, plain words, honest state, stores, Mac conventions) and every product rule
+Kenneth has set. A change that breaks one of them is not done.
 
 **The interface is the product.** Cellar exists to make a Windows game start on a Mac, and the only
 way anyone experiences that is the app in front of them. A change that compiles but reads like a

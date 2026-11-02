@@ -136,7 +136,14 @@ public struct GamePlan {
     /// Every launch route starts its processes with this; opening the store client on its own
     /// uses `env`, because a client the player opened is not this game.
     public var launchEnv: [String: String] {
-        let exe = launchExe.map { [($0 as NSString).lastPathComponent] } ?? []
+        // Every program of this launch that can show a window wears the game's name: the game, the
+        // stub a store starts it through, and a publisher launcher in between. Anything left out
+        // is called "wine" in the Dock, which no player should ever read (#266).
+        var exe = launchExe.map { [($0 as NSString).lastPathComponent] } ?? []
+        if !exe.isEmpty {
+            if let startExe { exe.append((startExe as NSString).lastPathComponent) }
+            exe += publisherLauncher?.windowedExecutables ?? []
+        }
         var env = DockShim.environment(naming: name, executables: exe)
         for (key, value) in self.env { env[key] = value }
         return env

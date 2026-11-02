@@ -11,6 +11,10 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #267 | GTA V's Rockstar launcher said "wine" in the Dock | `DockShimTests.swift` › `launcherWearsTheGamesName` |
+| #267 | The uninstall dialog showed a Terminal command and bottle names | `RemovalSummaryTests.swift` › `plainWords` |
+| #267 | The sidebar said "Sign in" to a signed-in player while loading | `SidebarAccountTests.swift` › `loading` |
+| #267 | The library filter's segments changed width with the selection | `EqualSegmentedPickerTests.swift` › `stableAcrossSelection` |
 | #261 | Planet Coaster 2's Workshop never loaded (stock wineserver) | `RunnerIntegrityTests.swift` › `stockWineserverIsDamage` |
 | #248 | macOS killed every game: the copied loader's signature broke | `GameAppTests.swift` › `resignsTheCopiedLoader` |
 | #236 | Steam asked to sign in again after it hung | `SteamClientSignInTests.swift` › `silentThenLoggedOnAfterRestart` |
