@@ -41,8 +41,11 @@ cd "$WORK/build"
 # The runner's wineserver is x86_64 (it runs under Rosetta), so configure and build as x86_64.
 # Nothing but the server is built, so every optional library is left out.
 # --enable-archs=x86_64 keeps configure to the one MinGW target Homebrew provides.
+# CC is pinned to an x86_64 clang: left to itself, a compiler started from an arm64 make picks the
+# arm64 SDK headers on top of the x86 ones.
 arch -x86_64 /bin/sh "$WORK/src/configure" \
   --build=x86_64-apple-darwin \
+  CC="/usr/bin/clang -arch x86_64" CXX="/usr/bin/clang++ -arch x86_64" \
   --enable-archs=x86_64 \
   --disable-tests \
   --without-x \
