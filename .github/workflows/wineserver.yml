@@ -38,10 +38,10 @@ jobs:
       # The runner's wineserver is x86_64; configure and make run under Rosetta.
       - name: Install Rosetta 2
         run: softwareupdate --install-rosetta --agree-to-license
-      # Wine's configure needs bison 3; macOS ships 2.3.
-      - name: Install bison
+      # Wine's configure needs bison 3 (macOS ships 2.3) and, on macOS, a MinGW cross compiler.
+      - name: Install bison and MinGW
         run: |
-          brew install bison
+          brew install bison mingw-w64
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
       - name: Build
         run: sh Scripts/build-wineserver.sh .build/wineserver/wineserver

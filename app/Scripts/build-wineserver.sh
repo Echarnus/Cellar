@@ -6,7 +6,9 @@
 # unchanged. The source is pinned to an exact commit, and the build fails if the checkout is not it.
 #
 # Usage: Scripts/build-wineserver.sh [output path]   (default: .build/wineserver/wineserver)
-# Needs: Xcode or the Command Line Tools, Rosetta, git, and bison >= 3 on PATH (Homebrew's).
+# Needs: Xcode or the Command Line Tools, Rosetta, git, bison >= 3 and a MinGW cross compiler on PATH
+# (Homebrew's `bison` and `mingw-w64`). Wine's configure refuses to run without MinGW on macOS,
+# although the server itself is a plain Mach-O and never touches it.
 set -eu
 cd "$(dirname "$0")/.."
 unset DEVELOPER_DIR SDKROOT
@@ -38,11 +40,11 @@ mkdir -p "$WORK/build"
 cd "$WORK/build"
 # The runner's wineserver is x86_64 (it runs under Rosetta), so configure and build as x86_64.
 # Nothing but the server is built, so every optional library is left out.
+# --enable-archs=x86_64 keeps configure to the one MinGW target Homebrew provides.
 arch -x86_64 /bin/sh "$WORK/src/configure" \
   --build=x86_64-apple-darwin \
-  --enable-win64 \
+  --enable-archs=x86_64 \
   --disable-tests \
-  --without-mingw \
   --without-x \
   --without-freetype \
   --without-gnutls \
