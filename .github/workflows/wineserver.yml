@@ -1,0 +1,53 @@
+name: Wineserver
+
+# Builds WineForge's wineserver with Cellar's patches (app/RunnerPatches/wineforge/) from the exact
+# WineForge commit pinned in app/Scripts/build-wineserver.sh, and keeps the binary as an artifact.
+on:
+  pull_request:
+    paths:
+      - app/RunnerPatches/**
+      - app/Scripts/build-wineserver.sh
+      - .github/workflows/wineserver.yml
+  push:
+    branches: [main]
+    paths:
+      - app/RunnerPatches/**
+      - app/Scripts/build-wineserver.sh
+      - .github/workflows/wineserver.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wineserver-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build patched wineserver
+    runs-on: xcode-27
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The runner's wineserver is x86_64; configure and make run under Rosetta.
+      - name: Install Rosetta 2
+        run: softwareupdate --install-rosetta --agree-to-license
+      # Wine's configure needs bison 3; macOS ships 2.3.
+      - name: Install bison
+        run: |
+          brew install bison
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+      - name: Build
+        run: sh Scripts/build-wineserver.sh .build/wineserver/wineserver
+      - name: Upload wineserver
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wineserver-wineforge-0.6.0.8-cellar
+          path: app/.build/wineserver/wineserver
+          if-no-files-found: error
