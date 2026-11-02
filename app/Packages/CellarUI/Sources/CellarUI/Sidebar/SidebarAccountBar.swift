@@ -1,6 +1,7 @@
 import CellarDomain
 import SwiftUI
 import AppKit
+import ImageIO
 
 /// The foot of the sidebar: who you are signed in as, and Settings.
 ///
@@ -81,8 +82,8 @@ public struct SidebarAccountBar: View {
                 // A placeholder the shape of the avatar, as a Mac list shows before its content
                 // arrives: neutral, so it can't be read as signed in or signed out.
                 Circle().fill(.quaternary).frame(width: 24, height: 24)
-            } else if let file = account.avatar, let picture = NSImage(contentsOf: file) {
-                Image(nsImage: picture)
+            } else if let picture = Self.picture(at: account.avatar) {
+                Image(decorative: picture, scale: 1)
                     .resizable().interpolation(.high).aspectRatio(contentMode: .fill)
                     .frame(width: 26, height: 26)
                     .clipShape(Circle())
@@ -103,5 +104,12 @@ public struct SidebarAccountBar: View {
         }
         .frame(width: 28, height: 28)
         .accessibilityHidden(true)
+    }
+
+    /// The Steam picture, decoded now as a bitmap: an `NSImage` decodes lazily, and a lazily decoded
+    /// image can come out blank when the view is drawn straight into a graphics context.
+    private static func picture(at file: URL?) -> CGImage? {
+        guard let file, let source = CGImageSourceCreateWithURL(file as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
     }
 }

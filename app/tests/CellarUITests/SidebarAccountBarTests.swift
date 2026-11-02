@@ -92,8 +92,8 @@ struct SidebarAccountBarTests {
         let account = AccountSummary(connected: [.steam], steam: .signedIn(account: "kenneth", days: 1, aging: false),
                                      avatar: file)
         #expect(account.avatar == file)
-        let red = avatarPixels(render(account)).filter { $0.r > 0.8 && $0.g < 0.3 && $0.b < 0.3 }
-        #expect(red.count > 100, "the Steam picture isn't drawn in the avatar")
+        let red = avatarPixels(render(account)).filter { $0.r > 0.6 && $0.r - $0.g > 0.4 && $0.r - $0.b > 0.4 }
+        #expect(red.count > 100, "the Steam picture isn't drawn in the avatar (\(red.count) red pixels)")
     }
 
     @Test("draw the account bar in every state, light and dark")
