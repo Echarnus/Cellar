@@ -24,10 +24,14 @@ needs_live_steam            = true
 requires_account            = "Steam"
 online                      = "single-player"
 status                      = "untested"
-notes                       = "DX11 via D3DMetal 3.0 should be well-behaved; SKSE/mods untested under Wine."
+notes                       = "DX11 via D3DMetal 4.0b3. On D3DMetal 3.0 it crashed on every start. SKSE and mods untested under Wine."
 
 [runner]
-id              = "wineforge"
+# WineForge 0.6.0.8 with D3DMetal 4.0b3, the runtime Planet Coaster 2 moved to. On D3DMetal 3.0
+# (runner "wineforge") SkyrimSE.exe died about 6 s in with 0xC0000094 on 9 starts out of 9, even
+# with its settings files in place. On this one it stayed up 300 s at 60 fps (cellar verify, M5 /
+# macOS 27.0.1, 2026-11-02).
+id              = "wineforge-d3dmetal4"
 windows_version = "win10"
 
 [graphics]
