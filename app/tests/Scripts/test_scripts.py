@@ -240,3 +240,62 @@ class RunnerGuardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LocalSignIdentityTests(unittest.TestCase):
+    """`Scripts/local-sign-identity.sh`: a build from source is signed so the keychain keeps trusting it (#242)."""
+
+    def identity(self, listing, override=None):
+        bin_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, bin_dir)
+        with open(os.path.join(bin_dir, "security"), "w", encoding="utf-8") as handle:
+            handle.write("#!/bin/sh\ncat <<'LIST'\n" + listing + "\nLIST\n")
+        os.chmod(os.path.join(bin_dir, "security"), 0o755)
+        env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ.get("PATH", ""))
+        env.pop("CELLAR_LOCAL_SIGN_IDENTITY", None)
+        if override is not None:
+            env["CELLAR_LOCAL_SIGN_IDENTITY"] = override
+        script = os.path.join(ROOT, "Scripts", "local-sign-identity.sh")
+        result = subprocess.run(["sh", "-c", f'. "{script}" >/dev/null; printf %s "$LOCAL_SIGN_IDENTITY"'],
+                                env=env, capture_output=True, text=True, check=True)
+        return result.stdout
+
+    DEV = "A" * 40
+    LISTING = (f'  1) {"B" * 40} "Developer ID Application: Kenneth (TEAM123456)"\n'
+               f'  2) {DEV} "Apple Development: kenneth@example.com (TEAM123456)"\n'
+               "     2 valid identities found")
+
+    def test_an_apple_development_identity_is_used(self):
+        self.assertEqual(self.identity(self.LISTING), self.DEV, "never ad-hoc when the Mac has one, never Developer ID")
+
+    def test_no_identity_falls_back_to_ad_hoc(self):
+        self.assertEqual(self.identity("     0 valid identities found"), "-")
+
+    def test_an_override_wins(self):
+        self.assertEqual(self.identity(self.LISTING, override="-"), "-")
+
+    def test_the_installer_signs_the_cli_with_its_stable_identifier(self):
+        with open(os.path.join(ROOT, "Scripts", "install-app.sh"), encoding="utf-8") as handle:
+            script = handle.read()
+        self.assertIn(". Scripts/local-sign-identity.sh", script)
+        self.assertIn('local_sign .build/release/cellar "$CELLAR_CLI_IDENTIFIER"', script)
+
+
+class RegressionLedgerTests(unittest.TestCase):
+    """`docs/REGRESSIONS.md`: every fixed bug names a test, and that test exists (Kenneth, 2026-11-02)."""
+
+    def test_every_listed_test_exists(self):
+        import re
+        with open(os.path.join(os.path.dirname(ROOT), "docs", "REGRESSIONS.md"), encoding="utf-8") as handle:
+            rows = [line for line in handle if re.match(r"^\| #\d+ ", line)]
+        self.assertGreater(len(rows), 10)
+        tests = os.path.join(ROOT, "tests")
+        for row in rows:
+            found = re.search(r"`([\w+.]+\.(?:swift|py))` › `(\w+)`", row)
+            self.assertIsNotNone(found, f"no test named in: {row.strip()}")
+            name, func = found.groups()
+            paths = [os.path.join(d, name) for d, _, files in os.walk(tests) if name in files]
+            self.assertTrue(paths, f"{name} not found under app/tests")
+            pattern = f"def {func}(" if name.endswith(".py") else f"func {func}("
+            with open(paths[0], encoding="utf-8") as handle:
+                self.assertIn(pattern, handle.read(), f"{name} has no {func}: {row.strip()}")

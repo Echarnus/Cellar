@@ -111,7 +111,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 75
     # The Swift package and its release scripts live in app/ (#133).
     defaults:
       run:
@@ -126,6 +126,18 @@ jobs:
         run: sh Scripts/build-sdl.sh
       - name: Test suite
         run: sh Scripts/test.sh
+      # The regression gate (docs/REGRESSIONS.md): nothing ships unless every fixed bug's test
+      # passes, the Wine tiers included, where a real runner starts a real Windows program.
+      - name: Install Rosetta 2
+        run: softwareupdate --install-rosetta --agree-to-license
+      - name: Install the default runner
+        run: |
+          swift build -c release --product cellar
+          .build/release/cellar runner install
+      - name: Wine tiers
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: sh Scripts/test.sh --integration --filter CellarIntegrationTests
       - name: Package (app + CLI zips)
         env:
           VERSION: ${{ needs.plan.outputs.version }}
