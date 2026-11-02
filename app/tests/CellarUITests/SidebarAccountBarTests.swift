@@ -84,7 +84,14 @@ struct SidebarAccountBarTests {
         let rep = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
                                                 bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                                 colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
-        for x in 0..<size { for y in 0..<size { rep.setColor(.red, atX: x, y: y) } }
+        // Written byte by byte: setColor(_:atX:y:) silently does nothing for a colour from another colour space.
+        let bytes = try #require(rep.bitmapData)
+        for row in 0..<size {
+            for x in 0..<size {
+                let p = bytes + row * rep.bytesPerRow + x * 4
+                p[0] = 255; p[1] = 0; p[2] = 0; p[3] = 255
+            }
+        }
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("avatar-\(UUID().uuidString).png")
         try #require(rep.representation(using: .png, properties: [:])).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
