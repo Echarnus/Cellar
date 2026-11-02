@@ -58,6 +58,25 @@ struct SteamOwnershipCheckTests {
         #expect(DepotTool.probeVerdict(in: "Got 379 licenses for account!") == nil)
     }
 
+    @Test("A free licence the check itself obtained is not ownership (#272)")
+    func claimedFreeIsNotOwned() {
+        // DepotDownloader asks Steam for a free-on-demand licence before giving up, then carries on as
+        // if the game were owned. The claim settles it: the player never added this game.
+        #expect(DepotTool.probeVerdict(in: "Obtained FreeOnDemand license for app 730")
+                == .answer(.claimedFree))
+
+        var claimed: Set<String> = []
+        let first = StoreLibrary.steamAnswers([730: .claimedFree, 374320: .available], into: [:],
+                                              claimedFree: &claimed)
+        #expect(first["730"] == .notOwned)
+        #expect(first["374320"] == .owned)
+        #expect(claimed == ["730"])
+
+        // The next check finds the licence the first one obtained. It still isn't the player's.
+        let second = StoreLibrary.steamAnswers([730: .available], into: first, claimedFree: &claimed)
+        #expect(second["730"] == .notOwned)
+    }
+
     @Test("Concurrent logon ids stay clear of DepotDownloader's default")
     func loginIDsAvoidDefault() {
         let defaultID: UInt32 = 0x534B32 // "SK2", used by a download started without -loginid

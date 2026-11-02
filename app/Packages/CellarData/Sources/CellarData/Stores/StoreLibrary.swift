@@ -105,6 +105,9 @@ public enum StoreLibrary {
         /// alternative is showing one person's library to the next person at that Mac.
         var account: String
         var apps: [String: Ownership]
+        /// Apps whose only licence is the free one an ownership check obtained (#272). Once Steam has
+        /// granted it, every later check finds a licence, so the first answer is the one that counts.
+        var claimedFree: [String]? = nil
     }
 
     static var steamCacheFile: URL {
@@ -165,7 +168,9 @@ public enum StoreLibrary {
         let appIDs = steamAppIDsInProfiles()
         guard !appIDs.isEmpty else { return [:] }
 
-        var answers = loadSteamCache()?.apps ?? [:]
+        let cached = loadSteamCache()
+        var answers = cached?.apps ?? [:]
+        var claimedFree = Set(cached?.claimedFree ?? [])
         let total = appIDs.count
         progress(steamCheckProgress(total: total, answered: 0))
         let verdicts = askSideBySide(appIDs.sorted(), width: steamCheckWidth) { appID, slot in
@@ -174,17 +179,31 @@ public enum StoreLibrary {
         } answered: { count in
             if count < total { progress(steamCheckProgress(total: total, answered: count)) }
         }
+        answers = steamAnswers(verdicts, into: answers, claimedFree: &claimedFree)
+        saveSteamCache(SteamCache(checkedAt: Date(), account: account, apps: answers,
+                                  claimedFree: claimedFree.sorted()))
+        return answers
+    }
+
+    /// Fold one round of checks into the cached answers.
+    static func steamAnswers(_ verdicts: [Int: DepotTool.Access], into cached: [String: Ownership],
+                             claimedFree: inout Set<String>) -> [String: Ownership] {
+        var answers = cached
         for (appID, verdict) in verdicts {
+            let key = "\(appID)"
+            if claimedFree.contains(key) { answers[key] = .notOwned; continue }
             switch verdict {
-            case .available:      answers["\(appID)"] = .owned
-            case .unavailable:    answers["\(appID)"] = .notOwned
+            case .available:      answers[key] = .owned
+            case .unavailable:    answers[key] = .notOwned
+            case .claimedFree:
+                claimedFree.insert(key)
+                answers[key] = .notOwned
             case .unknown(let why):
                 // Don't overwrite a good answer with a failed check — a dropped connection should
                 // not empty somebody's library.
-                if answers["\(appID)"] == nil { answers["\(appID)"] = .unknown(why) }
+                if answers[key] == nil { answers[key] = .unknown(why) }
             }
         }
-        saveSteamCache(SteamCache(checkedAt: Date(), account: account, apps: answers))
         return answers
     }
 

@@ -141,6 +141,10 @@ public enum DepotTool {
         case available
         /// Steam refused: this account has no licence for it.
         case unavailable
+        /// The account had no licence, and the check itself just obtained a free one: DepotDownloader
+        /// asks Steam for a free-on-demand licence before it gives up, and Steam grants one for every
+        /// free-to-play game. The player never added it, so it is not theirs to be shown (#272).
+        case claimedFree
         /// Cellar could not get an answer — not signed in, no network, the tool failed. Never
         /// rendered as "you don't own this": an unanswered question is not a "no".
         case unknown(String)
@@ -214,7 +218,10 @@ public enum DepotTool {
     }
 
     static func probeVerdict(in line: String) -> ProbeVerdict? {
-        if line.contains("is not available from this account") {
+        // Printed before "Using app branch", so it settles the question first.
+        if line.contains("Obtained FreeOnDemand license") {
+            return .answer(.claimedFree)
+        } else if line.contains("is not available from this account") {
             return .answer(.unavailable)
         } else if line.contains("Processing depot") || line.contains("Got manifest request code")
                     || line.contains("Using app branch") {
