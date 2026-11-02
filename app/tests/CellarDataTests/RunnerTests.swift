@@ -146,6 +146,24 @@ struct RunnerTests {
         #expect(install.hasD3DMetal)
     }
 
+    @Test("Planet Coaster 2 runs on the D3DMetal 4 runner; every other game stays on the default")
+    func planetCoaster2PinsD3DMetal4() throws {
+        // D3DMetal 3.0's startup race killed about 15 of 16 PC2 starts on an M5; 4.0b3 started it
+        // on the first attempt 3 times out of 3 (cellar verify, 2026-11-01). D3DMetal 4 is a beta,
+        // so it is opted into per game, not made the default under every other game.
+        let plan = try Game.plan(slug: "planet-coaster-2")
+        #expect(plan.runnerID == RunnerCatalog.wineforgeD3DMetal4.id)
+        #expect(RunnerCatalog.defaultID == RunnerCatalog.wineforge.id)
+
+        let spec = RunnerCatalog.wineforgeD3DMetal4
+        #expect(spec.deprecated == nil)
+        #expect(spec.hasD3DMetal)
+        // Template 1.0.24 moved the renderer out of Frameworks/; the old path installs nothing.
+        let d3dmetal = try #require(spec.artifacts.first { $0.kind == .d3dmetalFromTemplate })
+        #expect(d3dmetal.payloadPath == "Template-1.0.24.app/Contents/SharedSupport/renderer/d3dmetal")
+        #expect(spec.artifacts.contains { $0.kind == .wineDMG && $0.url.contains("/0.6.0.8/") })
+    }
+
     @Test("An unknown runner is refused at setup with a message naming it")
     func unknownRunnerRefused() throws {
         let plan = try TestHome.plan("[runner]\nid = \"totally-made-up\"", slug: "badrunner")
