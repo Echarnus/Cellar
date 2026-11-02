@@ -134,6 +134,9 @@ an AI agent, is the one who proves it works, in the PR, before anyone else spend
   ladder; tick only the rungs you actually climbed and paste the evidence (test count, command
   output, screenshot). A rung you could not climb stays unticked, with who has to climb it. An agent
   without a Mac says so — CI then is the build, and the PR says that too.
+- **A fixed bug stays fixed.** Every fix and every lesson gets a regression test (or a `cellar verify`
+  check), and a row in [`docs/REGRESSIONS.md`](docs/REGRESSIONS.md) naming it. A release builds
+  only when all of them pass, the Wine tiers included.
 - **Coverage only goes up.** `sh app/Scripts/test.sh --coverage` measures CellarDomain, CellarData and CellarUI and
   fails below `app/tests/coverage-baseline.json`. When a change raises it, raise the baseline in the same
   PR (`python3 app/Scripts/coverage.py --update <report>`).
