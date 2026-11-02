@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Testing
 @testable import CellarUI
 
@@ -39,5 +40,23 @@ struct HoverHighlightTests {
         #expect(HoverButtonStyle.kind(for: .bordered) == .lift)
         #expect(HoverButtonStyle.kind(for: .borderedProminent) == .lift)
         #expect(HoverButtonStyle.kind(for: .automatic) == .lift)
+    }
+
+    @Test("Every hover style draws its button, the way the system style would")
+    func everyStyleDraws() {
+        let sheet = VStack(spacing: 8) {
+            Button("Automatic") {}.buttonStyle(.hoverAutomatic)
+            Button("Bordered") {}.buttonStyle(.hoverBordered)
+            Button("Prominent") {}.buttonStyle(.hoverProminent)
+            Button("Borderless") {}.buttonStyle(.hoverBorderless)
+            Button("Link") {}.buttonStyle(.hoverLink)
+            Button("Disabled") {}.buttonStyle(.hoverBordered).disabled(true)
+            Text("Menu").hoverHighlight(.backdrop)
+        }
+        .padding()
+        let host = NSHostingView(rootView: sheet)
+        host.frame = NSRect(x: 0, y: 0, width: 240, height: 320)
+        host.layoutSubtreeIfNeeded()
+        #expect(host.fittingSize.height > 100, "the buttons took no room")
     }
 }

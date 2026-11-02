@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Testing
 @testable import CellarUI
 
@@ -42,5 +43,24 @@ struct EqualSegmentedPickerTests {
         control.selectedSegment = 2
         coordinator.changed(control)
         #expect(value == 2)
+    }
+
+    @Test("Hosted in SwiftUI, it is the AppKit control, showing the bound selection")
+    func hosted() throws {
+        let host = NSHostingView(rootView: EqualSegmentedPicker(Self.labels, selection: .constant(1),
+                                                                accessibilityLabel: "Filter by readiness")
+            .frame(width: 240))
+        host.frame = NSRect(x: 0, y: 0, width: 240, height: 30)
+        host.layoutSubtreeIfNeeded()
+        func find(_ view: NSView) -> NSSegmentedControl? {
+            if let control = view as? NSSegmentedControl { return control }
+            for sub in view.subviews { if let found = find(sub) { return found } }
+            return nil
+        }
+        let control = try #require(find(host), "no segmented control in the hosted view")
+        #expect(control.segmentCount == 3)
+        #expect(control.selectedSegment == 1)
+        #expect(control.segmentDistribution == .fillEqually)
+        #expect(control.accessibilityLabel() == "Filter by readiness")
     }
 }
