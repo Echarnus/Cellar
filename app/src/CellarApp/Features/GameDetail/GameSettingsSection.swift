@@ -20,46 +20,27 @@ struct GameSettingsSection: View {
     @State private var values: [PerformanceSetting: String] = [:]
     @State private var failure: String?
 
-    private struct Row {
-        let setting: PerformanceSetting
-        let title: String
-        let tradeOff: String
-    }
-
-    private var rows: [Row] {
-        let all = allRows
-        return advanced ? all.filter { $0.setting == .metalValidation } : all.filter { $0.setting != .metalValidation }
-    }
-
-    private var allRows: [Row] {
-        var rows = [
-            Row(setting: .retina, title: String(localized: "Retina resolution"),
-                tradeOff: String(localized: "Renders at your display's full pixel density. Sharper, and up to four times the work for the GPU.")),
-            Row(setting: .metalHUD, title: String(localized: "Show frame rate"),
-                tradeOff: String(localized: "Metal's overlay with frames per second and frame time. Costs next to nothing.")),
-            Row(setting: .metalValidation, title: String(localized: "Metal validation"),
-                tradeOff: String(localized: "Checks every graphics call. Slower, but it stops some games crashing on D3DMetal.")),
-        ]
-        if game.backend == GraphicsBackend.d3dmetal.rawValue {
-            rows.insert(Row(setting: .metalFXUpscaling, title: String(localized: "MetalFX upscaling"),
-                            tradeOff: String(localized: "Appears as DLSS in the game's own settings: renders smaller and upscales. Faster, slightly softer.")),
-                        at: 1)
-        }
-        return rows
+    /// The switches this page shows, in order. MetalFX only where the game runs on D3DMetal, the one
+    /// backend that offers it.
+    private var settings: [PerformanceSetting] {
+        if advanced { return [.metalValidation] }
+        return game.backend == GraphicsBackend.d3dmetal.rawValue
+            ? [.retina, .metalFXUpscaling, .metalHUD] : [.retina, .metalHUD]
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(advanced ? String(localized: "Graphics fixes") : String(localized: "Display and performance")).font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 .kerning(0.5).textCase(.uppercase)
-            ForEach(rows, id: \.setting) { row in
+            ForEach(settings, id: \.self) { setting in
                 VStack(alignment: .leading, spacing: 2) {
-                    Toggle(row.title, isOn: binding(row.setting))
-                    Text(row.tradeOff).font(.caption).foregroundStyle(.secondary)
+                    Toggle(setting.displayTitle, isOn: binding(setting))
+                    Text(setting.tradeOff).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text("Changes apply the next time \(game.name) starts.")
+            Text(advanced ? String(localized: "Changes apply the next time \(game.name) starts.")
+                          : String(localized: "Changes apply the next time \(game.name) starts. Settings holds the same switches for every game."))
                 .font(.caption).foregroundStyle(.secondary)
             if let failure {
                 Label(failure, systemImage: "exclamationmark.triangle.fill")

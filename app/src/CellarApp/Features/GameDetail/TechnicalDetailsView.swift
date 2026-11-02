@@ -44,19 +44,8 @@ struct TechnicalDetailsView: View {
 
                 if game.bottleExists { GameSettingsSection(game: game, advanced: true) }
 
-                GameLogSection(game: game, expanded: true)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Activity log", systemImage: "terminal").font(.callout)
-                    ScrollView {
-                        Text(runner.log.isEmpty ? String(localized: "Nothing has run yet.") : runner.log)
-                            .font(.system(.caption, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(6)
-                    }
-                    .frame(height: 200)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-                }
+                // No log on screen: the window is for the facts. The logs themselves go out through
+                // Troubleshooting → Save Diagnostics Report, which is what anyone helping will ask for.
             }
             .padding(24)
         }

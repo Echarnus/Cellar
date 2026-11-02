@@ -9,6 +9,9 @@ import Foundation
 public struct AccountSummary: Sendable, Equatable {
     /// How the button should look, beyond its words.
     public enum Tone: Sendable, Equatable {
+        /// The library hasn't been read yet, so nobody knows. Never "Sign in": a player who is signed
+        /// in must not be told otherwise for the second it takes Cellar to look (Kenneth, #266).
+        case loading
         /// No store connected: the button is the invitation to sign in.
         case signedOut
         /// At least one store connected, all well.
@@ -24,6 +27,20 @@ public struct AccountSummary: Sendable, Equatable {
     public let tone: Tone
     /// The connected stores, in library order.
     public let stores: [GameStore]
+    /// The Steam account's own picture, as a file on this Mac, when Cellar has one. Shown in place
+    /// of the generic person, so the player recognises their account at a glance.
+    public let avatar: URL?
+
+    /// Before the first read of the library: no claim either way.
+    public static let loading = AccountSummary(title: String(localized: "Loading…"), detail: "", tone: .loading)
+
+    private init(title: String, detail: String, tone: Tone) {
+        self.title = title
+        self.detail = detail
+        self.tone = tone
+        self.stores = []
+        self.avatar = nil
+    }
 
     /// - Parameters:
     ///   - connected: the stores Cellar may speak for (`StoreLibrary.isConnected`), in any order.
@@ -31,10 +48,13 @@ public struct AccountSummary: Sendable, Equatable {
     ///   - offered: the stores this build shows (`StoreAvailability`). A connected store that isn't
     ///     offered is left off the button, and the signed-out line names only the offered ones.
     public init(connected: [GameStore], steam: SteamSignInState,
-                offered: [GameStore] = GameStore.offered) {
+                offered: [GameStore] = GameStore.offered, avatar: URL? = nil) {
         let stores = GameStore.allCases.filter { connected.contains($0) && offered.contains($0) }
             .sorted { $0.sortIndex < $1.sortIndex }
         self.stores = stores
+        // Only beside a Steam account name: the picture is that account's, and it would be wrong
+        // next to "Sign in" or "Your accounts".
+        self.avatar = steam.accountName != nil && stores.contains(.steam) ? avatar : nil
         if case .expired(let account, _) = steam {
             title = account
             detail = String(localized: "Steam sign-in expired")

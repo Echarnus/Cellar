@@ -25,6 +25,34 @@ final class SettingsViewModel {
     /// Measured off the main thread when the pane opens: walking a 100 GB game takes seconds.
     private(set) var storageUsage: [GameStorage.Usage] = []
 
+    /// Retina, MetalFX and the frame-rate overlay for every game (`CellarSettings`), read when the
+    /// pane opens. A game's own page can still differ.
+    private(set) var everyGame: [PerformanceSetting: Bool] = [:]
+    private(set) var everyGameFailure: String?
+
+    func loadEveryGame() {
+        Self.migrateLegacyOverlay()
+        everyGame = Dictionary(uniqueKeysWithValues: CellarSettings.everyGameSettings.map { ($0, CellarSettings.isOn($0)) })
+    }
+
+    func setEveryGame(_ setting: PerformanceSetting, _ on: Bool) {
+        do {
+            try CellarSettings.set(setting, on: on)
+            everyGame[setting] = on
+            everyGameFailure = nil
+        } catch {
+            everyGameFailure = String(localized: "Couldn't save that: \(CellarLog.describe(error))")
+        }
+    }
+
+    /// The overlay used to be an app-only switch (`showHUD` in the app's defaults), passed as
+    /// `--hud`. It is the every-game setting now, so a player who had it on keeps it on.
+    static func migrateLegacyOverlay(_ defaults: UserDefaults = .standard) {
+        guard defaults.object(forKey: "showHUD") != nil else { return }
+        if defaults.bool(forKey: "showHUD") { try? CellarSettings.set(.metalHUD, on: true) }
+        defaults.removeObject(forKey: "showHUD")
+    }
+
     var runnerName: String { RunnerManager.installed().first?.spec.displayName ?? String(localized: "not installed") }
     var depot: String { DepotTool.isInstalled ? "installed" : String(localized: "installs on first download") }
 

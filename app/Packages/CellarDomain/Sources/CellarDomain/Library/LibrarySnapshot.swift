@@ -16,19 +16,23 @@ public struct LibrarySnapshot: Sendable {
     public var gogSignedIn: Bool
     /// Which stores are connected, for the account button at the foot of the sidebar.
     public var connectedStores: [GameStore]
+    /// The Steam account's picture on this Mac, if Cellar has fetched it (`SteamAvatar`).
+    public var steamAvatar: URL?
 
     public init(games: [GameSummary], withheld: [GameSummary], steam: SteamSignInState,
-                hasConnectedStore: Bool, gogSignedIn: Bool, connectedStores: [GameStore] = []) {
+                hasConnectedStore: Bool, gogSignedIn: Bool, connectedStores: [GameStore] = [],
+                steamAvatar: URL? = nil) {
         self.games = games
         self.withheld = withheld
         self.steam = steam
         self.hasConnectedStore = hasConnectedStore
         self.gogSignedIn = gogSignedIn
         self.connectedStores = connectedStores
+        self.steamAvatar = steamAvatar
     }
 
     /// The account button's two lines, read from the same snapshot as the games it explains.
-    public var account: AccountSummary { AccountSummary(connected: connectedStores, steam: steam) }
+    public var account: AccountSummary { AccountSummary(connected: connectedStores, steam: steam, avatar: steamAvatar) }
 
     public static let empty = LibrarySnapshot(games: [], withheld: [], steam: .signedOut,
                                               hasConnectedStore: false, gogSignedIn: false)

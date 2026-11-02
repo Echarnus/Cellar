@@ -12,7 +12,7 @@ extension Notification.Name {
     /// Posted by the "Accounts…" menu item, the sidebar button, and any "Sign in" button for a store
     /// whose token Cellar holds — because that sign-in is account-level, not per-game.
     static let cellarOpenAccounts = Notification.Name("cellar.openAccounts")
-    /// Posted by Settings' "Review folder access…" button — the same window first run shows, in its
+    /// Posted by Settings' "Review Folder Access…" button — the same window first run shows, in its
     /// status-board form.
     static let cellarOpenFolderAccess = Notification.Name("cellar.openFolderAccess")
     /// Posted by the "Welcome to Cellar…" menu item and by Settings, to replay the first-run tour.

@@ -19,7 +19,6 @@ struct SettingsView: View {
     let accounts: AccountsViewModel
     @Bindable var updater: AppUpdater
     let preparation: RuntimePreparation
-    @AppStorage("showHUD") private var showHUD = false
     /// Settings is shown in a standalone NSWindow (not a SwiftUI sheet — that crashes under
     /// NSHostingView), so anything that hands off to another window closes this one through this
     /// callback rather than `dismiss`.
@@ -71,15 +70,11 @@ struct SettingsView: View {
                 .tag(Pane.accounts)
 
                 Form {
-                    Section("Gameplay") {
-                        Toggle("Show Metal performance overlay (FPS)", isOn: $showHUD)
-                        Text("Shows FPS and frame time in every game you launch.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                    everyGameDisplay
                     GameLanguageSection()
                     WheelStrengthSection()
                     Section("Folder access") {
-                        Button("Review folder access…") {
+                        Button("Review Folder Access…") {
                             onClose()
                             NotificationCenter.default.post(name: .cellarOpenFolderAccess, object: nil)
                         }
@@ -87,7 +82,7 @@ struct SettingsView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Section("Help") {
-                        Button("Show the welcome tour again") {
+                        Button("Show the Welcome Tour Again") {
                             NotificationCenter.default.post(name: .cellarOpenWelcomeTour, object: nil)
                         }
                         Link("Questions & answers", destination: Links.help)
@@ -106,7 +101,7 @@ struct SettingsView: View {
                             set: { preparation.isEnabled = $0 }))
                         Text(preparationNote)
                             .font(.caption).foregroundStyle(.secondary)
-                        Button("Open Cellar folder") { NSWorkspace.shared.open(Paths.appSupport) }
+                        Button("Open Cellar Folder") { NSWorkspace.shared.open(Paths.appSupport) }
                     }
                     gameDatabase
                     storage
@@ -166,30 +161,50 @@ struct SettingsView: View {
         .onAppear { accounts.refresh() }
     }
 
-    /// Always present, at a fixed height, rather than appearing when something happens: a pane that
+    /// Always present, at a fixed height, rather than appearing when something happens: a row that
     /// materialises mid-run changes the view tree's shape during layout, which is what this app
-    /// crashes on. Empty, it explains itself.
+    /// crashes on. It says what Cellar is doing in one line; the raw output stays out of the window
+    /// (it is in the diagnostics report, under Advanced).
     private var activity: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                if runner.busy {
-                    ProgressView().controlSize(.small)
-                    Text(runner.busyTitle).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
+        HStack(spacing: 8) {
+            if runner.busy {
+                ProgressView().controlSize(.small)
+                Text(runner.busyTitle).font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Settings apply as you change them.").font(.caption).foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 12).padding(.top, 8)
-            ScrollView {
-                Text(runner.log.isEmpty ? String(localized: "Anything Cellar runs shows up here.") : runner.log)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(runner.log.isEmpty ? .secondary : .primary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
-            }
-            .frame(height: 92)
+            Spacer(minLength: 0)
         }
-        .background(Color.primary.opacity(0.04))
+        .padding(.horizontal, 16)
+        .frame(height: 32)
+    }
+
+    // MARK: - Display and performance
+
+    /// The same three switches as a game's page, set once for every game. A game's page can still
+    /// differ, and says which it is following.
+    @ViewBuilder private var everyGameDisplay: some View {
+        Section {
+            ForEach(CellarSettings.everyGameSettings, id: \.self) { setting in
+                Toggle(isOn: Binding(get: { model.everyGame[setting] ?? false },
+                                     set: { model.setEveryGame(setting, $0) })) {
+                    Text(setting.displayTitle)
+                    Text(setting == .metalFXUpscaling
+                         ? setting.tradeOff + " " + String(localized: "Games on D3DMetal only.")
+                         : setting.tradeOff)
+                }
+            }
+            if let failure = model.everyGameFailure {
+                Label(failure, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(.red)
+            }
+        } header: {
+            Text("Display and performance")
+        } footer: {
+            Text("For every game, from its next start. A game's own page can still change these for that game.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .task { model.loadEveryGame() }
     }
 
     // MARK: - Updates
@@ -238,7 +253,7 @@ struct SettingsView: View {
                 Text("This copy of Cellar can't check a downloaded game database, so it uses the one it shipped with. Installing a newer Cellar brings newer games.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-                Button("Check for new games now") {
+                Button("Check for New Games Now") {
                     runner.run(.updateProfiles(quiet: false), title: String(localized: "Updating the game database"),
                                then: { model.refreshDatabase() })
                 }
@@ -280,9 +295,9 @@ struct SettingsView: View {
         Section("Diagnostics") {
             LabeledContent("Kept log", value: model.logSize)
             HStack {
-                Button("Export diagnostics…") { model.exportReport(cellarVersion: appVersion) }
+                Button("Export Diagnostics…") { model.exportReport(cellarVersion: appVersion) }
                     .disabled(model.export == .working)
-                Button("Open logs folder") { NSWorkspace.shared.open(Paths.logs) }
+                Button("Open Logs Folder") { NSWorkspace.shared.open(Paths.logs) }
             }
             Text("""
                 Writes one text file — your Mac's details, Cellar's log of what it did, and the \

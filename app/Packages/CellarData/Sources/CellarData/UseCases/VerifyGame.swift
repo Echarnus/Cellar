@@ -432,9 +432,11 @@ public struct VerifyGame {
 
     static func judgeSettings(_ entries: [PerformanceSettings.Entry], language: LanguageChoice,
                               macLanguage: GameLanguage = .system()) -> VerificationCheck {
-        let overridden = entries.filter { $0.source == .bottle }
+        // The player's own choices, for this game or for every game in Settings: either way, what
+        // runs isn't the profile as it ships.
+        let overridden = entries.filter { $0.source == .bottle || $0.source == .everyGame }
         var differences = overridden.filter { !displayOnlySettings.contains($0.setting) }
-            .map { "\($0.setting.key) = \($0.value) is set for this bottle, over the profile" }
+            .map { "\($0.setting.key) = \($0.value) is set \($0.source == .bottle ? "for this bottle" : "for every game"), over the profile" }
         let cosmetic = overridden.filter { displayOnlySettings.contains($0.setting) }
             .map { "\($0.setting.key) = \($0.value)" }
         let aside = cosmetic.isEmpty ? "" : " The player's own display-only choice (\(cosmetic.joined(separator: ", "))) doesn't change how the game runs."

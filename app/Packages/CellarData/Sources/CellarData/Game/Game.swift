@@ -67,6 +67,7 @@ public enum Game {
         let bottleFile = BottleConfig.url(forBottle: bottleName)
         let profileBackend = fields["backend"] ?? "d3dmetal"
         let performance = PerformanceSettings.resolve(
+            everyGame: CellarSettings.performance(),
             profileFields: fields, profileEnv: ProfileStore.env(ref),
             bottleFields: BottleConfig.fields(bottleFile), bottleEnv: BottleConfig.env(bottleFile))
         return GamePlan(

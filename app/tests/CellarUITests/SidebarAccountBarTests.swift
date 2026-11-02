@@ -69,11 +69,18 @@ struct SidebarAccountBarTests {
         #expect(avatar.filter(Self.isOrange).count > 10, "no orange badge on an expired sign-in")
     }
 
+    @Test("Loading draws neither the accent invitation nor the orange warning", arguments: [false, true])
+    func loadingIsNeutral(dark: Bool) {
+        let avatar = avatarPixels(render(.loading, dark ? .dark : .light))
+        #expect(!avatar.contains(where: Self.isOrange))
+        #expect(avatar.filter(Self.isBlue).count < 10, "the loading bar looks like a sign-in invitation")
+    }
+
     @Test("draw the account bar in every state, light and dark")
     func drawSheet() throws {
         for scheme in [ColorScheme.light, .dark] {
             let sheet = VStack(alignment: .leading, spacing: 0) {
-                ForEach([("Signed out", Self.signedOut), ("Signed in", Self.connected),
+                ForEach([("Loading", AccountSummary.loading), ("Signed out", Self.signedOut), ("Signed in", Self.connected),
                          ("Steam expired", Self.expired)], id: \.0) { label, account in
                     Text(label).font(.caption2).foregroundStyle(.secondary)
                         .padding(.horizontal, 12).padding(.top, 10)
@@ -83,7 +90,7 @@ struct SidebarAccountBarTests {
             }
             .frame(width: Self.barSize.width, alignment: .leading)
             .environment(\.colorScheme, scheme)
-            let bitmap = Snapshot.render(sheet, size: CGSize(width: Self.barSize.width, height: 240), scale: 2,
+            let bitmap = Snapshot.render(sheet, size: CGSize(width: Self.barSize.width, height: 310), scale: 2,
                                          background: scheme == .dark ? Color(white: 0.13) : Color(white: 0.97))
             let data = try #require(bitmap.pngData(), "the account bar rendered no PNG data")
             let url = ContactSheetTests.outputDirectory

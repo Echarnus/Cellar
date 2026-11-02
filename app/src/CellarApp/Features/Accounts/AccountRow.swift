@@ -29,7 +29,7 @@ struct AccountRow: View {
             if let actionTitle {
                 Button(actionTitle, action: action)
                     .disabled(busy)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.hoverBordered)
             }
         }
         .padding(12)

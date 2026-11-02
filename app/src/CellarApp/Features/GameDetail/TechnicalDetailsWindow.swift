@@ -1,6 +1,7 @@
 import CellarDomain
 import AppKit
 import SwiftUI
+import CellarUI
 import CellarData
 
 /// The window behind Troubleshooting → Technical Details: how Cellar runs a game, for whoever is
@@ -37,7 +38,7 @@ final class TechnicalDetailsWindow: NSObject, NSWindowDelegate {
         window.title = String(localized: "\(game.name) — Technical Details")
         window.isReleasedWhenClosed = false
         window.center()
-        window.contentView = NSHostingView(rootView: TechnicalDetailsView(game: game, runner: runner))
+        window.contentView = NSHostingView(rootView: TechnicalDetailsView(game: game, runner: runner).buttonStyle(.hoverAutomatic))
         window.delegate = self
         self.window = window
         window.makeKeyAndOrderFront(nil)

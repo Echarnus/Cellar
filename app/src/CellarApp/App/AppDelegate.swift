@@ -2,6 +2,7 @@ import CellarDomain
 import AppKit
 import CellarData
 import SwiftUI
+import CellarUI
 
 // A SwiftPM executable can't use @main App scenes, so stand the app up by hand: an NSApplication
 // whose window hosts the SwiftUI LibraryView. This is the Phase-3 "Steam-like" front-end over
@@ -95,7 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let useDiagnostic = ProcessInfo.processInfo.environment["CELLAR_DIAG"] != nil
         window.contentView = useDiagnostic
             ? NSHostingView(rootView: AnyView(Text("Cellar GUI works").padding()))
-            : NSHostingView(rootView: LibraryView(lib: model.library, runner: model.activity, downloads: model.downloads, preparation: model.preparation))
+            : NSHostingView(rootView: LibraryView(lib: model.library, runner: model.activity, downloads: model.downloads, preparation: model.preparation)
+                                        .buttonStyle(.hoverAutomatic))
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.bringToFront()
@@ -279,7 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.contentView = NSHostingView(rootView: SettingsView(runner: model.activity, library: model.library, accounts: model.accounts,
                                                                 updater: model.updater, preparation: model.preparation, onClose: { [weak self] in
                 self?.settingsWindow?.close()
-            }))
+            }).buttonStyle(.hoverAutomatic))
             settingsWindow = w
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
@@ -311,7 +313,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.center()
         w.contentView = NSHostingView(rootView: WelcomeView(isReview: isReview) { [weak self] in
             self?.folderAccessWindow?.close()
-        })
+        }.buttonStyle(.hoverAutomatic))
         folderAccessWindow = w
         w.makeKeyAndOrderFront(nil)
         NSApp.bringToFront()
@@ -333,7 +335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                                    preparation: model.preparation, onFinish: { [weak self] in
                 WelcomeTour.markSeen()
                 self?.welcomeTourWindow?.close()
-            }))
+            }).buttonStyle(.hoverAutomatic))
             welcomeTourWindow = w
         }
         WelcomeTour.markSeen()

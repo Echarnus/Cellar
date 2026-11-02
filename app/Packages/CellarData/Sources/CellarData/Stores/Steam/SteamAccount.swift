@@ -249,6 +249,7 @@ public enum SteamAccount {
         // for the rest of the token's ~200 days — a credential they believe they removed.
         if let account = record?.accountName {
             SteamBottle.forgetClientSessions(account: account)
+            SteamAvatar.forget(account)
         }
         try DepotTool.forgetSession()
         write(nil)

@@ -1,5 +1,6 @@
 import CellarDomain
 import SwiftUI
+import CellarUI
 import AppKit
 import CellarData
 
@@ -188,7 +189,7 @@ struct WelcomeTourView: View {
             Button("Skip for now") {
                 onFinish()
             }
-            .buttonStyle(.link)
+            .buttonStyle(.hoverLink)
             .disabled(step.isLast)
             .opacity(step.isLast ? 0 : 1)
             .accessibilityHidden(step.isLast)

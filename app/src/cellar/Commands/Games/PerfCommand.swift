@@ -39,6 +39,7 @@ struct PerfCommand: ParsableCommand {
     static func describe(_ source: PerformanceSettings.Source) -> String {
         switch source {
         case .cellarDefault: return "Cellar's default"
+        case .everyGame:     return "your setting for every game"
         case .profile:       return "the game's profile"
         case .bottle:        return "your choice"
         }

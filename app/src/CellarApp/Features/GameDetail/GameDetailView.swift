@@ -11,7 +11,6 @@ struct GameDetailView: View {
     /// The downloads queue: Install goes through it, and it says what this game is doing.
     let downloads: DownloadsViewModel
     let onChange: () -> Void
-    @AppStorage("showHUD") private var showHUD = false
     /// What the page read about this game from the machine, and the calls behind its buttons.
     @State private var model = GameDetailViewModel()
 
@@ -60,27 +59,18 @@ struct GameDetailView: View {
 
     // MARK: - Hero
 
-    /// Banner, cover, title — and the store, spelled out directly under the name. Which storefront
-    /// a game belongs to is the first thing that changes what every control below does, so it is
-    /// given a line of its own rather than hidden in a details table.
+    /// Banner, cover and title.
     private var hero: some View {
         ZStack(alignment: .bottomLeading) {
             GameBanner(game: game)
             LinearGradient(colors: [.clear, .black.opacity(0.78)], startPoint: .center, endPoint: .bottom)
             HStack(alignment: .bottom, spacing: 16) {
-                GameCover(game: game, width: 92, showsBadge: false)
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(game.name)
-                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                        .foregroundStyle(.white).shadow(radius: 4).lineLimit(2)
-                    HStack(spacing: 8) {
-                        StoreLockup(store: game.store)
-                        if let account = game.account {
-                            Text("Signed in as \(account)")
-                                .font(.caption).foregroundStyle(.white.opacity(0.85))
-                        }
-                    }
-                }
+                GameCover(game: game, width: 92)
+                // The name alone. The sidebar's store section already says which store this is, and
+                // the account at its foot says who is signed in; repeating both here was noise.
+                Text(game.name)
+                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                    .foregroundStyle(.white).shadow(radius: 4).lineLimit(2)
                 Spacer()
             }
             .padding(20)
@@ -110,7 +100,7 @@ struct GameDetailView: View {
                 }
                 .frame(minWidth: 168).padding(.vertical, 6)
             }
-            .buttonStyle(.borderedProminent).controlSize(.large)
+            .buttonStyle(.hoverProminent).controlSize(.large)
             // Green means "go" for Play; every other step is tinted by the store whose client is
             // about to appear, so the button and the window that opens belong to each other.
             .tint(game.nextStep == .play ? .green : game.store.tint)
@@ -145,8 +135,8 @@ struct GameDetailView: View {
                 .font(.callout).foregroundStyle(.secondary)
                 .help(position == 1 ? Text("\(game.name) starts downloading when Cellar is done with what it is doing now.")
                                     : Text("\(game.name) starts downloading after the games ahead of it in the queue."))
-            Button("Remove from queue") { downloads.cancel(game.slug) }
-                .buttonStyle(.link)
+            Button("Remove from Queue") { downloads.cancel(game.slug) }
+                .buttonStyle(.hoverLink)
         } else if runner.busy, runner.installingSlug != nil {
             // Another game is downloading. This page is about this game: it says what Install will
             // do now, not what the other game is doing (that is in the sidebar's downloads panel).
@@ -163,8 +153,8 @@ struct GameDetailView: View {
             ProgressView().controlSize(.small)
             Text(runner.busyTitle).font(.callout).foregroundStyle(.secondary)
             if runner.launchingSlug == game.slug {
-                Button("Show progress") { LaunchSplashWindow.present(game: game, runner: runner) }
-                    .buttonStyle(.link)
+                Button("Show Progress") { LaunchSplashWindow.present(game: game, runner: runner) }
+                    .buttonStyle(.hoverLink)
                     .help("Bring the launch window back.")
             }
         } else if model.measuringRemoval {
@@ -198,6 +188,7 @@ struct GameDetailView: View {
             Image(systemName: "ellipsis.circle").font(.title3)
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .hoverHighlight(.backdrop)
         .help("More actions for \(game.name)")
         .accessibilityLabel("More actions")
     }
@@ -236,8 +227,6 @@ struct GameDetailView: View {
             } else {
                 act(.steamOpen(slug: game.slug), String(localized: "Opening Steam"))
             }
-        case .installThroughClient:
-            act(.steamInstall(slug: game.slug), String(localized: "Installing"))
         case .reapplyClientSettings:
             act(.battleNetConfigure(slug: game.slug), String(localized: "Configuring"))
         case .checkForUpdates:
@@ -382,7 +371,7 @@ struct GameDetailView: View {
 
             if game.backendIsPlayerChoice, game.profileBackend.flatMap(GraphicsBackend.init(rawValue:)) != nil {
                 Button("Go back to the recommended graphics setting") { resetBackend() }
-                    .buttonStyle(.link).font(.callout)
+                    .buttonStyle(.hoverLink).font(.callout)
                     .disabled(runner.busy)
                     .help("\(game.name) goes back to the graphics setting Cellar recommends for it, from its next launch.")
             }
@@ -504,7 +493,9 @@ struct GameDetailView: View {
             // The launch gets a window of its own: it is a minute or two of work with several
             // steps, and a spinner beside the button reads as a hang.
             let launched = game
-            runner.launch(slug: game.slug, showHUD: showHUD) {
+            // The frame-rate overlay is a setting like Retina and MetalFX now (Settings → Games, or
+            // this page), read from the plan by the launch itself, so the app passes no flag.
+            runner.launch(slug: game.slug, showHUD: false) {
                 onChange()
                 // Played and quit: the one moment "how did it run?" has an answer.
                 if runner.stage == .closed { CompatibilityPrompt.offerAfterSession(launched) }

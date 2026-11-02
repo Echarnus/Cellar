@@ -10,9 +10,11 @@ public struct DiskLibraryRepository: LibraryRepository {
     /// `LoadLibrary` runs on every refresh.
     public func snapshot() -> LibrarySnapshot {
         let all = LoadLibrary().summaries()
+        let steam = SteamAccount.state
         return LibrarySnapshot(games: all.filter(\.isVisible), withheld: all.filter { !$0.isVisible },
-                               steam: SteamAccount.state, hasConnectedStore: StoreLibrary.hasConnectedStore,
+                               steam: steam, hasConnectedStore: StoreLibrary.hasConnectedStore,
                                gogSignedIn: GOGAuth.isSignedIn,
-                               connectedStores: GameStore.offered.filter(StoreLibrary.isConnected))
+                               connectedStores: GameStore.offered.filter(StoreLibrary.isConnected),
+                               steamAvatar: SteamAvatar.localFile(for: steam.accountName))
     }
 }
