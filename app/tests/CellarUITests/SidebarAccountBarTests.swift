@@ -1,6 +1,7 @@
 import CellarDomain
 import Testing
 import SwiftUI
+import AppKit
 import Foundation
 @testable import CellarUI
 
@@ -74,6 +75,25 @@ struct SidebarAccountBarTests {
         let avatar = avatarPixels(render(.loading, dark ? .dark : .light))
         #expect(!avatar.contains(where: Self.isOrange))
         #expect(avatar.filter(Self.isBlue).count < 10, "the loading bar looks like a sign-in invitation")
+    }
+
+    @Test("With a Steam picture, the avatar is that picture, not the generic person")
+    func steamPictureShows() throws {
+        // A solid red square stands in for the player's picture: easy to find in the pixels.
+        let size = 32
+        let rep = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
+                                                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        for x in 0..<size { for y in 0..<size { rep.setColor(.red, atX: x, y: y) } }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("avatar-\(UUID().uuidString).png")
+        try #require(rep.representation(using: .png, properties: [:])).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let account = AccountSummary(connected: [.steam], steam: .signedIn(account: "kenneth", days: 1, aging: false),
+                                     avatar: file)
+        #expect(account.avatar == file)
+        let red = avatarPixels(render(account)).filter { $0.r > 0.8 && $0.g < 0.3 && $0.b < 0.3 }
+        #expect(red.count > 100, "the Steam picture isn't drawn in the avatar")
     }
 
     @Test("draw the account bar in every state, light and dark")
