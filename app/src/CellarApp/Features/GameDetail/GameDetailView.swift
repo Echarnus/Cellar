@@ -96,7 +96,7 @@ struct GameDetailView: View {
             Button { primary() } label: {
                 HStack(spacing: 8) {
                     Image(systemName: queuesOnPress ? "text.badge.plus" : game.actionSymbol).font(.title3)
-                    Text(queuesOnPress ? String(localized: "Add to queue") : game.actionTitle).fontWeight(.semibold)
+                    Text(queuesOnPress ? String(localized: "Add to Queue") : game.actionTitle).fontWeight(.semibold)
                 }
                 .frame(minWidth: 168).padding(.vertical, 6)
             }
@@ -488,28 +488,7 @@ struct GameDetailView: View {
     // MARK: - Behaviour
 
     private func primary() {
-        switch game.nextStep {
-        case .play:
-            // The launch gets a window of its own: it is a minute or two of work with several
-            // steps, and a spinner beside the button reads as a hang.
-            let launched = game
-            // The frame-rate overlay is a setting like Retina and MetalFX now (Settings → Games, or
-            // this page), read from the plan by the launch itself, so the app passes no flag.
-            runner.launch(slug: game.slug, showHUD: false) {
-                onChange()
-                // Played and quit: the one moment "how did it run?" has an answer.
-                if runner.stage == .closed { CompatibilityPrompt.offerAfterSession(launched) }
-            }
-            LaunchSplashWindow.present(game: game, runner: runner, onFinished: { onChange() })
-        case .setup:
-            act(.setUp(slug: game.slug), String(localized: "Setting up"))
-        case .install:
-            // One verb for every store. The route still differs — Cellar downloads a Steam or GOG
-            // game itself and opens Blizzard's client for a Battle.net one — but that is a fact
-            // about the store, not something the player should have to know to press a button.
-            // Through the queue: started now when Cellar is free, otherwise when its turn comes.
-            downloads.install(game)
-        }
+        GamePrimaryAction.perform(game, runner: runner, downloads: downloads, onChange: onChange)
     }
 
     /// Copy a draft profile out, for contributing it once the game is known to run.

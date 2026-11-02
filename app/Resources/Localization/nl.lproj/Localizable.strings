@@ -12,7 +12,6 @@
 "%@ is on the drive “%@”, which isn't connected. Connect it to play." = "%@ staat op de schijf “%@”, die niet aangesloten is. Sluit hem aan om te spelen.";
 "%@ is running" = "%@ draait";
 "%@ isn't installed, and Cellar has nothing of its own left on disk." = "%@ is niet geïnstalleerd en Cellar heeft er niets meer van op schijf.";
-"%@ isn't installed. Deletes %@ of leftovers:" = "%@ is niet geïnstalleerd. Verwijdert %@ aan restanten:";
 "%@ so far — Windows games take a minute or two to come up." = "Al %@ — Windows-games hebben een minuut of twee nodig om op te starten.";
 "%@ — your choice" = "%@ — jouw keuze";
 "%@'s DRM checks the %@ app, which keeps a sign-in of its own. Cellar usually signs it in with your sign-in from Settings, but can't right now. The first time you press Play, its window opens — the QR code with the mobile app is quickest. Every %@ game shares it." = "De DRM van %@ controleert de %@-app, die een eigen aanmelding bijhoudt. Meestal logt Cellar die in met je aanmelding uit Instellingen, maar nu lukt dat niet. De eerste keer dat je op Spelen drukt, opent het venster — de QR-code met de mobiele app is het snelst. Elke %@-game deelt die aanmelding.";
@@ -154,7 +153,6 @@
 "Couldn't load GOG's sign-in page: %@" = "Kon de inlogpagina van GOG niet laden: %@";
 "Cut" = "Knip";
 "Delete" = "Verwijder";
-"Deletes %@:" = "Verwijdert %@:";
 "Diagnostics" = "Diagnose";
 "Display and performance" = "Weergave en prestaties";
 "Done" = "Klaar";
@@ -213,7 +211,6 @@
 "Its profile names %@ as the one to try when %@ doesn't work. %@ If %@ comes up, Cellar keeps using it; you can switch back on the game's page." = "Het profiel noemt %@ als alternatief wanneer %@ niet werkt. %@ Als %@ opstart, blijft Cellar die gebruiken; je kunt terugschakelen op de pagina van de game.";
 "Keep my save games (%@) — copied to Documents first" = "Bewaar mijn opgeslagen games (%@) — eerst gekopieerd naar Documenten";
 "Keep my save games (none found inside Cellar)" = "Bewaar mijn opgeslagen games (geen gevonden in Cellar)";
-"Keeps:" = "Bewaart:";
 "Kept log" = "Bewaarde log";
 "Language" = "Taal";
 "Last backed up %@ — %@, %@. Cellar keeps the last %lld." = "Laatste reservekopie %@ — %@, %@. Cellar bewaart de laatste %lld.";
@@ -449,7 +446,6 @@
 "Your Windows games, running on this Mac." = "Je Windows-games, op deze Mac.";
 "Zoom" = "Zoom";
 "· UNTESTED, CELLAR GUESSED" = "· NIET GETEST, DOOR CELLAR GERADEN";
-"• and %lld more" = "• en nog %lld";
 "Cellar sets up the %@ this game starts through. Its installer opens a window and needs a few clicks from you." = "Cellar installeert de %@ waarmee deze game start. Het installatieprogramma opent een venster en vraagt een paar klikken van je.";
 "Cellar first sets up the %@ this game starts through — its installer opens a window and needs a few clicks from you. Then it downloads the game from your %@ library, with nothing more to click." = "Cellar installeert eerst de %@ waarmee deze game start — het installatieprogramma opent een venster en vraagt een paar klikken van je. Daarna downloadt het de game uit je %@-bibliotheek, zonder nog iets te hoeven klikken.";
 "Installed. Play starts %@ quietly, then the %@ opens. Sign in with your %@ there the first time, and it starts the game." = "Geïnstalleerd. Spelen start %@ stil, daarna opent de %@. Log de eerste keer daar in met je %@, en die start de game.";
@@ -487,7 +483,7 @@
 "%@ starts downloading when Cellar is done with what it is doing now." = "%@ begint te downloaden zodra Cellar klaar is met waar het nu mee bezig is.";
 "%lld waiting" = "%lld in de wachtrij";
 "1 waiting" = "1 in de wachtrij";
-"Add to queue" = "In wachtrij zetten";
+"Add to Queue" = "In wachtrij zetten";
 "Cellar is downloading another game. Install adds this one to the queue." = "Cellar downloadt een andere game. Installeer zet deze in de wachtrij.";
 "Checking for updates" = "Zoeken naar updates";
 "Download incomplete" = "Download onvolledig";
@@ -518,3 +514,9 @@
 "Records what Wine does. Only for chasing a bug: it slows the game." = "Legt vast wat Wine doet. Alleen om een fout op te sporen: het vertraagt de game.";
 "Settings apply as you change them." = "Instellingen gelden zodra je ze wijzigt.";
 "Wine debug logging" = "Wine-debuglogboek";
+
+"%@ Settings" = "Instellingen van %@";
+"%@ isn't installed. This frees the %@ it left behind." = "%@ is niet geïnstalleerd. Dit maakt de %@ vrij die achterbleef.";
+"%@'s settings are here once it is installed." = "De instellingen van %@ verschijnen hier zodra de game geïnstalleerd is.";
+"Frees %@ on this Mac. Cellar backs up your save games first. You still own %@ on %@, so you can download it again any time." = "Maakt %@ vrij op deze Mac. Cellar maakt eerst een reservekopie van je opgeslagen spellen. Je bezit %@ nog steeds op %@, dus je kunt de game altijd opnieuw downloaden.";
+"Frees %@ on this Mac. You still own %@ on %@, and your sign-in stays, so you can download it again any time." = "Maakt %@ vrij op deze Mac. Je bezit %@ nog steeds op %@ en je blijft ingelogd, dus je kunt de game altijd opnieuw downloaden.";

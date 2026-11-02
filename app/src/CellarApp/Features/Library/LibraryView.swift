@@ -205,6 +205,9 @@ struct LibraryView: View {
                                        activity: downloads.activity(for: game.slug))
                                 .contentShape(Rectangle())
                                 .onTapGesture { lib.selected = game.slug }
+                                // Right-click, as in Steam's library and every Mac sidebar: the
+                                // game's one big action and its settings, without opening the page.
+                                .contextMenu { contextMenu(for: game) }
                         }
                     } header: {
                         StoreSectionHeader(store: section.store, count: section.games.count, guessed: section.guessed)
@@ -235,6 +238,24 @@ struct LibraryView: View {
             default: break
             }
         }
+    }
+
+    @ViewBuilder private func contextMenu(for game: GameSummary) -> some View {
+        Button {
+            lib.selected = game.slug
+            GamePrimaryAction.perform(game, runner: runner, downloads: downloads) { lib.refresh() }
+        } label: {
+            Label(GamePrimaryAction.title(game, downloads: downloads), systemImage: game.actionSymbol)
+        }
+        .disabled(!GamePrimaryAction.isAvailable(game, runner: runner, downloads: downloads))
+        Divider()
+        Button {
+            lib.selected = game.slug
+            TechnicalDetailsWindow.presentSettings(game: game)
+        } label: {
+            Label(String(localized: "Settings…"), systemImage: "slider.horizontal.3")
+        }
+        .disabled(!game.bottleExists)
     }
 
     /// Games are being withheld because a store hasn't been asked yet — say so, in the library,

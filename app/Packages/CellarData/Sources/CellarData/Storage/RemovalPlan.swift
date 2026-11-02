@@ -35,4 +35,31 @@ public struct RemovalPlan: Sendable {
 
     /// "12.4 GB" — the number the player is actually deciding about.
     public var totalSizeDescription: String { ByteSize.describe(totalBytes) }
+
+    /// The dialog's question, in the player's words.
+    public var question: String {
+        switch scope {
+        case .bottle: return String(localized: "Remove \(name) completely?")
+        case .game:
+            return removesGameFiles ? String(localized: "Uninstall \(name)?")
+                                    : String(localized: "Clean up what's left of \(name)?")
+        }
+    }
+
+    /// What it frees and why it is safe, in plain sentences (Kenneth, #266). The itemised list —
+    /// manifests, links, caches, the bottle and the runner by name — stays in `cellar uninstall`;
+    /// a player deciding whether to click needs the size, and to know the game isn't gone for good.
+    /// Never a command, a bottle or a runner.
+    public var playerSummary: String {
+        let size = totalSizeDescription
+        let store = store.displayName
+        switch scope {
+        case .bottle:
+            return String(localized: "Frees \(size) on this Mac. Cellar backs up your save games first. You still own \(name) on \(store), so you can download it again any time.")
+        case .game where removesGameFiles:
+            return String(localized: "Frees \(size) on this Mac. You still own \(name) on \(store), and your sign-in stays, so you can download it again any time.")
+        case .game:
+            return String(localized: "\(name) isn't installed. This frees the \(size) it left behind.")
+        }
+    }
 }
