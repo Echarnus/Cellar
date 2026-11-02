@@ -12,9 +12,7 @@ struct LibraryCommand: ParsableCommand {
         own. Steam is asked with the same session that would do the downloading, so "owned" means
         "Cellar can install this" rather than "an id turned up in a list".
 
-        Battle.net publishes neither a sign-in state nor what you own, so Cellar asks you instead:
-        `cellar battlenet add` puts Blizzard's games in the library, and they are marked as
-        unchecked, because that is what they are.
+        This release offers Steam only; Battle.net and GOG games are not listed.
         """)
 
     @Flag(name: .long, help: "Ask the stores again instead of using the cached answers.")
@@ -38,13 +36,17 @@ struct LibraryCommand: ParsableCommand {
             print(Term.bold("Nothing to show yet."))
             print("  " + SteamAccount.state.summary)
             print(Term.dim("  cellar steam login      Steam, by QR code from your phone"))
-            print(Term.dim("  cellar gog login        GOG, in a browser window"))
-            print(Term.dim("  cellar battlenet add    Battle.net, which publishes nothing to check"))
+            if GameStore.gog.isOffered {
+                print(Term.dim("  cellar gog login        GOG, in a browser window"))
+            }
+            if GameStore.battlenet.isOffered {
+                print(Term.dim("  cellar battlenet add    Battle.net, which publishes nothing to check"))
+            }
             print(Term.dim("  cellar library --refresh"))
             return
         }
 
-        for store in GameStore.allCases.sorted(by: { $0.sortIndex < $1.sortIndex }) {
+        for store in GameStore.offered {
             let inStore = visible.filter { $0.store == store }
             guard !inStore.isEmpty else { continue }
             print(Term.bold(store.descriptor.sectionTitle) + "  " + Term.dim(sectionNote(for: store)))
@@ -58,7 +60,7 @@ struct LibraryCommand: ParsableCommand {
         // *why* their games are missing, so it gets a line rather than silence. Every store, not
         // just the ones that can answer about ownership — Battle.net's games are now withheld too,
         // and silence there is exactly the confusion this line exists to prevent.
-        for store in GameStore.allCases {
+        for store in GameStore.offered {
             let hidden = games.filter { $0.store == store && !$0.isVisible }
             guard !hidden.isEmpty, !all else { continue }
             let unchecked = hidden.filter { if case .unknown = $0.ownership { return true }; return false }

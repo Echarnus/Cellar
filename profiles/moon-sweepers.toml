@@ -1,0 +1,52 @@
+# Cellar game profile — Moon Sweepers
+#
+# DragDrop Games' co-op game, out 2026-10-23, rank 29 on Steam's Most Played chart (64K players,
+# 2026-11-01). Windows only. Steam offers a DirectX 11 launch (-force-d3d11, the default) and a
+# DirectX 12 one; Cellar starts the default.
+# Facts below are from the Steam store page and SteamDB's config, read 2026-11-01. Not yet run on a
+# Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "moon-sweepers"
+name          = "Moon Sweepers"
+developer     = "DragDrop Games"
+publisher     = "DragDrop Games"
+steam_appid   = 5335510
+engine        = "not published"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2026-10-23"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player + online co-op for up to 16"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Steam's own default starts it in DirectX 11."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 5335510
+install_dir = "Moon Sweepers"
+exe         = "MoonSweepers.exe"
+
+[art]
+# A 2026 release: art only under the hashed store_item_assets path.
+art_portrait = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/5335510/b11598a928ea1ac19bfa83eec2ab071a93ec7313/library_capsule.jpg"
+art_hero     = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/5335510/96be25d2fcd970087569af58184ede859f213256/library_hero.jpg"
+
+[legal]
+drm_circumvention = "never"

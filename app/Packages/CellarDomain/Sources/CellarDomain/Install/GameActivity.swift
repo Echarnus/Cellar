@@ -45,6 +45,8 @@ public enum GameActivity: Equatable, Sendable {
                 return percent.map { String(localized: "Updating \($0)") } ?? String(localized: "Updating")
             case .updateCheck:
                 return String(localized: "Checking for updates")
+            case .runtimeRepair:
+                return String(localized: "Repairing")
             case .runtime, .bottle, .client, .clientUpdate, .installing, nil:
                 return String(localized: "Installing")
             }

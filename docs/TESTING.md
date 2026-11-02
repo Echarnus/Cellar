@@ -56,6 +56,12 @@ behind protocols written only for tests:
 
 - **The sandbox** (`TestHome`, `app/Scripts/test.sh`) — `CELLAR_HOME`, `CELLAR_PROFILES_DIR` and
   `CELLAR_APPLICATIONS_DIR` move every byte Cellar writes into a throwaway directory.
+  It can never reach the player's real installation (#204), which `CellarSandbox` enforces three
+  ways. A sandbox that is, sits inside, or contains the real Cellar folder stops the run before
+  its first write. The Wine tiers borrow the machine's runners as **APFS clones**, never links,
+  because a link is how a fake `wine` once landed in the real WineForge (#190). And
+  `app/Scripts/runner-guard.sh` fingerprints the real runners before and after every
+  `test.sh` run, failing the run and naming each file if anything changed.
 - **Profile fixtures** (`TestHome.writeProfile`/`plan`) — a game is a TOML string, resolved through
   the same `Game.plan` the app uses.
 - **A fake game on disk** (`TestHome.installFakeGame`) — the bytes of a PE header where the profile
@@ -102,6 +108,39 @@ becomes required once it has run green across a week of PRs. The required set li
 `.github/rulesets/main.json`, which is imported into the repository settings by hand.
 
 ---
+
+## `cellar verify`: does the game actually work?
+
+Every tier above proves Cellar's code. None of them proves that a game works on a Mac, and that
+gap is where broken deliveries came from (#203). `cellar verify <slug>` closes it. It starts the
+game through the real Play path, watches it, closes it, and writes a report with a **PASS**,
+**FAIL** or **COULD NOT CHECK** for each check. Nobody has to watch the run.
+
+```sh
+cellar verify planet-coaster-2                   # one launch, up for 5 minutes
+cellar verify planet-coaster-2 --runs 3 --minutes 10
+```
+
+The baseline is the same for every game and never opt-in. The IDs are shared with
+`docs/DELIVERY-CHECKLIST.md`:
+
+| ID | Passes when |
+|---|---|
+| `signed-in` | the store signed in by itself, as the player's account, with no sign-in window. Read from Steam's `connection_log.txt`. Battle.net can't be read, so it answers could-not-check |
+| `steam-online` | Steam logged on, stayed connected, and is not in offline mode (`loginusers.vdf`) |
+| `launch` | Play started the game |
+| `stays-up` | the game's process stayed up for the whole run, with no crash reporter (looked for 15 s after an exit too), no crash dump written under the bottle's `drive_c/users`, and no Wine crash in its log. A quiet exit says so, with the end of the Wine log as evidence |
+| `game-online` | the game's **own process** held connections to the internet (`lsof`), to every `online_hosts` server, with no Schannel or certificate errors in its Wine log, and none of the profile's `online_errors` in that log or a crash dump's comment. A bottle probe passing is not enough |
+| `dlc` | (Steam) the bottle's Steam records the game fully installed (`appmanifest` `StateFlags 4`) and, for a copy Cellar downloaded, lists every depot that came down, so `BIsDlcInstalled` says yes. Could-not-check when the bottle has no Steam client |
+| `dock` | while the game ran (`lsappinfo list`), the Dock held the game under its own name from its own `.app`, and no `wine`, no Steam, nothing else started from the runner |
+| `settings-match` | the bottle overrides none of the profile's switches, and the game runs in the Mac's language. A player's own change fails it by name: then what was verified isn't what ships |
+| `clean-exit` | after closing, nothing that runs the bottle's runner is left |
+| `real-install-untouched` | every runner file games start from has the checksum it had before |
+
+The report folder is `~/Library/Application Support/Cellar/verify/<slug>/<time>/`, holding
+`report.md`, `report.json` and a screenshot per launch. The command exits 0 only when every check
+passed, 1 on a failure and 2 when something could not be checked. Ctrl-C (or SIGTERM) stops it the tidy way: the run under way is closed down (game, store, Wine), and the report keeps every finished run plus an `interrupted` check that is never a pass; a second Ctrl-C (or a SIGTERM right after the first) stops it at once, still ending everything in the bottle (`wineserver -k`, Steam included) and rewriting the report with the run under way marked as cut off. The report is also rewritten after each run, so even a verify that is killed outright leaves the runs it finished. The judgements are covered by
+`VerificationTests`, and one whole run against the fake Wine by `VerifyRunTests`.
 
 ## The tiers
 
@@ -224,8 +263,12 @@ the game down through **`Game.fetchDepot`**, and start it.
   running instead. Translation is the only way it can start on this Mac. This is the property that
   makes it evidence rather than a smoke test.
 - **Single-player, no third-party DRM** — Steam publishes no `drm_notice` and no
-  `ext_user_account_notice` for it — so it takes Cellar's store-free route and the test watches the
-  game's own process instead of a client that spawned it.
+  `ext_user_account_notice` for it. Its online half (Steam Cloud, the timed events) goes through
+  Steamworks, though, so it runs beside the bottle's Steam client, signed in with the session Cellar
+  hands over: the tier sets the client up, launches through the beside-Steam route
+  (`.steamAlongside`) and watches the game's own process, which puts the hand-over under test too.
+  A title pointed at with `CELLAR_IT_STEAM_SLUG` that needs no live session still takes the
+  store-free route.
 
 It runs the profile the repo actually ships (`profiles/fallout-shelter.toml`), not a fixture. That is
 the point: when this tier passes, that file is correct. Step 5 is the one worth knowing about — it

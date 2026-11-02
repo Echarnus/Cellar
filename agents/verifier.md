@@ -66,6 +66,11 @@ comes from its install on this machine (`StoreIcon.swift`), with Cellar's own ve
 controls have both `.accessibilityLabel` and `.help`. **Evidence: a screenshot of the changed screen
 from a launched build** — a diff is not evidence about an interface.
 
+**2c. The delivery checklist** ([`../docs/DELIVERY-CHECKLIST.md`](../docs/DELIVERY-CHECKLIST.md)):
+every line that applies is answered yes with evidence in the PR (a `cellar verify` report for the G
+lines), and every line marked `n/a:` really cannot apply. A G line ticked without a report, or a
+"please check" left for Kenneth, is a FAIL.
+
 **3. It enforces the hard project rules** ([`../AGENTS.md`](../AGENTS.md) → *Hard project rules*):
 no bundled D3DMetal or game files; no DRM/anti-cheat circumvention; nothing that should be gitignored
 is being committed; commit messages carry no attribution trailers.

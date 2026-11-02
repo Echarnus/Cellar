@@ -44,7 +44,7 @@ both use them.
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
 | `app/Shim/` | `cellar-dock-shim.c` — the one piece of C in the repo. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts. Built by `app/Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
 | `app/Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `release-notes.py` (a release's notes, from the issues it closed), `test.sh` (the test runner), `coverage.py` (the coverage ratchet), `check-pr.py` (the PR checklist). |
-| `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`, `TESTING.md`. |
+| `docs/` | `ARCHITECTURE.md`, `APP-ARCHITECTURE.md` (code layering + migration plan), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`, `TESTING.md`, `DELIVERY-CHECKLIST.md`. |
 | `.github/` | Workflows (`ci`, `pr-checklist`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
 
@@ -113,6 +113,13 @@ verifying, and if you cannot verify, say so and name what needs manual checking.
    reading the diff. Site changes are verified by generating and opening `pages/dist/index.html`.
 
 Full map, including how to point tiers C and D at a specific game: [`docs/TESTING.md`](docs/TESTING.md).
+
+**Then the delivery checklist.** The ladder proves the code; [`docs/DELIVERY-CHECKLIST.md`](docs/DELIVERY-CHECKLIST.md)
+proves the delivery. It is one yes/no line for every way a delivery has reached Kenneth broken
+(Steam asking to sign in, Steam offline, the Workshop unreachable, the crash reporter, missing DLC,
+"wine" in the Dock, a Terminal command for the player…), each with how it is checked, mostly by
+`cellar verify`. Nothing is called done, and no release is cut, until every line that applies is a
+yes with evidence. The PR template carries it and *PR checklist* enforces it.
 The [verifier agent](agents/verifier.md) codifies these demands per kind of change.
 
 ### Every change arrives tested — no exceptions for AI authors
@@ -127,6 +134,9 @@ an AI agent, is the one who proves it works, in the PR, before anyone else spend
   ladder; tick only the rungs you actually climbed and paste the evidence (test count, command
   output, screenshot). A rung you could not climb stays unticked, with who has to climb it. An agent
   without a Mac says so — CI then is the build, and the PR says that too.
+- **A fixed bug stays fixed.** Every fix and every lesson gets a regression test (or a `cellar verify`
+  check), and a row in [`docs/REGRESSIONS.md`](docs/REGRESSIONS.md) naming it. A release builds
+  only when all of them pass, the Wine tiers included.
 - **Coverage only goes up.** `sh app/Scripts/test.sh --coverage` measures CellarDomain, CellarData and CellarUI and
   fails below `app/tests/coverage-baseline.json`. When a change raises it, raise the baseline in the same
   PR (`python3 app/Scripts/coverage.py --update <report>`).

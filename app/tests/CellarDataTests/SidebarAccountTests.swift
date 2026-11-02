@@ -9,19 +9,23 @@ struct SidebarAccountTests {
 
     // MARK: - The account button
 
+    /// Every store, as if all three were offered — these tests are about the button's shape, not
+    /// about which stores a release ships with (that is `StoreAvailabilityTests`).
+    private let all = GameStore.inLibraryOrder
+
     @Test("With nothing connected the button is the invitation to sign in, naming the stores")
     func signedOut() {
-        let summary = AccountSummary(connected: [], steam: .signedOut)
+        let summary = AccountSummary(connected: [], steam: .signedOut, offered: all)
         #expect(summary.tone == .signedOut)
         #expect(summary.title == "Sign in")
-        #expect(summary.detail == "Steam, GOG or Battle.net")
+        #expect(summary.detail == "Steam, Battle.net or GOG")
         #expect(summary.stores.isEmpty)
     }
 
     @Test("Signed in to Steam, the button names the Steam account and every connected store in library order")
     func steamAccountNamed() {
         let steam = SteamSignInState.signedIn(account: "kenneth", days: 3, aging: false)
-        let summary = AccountSummary(connected: [.gog, .steam], steam: steam)
+        let summary = AccountSummary(connected: [.gog, .steam], steam: steam, offered: all)
         #expect(summary.tone == .connected)
         #expect(summary.title == "kenneth")
         #expect(summary.stores == [.steam, .gog])
@@ -30,7 +34,7 @@ struct SidebarAccountTests {
 
     @Test("Without a Steam name the title says whose accounts these are, never a bare store name")
     func noSteamName() {
-        let summary = AccountSummary(connected: [.battlenet], steam: .signedOut)
+        let summary = AccountSummary(connected: [.battlenet], steam: .signedOut, offered: all)
         #expect(summary.tone == .connected)
         #expect(summary.title == "Your accounts")
         #expect(summary.detail == "Battle.net")
@@ -38,7 +42,7 @@ struct SidebarAccountTests {
 
     @Test("An expired Steam session is said out loud, as that account, even beside a working store")
     func expiredSteam() {
-        let summary = AccountSummary(connected: [.gog], steam: .expired(account: "kenneth", reason: "revoked"))
+        let summary = AccountSummary(connected: [.gog], steam: .expired(account: "kenneth", reason: "revoked"), offered: all)
         #expect(summary.tone == .needsAttention)
         #expect(summary.title == "kenneth")
         #expect(summary.detail == "Steam sign-in expired")

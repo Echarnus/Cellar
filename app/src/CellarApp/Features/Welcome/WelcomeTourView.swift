@@ -85,7 +85,7 @@ struct WelcomeTourView: View {
                         detail: String(localized: "Cellar builds a small Windows environment per game — Wine, plus Apple's D3DMetal — and translates the game's graphics to Metal as it runs."))
                 FactRow(symbol: "person.badge.shield.checkmark", tint: .blue,
                         title: String(localized: "Games you already own"),
-                        detail: String(localized: "Everything installs from your own Steam, Battle.net or GOG account. Cellar doesn't host, sell or unlock anything."))
+                        detail: String(localized: "Everything installs from your own \(StoreAvailability.phrase()) account. Cellar doesn't host, sell or unlock anything."))
                 FactRow(symbol: "heart", tint: .red,
                         title: String(localized: "Free and open source"),
                         detail: String(localized: "GPL-3.0, no account with us, no telemetry. Not affiliated with Valve, Blizzard, GOG or Apple."))
@@ -105,7 +105,9 @@ struct WelcomeTourView: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 StepRow(number: 1, title: String(localized: "Sign in to the store"),
-                        detail: String(localized: "A game comes from Steam, Battle.net or GOG. One sign-in covers every game from that store — you are not asked again per game."))
+                        detail: GameStore.offered.count == 1
+                            ? String(localized: "Every game comes from your \(StoreAvailability.phrase()) account. You sign in once, and it covers every game — you are not asked again per game.")
+                            : String(localized: "A game comes from \(StoreAvailability.phrase()). One sign-in covers every game from that store — you are not asked again per game."))
                 StepRow(number: 2, title: String(localized: "Install"),
                         detail: String(localized: "One button. Cellar gets the Windows runtime, builds the game its own bottle and downloads it — with a progress bar. The first game takes a few extra minutes; the ones after are quick."))
                 StepRow(number: 3, title: String(localized: "Play"),

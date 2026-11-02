@@ -6,7 +6,7 @@ struct RunnerCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "runner",
         abstract: "Manage Wine runners (the builds Cellar runs games through).",
-        subcommands: [List.self, Install.self]
+        subcommands: [List.self, Install.self, Check.self]
     )
 
     struct List: ParsableCommand {
@@ -60,6 +60,37 @@ struct RunnerCommand: ParsableCommand {
             let install = try RunnerManager.install(spec) { print("  " + Term.dim($0)) }
             let version = WineRunner(install: install, prefix: Paths.runners).wineVersion()
             print(Term.green("Installed.") + Term.dim("  \(version.isEmpty ? install.wineBinary.lastPathComponent : version)"))
+        }
+    }
+
+    /// What Play does before every launch, on demand: check the runner against the checksums
+    /// recorded when it was installed, and replace it when it is damaged (`RunnerIntegrity`).
+    struct Check: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Check a runner's files and repair it if any are damaged (Play does this by itself).")
+
+        @Argument(help: "Runner id (default: \(RunnerCatalog.defaultID)).")
+        var id: String = RunnerCatalog.defaultID
+
+        @Flag(help: "Only report; don't repair.")
+        var noRepair = false
+
+        func run() throws {
+            guard RunnerCatalog.spec(forID: id) != nil else {
+                let options = RunnerCatalog.all.map(\.id).joined(separator: ", ")
+                throw CellarError.invalidArgument("Unknown runner '\(id)'. Options: \(options)")
+            }
+            switch RunnerIntegrity.check(runnerID: id) {
+            case nil:
+                print(Term.dim("\(id) isn't installed. Install it: cellar runner install \(id)"))
+            case .intact?:
+                print(Term.green("✓") + " \(id) is intact.")
+            case .damaged(let files)?:
+                print(Term.yellow("\(id) is damaged: ") + files.joined(separator: ", "))
+                guard !noRepair else { throw ExitCode(1) }
+                try RunnerIntegrity.ensureIntact(runnerID: id, progress: { print("  " + Term.dim($0)) })
+                print(Term.green("✓") + " \(id) is repaired.")
+            }
         }
     }
 }

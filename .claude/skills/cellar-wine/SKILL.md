@@ -12,8 +12,8 @@ receipts there. Key rules:
 - **Never bundle D3DMetal** (Apple's, user-supplied, grafted at runtime), never commit bottles,
   runners, depots or logs, never circumvent DRM or anti-cheat.
 - **Launching Wine — do not regress:** don't wrap it in `/usr/bin/arch -x86_64` (SIP strips `DYLD_*`
-  and the runner's dylibs stop resolving); **inherit** the caller's environment then **strip** any
-  `WINE*`/`DYLD_*`/`D3DM*`/`MTL_*`/`GST_*`/`GRAPHICS_BACKEND` it carried; **merge**
+  and the runner's dylibs stop resolving); **inherit** only the allow-listed session basics of the
+  caller's environment (`ChildEnvironment`: no other runner's `WINE*`/`DYLD_*`, no secrets, #238); **merge**
   `WINEDLLOVERRIDES`, never assign over it (a plain assignment silently drops the backend and the
   game launches on the wrong renderer). A *bare* environment makes PC2 exit silently ~4 s in.
 - **Runner default is WineForge** (Wine 11.17 + D3DMetal 3.0). GPTK 7.7 crash-loops the Steam CEF
@@ -35,3 +35,5 @@ receipts there. Key rules:
   never by a clean build. Record the hardware and OS in the profile's `notes`.
 
 Before reporting done, run the **cellar-verifier** agent.
+
+- **An online feature spins forever** (Workshop "loading...", no TLS error): Wine skips queued APCs in alertable waits on always-signalled file handles. See `skills/wine-and-runners.md` → *A game's online feature spins forever* (#23).

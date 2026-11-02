@@ -9,15 +9,11 @@ import CellarData
 struct Accounts: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "accounts",
-        abstract: "Show which stores you're signed in to, and how to sign in to the rest.",
+        abstract: "Show where you're signed in, and how to sign in where you aren't.",
         discussion: """
-        Each store answers "who is signed in?" differently, and Cellar reports exactly what it can
-        actually check — never a ✓ for a guess:
-
-          Steam       one sign-in, by QR, held by Cellar. It covers what you own and what it can
-                      download. Sessions expire; this says so when one has.
-          GOG         Cellar holds the OAuth token, so it knows the account name.
-          Battle.net  publishes nothing readable. Cellar never claims to know.
+        Cellar reports exactly what it can actually check — never a ✓ for a guess. Steam is one
+        sign-in, by QR, held by Cellar: it covers what you own and what Cellar can download.
+        Sessions expire, and this says so when one has.
         """)
 
     func run() throws {
@@ -41,7 +37,13 @@ struct Accounts: ParsableCommand {
             print("    " + Term.dim("Windows Steam client: signed in as \(inBottle), for games whose DRM needs it running"))
         }
 
-        // GOG — a token Cellar owns, so the account name is a fact.
+        // Battle.net and GOG are hidden while the release is Steam only (`StoreAvailability`).
+        if GameStore.gog.isOffered { gogRow() }
+        if GameStore.battlenet.isOffered { battleNetRow() }
+    }
+
+    // GOG — a token Cellar owns, so the account name is a fact.
+    private func gogRow() {
         if GOGAuth.isSignedIn {
             let name = (try? GOGAuth.username()) ?? GOGAuth.cachedUsername
             if let name {
@@ -53,7 +55,9 @@ struct Accounts: ParsableCommand {
         } else {
             row(state: .no, store: "GOG", detail: "not signed in — cellar gog login")
         }
+    }
 
+    private func battleNetRow() {
         // Battle.net — the honest row. Blizzard publishes no readable signed-in state, so this is a
         // `·` forever and never a ✓ or a ✗ (see skills/ux.md, "Honesty is a UX rule"). The only
         // thing that varies is whether the player has told Cellar the account exists, which is what

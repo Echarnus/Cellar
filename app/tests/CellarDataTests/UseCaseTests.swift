@@ -98,8 +98,33 @@ struct UseCaseTests {
         let library = LoadLibrary(slugs: { [plan.slug, "usecase-broken"] }, plan: { slug in
             guard slug == plan.slug else { throw CellarError.invalidArgument("no such profile") }
             return plan
-        })
+        }, stores: [.gog])
         #expect(library.summaries().map(\.slug) == [plan.slug])
+    }
+
+    @Test("LoadLibrary leaves out every game whose store this build doesn't offer — not withheld, gone")
+    func loadLibraryHidesStoresNotOffered() throws {
+        let steam = try TestHome.plan("[game]\nname = \"Offered Steam Game\"\nstore = \"steam\"\nsteam_appid = \"2210\"",
+                                      slug: "usecase-offered-steam")
+        let bnet = try TestHome.plan("[game]\nname = \"Hidden Battle.net Game\"\nstore = \"battlenet\"",
+                                     slug: "usecase-hidden-bnet")
+        let gog = try TestHome.plan("[game]\nname = \"Hidden GOG Game\"\nstore = \"gog\"", slug: "usecase-hidden-gog")
+        let plans = [steam, bnet, gog]
+        func library(_ stores: Set<GameStore>) -> LoadLibrary {
+            LoadLibrary(slugs: { plans.map(\.slug) }, plan: { slug in
+                guard let plan = plans.first(where: { $0.slug == slug }) else {
+                    throw CellarError.invalidArgument("no such profile")
+                }
+                return plan
+            }, stores: stores)
+        }
+
+        #expect(library([.steam]).summaries().map(\.slug) == [steam.slug])
+        #expect(library([.steam]).library().allSatisfy { $0.store == .steam })
+        #expect(library(Set(GameStore.allCases)).summaries().map(\.slug) == plans.map(\.slug))
+        // The default is the build's flag, and the engine's façade still sees every store.
+        #expect(LoadLibrary().stores == StoreAvailability.offered)
+        #expect(Game.summaries().contains { $0.slug == gog.slug })
     }
 
     // MARK: - Uninstall

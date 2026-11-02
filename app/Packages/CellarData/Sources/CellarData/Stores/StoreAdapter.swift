@@ -39,4 +39,15 @@ public protocol StoreAdapter: Sendable {
     func launchThroughClient(_ plan: GamePlan, wine: WineRunner, showHUD: Bool, forceStore: Bool,
                              progress: (String) -> Void, stage: (LaunchStage) -> Void,
                              update: (InstallProgress) -> Void) throws -> LaunchRoute
+
+    // MARK: Verification (#203)
+
+    /// Where the store's own session record stands now, so `cellar verify` reads only what this
+    /// run adds to it. Zero for a store that keeps none.
+    func verificationMark(_ plan: GamePlan) -> UInt64
+    /// The store's baseline checks for one run (`signed-in`, `steam-online`), read from what the
+    /// store wrote since `mark`. `launchSteps` is every sentence the launch reported.
+    func verificationChecks(_ plan: GamePlan, since mark: UInt64, launchSteps: [String]) -> [VerificationCheck]
+    /// Quit the store's client in the bottle, and the bottle's Wine with it.
+    func shutDownClient(_ plan: GamePlan, wine: WineRunner)
 }

@@ -49,12 +49,12 @@ struct FalloutShelterTests {
         #expect(plan.installMethod == "depot", "no store client installs this — Cellar fetches the depot itself")
     }
 
-    @Test("It is a Steam game that needs no live Steam session, which is the whole point of it")
-    func steamGameWithoutLiveSession() throws {
+    @Test("It runs beside a signed-in Steam, because its online half goes through Steamworks")
+    func steamGameNeedsLiveSession() throws {
         let plan = try Self.plan()
         #expect(plan.store == .steam)
-        #expect(plan.needsLiveSession == false,
-                "Steam lists no DRM and no third-party account for 588430; requiring a live client would be inventing one")
+        #expect(plan.needsLiveSession,
+                "with no client running the game logs SteamAPI_Init() failed and shows no connectivity")
         #expect(plan.launchExe == "FalloutShelter.exe")
     }
 
@@ -93,8 +93,8 @@ struct FalloutShelterTests {
         defer { try? fm.removeItem(at: plan.prefix) }
 
         #expect(plan.directLaunchExe?.path == exe.path)
-        #expect(plan.canLaunchStoreFree,
-                "a DRM-free game whose files are present must launch with no client at all")
+        #expect(plan.canLaunchStoreFree == false,
+                "its files are present, but it is started beside Steam, never without it")
     }
 
     // MARK: - Telling the game apart from everything else running
@@ -128,13 +128,7 @@ struct FalloutShelterTests {
         #expect(summary.gameInstalled == false)
         #expect(summary.nextStep == .install)
         #expect(summary.actionTitle == "Install")
-        #expect(summary.actionHint.contains("No Steam window"))
-        #expect(summary.needsLiveSession == false)
-
-        // The step that must *not* appear. This game never talks to a running Steam, so demanding
-        // the Windows client would invent a 1.4 GB detour on the way to a game that does not need it.
-        #expect(summary.nextStep != .setup)
-        #expect(!summary.clientSignInPending)
+        #expect(summary.needsLiveSession)
     }
 
     @Test("It is filed under Steam and wears Steam's artwork")
@@ -162,7 +156,9 @@ struct FalloutShelterTests {
             #expect(notes.count > 20)
         }
         #expect(plan.facts.anticheat == "none")
-        #expect(try #require(plan.facts.drm).lowercased().contains("none"),
-                "Steam publishes no DRM notice for 588430; claiming DRM here would be as wrong as hiding it")
+        let drm = try #require(plan.facts.drm).lowercased()
+        #expect(drm.contains("steamworks"), "it needs the client running, and the fact says why")
+        #expect(drm.contains("no third-party"),
+                "Steam publishes no DRM notice for 588430; claiming third-party DRM would be as wrong as hiding Steamworks")
     }
 }

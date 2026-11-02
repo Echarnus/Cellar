@@ -402,7 +402,8 @@ public enum DepotTool {
         p.executableURL = binary
         p.arguments = args
         p.currentDirectoryURL = root
-        var env = ProcessInfo.processInfo.environment
+        // Only the session basics, never a secret from the caller's shell (#238).
+        var env = ChildEnvironment.inherited(alsoAllowing: ["DOTNET_"])
         env["HOME"] = home.path
         p.environment = env
         return p

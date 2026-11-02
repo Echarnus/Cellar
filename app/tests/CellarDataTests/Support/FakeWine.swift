@@ -34,6 +34,8 @@ enum FakeWine {
         }
         try write(script(tool: "wine"), to: install.wineBinary)
         try write(script(tool: "wineserver"), to: install.binDirectory.appendingPathComponent("wineserver"))
+        // The scripts are this sandbox's runner now; recorded so Play's integrity check accepts them.
+        try RunnerIntegrity.record(install)
         return install
     }
 
@@ -72,7 +74,7 @@ enum FakeWine {
         {
           echo "--- call \(tool)"
           for arg in "$@"; do echo "arg=$arg"; done
-          env | grep -E '^(WINE|LANG=|LC_ALL=|GRAPHICS_BACKEND=|CELLAR_|FIXTURE_)'
+          env | grep -E '^(WINE|LANG=|LC_ALL=|GRAPHICS_BACKEND=|CELLAR_|FIXTURE_|CLAUDE_|ANTHROPIC_|GITHUB_|AWS_|SSH_AUTH_SOCK=)'
         } >> '\(log.path)'
         case "$1" in
           *.exe) if [ -f "$1.lifetime" ]; then sleep "$(cat "$1.lifetime")"; fi ;;

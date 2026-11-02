@@ -1,0 +1,52 @@
+# Cellar game profile — Deadlock
+#
+# Valve's Source 2 hero shooter, in an invite-only playtest and on Steam's Most Played chart
+# (148K players, 2026-11-01). There is no Mac version: AppleGamingWiki rates the native route
+# unplayable and CrossOver and Whisky playable. Facts below are from the Steam store page and
+# SteamDB's config for app 1422450, read 2026-11-01.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "deadlock"
+name          = "Deadlock"
+developer     = "Valve"
+publisher     = "Valve"
+steam_appid   = 1422450
+engine        = "Source 2"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "playtest (no release date announced)"
+store         = "steam"
+
+[compatibility]
+# Valve's store page names no anti-cheat for it, and none of it is kernel-level that anyone reports.
+# Only a player Valve let into the playtest owns it: Steam's ownership check is what decides.
+anticheat                   = "none published by Valve"
+drm                         = "Steamworks (needs a running Steam client)"
+needs_live_session          = true
+requires_account            = "Steam, with access to the playtest (friend invite from a playtester)"
+online                      = "online only; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. AppleGamingWiki rates it playable through CrossOver 24.0.5 and through Whisky on Apple Silicon. It is still a playtest: Valve changes it often, and access is by friend invite only."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# The Windows build renders through DirectX 11 by default. D3DMetal first, DXVK as the second route.
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 1422450
+# Steam's Windows launch option: game\bin\win64\deadlock.exe with -steam -console.
+install_dir = "Deadlock"
+exe         = "game/bin/win64/deadlock.exe"
+
+[legal]
+drm_circumvention = "never"

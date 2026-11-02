@@ -32,8 +32,26 @@ public enum GameApp {
 
     /// Where the game apps live. Not `~/Applications`: these are runtime plumbing, not something
     /// to open from Finder — double-clicking one would run Wine with no program.
-    public static func bundleURL(slug: String) -> URL {
+    public static func bundleURL(name: String, slug: String) -> URL {
+        Paths.gameApps.appendingPathComponent("\(fileName(for: name, slug: slug)).app", isDirectory: true)
+    }
+
+    /// Where versions before the bundle took the game's name kept it: `<slug>.app`. The Dock names
+    /// a running app after its bundle's file name, so that one showed "fallout-shelter".
+    static func legacyBundleURL(slug: String) -> URL {
         Paths.gameApps.appendingPathComponent("\(slug).app", isDirectory: true)
+    }
+
+    /// The bundle's file name: the game's own name, exactly as the player reads it, because that is
+    /// what the Dock, ⌘-Tab and Activity Monitor show. A `/` cannot be in a file name and a `:` is
+    /// shown as `/` by Finder, so both become the look-alike characters macOS uses in their place.
+    static func fileName(for name: String, slug: String) -> String {
+        let cleaned = name
+            .replacingOccurrences(of: "/", with: "\u{2215}")   // ∕ division slash
+            .replacingOccurrences(of: ":", with: "\u{A789}")   // ꞉ modifier letter colon
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, !cleaned.hasPrefix(".") else { return slug }
+        return cleaned
     }
 
     /// How to start the game from its app: the loader to copy into it, the `argv[0]` to give that
@@ -117,7 +135,10 @@ public enum GameApp {
         if ProcessInfo.processInfo.environment[disableVariable] == "1" { return nil }
         guard let loader = loader(for: runnerBinary) else { return nil }
         let fm = FileManager.default
-        let app = bundleURL(slug: slug)
+        let app = bundleURL(name: name, slug: slug)
+        // A bundle from before it took the game's name is replaced by this one, not kept beside it.
+        let legacy = legacyBundleURL(slug: slug)
+        if legacy.standardizedFileURL != app.standardizedFileURL { try? fm.removeItem(at: legacy) }
         let contents = app.appendingPathComponent("Contents", isDirectory: true)
         let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
         let resources = contents.appendingPathComponent("Resources", isDirectory: true)
@@ -127,12 +148,18 @@ public enum GameApp {
             try fm.createDirectory(at: resources, withIntermediateDirectories: true)
             var changed = false
 
-            // A runner update replaces the loader; the copy must follow it, byte for byte.
-            let source = try Data(contentsOf: loader.file)
-            if (try? Data(contentsOf: executable)) != source {
+            // A runner update replaces the loader; the copy must follow it. The copy is re-signed
+            // below, so its bytes no longer match the runner's: what it was copied from is
+            // recorded beside the bundle, and that is what is compared.
+            let sourceHash = try Checksum.sha256(of: loader.file)
+            let stamp = loaderStamp(for: app)
+            if !fm.isExecutableFile(atPath: executable.path)
+                || (try? String(contentsOf: stamp, encoding: .utf8)) != sourceHash {
                 try? fm.removeItem(at: executable)
                 try fm.copyItem(at: loader.file, to: executable)
                 try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+                // Written once the copy is signed: a copy that failed to sign is copied again.
+                try? fm.removeItem(at: stamp)
                 changed = true
             }
 
@@ -154,6 +181,17 @@ public enum GameApp {
             }
 
             if changed {
+                // A signed loader (WineForge 0.6.0.6 and later is Developer-ID signed) carries a
+                // signature over Wine's own Info.plist. Inside this bundle that signature no longer
+                // matches, and macOS kills the process at exec ("Code Signature Invalid") before the
+                // game ever starts. So the bundle is signed again, ad hoc, as itself — what Xcode
+                // does for a local build. An unsigned loader gets the same, which costs nothing.
+                let signed = Shell.run(codesign, ["--force", "--sign", "-", app.path])
+                // A loader that isn't a Mach-O program (a test's script) has nothing for macOS to check.
+                guard signed.succeeded || !RunnerIntegrity.isMachO(executable) else {
+                    throw CellarError.ioFailure("codesign failed: \(signed.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
+                }
+                try sourceHash.write(to: stamp, atomically: true, encoding: .utf8)
                 Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", app.path])
                 let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
                 if fm.fileExists(atPath: lsregister) { Shell.run(lsregister, ["-f", app.path]) }
@@ -166,6 +204,13 @@ public enum GameApp {
             return nil
         }
     }
+
+    /// Where the copied loader's source hash is kept: beside the bundle, never in it, because
+    /// anything written inside a signed bundle after signing breaks its seal.
+    static func loaderStamp(for app: URL) -> URL {
+        app.deletingLastPathComponent().appendingPathComponent(".\(app.lastPathComponent).loader-sha256")
+    }
+    static let codesign = "/usr/bin/codesign"
 
     /// `prepare` for a plan and the runner about to start it.
     public static func prepare(for plan: GamePlan, runner: WineRunner) -> Start? {

@@ -1,4 +1,4 @@
-"""Tests for the Python that guards the repo: the PR checklist and the coverage ratchet.
+"""Tests for the scripts that guard the repo: the PR checklist, the coverage ratchet and the runner guard.
 
     python3 -m unittest discover -s app/tests/Scripts
 
@@ -8,6 +8,8 @@ both are exercised here on the shapes they meet in CI. Standard library only, li
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -35,6 +37,12 @@ Closes #80
 - [x] Tests pass (`sh Scripts/test.sh`)
 - [ ] Wine tiers
 
+## Delivery checklist
+
+- [x] A1 proven: report linked above
+- [ ] G4 stays-up: n/a: this changes no launch path
+- [ ] P5 responsive — n/a: no screen changes in this PR
+
 ## Notes for the release
 """
 
@@ -54,7 +62,8 @@ class PRChecklistTests(unittest.TestCase):
         with open(os.path.join(os.path.dirname(ROOT), ".github", "pull_request_template.md"), encoding="utf-8") as handle:
             template = handle.read()
         found = check_pr.problems(template, ["app/Packages/CellarData/Sources/CellarData/Game.swift"])
-        self.assertEqual(len(found), 3, found)
+        self.assertEqual(len(found), 4, found)
+        self.assertTrue(any("A1 proven" in f and "P5 responsive" in f for f in found), found)
 
     def test_an_issue_link_is_required(self):
         found = check_pr.problems(GOOD.replace("Closes #80", "See the thread."), ["README.md"])
@@ -85,6 +94,40 @@ class PRChecklistTests(unittest.TestCase):
 
     def test_non_swift_changes_do_not_need_tests(self):
         self.assertEqual(check_pr.problems(GOOD, ["docs/TESTING.md", "profiles/witcher-3.toml"]), [])
+
+    def test_the_delivery_checklist_is_answered_for_anything_a_player_gets(self):
+        for path in ("app/src/CellarApp/App/AppModel.swift", "profiles/witcher-3.toml", "app/Shim/cellar-dock-shim.c"):
+            self.assertTrue(check_pr.touches_delivery([path]), path)
+        self.assertFalse(check_pr.touches_delivery(["docs/TESTING.md", ".github/workflows/ci.yml", "pages/gen-site.py"]))
+        body = GOOD[:GOOD.index("## Delivery checklist")] + "## Notes for the release\n"
+        found = check_pr.problems(body, ["profiles/witcher-3.toml"])
+        self.assertTrue(any("## Delivery checklist" in f for f in found), found)
+        self.assertEqual(check_pr.problems(body, ["docs/TESTING.md"]), [])
+
+    def test_an_unticked_delivery_line_needs_a_real_reason(self):
+        files = ["profiles/witcher-3.toml"]
+        for line in ("- [ ] G4 stays-up", "- [ ] G4 stays-up: n/a:", "- [ ] G4 stays-up: n/a: no"):
+            body = GOOD.replace("- [ ] G4 stays-up: n/a: this changes no launch path", line)
+            found = check_pr.problems(body, files)
+            self.assertEqual(len(found), 1, (line, found))
+            self.assertIn("G4 stays-up is unticked", found[0])
+        self.assertEqual(check_pr.problems(GOOD, files), [])
+
+    def test_a_delivery_checklist_without_boxes_fails(self):
+        body = GOOD.replace("- [x] A1 proven: report linked above\n", "").replace(
+            "- [ ] G4 stays-up: n/a: this changes no launch path\n", "").replace(
+            "- [ ] P5 responsive — n/a: no screen changes in this PR\n", "")
+        self.assertTrue(any("has no boxes" in f for f in check_pr.problems(body, ["profiles/witcher-3.toml"])))
+
+    def test_release_notes_never_hand_players_a_command(self):
+        for notes in ("Run `sh app/Scripts/restore.sh` first.", "```\ncellar repair\n```",
+                      "$ xattr -dr com.apple.quarantine Cellar.app", "Paste `cd ~ && cp a b` into Terminal."):
+            body = GOOD + notes + "\n"
+            self.assertTrue(any("Players never need Terminal" in f for f in check_pr.problems(body, [])), notes)
+        fine = GOOD + "Planet Coaster 2 shows all your DLC. The `Repairing` step takes a minute.\n"
+        self.assertEqual(check_pr.problems(fine, []), [])
+        # A command elsewhere in the PR (how it was verified) is evidence, not an instruction to players.
+        self.assertEqual(check_pr.problems(GOOD.replace("Fixes the launch.", "Ran `sh app/Scripts/test.sh`."), []), [])
 
     def test_dependabot_is_exempt(self):
         self.assertEqual(check_pr.problems("Bumps foo.", ["Package.resolved"], author="dependabot[bot]"), [])
@@ -130,5 +173,129 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(set(baseline), set(coverage.TARGETS))
 
 
+class RunnerGuardTests(unittest.TestCase):
+    """`Scripts/runner-guard.sh`: a test run that changes the real runners fails, by name (#204)."""
+
+    def setUp(self):
+        self.real = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.real)
+        self.bin = os.path.join(self.real, "runners", "wineforge", "wine", "bin")
+        unix = os.path.join(self.real, "runners", "wineforge", "wine", "lib", "wine", "x86_64-unix")
+        os.makedirs(self.bin)
+        os.makedirs(unix)
+        self.write(os.path.join(self.bin, "wine"), "the real wine")
+        self.write(os.path.join(self.bin, "wineserver"), "the real wineserver")
+        self.write(os.path.join(unix, "ntdll.so"), "the real ntdll")
+        self.write(os.path.join(unix, "user32.so"), "not guarded")
+        self.snapshot = os.path.join(self.real, "before")
+
+    @staticmethod
+    def write(path, text):
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+
+    def guard(self, mode):
+        env = dict(os.environ, CELLAR_REAL_HOME=self.real)
+        return subprocess.run(["sh", os.path.join(ROOT, "Scripts", "runner-guard.sh"), mode, self.snapshot],
+                              env=env, capture_output=True, text=True, check=False)
+
+    def test_an_untouched_runner_passes(self):
+        self.assertEqual(self.guard("snapshot").returncode, 0)
+        self.assertEqual(self.guard("compare").returncode, 0)
+
+    def test_the_190_write_fails_and_is_named(self):
+        self.guard("snapshot")
+        self.write(os.path.join(self.bin, "wine"), "#!/bin/sh\n# Cellar's fake Wine\nexit 0\n")
+        result = self.guard("compare")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("wineforge/wine/bin/wine\n", result.stderr)
+        self.assertNotIn("wineserver", result.stderr)
+
+    def test_added_and_removed_files_are_named(self):
+        self.guard("snapshot")
+        os.remove(os.path.join(self.bin, "wineserver"))
+        self.write(os.path.join(self.bin, "wine64"), "new")
+        result = self.guard("compare")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("wineforge/wine/bin/wineserver", result.stderr)
+        self.assertIn("wineforge/wine/bin/wine64", result.stderr)
+
+    def test_files_a_runner_is_not_started_from_are_not_guarded(self):
+        self.guard("snapshot")
+        self.write(os.path.join(self.real, "runners", "wineforge", "wine", "lib", "wine", "x86_64-unix", "user32.so"), "x")
+        self.assertEqual(self.guard("compare").returncode, 0)
+
+    def test_a_mac_with_no_cellar_passes(self):
+        shutil.rmtree(os.path.join(self.real, "runners"))
+        self.assertEqual(self.guard("snapshot").returncode, 0)
+        self.assertEqual(self.guard("compare").returncode, 0)
+
+    def test_the_test_runner_uses_the_guard(self):
+        with open(os.path.join(ROOT, "Scripts", "test.sh"), encoding="utf-8") as handle:
+            script = handle.read()
+        self.assertIn("runner-guard.sh snapshot", script)
+        self.assertIn("runner-guard.sh compare", script)
+        self.assertLess(script.index("runner-guard.sh snapshot"), script.index("swift test --no-parallel"))
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class LocalSignIdentityTests(unittest.TestCase):
+    """`Scripts/local-sign-identity.sh`: a build from source is signed so the keychain keeps trusting it (#242)."""
+
+    def identity(self, listing, override=None):
+        bin_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, bin_dir)
+        with open(os.path.join(bin_dir, "security"), "w", encoding="utf-8") as handle:
+            handle.write("#!/bin/sh\ncat <<'LIST'\n" + listing + "\nLIST\n")
+        os.chmod(os.path.join(bin_dir, "security"), 0o700)
+        env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ.get("PATH", ""))
+        env.pop("CELLAR_LOCAL_SIGN_IDENTITY", None)
+        if override is not None:
+            env["CELLAR_LOCAL_SIGN_IDENTITY"] = override
+        script = os.path.join(ROOT, "Scripts", "local-sign-identity.sh")
+        result = subprocess.run(["sh", "-c", f'. "{script}" >/dev/null; printf %s "$LOCAL_SIGN_IDENTITY"'],
+                                env=env, capture_output=True, text=True, check=True)
+        return result.stdout
+
+    DEV = "A" * 40
+    LISTING = (f'  1) {"B" * 40} "Developer ID Application: Kenneth (TEAM123456)"\n'
+               f'  2) {DEV} "Apple Development: kenneth@example.com (TEAM123456)"\n'
+               "     2 valid identities found")
+
+    def test_an_apple_development_identity_is_used(self):
+        self.assertEqual(self.identity(self.LISTING), self.DEV, "never ad-hoc when the Mac has one, never Developer ID")
+
+    def test_no_identity_falls_back_to_ad_hoc(self):
+        self.assertEqual(self.identity("     0 valid identities found"), "-")
+
+    def test_an_override_wins(self):
+        self.assertEqual(self.identity(self.LISTING, override="-"), "-")
+
+    def test_the_installer_signs_the_cli_with_its_stable_identifier(self):
+        with open(os.path.join(ROOT, "Scripts", "install-app.sh"), encoding="utf-8") as handle:
+            script = handle.read()
+        self.assertIn(". Scripts/local-sign-identity.sh", script)
+        self.assertIn('local_sign .build/release/cellar "$CELLAR_CLI_IDENTIFIER"', script)
+
+
+class RegressionLedgerTests(unittest.TestCase):
+    """`docs/REGRESSIONS.md`: every fixed bug names a test, and that test exists (Kenneth, 2026-11-02)."""
+
+    def test_every_listed_test_exists(self):
+        import re
+        with open(os.path.join(os.path.dirname(ROOT), "docs", "REGRESSIONS.md"), encoding="utf-8") as handle:
+            rows = [line for line in handle if re.match(r"^\| #\d+ ", line)]
+        self.assertGreater(len(rows), 10)
+        tests = os.path.join(ROOT, "tests")
+        for row in rows:
+            found = re.search(r"`([\w+.]+\.(?:swift|py))` › `(\w+)`", row)
+            self.assertIsNotNone(found, f"no test named in: {row.strip()}")
+            name, func = found.groups()
+            paths = [os.path.join(d, name) for d, _, files in os.walk(tests) if name in files]
+            self.assertTrue(paths, f"{name} not found under app/tests")
+            pattern = f"def {func}(" if name.endswith(".py") else f"func {func}("
+            with open(paths[0], encoding="utf-8") as handle:
+                self.assertIn(pattern, handle.read(), f"{name} has no {func}: {row.strip()}")

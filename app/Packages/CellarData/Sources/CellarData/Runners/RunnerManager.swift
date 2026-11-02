@@ -33,7 +33,7 @@ public enum RunnerManager {
 
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
         for (index, artifact) in spec.artifacts.enumerated() {
-            let ext = artifact.url.hasSuffix(".dmg") ? "dmg" : "tar.xz"
+            let ext = artifact.kind == .wineserver ? "bin" : artifact.url.hasSuffix(".dmg") ? "dmg" : "tar.xz"
             let archive = Paths.cache.appendingPathComponent("\(spec.id)-\(index).\(ext)")
             if !fm.fileExists(atPath: archive.path) {
                 progress("Downloading \(artifact.url)")
@@ -44,6 +44,13 @@ public enum RunnerManager {
             }
             // Fresh or cached, nothing is unpacked until it is the exact file this build pinned.
             try Checksum.verify(archive, sha256: artifact.sha256, what: artifact.url)
+
+            if artifact.kind == .wineserver {
+                progress("Installing Cellar's wineserver…")
+                try placeWineserver(archive, in: dest)
+                try? fm.removeItem(at: archive)
+                continue
+            }
 
             if artifact.kind == .wineDMG {
                 progress("Copying Wine out of \(archive.lastPathComponent)…")
@@ -62,7 +69,7 @@ public enum RunnerManager {
             try Archive.extractTar(archive, to: staging)
 
             switch artifact.kind {
-            case .wineDMG:
+            case .wineDMG, .wineserver:
                 break // handled above
             case .d3dmetalFromTemplate:
                 let payload = staging.appendingPathComponent(artifact.payloadPath)
@@ -94,10 +101,32 @@ public enum RunnerManager {
             throw CellarError.ioFailure(
                 "Could not find '\(spec.wineBinaryName)' after installing \(spec.displayName).")
         }
-        return RunnerInstall(spec: spec, root: dest, wineBinary: bin)
+        let install = RunnerInstall(spec: spec, root: dest, wineBinary: bin)
+        // Fresh from checksummed downloads: what every later Play checks the runner against.
+        do {
+            try RunnerIntegrity.record(install)
+        } catch {
+            CellarLog.warn(.runner, "Couldn't record \(spec.displayName)'s checksums: \(CellarLog.describe(error))",
+                           subject: spec.id)
+        }
+        return install
     }
 
     // MARK: - Internals
+
+    /// Put a checksummed `wineserver` (a `.wineserver` artifact) in place of the engine's own, at
+    /// `<runner>/wine/bin/wineserver`, executable. The engine has to be unpacked already.
+    static func placeWineserver(_ file: URL, in root: URL) throws {
+        let fm = FileManager.default
+        let bin = root.appendingPathComponent("wine/bin", isDirectory: true)
+        guard fm.fileExists(atPath: bin.path) else {
+            throw CellarError.ioFailure("Cellar's wineserver has no Wine engine to go into at \(bin.path).")
+        }
+        let target = bin.appendingPathComponent("wineserver")
+        try? fm.removeItem(at: target)
+        try fm.copyItem(at: file, to: target)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: target.path)
+    }
 
     /// Find `.../bin/<name>` inside a runner root. Engine runners keep it at `wine/bin/<name>`;
     /// GPTK keeps it at `<app>/Contents/Resources/wine/bin/<name>`.

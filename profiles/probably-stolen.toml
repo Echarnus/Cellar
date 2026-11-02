@@ -1,0 +1,58 @@
+# Cellar game profile — Probably Stolen - Cyberpunk Shopkeeper Sim
+#
+# Questing Goose Studio's pixel-art shop simulator, released 2026-10-28 by tinyBuild and on Steam's
+# Most Played chart (145K players, 2026-11-01). Windows only. Facts below are from the Steam store
+# page and SteamDB's config for app 4348910, read 2026-11-01. The engine is not published.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "probably-stolen"
+name          = "Probably Stolen - Cyberpunk Shopkeeper Sim"
+developer     = "Questing Goose Studio"
+publisher     = "tinyBuild"
+steam_appid   = 4348910
+engine        = "not published"
+graphics_api  = "DirectX 10 or later"
+architecture  = "x86-64"
+released      = "2026-10-28"
+store         = "steam"
+
+[compatibility]
+# The store page lists no third-party DRM and no anti-cheat. Cellar still keeps Steam running
+# beside it until a run shows the game starts without the client.
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Steam lists DirectX 10 as the minimum. A small 2D pixel-art game, so the graphics card is not the concern."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# Steam names DirectX 10 as the minimum. DXVK translates 10 and 11; D3DMetal only 11 and 12, so it
+# is the second route, offered once if DXVK never brings the game up.
+backend           = "dxvk"
+fallback_backend  = "d3dmetal"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 4348910
+install_dir = "Probably Stolen"
+exe         = "Probably Stolen.exe"
+
+[legal]
+drm_circumvention = "never"
+
+[art]
+# Released in 2026, so Steam keeps its art only under the hashed store_item_assets path; the
+# legacy /steam/apps/<id>/library_600x900.jpg the generator derives returns 404. library_capsule is
+# the same 600x900 portrait. Hotlinked from Steam's public CDN, never bundled.
+art_portrait = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4348910/5cb0a6457762778c2c3bcaaa06768bb77cc791a8/library_capsule.jpg"
+art_hero     = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4348910/5c4503e62e9ff9d138d93d972ebd1fe62af114bc/library_hero.jpg"

@@ -11,6 +11,8 @@ import Foundation
 public enum InstallPhase: String, Sendable, CaseIterable {
     /// Downloading and unpacking the Wine runner. Once per Mac, shared by every game.
     case runtime
+    /// Replacing a runner whose files were found damaged before a launch (`RunnerIntegrity`).
+    case runtimeRepair
     /// Creating and initialising the game's bottle.
     case bottle
     /// Installing the store's client into the bottle.
@@ -30,6 +32,7 @@ public enum InstallPhase: String, Sendable, CaseIterable {
     public func title(game: String, store: GameStore) -> String {
         switch self {
         case .runtime:     return String(localized: "Getting the Windows runtime")
+        case .runtimeRepair: return String(localized: "Repairing the Windows runtime")
         case .bottle:      return String(localized: "Building \(game)'s bottle")
         case .client:      return String(localized: "Installing \(store.displayName) into the bottle")
         case .clientUpdate: return String(localized: "Updating \(store.displayName)")
@@ -45,6 +48,8 @@ public enum InstallPhase: String, Sendable, CaseIterable {
         switch self {
         case .runtime:
             return String(localized: "A one-time download, shared by every game you add.")
+        case .runtimeRepair:
+            return String(localized: "Some of its files were damaged, so Cellar is downloading a fresh copy. Your games and saves aren't touched.")
         case .bottle:
             return String(localized: "Windows' folders and settings, just for this game.")
         case .client:

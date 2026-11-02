@@ -40,7 +40,9 @@ struct Doctor: ParsableCommand {
         } else {
             print("  \(Term.dim("·")) Steam        no shared install yet — created by: cellar setup --profile <slug>")
         }
-        if GOGAuth.isSignedIn {
+        if !GameStore.gog.isOffered {
+            // Not offered in this build (`StoreAvailability`), so not a line a player needs.
+        } else if GOGAuth.isSignedIn {
             print("  \(Term.green("✓")) GOG          signed in\(GOGAuth.cachedUsername.map { " as \($0)" } ?? "")")
         } else {
             print("  \(Term.dim("·")) GOG          not signed in — cellar gog login")

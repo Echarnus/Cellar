@@ -22,7 +22,7 @@ struct ProfileCommand: ParsableCommand {
             // Grouped by store, because "which client does this need?" is the first thing you
             // want to know about a game and the thing that decides every command that follows.
             let plans = profiles.compactMap { try? Game.plan(slug: $0.slug) }
-            for store in GameStore.allCases.sorted(by: { $0.sortIndex < $1.sortIndex }) {
+            for store in GameStore.offered {
                 let inStore = plans.filter { $0.store == store }
                 guard !inStore.isEmpty else { continue }
                 print(Term.bold(store.descriptor.sectionTitle))

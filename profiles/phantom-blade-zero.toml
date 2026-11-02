@@ -1,0 +1,60 @@
+# Cellar game profile — Phantom Blade Zero
+#
+# S-GAME's Unreal Engine 5 action RPG, released 2026-10-28 and number two on Steam's Most Played
+# chart (784K players, 2026-11-01). Windows only. Facts below are from the Steam store page and
+# SteamDB's config for app 4115450, read 2026-11-01.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "phantom-blade-zero"
+name          = "Phantom Blade Zero"
+developer     = "S-GAME Studio"
+publisher     = "S-GAME Publishing"
+steam_appid   = 4115450
+engine        = "Unreal Engine 5"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2026-10-28"
+store         = "steam"
+
+[compatibility]
+# Denuvo is anti-tamper DRM, not anti-cheat: it runs in user space, through the layer, and wants a
+# running Steam session at launch. The store page lists no anti-cheat; it is single-player.
+anticheat                   = "none (single-player)"
+drm                         = "Denuvo Anti-Tamper + Steamworks"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 12 only, so Cellar has one way to run it and no second option to offer if it does not start. A 145 GB download. Denuvo counts hardware changes, so moving the game between Macs can use up activations."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DirectX 12 only: DXVK and DXMT stop at DX11 and no VKD3D-Proton build ships with the runners, so
+# there is deliberately no fallback_backend that could never start it (as for Kingdom Come II).
+backend           = "d3dmetal"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 4115450
+# Steam's only launch option is steam\PBZ.exe under the PBZ folder. An Unreal game's real binary
+# usually sits deeper, under Binaries/Win64; the install_dir needle catches it either way.
+install_dir = "PBZ"
+exe         = "steam/PBZ.exe"
+
+[legal]
+# Denuvo runs untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
+
+[art]
+# Released in 2026, so Steam keeps its art only under the hashed store_item_assets path; the
+# legacy /steam/apps/<id>/library_600x900.jpg the generator derives returns 404. library_capsule is
+# the same 600x900 portrait. Hotlinked from Steam's public CDN, never bundled.
+art_portrait = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4115450/471e77854910665c03eb9a53ad06f2ac12903acd/library_capsule.jpg"
+art_hero     = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4115450/1cd52ca84a3d974c4206e9cb90231956324c5999/library_hero.jpg"

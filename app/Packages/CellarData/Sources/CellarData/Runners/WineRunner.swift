@@ -50,17 +50,18 @@ public struct WineRunner {
     /// (`FastSync`) — WineForge wants `WINEWFUSYNC`, Sikarugir `WINEMSYNC`/`WINEESYNC`, and a
     /// variable a build does not know is ignored, which is how the default runner ran without any
     /// fast sync until this was measured.
-    public func environment(extra: [String: String] = [:]) -> [String: String] {
+    ///
+    /// `inherited` is the environment Cellar was started from; only its allow-listed part
+    /// (`ChildEnvironment`) reaches Wine, so a token in the caller's shell never reaches a game.
+    public func environment(extra: [String: String] = [:],
+                            inherited: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        // Start from the caller's environment (TMPDIR, USER, LANG, __CF_USER_TEXT_ENCODING…) and
+        // Start from the caller's session basics (TMPDIR, USER, LANG, __CF_USER_TEXT_ENCODING…) and
         // overlay Cellar's variables. A bare environment makes Planet Coaster 2 exit silently ~4 s
-        // after launch; an inherited one runs. Same approach as Proton.
-        var env = ProcessInfo.processInfo.environment
-        // Never let the caller's shell inject Wine/graphics settings from another runner.
-        for key in env.keys where key.hasPrefix("WINE") || key.hasPrefix("DYLD_") || key.hasPrefix("D3DM")
-            || key.hasPrefix("MTL_") || key.hasPrefix("DXMT_") || key == "GRAPHICS_BACKEND" || key.hasPrefix("GST_") {
-            env.removeValue(forKey: key)
-        }
+        // after launch; an inherited one runs. Same approach as Proton. An allow-list, not the
+        // whole environment: Wine/graphics settings from another runner, and any secret in the
+        // caller's shell, never get in (#238).
+        var env = ChildEnvironment.inherited(from: inherited)
         for (k, v) in [
             "WINEPREFIX": prefix.path,
             "WINEDEBUG": "-all",

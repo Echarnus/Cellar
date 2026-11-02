@@ -76,7 +76,9 @@ struct GameAppTests {
         let slug = "pc2-\(UUID().uuidString.prefix(6))".lowercased()
         let start = try #require(GameApp.prepare(name: "Planet Coaster 2", slug: slug,
                                                  runnerBinary: runner.binary, icon: nil))
-        let app = GameApp.bundleURL(slug: slug)
+        let app = GameApp.bundleURL(name: "Planet Coaster 2", slug: slug)
+        // The Dock names a running app after its bundle's file name, not CFBundleName.
+        #expect(app.lastPathComponent == "Planet Coaster 2.app")
         #expect(start.executable.path == app.appendingPathComponent("Contents/MacOS/wine").path)
         #expect(try Data(contentsOf: start.executable) == Data(contentsOf: runner.inner))
         #expect(FileManager.default.isExecutableFile(atPath: start.executable.path))
@@ -99,6 +101,28 @@ struct GameAppTests {
         #expect(!AppBundle.isGenerated(app))
     }
 
+    @Test("The bundle is named as the player reads the game, never after its slug")
+    func bundleTakesTheGamesName() {
+        #expect(GameApp.fileName(for: "Fallout Shelter", slug: "fallout-shelter") == "Fallout Shelter")
+        #expect(GameApp.fileName(for: "Kingdom Come: Deliverance II", slug: "kcd2") == "Kingdom Come\u{A789} Deliverance II",
+                "Finder shows a : in a file name as /")
+        #expect(GameApp.fileName(for: "Half/Life", slug: "hl") == "Half\u{2215}Life", "a / cannot be in a file name")
+        #expect(GameApp.fileName(for: "  ", slug: "blank") == "blank")
+        #expect(GameApp.fileName(for: ".hidden", slug: "dot") == "dot", "a leading dot would hide the bundle")
+    }
+
+    @Test("A bundle named after the slug, from before, is replaced by the one named after the game")
+    func replacesTheSlugNamedBundle() throws {
+        let runner = try wineForgeRunner()
+        let slug = "fallout-shelter-\(UUID().uuidString.prefix(6))".lowercased()
+        let legacy = GameApp.legacyBundleURL(slug: slug)
+        try FileManager.default.createDirectory(at: legacy.appendingPathComponent("Contents/MacOS"),
+                                                withIntermediateDirectories: true)
+        _ = try #require(GameApp.prepare(name: "Fallout Shelter", slug: slug, runnerBinary: runner.binary, icon: nil))
+        #expect(!FileManager.default.fileExists(atPath: legacy.path))
+        #expect(FileManager.default.fileExists(atPath: GameApp.bundleURL(name: "Fallout Shelter", slug: slug).path))
+    }
+
     @Test("A runner update replaces the copied loader")
     func followsRunnerUpdates() throws {
         let runner = try wineForgeRunner()
@@ -108,6 +132,35 @@ struct GameAppTests {
         let second = try #require(GameApp.prepare(name: "Game", slug: slug, runnerBinary: runner.binary, icon: nil))
         #expect(first == second)
         #expect(try String(contentsOf: second.executable, encoding: .utf8).contains("updated"))
+    }
+
+    @Test("A signed loader's copy is signed again as the game's app, so macOS lets it run")
+    func resignsTheCopiedLoader() throws {
+        // WineForge 0.6.0.8's loader is Developer-ID signed over Wine's own Info.plist. Copied into
+        // the game's bundle unchanged, `codesign --verify` said "invalid Info.plist" and macOS
+        // killed every start at exec (Code Signature Invalid): Planet Coaster 2 never appeared,
+        // eight times in a row, on Kenneth's Mac (2026-11-01). Any signed Mach-O stands in for it.
+        let runner = try wineForgeRunner()
+        try FileManager.default.removeItem(at: runner.inner)
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: runner.inner)
+        let slug = "signed-\(UUID().uuidString.prefix(6))".lowercased()
+        let start = try #require(GameApp.prepare(name: "Signed Game", slug: slug, runnerBinary: runner.binary, icon: nil))
+        let app = GameApp.bundleURL(name: "Signed Game", slug: slug)
+
+        let verify = Shell.run(GameApp.codesign, ["--verify", "--strict", app.path])
+        #expect(verify.succeeded, "the bundle's signature holds: \(verify.stderr)")
+        let info = Shell.run(GameApp.codesign, ["-dv", app.path])
+        let details = info.stdout + info.stderr
+        #expect(details.contains("Signature=adhoc"), "signed as the game's app, not the runner's: \(details)")
+        #expect(details.contains("Identifier=it.clercq.cellar.game.\(slug)"))
+        // And it really runs.
+        #expect(Shell.run(start.executable.path, []).succeeded)
+
+        // Signing changes the copy's bytes; that must not read as a runner update on the next Play.
+        let modified = try FileManager.default.attributesOfItem(atPath: start.executable.path)[.modificationDate] as? Date
+        _ = try #require(GameApp.prepare(name: "Signed Game", slug: slug, runnerBinary: runner.binary, icon: nil))
+        #expect(try FileManager.default.attributesOfItem(atPath: start.executable.path)[.modificationDate] as? Date == modified,
+                "an unchanged runner is not copied and signed again on every Play")
     }
 
     @Test("The bundled loader starts with the game's arguments, no re-exec, and its output in the log")
