@@ -9,7 +9,8 @@ Fails (exit 1) on:
   - structure: not exactly one <h1>, a skipped heading level, an <img> without alt, a duplicate
     id, an <input> without a label, a <button> without a type or an accessible name, a missing
     lang or <title>, template text that leaked into the page ({…}), or copy implying a game
-    can come from no store
+    can come from no store, or that names a store the site does not offer yet (gen-site.py's
+    OFFERED; the first release is Steam only) outside a game card's own profile facts
   - a game card whose cover has no <img> (every game ships real cover art; the generated
     placeholder is only what shows if the image fails to load)
   - any palette pair in gen-site.py's CONTRAST table under its WCAG 2.2 AA ratio
@@ -41,6 +42,7 @@ def load_generator():
 
 
 class Page(html.parser.HTMLParser):
+    OFFERED, HIDDEN = (), ()  # names of the stores the site does not offer yet, set from gen-site.py's OFFERED
     VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
     def __init__(self):
@@ -54,6 +56,7 @@ class Page(html.parser.HTMLParser):
         self._raw = 0          # inside <script>/<style>
         self.covers = []       # [line, cover src or None] per game card's .art
         self._art = None       # stack depth of the .art being read
+        self._card = None      # stack depth of the game card being read
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -70,6 +73,10 @@ class Page(html.parser.HTMLParser):
             self.links.append((a["href"], line, "a"))
         if tag == "link" and a.get("rel") in ("icon", "apple-touch-icon", "stylesheet"):
             self.links.append((a.get("href", ""), line, "link"))
+        if tag == "li" and "card" in (a.get("class") or "").split():
+            self._card = len(self._in)
+            if a.get("data-store") not in self.OFFERED:
+                self.problems.append(f"line {line}: a card for a store the site doesn't offer: {a.get('data-store')!r}")
         if tag == "div" and "art" in (a.get("class") or "").split():
             self.covers.append([line, None])
             self._art = len(self._in)
@@ -108,6 +115,8 @@ class Page(html.parser.HTMLParser):
                 pass
         if self._art is not None and len(self._in) <= self._art:
             self._art = None
+        if self._card is not None and len(self._in) <= self._card:
+            self._card = None
 
     def handle_data(self, data):
         if self._raw:
@@ -120,6 +129,12 @@ class Page(html.parser.HTMLParser):
         # a store-less or manual-download path.
         if re.search(r"\bno[- ]store\b|without (a|the|any) store\b|manual download", data, re.I):
             self.problems.append(f"line {self.getpos()[0]}: implies a store-less path: {data.strip()[:60]!r}")
+        # Steam only for now (Kenneth, 2026-11-02): no hidden store in the site's own copy. A card's
+        # facts are its profile's words (a Steam game's DRM may name another account), so they pass.
+        if self._card is None:
+            for name in self.HIDDEN:
+                if re.search(rf"\b{re.escape(name)}\b", data, re.I):
+                    self.problems.append(f"line {self.getpos()[0]}: names {name}, a store the site doesn't offer yet: {data.strip()[:60]!r}")
         if "{" in data or "}" in data:
             self.problems.append(f"line {self.getpos()[0]}: template text leaked into the page: {data.strip()[:60]!r}")
 
@@ -170,6 +185,9 @@ def main():
     args = ap.parse_args()
 
     gen = load_generator()
+    Page.OFFERED = tuple(gen.OFFERED)
+    Page.HIDDEN = tuple(n for k, label in gen.STORES.items() if k not in gen.OFFERED
+                        for n in {label, gen.OWNERS[k]})
     site = os.path.abspath(args.site)
     pages = sorted(glob.glob(os.path.join(site, "*.html")))
     if not pages:
