@@ -11,6 +11,10 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #246 | Skyrim closed at once: the settings files its launcher writes were never made | `FirstRunFilesTests.swift` › `playWritesThemFirst` |
+| #246 | Skyrim's downloaded copy never reached Steam's library while another game's Steam was open | `SteamLibraryEntryOrderTests.swift` › `registersAfterTheHandOverAndBeforeTheClient` |
+| #246 | Skyrim crashed on D3DMetal 3.0 even with its settings; it needs D3DMetal 4 | `FirstRunFilesTests.swift` › `skyrimProfile` |
+| #246 | Every game's failed start read as Planet Coaster 2 hitting "the D3DMetal startup race" | `StartSupervisorTests.swift` › `givingUpNamesTheGame` |
 | #261 | Planet Coaster 2's Workshop never loaded (stock wineserver) | `RunnerIntegrityTests.swift` › `stockWineserverIsDamage` |
 | #248 | macOS killed every game: the copied loader's signature broke | `GameAppTests.swift` › `resignsTheCopiedLoader` |
 | #236 | Steam asked to sign in again after it hung | `SteamClientSignInTests.swift` › `silentThenLoggedOnAfterRestart` |

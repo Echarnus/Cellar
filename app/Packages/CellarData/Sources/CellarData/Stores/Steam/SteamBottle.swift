@@ -504,6 +504,7 @@ public enum SteamBottle {
             Thread.sleep(forTimeInterval: 6) // let login settle
         }
 
+        var everAppeared = false
         for attempt in 1...attempts {
             // Clean slate: kill any half-dead game / crash-reporter from a previous attempt and let
             // wineserver settle, or the next rungameid races even harder.
@@ -525,6 +526,7 @@ public enum SteamBottle {
                 progress("Attempt \(attempt): game didn't start; retrying…")
                 continue
             }
+            everAppeared = true
             // It started — did it survive the startup race? Watch for ~16 s.
             var survived = true
             for _ in 0..<8 {
@@ -535,10 +537,9 @@ public enum SteamBottle {
                 if attempt > 1 { progress("Up after \(attempt) attempts.") }
                 return
             }
-            progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
+            progress(ProcessWatch.closedAsItStarted(attempt: attempt, within: 16))
         }
-        throw CellarError.ioFailure(
-            "Planet Coaster 2 kept hitting the D3DMetal startup race after \(attempts) attempts. Try `cellar launch` again.")
+        throw CellarError.ioFailure(ProcessWatch.gaveUp(game: game, attempts: attempts, appeared: everAppeared))
     }
 
     /// Whether any process whose command line contains `needle` is running (case-insensitive).
@@ -683,6 +684,7 @@ public extension SteamBottle {
             },
             isUp: { ProcessWatch.isRunning(watched) },
             keepWaiting: keepWaiting,
+            game: game,
             progress: progress,
             stage: stage)
     }

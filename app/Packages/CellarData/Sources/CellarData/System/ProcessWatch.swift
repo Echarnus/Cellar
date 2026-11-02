@@ -74,6 +74,11 @@ public enum ProcessWatch {
     ///     Rockstar launcher while the player signs in — so a closed launcher is not waited out.
     ///   - stage: coarse step reporting for the app's launch window; a retry legitimately goes back
     ///     to `.starting`, which is what makes a second attempt visible rather than a stall.
+    ///   - game: the game's name, for the words the player reads.
+    ///
+    /// A game that closes as it starts is *described*, never diagnosed: Cellar sees a process go
+    /// away, not why. Skyrim's eight exits on 2026-11-01 (exit code 54, then 0xC0000005) were all
+    /// logged as "the D3DMetal startup race", which sent the investigation the wrong way.
     public static func superviseStart(attempts: Int,
                                       appearSeconds: Int = 24,
                                       settleSeconds: Int = 16,
@@ -82,8 +87,10 @@ public enum ProcessWatch {
                                       start: () throws -> Void,
                                       isUp: () -> Bool,
                                       keepWaiting: () -> Bool = { true },
+                                      game: String = "The game",
                                       progress: (String) -> Void = { _ in },
                                       stage: (LaunchStage) -> Void = { _ in }) throws {
+        var everAppeared = false
         for attempt in 1...max(1, attempts) {
             cleanup()
             if attempt > 1 { Thread.sleep(forTimeInterval: backoffSeconds) }
@@ -106,6 +113,7 @@ public enum ProcessWatch {
                 continue
             }
 
+            everAppeared = true
             var survived = true
             let settleDeadline = Date().addingTimeInterval(TimeInterval(settleSeconds))
             while Date() < settleDeadline {
@@ -119,12 +127,25 @@ public enum ProcessWatch {
                 }
                 return
             }
-            progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
+            progress(closedAsItStarted(attempt: attempt, within: settleSeconds))
             CellarLog.warn(.launch, "Start attempt \(attempt) of \(attempts): the game appeared and then "
-                + "died inside \(settleSeconds)s — the D3DMetal startup race. Cleaning up and retrying.")
+                + "closed within \(settleSeconds)s. Cleaning up and retrying.")
         }
         CellarLog.error(.launch, "Gave up: the game would not stay up after \(attempts) attempts.")
-        throw CellarError.ioFailure(
-            "The game kept failing to stay up after \(attempts) attempts. Try launching again.")
+        throw CellarError.ioFailure(gaveUp(game: game, attempts: attempts, appeared: everAppeared))
+    }
+
+    /// What the player reads when an attempt came up and then went away. It says what was seen,
+    /// not a cause: the same words fit a graphics crash, a missing settings file or a DRM refusal.
+    static func closedAsItStarted(attempt: Int, within seconds: Int) -> String {
+        "Attempt \(attempt): the game closed within \(seconds) s of starting; cleaning up and retrying…"
+    }
+
+    /// What the player reads after the last attempt: that the game closed as it started, or, if it
+    /// never once appeared, that it never started.
+    static func gaveUp(game: String, attempts: Int, appeared: Bool = true) -> String {
+        appeared
+            ? "\(game) kept closing as it started, \(attempts) attempts in a row. Try launching again."
+            : "\(game) never started, \(attempts) attempts in a row. Try launching again."
     }
 }
