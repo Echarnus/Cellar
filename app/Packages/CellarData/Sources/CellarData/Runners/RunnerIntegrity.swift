@@ -72,17 +72,28 @@ public enum RunnerIntegrity {
 
     /// Check an installed runner. Cheap enough for every Play.
     public static func check(_ install: RunnerInstall) -> Verdict {
+        var damaged: [String]
         if let manifest = readManifest(install.root) {
-            let damaged = manifest.files.keys.sorted().filter { path in
+            damaged = manifest.files.keys.sorted().filter { path in
                 let url = install.root.appendingPathComponent(path)
                 return (try? Checksum.sha256(of: url)) != manifest.files[path]
             }
-            return damaged.isEmpty ? .intact : .damaged(damaged)
+        } else {
+            // No manifest: installed before Cellar recorded one. Only what every runner shares is held.
+            let required = [install.wineBinary, install.binDirectory.appendingPathComponent("wineserver")]
+            damaged = required.filter { !isMachO($0) }.map { relativePath($0, in: install.root) }
         }
-        // No manifest: installed before Cellar recorded one. Only what every runner shares is held.
-        let required = [install.wineBinary, install.binDirectory.appendingPathComponent("wineserver")]
-        let damaged = required.filter { !isMachO($0) }.map { relativePath($0, in: install.root) }
-        return damaged.isEmpty ? .intact : .damaged(damaged)
+        // A runner whose spec pins Cellar's own wineserver has to be running that one: an install
+        // made before the pin (with the engine's stock server, which hangs Frontier's online code,
+        // #23) is repaired onto it like any other damage, whatever its manifest says.
+        for artifact in install.spec.artifacts where artifact.kind == .wineserver {
+            let server = install.binDirectory.appendingPathComponent("wineserver")
+            let path = relativePath(server, in: install.root)
+            if !damaged.contains(path), (try? Checksum.sha256(of: server)) != artifact.sha256.lowercased() {
+                damaged.append(path)
+            }
+        }
+        return damaged.isEmpty ? .intact : .damaged(damaged.sorted())
     }
 
     /// The runner `id` names, checked — including one whose folder is there but whose `wine` is
