@@ -250,7 +250,7 @@ class LocalSignIdentityTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, bin_dir)
         with open(os.path.join(bin_dir, "security"), "w", encoding="utf-8") as handle:
             handle.write("#!/bin/sh\ncat <<'LIST'\n" + listing + "\nLIST\n")
-        os.chmod(os.path.join(bin_dir, "security"), 0o755)
+        os.chmod(os.path.join(bin_dir, "security"), 0o700)
         env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ.get("PATH", ""))
         env.pop("CELLAR_LOCAL_SIGN_IDENTITY", None)
         if override is not None:
