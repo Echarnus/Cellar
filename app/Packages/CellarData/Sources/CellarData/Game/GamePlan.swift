@@ -73,6 +73,9 @@ public struct GamePlan {
     /// `ShowNetworkError`). `cellar verify` fails `game-online` when one shows up in the Wine log or
     /// a crash dump's comment: a connection that opened is not a call that worked (#210).
     public var onlineErrors: [String] = []
+    /// `first_run_files`: settings files the game's own launcher would write before its first run,
+    /// which Cellar writes instead because it starts the game itself (`FirstRunFiles`).
+    public var firstRunFiles: [FirstRunFiles.Copy] = []
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }

@@ -507,6 +507,7 @@ public enum SteamBottle {
             Thread.sleep(forTimeInterval: 6) // let login settle
         }
 
+        var everAppeared = false
         for attempt in 1...attempts {
             // Clean slate: kill any half-dead game / crash-reporter from a previous attempt and let
             // wineserver settle, or the next rungameid races even harder.
@@ -528,6 +529,7 @@ public enum SteamBottle {
                 progress("Attempt \(attempt): game didn't start; retrying…")
                 continue
             }
+            everAppeared = true
             // It started — did it survive the startup race? Watch for ~16 s.
             var survived = true
             for _ in 0..<8 {
@@ -539,7 +541,7 @@ public enum SteamBottle {
                 fallback.stayedUp()
                 return
             }
-            progress("Attempt \(attempt): hit the D3DMetal startup race; cleaning up and retrying…")
+            progress(ProcessWatch.closedAsItStarted(attempt: attempt, within: 16))
             // Steam is the game's parent, so the game has Steam's environment: putting a workaround
             // back means starting the client again with it.
             if attempt < attempts, let restored = fallback.diedStarting(progress: progress) {
@@ -552,8 +554,7 @@ public enum SteamBottle {
                 Thread.sleep(forTimeInterval: 6)
             }
         }
-        throw CellarError.ioFailure(
-            "\(game) kept hitting the D3DMetal startup race after \(attempts) attempts. Press Play to try again.")
+        throw CellarError.ioFailure(ProcessWatch.gaveUp(game: game, attempts: attempts, appeared: everAppeared))
     }
 
     /// Whether any process whose command line contains `needle` is running (case-insensitive).
@@ -709,6 +710,7 @@ public extension SteamBottle {
             diedStarting: { _ in
                 if let restored = fallback.diedStarting(progress: progress) { env = environment(restored) }
             },
+            game: game,
             progress: progress,
             stage: stage)
         fallback.stayedUp()
