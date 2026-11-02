@@ -70,6 +70,11 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   running game holds a connection to each one. That is the check that would have caught the PC2
   Workshop (#23), where every bottle probe passed. Name hosts seen in a run (`lsof` on the game's
   process, or its `wine_debug` trace), never guessed ones.
+  Optional `online_errors` — space-separated words the game writes when an online call fails
+  (Planet Coaster 2: `ShowNetworkError _ShowUnrecoverableError`, from the Lua callstack in its
+  crash dump). `cellar verify` fails `game-online` when one appears in the Wine log or in the
+  comment of a crash dump written during the run, because an open connection is not a call that
+  worked. Use words seen in a real failure, never guessed ones.
   Optional `crash_processes` — space-separated process names of a crash reporter of the game's own
   that `cellar verify` doesn't already know. Frontier's, Unity's, Unreal's, Wine's debugger and
   Steam's are built in (`CrashSigns`).

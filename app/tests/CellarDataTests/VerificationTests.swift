@@ -366,7 +366,7 @@ struct VerifyRunTests {
         let (report, _) = verify(plan, surviveSeconds: 20).run()
         let staysUp = try #require(report.checks.first { $0.id == "stays-up" })
         #expect(staysUp.verdict == .fail)
-        #expect(staysUp.detail.contains("stopped after"))
+        #expect(staysUp.detail.contains("exited quietly after"), "the fake game exits with no crash")
     }
 }
 
@@ -495,13 +495,18 @@ struct BaselineCheckTests {
     @Test("A switch the bottle overrides, or a language other than the Mac's, fails settings-match by name")
     func judgesSettings() {
         let profile = PerformanceSettings.Entry(setting: .metalValidation, value: "true", source: .profile)
-        let bottle = PerformanceSettings.Entry(setting: .metalHUD, value: "true", source: .bottle)
+        let bottle = PerformanceSettings.Entry(setting: .retina, value: "true", source: .bottle)
         let mac = LanguageChoice(language: .english, source: .system)
         #expect(VerifyGame.judgeSettings([profile], language: mac, macLanguage: .english).verdict == .pass)
 
         let overridden = VerifyGame.judgeSettings([profile, bottle], language: mac, macLanguage: .english)
         #expect(overridden.verdict == .fail)
-        #expect(overridden.evidence == ["metal_hud = true is set for this bottle, over the profile"])
+        #expect(overridden.evidence == ["retina = true is set for this bottle, over the profile"])
+
+        let hud = VerifyGame.judgeSettings([profile, PerformanceSettings.Entry(setting: .metalHUD, value: "true", source: .bottle)],
+                                           language: mac, macLanguage: .english)
+        #expect(hud.verdict == .pass, "the HUD only draws on top of the game: the PC2 pilot's false failure")
+        #expect(hud.detail.contains("metal_hud = true"), "but it is still named")
 
         let dutch = VerifyGame.judgeSettings([profile], language: LanguageChoice(language: .dutch, source: .allGames),
                                              macLanguage: .english)
@@ -545,5 +550,114 @@ struct InterruptedVerifyTests {
         watch.interrupted = true
         #expect(VerifyGame.cutShort(failed, watch, failedOnEvidence: false).verdict == .couldNotCheck)
         #expect(VerifyGame.cutShort(failed, watch, failedOnEvidence: true).verdict == .fail)
+    }
+}
+
+/// What the PC2 pilot (#210) showed verify should say better.
+struct PilotFindingsTests {
+    @Test("A quiet exit says it was quiet and carries the end of the Wine log as evidence")
+    func quietExit() {
+        var watch = VerifyGame.Watch()
+        watch.gameSeenRunning = true
+        watch.exitedAfter = 73
+        watch.watchedSeconds = 73
+        let log = (1...30).map { "0124:trace:line \($0)" }.joined(separator: "\n") + "\n\n"
+        let check = VerifyGame.judgeStaysUp(watch, wineLog: log, surviveSeconds: 300, name: "G")
+        #expect(check.verdict == .fail)
+        #expect(check.detail.contains("exited quietly after 73 s"))
+        #expect(check.evidence.count == 20)
+        #expect(check.evidence.last == "0124:trace:line 30")
+    }
+}
+
+/// Crash dumps and the online errors in them (#210): what the PC2 pilot's run 1 left behind.
+struct CrashDumpTests {
+    static let pc2Comment = """
+        GameMain\\Lua\\Managers\\DialogStackManager.lua:259: attempt to index a nil value (field 'ui')
+        LUA[2]@GameMain\\Lua\\Managers\\WebRequestManager.lua(285): method ShowNetworkError:
+        LUA[3]@GameMain\\Lua\\Managers\\FrontierAccountManager.lua(1396): method _ShowUnrecoverableError:
+        LUA[4]@GameMain\\Lua\\Managers\\FrontierAccountManager.lua(968): method _ProcessUpdateUserResult:
+        """
+
+    /// A minidump with a thread-list stream and then a comment stream, laid out as Windows writes them.
+    static func minidump(comment: String?) -> Data {
+        func le(_ value: UInt32) -> [UInt8] { (0..<4).map { UInt8((value >> (8 * $0)) & 0xFF) } }
+        var streams: [(UInt32, [UInt8])] = [(3, [UInt8](repeating: 0, count: 8))]
+        if let comment { streams.append((10, Array(comment.utf8) + [0])) }
+        let directory: UInt32 = 32
+        var data = Array("MDMP".utf8) + le(0xA793) + le(UInt32(streams.count)) + le(directory)
+        data += [UInt8](repeating: 0, count: 16)
+        var rva = directory + UInt32(streams.count * 12)
+        var payload: [UInt8] = []
+        for (type, bytes) in streams {
+            data += le(type) + le(UInt32(bytes.count)) + le(rva)
+            payload += bytes
+            rva += UInt32(bytes.count)
+        }
+        return Data(data + payload)
+    }
+
+    @Test("A minidump's comment stream reads back; one without, or a file that isn't a dump, has none")
+    func readsTheComment() {
+        #expect(CrashDumps.comment(ofMinidump: Self.minidump(comment: Self.pc2Comment)) == Self.pc2Comment)
+        #expect(CrashDumps.comment(ofMinidump: Self.minidump(comment: nil)) == nil)
+        #expect(CrashDumps.comment(ofMinidump: Data("not a dump at all, just some text".utf8)) == nil)
+        var cut = Self.minidump(comment: Self.pc2Comment)
+        cut.removeLast(40)
+        #expect(CrashDumps.comment(ofMinidump: cut) == nil, "a truncated dump is not read past its end")
+    }
+
+    @Test("Only dumps written during the run are found, wherever under the bottle's users they are")
+    func findsNewDumps() throws {
+        let prefix = TestHome.scratch("dump-prefix")
+        let folder = prefix.appendingPathComponent(
+            "drive_c/users/player/AppData/Local/Temp/Frontier Developments/Planet Coaster 2/CrashDumps")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let old = folder.appendingPathComponent("old.dmp")
+        try Self.minidump(comment: "an earlier crash").write(to: old)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: old.path)
+        let since = Date(timeIntervalSinceNow: -5)
+        try Self.minidump(comment: Self.pc2Comment).write(to: folder.appendingPathComponent("f38604a6.dmp"))
+
+        let dumps = CrashDumps.written(in: prefix, since: since)
+        #expect(dumps.map { ($0.path as NSString).lastPathComponent } == ["f38604a6.dmp"])
+        #expect(dumps.first?.comment == Self.pc2Comment)
+    }
+
+    @Test("A crash dump fails stays-up with the dump and its comment as evidence")
+    func dumpFailsStaysUp() {
+        var watch = VerifyGame.Watch()
+        watch.gameSeenRunning = true
+        watch.exitedAfter = 136
+        watch.dumps = [CrashDumps.Dump(path: "/b/CrashDumps/f386.dmp", comment: Self.pc2Comment)]
+        let check = VerifyGame.judgeStaysUp(watch, wineLog: "", surviveSeconds: 300, name: "PC2")
+        #expect(check.verdict == .fail)
+        #expect(check.detail.contains("crash dump") && check.detail.contains("136 s"))
+        #expect(check.evidence.first == "dump: /b/CrashDumps/f386.dmp")
+        #expect(check.evidence.contains { $0.contains("ShowNetworkError") })
+    }
+
+    @Test("game-online fails on the game's own online-error words, even with every host connected")
+    func onlineErrorsFailGameOnline() throws {
+        let plan = try TestHome.plan("""
+        [game]
+        name  = "Online Errors"
+        store = "steam"
+
+        [compatibility]
+        online_hosts  = "css-api.zaonce.net"
+        online_errors = "ShowNetworkError _ShowUnrecoverableError"
+        """, slug: "online-errors")
+        #expect(plan.onlineErrors == ["ShowNetworkError", "_ShowUnrecoverableError"])
+
+        var watch = VerifyGame.Watch()
+        watch.endpoints = [GameConnections.Endpoint(address: "34.248.10.1", port: 443)]
+        watch.hostAddresses = ["css-api.zaonce.net": ["34.248.10.1"]]
+        #expect(VerifyGame.judgeOnline(watch, wineLog: "", plan: plan).verdict == .pass, "connected, and nothing reported")
+
+        watch.dumps = [CrashDumps.Dump(path: "/b/f386.dmp", comment: Self.pc2Comment)]
+        let failed = VerifyGame.judgeOnline(watch, wineLog: "", plan: plan)
+        #expect(failed.verdict == .fail, "the PC2 pilot: connected to css-api, and its account call still failed")
+        #expect(failed.evidence.filter { $0.hasPrefix("f386.dmp:") }.count == 2)
     }
 }

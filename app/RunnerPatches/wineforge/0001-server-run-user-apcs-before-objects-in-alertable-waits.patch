@@ -1,0 +1,25 @@
+diff --git a/server/thread.c b/server/thread.c
+index bb9728f..93a7d8f 100644
+--- a/server/thread.c
++++ b/server/thread.c
+@@ -1145,6 +1145,12 @@ static int check_wait( struct thread *thread )
+     /* Suspended threads may not acquire locks, but they can run system APCs */
+     if (is_thread_suspended( thread )) return -1;
+ 
++    /* An alertable wait runs the thread's queued user APCs before it looks at the objects, as
++     * on Windows: WaitForSingleObjectEx(signaled, ..., TRUE) with an APC queued returns
++     * WAIT_IO_COMPLETION. Checking the objects first means a wait on an always-signaled handle
++     * (a regular file opened FILE_FLAG_OVERLAPPED) never runs a WriteFileEx completion routine. */
++    if ((wait->flags & SELECT_ALERTABLE) && !list_empty(&thread->user_apc)) return STATUS_USER_APC;
++
+     if (wait->select == SELECT_WAIT_ALL)
+     {
+         int not_ok = 0;
+@@ -1160,7 +1166,6 @@ static int check_wait( struct thread *thread )
+             if (object_sync_signaled( entry->obj, entry )) return i;
+     }
+ 
+-    if ((wait->flags & SELECT_ALERTABLE) && !list_empty(&thread->user_apc)) return STATUS_USER_APC;
+     if (wait->when >= 0 && wait->when <= current_time) return STATUS_TIMEOUT;
+     if (wait->when < 0 && -wait->when <= monotonic_time) return STATUS_TIMEOUT;
+     return -1;
