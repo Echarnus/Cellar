@@ -39,15 +39,16 @@ struct VerifyCommand: ParsableCommand {
         signal(SIGPIPE, SIG_IGN)
         let plan = try Game.plan(slug: slug)
         var verify = VerifyGame(plan, runs: runs, surviveSeconds: Int(minutes * 60))
-        // Ctrl-C (or a kill from whatever started us) stops verify the tidy way: the game, its
+        // Ctrl-C (or a kill from whatever started us, or the terminal closing) stops verify the tidy way: the game, its
         // store and Wine are closed and the report keeps the runs that were done (#249). A second
         // one stops it at once, but still shuts the bottle's Wine down and rewrites the report
         // first (#270): a harness that sends SIGTERM right after SIGINT used to leave the bottle's
         // Steam and wineserver running and a report that said "still running".
         let stop = Stop()
+        ChildProcesses.leaveStopToCommand()
         verify.isInterrupted = { stop.requested }
         let stopper = StopNow(verify)
-        let sources = [SIGINT, SIGTERM].map { number -> DispatchSourceSignal in
+        let sources = [SIGINT, SIGTERM, SIGHUP].map { number -> DispatchSourceSignal in
             signal(number, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: number, queue: .global())
             source.setEventHandler {

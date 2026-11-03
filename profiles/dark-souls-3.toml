@@ -1,46 +1,50 @@
 # Cellar game profile — DARK SOULS III
+#
+# FromSoftware's 2016 action RPG. DirectX 11, 64-bit, Windows only, with the exe under Game/ in
+# Steam's install folder. No third-party anti-cheat (that is Elden Ring); online play runs through
+# FromSoftware's servers, which came back on PC in 2022 after that year's shutdown.
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes.
+
 [game]
 slug          = "dark-souls-3"
 name          = "DARK SOULS III"
 developer     = "FromSoftware"
+publisher     = "Bandai Namco Entertainment"
 steam_appid   = 374320
 engine        = "Dantelion"
 graphics_api  = "DirectX 11"
 architecture  = "x86-64"
 released      = "2016-04-11"
-
-# Which client Cellar stands up in the bottle for this game. Steam is the default, but every
-# profile says so out loud now that Cellar speaks more than one store (see docs/ARCHITECTURE.md).
 store         = "steam"
 
 [compatibility]
-anticheat                   = "EasyAntiCheat (online only)"
-drm                         = "Steamworks"
-# Steamworks DRM + EAC for online. Single-player runs with Steam in the background; online/co-op via
-# EAC is not wired up. Needs a live Steam session.
-needs_live_steam            = true
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
 requires_account            = "Steam"
-online                      = "single-player offline; online needs EAC (unsupported here)"
+online                      = "single-player, with online co-op, invasions and messages through FromSoftware's servers"
 status                      = "untested"
-notes                       = "DX11 via D3DMetal 3.0 should suit it; validate on M5."
+notes                       = "Not yet launched under Cellar."
 
+# WineForge, as for every Steam title: the current Steam client needs a modern Wine, and Steamworks
+# needs that client running beside the game.
 [runner]
 id              = "wineforge"
 windows_version = "win10"
 
 [graphics]
 backend           = "d3dmetal"
-fallback_backend  = "dxmt"
+fallback_backend  = "dxvk"
 
 [env]
-MTL_HUD_ENABLED = "1"
 
 [install]
-method      = "depot"
+# Installed by the bottle's Steam, which is already signed in: a depot download would sign in a
+# second time for a game that needs the client running anyway.
+method      = "windows-steam-in-bottle"
 steam_appid = 374320
-
-[launch]
-exe = "Game/DarkSoulsIII.exe"
+install_dir = "DARK SOULS III"
+exe         = "Game/DarkSoulsIII.exe"
 
 [legal]
 drm_circumvention = "never"
