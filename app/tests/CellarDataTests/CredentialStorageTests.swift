@@ -123,6 +123,21 @@ struct CredentialStorageTests {
         #expect(report.contains("Done."))
     }
 
+    @Test("A Steam password sign-in leaves no password behind: not in the command, not in the record (#278)")
+    func steamPasswordKeptNowhere() throws {
+        // The app's command carries no secret: the name and password go on stdin.
+        let command = CellarCommand.steamPasswordSignIn.arguments
+        #expect(command == ["steam", "login", "--password"])
+        // DepotDownloader is never handed one on argv either, where `ps` would show it.
+        let tool = DepotTool.Credentials.password(username: "kennethdc").arguments
+        #expect(!tool.contains { $0.lowercased().hasPrefix("-pass") })
+        // And the record written after it has no field a password could be in.
+        let record = SteamAccount.SignIn(accountName: "kennethdc", signedInAt: Date(), lastUsedAt: Date())
+        let json = try #require(String(data: try JSONEncoder().encode(record), encoding: .utf8))
+        #expect(!json.lowercased().contains("pass"))
+        #expect(!json.lowercased().contains("code"))
+    }
+
     @Test("A QR row is told apart from ordinary output, CRLF endings included")
     func signInCodeRows() {
         for row in Self.qrRows {

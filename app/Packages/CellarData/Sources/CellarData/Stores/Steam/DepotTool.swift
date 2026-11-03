@@ -38,7 +38,10 @@ public enum DepotTool {
     /// Steam mobile app. It is used exactly once, by `SteamAccount.signIn`.
     ///
     /// `session` is every run after that: the token stored under the account name is reused with no
-    /// prompt at all. `password` stays for scripted use and for accounts without the mobile app.
+    /// prompt at all. `password` is the sign-in for accounts without the Steam mobile app
+    /// (`SteamPasswordSignIn`): the password and any Steam Guard code go to the tool on stdin, never
+    /// as arguments. `-no-mobile` makes an authenticator account ask for its code rather than wait
+    /// for an approval in the app — a player who has the app is better served by the QR code.
     public enum Credentials: Sendable {
         case qr
         case session(username: String)
@@ -53,8 +56,10 @@ public enum DepotTool {
             // token: the ownership checks straight after signing in worked, and three minutes later
             // Steam refused it with AccessDenied — so the sign-in evaporated on its own.
             case .qr: return ["-qr", "-remember-password"]
-            case .session(let username), .password(let username):
+            case .session(let username):
                 return ["-username", username, "-remember-password"]
+            case .password(let username):
+                return ["-username", username, "-remember-password", "-no-mobile"]
             case .anonymous: return []
             }
         }
@@ -131,6 +136,100 @@ public enum DepotTool {
             try? runInheritingIO(args: args)
         }
         try? FileManager.default.removeItem(at: scratch)
+    }
+
+    /// Sign in with an account name and password: the same smallest job as `signIn`, but a
+    /// conversation — DepotDownloader asks for the password and for any Steam Guard code on stdin,
+    /// and `answer` supplies each (nil stops the run). Returns once the session is established or
+    /// the tool gives up. The password never appears in `args`, so it is never visible to `ps`.
+    public static func signIn(username: String, answer: (SteamPasswordSignIn.Prompt) -> String?,
+                              output: (String) -> Void) throws {
+        try install()
+        let scratch = Paths.cache.appendingPathComponent("steam-signin", isDirectory: true)
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var args = ["-app", "480", "-os", "windows", "-osarch", "64", "-dir", scratch.path]
+        args += Credentials.password(username: username).arguments
+        let lease = SteamTokenVault.begin()
+        defer { protectStoredSessions(); lease?.end() }
+        let p = try process(args)
+        var established = false
+        _ = try? converse(with: p, answer: answer, output: { line in
+            if SteamAccount.isSessionEstablished(line) { established = true }
+            output(line)
+        }, stopWhen: { established })
+    }
+
+    /// Run `p` with a pipe on its stdin, answering each prompt it prints (`SteamPasswordSignIn.prompt`).
+    ///
+    /// A prompt is printed without a line ending, so it is looked for in the unfinished tail of the
+    /// output after every read, and also in each whole line (a tool that does end it with one).
+    /// Prompts are answered, not shown: `output` never sees one, so the password prompt — which names
+    /// the account — stays out of the activity log. An answer of nil ends the run.
+    ///
+    /// Returns true when `stopWhen` ended the run (the job is done), false when the tool exited.
+    /// Internal, and handed the process, so a test can drive it with a script that asks the same
+    /// questions DepotDownloader does.
+    @discardableResult
+    static func converse(with p: Process, answer: (SteamPasswordSignIn.Prompt) -> String?,
+                         output: (String) -> Void, stopWhen: () -> Bool = { false }) throws -> Bool {
+        // Writing to a pipe whose reader has gone raises SIGPIPE, and its default action kills
+        // this process — the CLI, or the test runner. Ignored, the write throws instead.
+        signal(SIGPIPE, SIG_IGN)
+        let out = Pipe()
+        let input = Pipe()
+        p.standardOutput = out
+        p.standardError = out
+        p.standardInput = input
+        try p.run()
+        ChildProcesses.track(p)
+        defer { ChildProcesses.untrack(p) }
+        let writer = input.fileHandleForWriting
+        var buffer = Data()
+        var stopped = false
+        var ended = false
+
+        /// Answer `prompt`, or end the run when there is no answer. A tool that exits between its
+        /// question and the answer makes the write fail, which ends the run the same way.
+        func reply(_ prompt: SteamPasswordSignIn.Prompt) {
+            guard let text = answer(prompt) else { ended = true; return }
+            let line = text.replacingOccurrences(of: "\n", with: "").replacingOccurrences(of: "\r", with: "")
+            do { try writer.write(contentsOf: Data((line + "\n").utf8)) } catch { ended = true }
+        }
+
+        let handle = out.fileHandleForReading
+        reading: while true {
+            let chunk = handle.availableData
+            if chunk.isEmpty { break }
+            buffer.append(chunk)
+            for line in takeLines(from: &buffer) where !line.trimmingCharacters(in: .whitespaces).isEmpty {
+                if let prompt = SteamPasswordSignIn.prompt(in: line) {
+                    reply(prompt)
+                } else {
+                    output(line)
+                }
+                if ended { break reading }
+            }
+            if !buffer.isEmpty, let tail = String(data: buffer, encoding: .utf8),
+               let prompt = SteamPasswordSignIn.prompt(in: tail) {
+                buffer.removeAll()
+                reply(prompt)
+                if ended { break }
+            }
+            if stopWhen() { stopped = true; break }
+        }
+        try? writer.close()
+        if stopped || ended {
+            if p.isRunning { p.terminate() }
+            p.waitUntilExit()
+            return stopped
+        }
+        if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8),
+           !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            output(line)
+        }
+        p.waitUntilExit()
+        return false
     }
 
     // MARK: - Ownership

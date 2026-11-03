@@ -208,8 +208,9 @@ The differences are real, not cosmetic — the three that bite hardest:
   never opened Battle.net. So Accounts asks once — "Add" (`cellar battlenet add`), a self-report,
   never called a sign-in — and `StoreLibrary.verdict` withholds the store's games until it is given.
 - **Signing in is account-level, never per game — and Steam is asked exactly once.** The single
-  Steam sign-in is Steam's QR device flow (`SteamAccount`), and it covers both *what you own* and
-  *downloading it*. There is no Web API key and no separate download session; the in-bottle Windows
+  Steam sign-in is Steam's QR device flow (`SteamAccount`), or — for a player without the Steam
+  mobile app — account name and password with any Steam Guard code (`SteamPasswordSignIn`, password
+  on stdin only, #278). Either covers both *what you own* and *downloading it*. There is no Web API key and no separate download session; the in-bottle Windows
   client is not a second account but a runtime dependency of games whose DRM talks to a running
   Steam. Sign-in belongs in **Settings** (`cellar steam login`, ⌘⇧A), never on a game's page.
   `StoreDescriptor.authStyle` is the fact that decides which shape a store has.
