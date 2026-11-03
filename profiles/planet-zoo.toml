@@ -1,0 +1,51 @@
+# Cellar game profile — Planet Zoo
+#
+# Frontier's 2019 zoo builder on its COBRA engine, Planet Coaster 2's older sibling. Windows only.
+# DirectX 11 only (no DirectX 12 path, unlike PC2), 64-bit. Denuvo Anti-Tamper per PCGamingWiki: DRM,
+# not anti-cheat, and it runs untouched in user space, but it wants a running Steam.
+# AppleGamingWiki rates it Perfect in CrossOver with D3DMetal (M1 Max, macOS 14, 60 FPS at 1920x1200
+# High). PC2 needs Metal's validation layer to dodge a D3DMetal race; that is PC2's own finding and is
+# not copied here until a run shows Planet Zoo needs it. Frontier's crash reporter is already one of
+# the signs `cellar verify` watches for (CrashSigns), so no crash_processes line is needed.
+# No online_hosts: Franchise mode talks to Frontier's servers, but no run has named the host yet.
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "planet-zoo"
+name          = "Planet Zoo"
+developer     = "Frontier Developments"
+publisher     = "Frontier Developments"
+steam_appid   = 703080
+engine        = "COBRA"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2019-11-05"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "Steamworks + Denuvo Anti-Tamper"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player career, sandbox and challenge; Franchise mode and its animal market need Frontier's servers; blueprints come from the Steam Workshop"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Players report it running at 60 FPS on High at 1920x1200 on an M1 Max MacBook Pro through CrossOver."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 703080
+install_dir = "Planet Zoo"
+exe         = "PlanetZoo.exe"
+
+[legal]
+drm_circumvention = "never"

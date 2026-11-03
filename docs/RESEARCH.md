@@ -300,3 +300,26 @@ The facts behind the choices:
 - **Overwatch on Steam** still signs in to a linked Battle.net account. It is a `steam` game with Battle.net named in `requires_account`, not a `battlenet` one.
 - **GTA V Enhanced** is its own AppID and folder. Its needles (`GTA5_Enhanced.exe`, `\Grand Theft Auto V Enhanced\`) and Legacy's never match each other's processes, and `TopPlayedTests.gtaEnhanced` holds that.
 - **TBH** docks into the Windows taskbar. On a Mac it is an ordinary window, and its notes say so.
+
+## Update 2026-11-01: Dark Souls, Fallout and Planet Zoo (#251–#255)
+
+Five Steam games Kenneth asked for by name, none with a Mac version. All are profiles marked
+`untested` until `cellar verify` passes.
+
+| Game | AppID | Graphics | Route | Why |
+|---|---|---|---|---|
+| DARK SOULS: REMASTERED (#251) | 570940 | DX11, 64-bit | DXVK, then D3DMetal | Prepare to Die Edition (211420) left Steam in 2018. AppleGamingWiki rates the remaster Perfect through DXVK on Apple Silicon, with frequent crashes through GPTK's D3DMetal 1.0.2. |
+| DARK SOULS II: Scholar of the First Sin (#252) | 335300 | DX11, 64-bit | D3DMetal, then DXVK | This is the edition Steam sells. The 2014 original (236430) is a separate DX9, 32-bit program and isn't covered. |
+| Fallout 4 (#253) | 377160 | DX11, 64-bit | D3DMetal, then DXMT | Same engine family as Skyrim SE. |
+| Fallout: New Vegas (#254) | 22380 | DX9, 32-bit | DXVK, then WineD3D | D3DMetal doesn't translate DX9. It is the first 32-bit game in the database. |
+| Planet Zoo (#255) | 703080 | DX11, 64-bit | D3DMetal, then DXVK | Frontier's COBRA engine, like PC2. It has Denuvo Anti-Tamper. AppleGamingWiki rates it Perfect in CrossOver with D3DMetal. |
+
+- **Both Fallouts start through a launcher that writes their settings.** Skyrim crashed on every
+  start without its launcher's INI files (#245). Fallout 4's launcher copies `Fallout4_Default.ini`
+  to `Fallout4.ini` and `Fallout4/Fallout4Prefs.ini` to `Fallout4Prefs.ini`, in
+  `My Games/Fallout4` (STEP's Fallout 4 configuration guide). New Vegas's copies
+  `Fallout_default.ini` to `My Games/FalloutNV/Fallout.ini`. Both profiles name those copies in
+  `first_run_files` (#246).
+- **Planet Zoo doesn't inherit PC2's fixes unproven.** Frontier's crash reporter is already in
+  `CrashSigns`, so verify catches it. `metal_validation` and `online_hosts` wait for a run that
+  shows they're needed.

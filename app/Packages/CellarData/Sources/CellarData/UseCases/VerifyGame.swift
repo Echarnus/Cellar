@@ -50,6 +50,8 @@ public struct VerifyGame {
     /// Whether someone asked verify to stop (Ctrl-C). Checked between runs and every second of a
     /// watch; the run under way is then closed down and the report written with what was done (#249).
     public var isInterrupted: () -> Bool = { false }
+    /// How far this verify has got, for `stopNow()` on another thread. Shared by every copy.
+    public let progress = VerifyProgress()
 
     public init(_ plan: GamePlan, runs: Int = 1, surviveSeconds: Int = 300, sampleSeconds: TimeInterval = 10,
                 reportsRoot: URL = Paths.appSupport.appendingPathComponent("verify", isDirectory: true),
@@ -70,6 +72,7 @@ public struct VerifyGame {
             .appendingPathComponent(plan.slug, isDirectory: true)
             .appendingPathComponent(Self.folderName(started), isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        progress.begin(folder: folder, started: started)
 
         let before = CellarSandbox.Fingerprint.of(runnersAt: Paths.runners)
         var checks: [VerificationCheck] = []
@@ -94,9 +97,11 @@ public struct VerifyGame {
                     break
                 }
                 say("Run \(number) of \(runs): starting \(plan.name)…")
+                progress.starting(run: number)
                 let (found, screenshot) = verifyOneLaunch(number: number, folder: folder, say: say)
                 checks += runs == 1 ? found : found.map { $0.inRun(number) }
                 if let screenshot { attachments.append(screenshot) }
+                progress.finished(run: number, checks: checks, attachments: attachments)
                 if isInterrupted() {
                     checks.append(Self.judgeInterrupted(stoppedIn: number, completed: number - 1, runs: runs))
                     break
@@ -126,6 +131,37 @@ public struct VerifyGame {
     }
 
     static let interruptedTitle = "Every run asked for was done"
+
+    /// Stop at once, from any thread (a second Ctrl-C, or a kill after the first, #270): end every
+    /// Windows process in the bottle (the game, its crash reporter, the bottle's Steam) and its
+    /// wineserver, then write the report with what was done and the run under way marked as cut
+    /// off. Takes seconds, not the tidy close-down's minute. Returns the report's folder, or nil
+    /// when verify hadn't started or `stopNow` already ran.
+    @discardableResult
+    public func stopNow() -> URL? {
+        guard progress.abandon() else { return nil }
+        let table = Self.processTable()
+        let doomed = Self.gamePids(inProcessList: table, needles: plan.gameProcessNeedles)
+            + Self.pids(of: CrashSigns.crashReporters(inProcessList: table, extra: plan.crashProcesses))
+        for pid in doomed { kill(pid, SIGKILL) }
+        // `wineserver -k` ends every process in the prefix, the store client included.
+        Game.wineRunner(plan)?.shutDown(grace: 3)
+        let now = progress.snapshot
+        guard let folder = now.folder else { return nil }
+        var checks = now.checks
+        checks.append(Self.judgeStoppedAtOnce(stoppedIn: now.run, completed: now.completed, runs: runs))
+        writeReport(makeReport(checks: checks, attachments: now.attachments, started: now.started), to: folder)
+        CellarLog.info(.launch, "Verify of \(plan.name) was stopped at once; the bottle's Wine was shut down.", subject: plan.slug)
+        return folder
+    }
+
+    /// The `interrupted` check when verify was stopped at once rather than the tidy way.
+    static func judgeStoppedAtOnce(stoppedIn: Int?, completed: Int, runs: Int) -> VerificationCheck {
+        let done = "\(completed) of \(runs) run\(runs == 1 ? "" : "s") finished"
+        let during = stoppedIn.map { "during run \($0), which was cut off with no checks" } ?? "between runs"
+        return VerificationCheck(id: "interrupted", title: interruptedTitle, verdict: .couldNotCheck,
+                                 detail: "Verify was stopped at once \(during); the bottle's Wine and store were shut down. \(done).")
+    }
 
     /// The `interrupted` check: never a pass, because runs that weren't done prove nothing.
     /// `stoppedIn` is the run that was cut short, nil when verify stopped between runs.
@@ -580,6 +616,12 @@ public struct VerifyGame {
     }
 
     private func write(_ report: VerificationReport, to folder: URL) {
+        // Once stopped at once, the report `stopNow` wrote is the last word.
+        guard !progress.isAbandoned else { return }
+        writeReport(report, to: folder)
+    }
+
+    private func writeReport(_ report: VerificationReport, to folder: URL) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601

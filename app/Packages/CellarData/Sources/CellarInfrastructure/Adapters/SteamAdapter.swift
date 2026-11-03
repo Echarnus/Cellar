@@ -156,6 +156,11 @@ public struct SteamAdapter: StoreAdapter {
                 try SteamBottle.waitForClientSignIn(runner: wine, game: plan.name, showHUD: showHUD,
                                                     gameEnv: plan.launchEnv, progress: progress)
             }
+            // Again, now that the way is clear. The entry above is skipped while any Steam runs,
+            // and the Steam another game left open is only closed after it — so Skyrim started
+            // with Steam knowing nothing of its copy (2026-11-01). Writes nothing when it is
+            // already there.
+            SteamLibraryEntry.register(plan)
             progress("Starting Steam quietly for \(plan.name)'s DRM, then launching the game…")
             try SteamBottle.launchAlongside(runner: wine, exe: exe, appID: appID,
                                             showHUD: showHUD, gameEnv: plan.launchEnv,
@@ -163,6 +168,7 @@ public struct SteamAdapter: StoreAdapter {
                                             game: plan.name, expectsSignIn: signsItself,
                                             start: plan.directStartExe,
                                             publisherLauncher: plan.publisherLauncher,
+                                            workaround: plan.launchWorkaround,
                                             progress: progress, stage: stage)
             return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
         }
@@ -178,6 +184,7 @@ public struct SteamAdapter: StoreAdapter {
         }
         try SteamBottle.runGameSupervised(runner: wine, appID: appID, showHUD: showHUD,
                                           gameEnv: plan.launchEnv, game: plan.name, expectsSignIn: signsItself,
+                                          workaround: plan.launchWorkaround,
                                           progress: progress, stage: stage)
         stage(.running)
         return .steam(appID: appID)
