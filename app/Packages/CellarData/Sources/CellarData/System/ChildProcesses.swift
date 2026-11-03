@@ -44,6 +44,23 @@ public enum ChildProcesses {
         return processes.filter(\.isRunning).count
     }
 
+    /// Whether `stopWithThisProcess` is what acts on SIGTERM, SIGINT and SIGHUP right now.
+    static var stopsWithThisProcess: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return !signalSources.isEmpty
+    }
+
+    /// Let the running command handle being stopped itself. `verify` closes the game, its store and
+    /// Wine and writes its report on Ctrl-C; with this process-wide stop still listening, the same
+    /// signal also re-raised itself at the default action, so `cellar verify` died at once and left
+    /// the bottle's Steam and wineserver running. The no-op C handler stays, so nothing ends the
+    /// process until the command's own handler decides.
+    public static func leaveStopToCommand() {
+        lock.lock(); defer { lock.unlock() }
+        signalSources.forEach { $0.cancel() }
+        signalSources.removeAll()
+    }
+
     /// When this process is told to stop (SIGTERM from the app's Cancel, SIGINT from Ctrl-C, SIGHUP
     /// from a closed terminal), stop the followed tools first, then stop the way the signal asked.
     /// Called once, by the CLI's entry point.

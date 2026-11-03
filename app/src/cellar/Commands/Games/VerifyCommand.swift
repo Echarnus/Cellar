@@ -45,6 +45,7 @@ struct VerifyCommand: ParsableCommand {
         // first (#270): a harness that sends SIGTERM right after SIGINT used to leave the bottle's
         // Steam and wineserver running and a report that said "still running".
         let stop = Stop()
+        ChildProcesses.leaveStopToCommand()
         verify.isInterrupted = { stop.requested }
         let stopper = StopNow(verify)
         let sources = [SIGINT, SIGTERM].map { number -> DispatchSourceSignal in
