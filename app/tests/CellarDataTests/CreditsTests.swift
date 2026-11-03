@@ -44,6 +44,57 @@ struct CreditsTests {
         }
     }
 
+    // MARK: - Sources of knowledge (Kenneth, 2026-11-03: credit where credit is due)
+
+    @Test("Every source the compatibility estimate names is credited, with its terms")
+    func forecastSourcesAreCredited() {
+        let names = Credits.sources.map(\.name)
+        #expect(Set(names).count == names.count)
+        for credit in Credits.sources {
+            #expect(!credit.role.isEmpty && !credit.license.isEmpty, "\(credit.name)")
+            #expect(credit.url.scheme == "https", "\(credit.name)")
+        }
+        // Every non-issue source a reason can carry.
+        let everything = CompatibilityForecast(CompatibilitySignals(
+            facts: GameFacts(graphicsAPI: "DirectX 11", anticheat: "Easy Anti-Cheat",
+                             evidence: CompatibilityEvidence(protonDB: "gold", steamDeck: "verified",
+                                                             anticheatOnLinux: "supported", onMac: "runs"))))
+        let cited = Set(everything.reasons.compactMap(\.source).filter { !$0.hasPrefix("#") })
+        #expect(cited == ["ProtonDB", "Steam Deck", "AreWeAntiCheatYet"])
+        for source in cited {
+            #expect(names.contains { $0.contains(source) }, "the estimate cites \(source), which Credits.sources does not name")
+        }
+    }
+
+    @Test("Every address refresh-evidence.py reads belongs to a credited source")
+    func refreshedSourcesAreCredited() throws {
+        let script = try String(contentsOf: Repo.app.appendingPathComponent("Scripts/refresh-evidence.py"), encoding: .utf8)
+        let regex = try NSRegularExpression(pattern: #"https://[^"\s{}()]+"#)
+        let urls = regex.matches(in: script, range: NSRange(script.startIndex..., in: script))
+            .compactMap { Range($0.range, in: script).map { String(script[$0]) } }
+            .compactMap(URL.init(string:))
+            .filter { $0.host != "github.com" }   // the script's own User-Agent names Cellar's repo
+        #expect(urls.count >= 3)
+        let hosts = Set(Credits.sources.flatMap { [$0.url, $0.sourceURL].compactMap { $0?.host } })
+        let owners = Set(Credits.sources.flatMap { [$0.url, $0.sourceURL].compactMap { $0 }.compactMap(Self.githubOwner) })
+        for url in urls {
+            let rawOwner = url.host == "raw.githubusercontent.com" ? url.pathComponents.dropFirst().first?.lowercased() : nil
+            let credited = hosts.contains(url.host ?? "") || rawOwner.map { owners.contains($0) } == true
+            #expect(credited, "refresh-evidence.py reads \(url), and no credit in Credits.sources covers it")
+        }
+    }
+
+    @Test("Every public source a shipped profile cites is credited")
+    func profileSourcesAreCredited() throws {
+        // The sources profiles cite by name. A profile citing a new one adds it here and to
+        // Credits.sources together.
+        let cited = ["ProtonDB", "AppleGamingWiki", "CodeWeavers", "PCGamingWiki", "SteamDB", "AreWeAntiCheatYet"]
+        let names = Credits.sources.map(\.name)
+        for source in cited {
+            #expect(names.contains { $0.contains(source) }, "\(source) is cited in profiles but not credited")
+        }
+    }
+
     /// Every package in Package.resolved, with the Credit and the licence text that cover it. A new
     /// package fails this until it has a Credit, a row in THIRD_PARTY_LICENSES.md and a text in
     /// licenses/ — and a line here.

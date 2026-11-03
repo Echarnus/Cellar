@@ -25,6 +25,9 @@ requires_account            = "Steam"
 online                      = "single-player"
 status                      = "playable"
 notes                       = "DX11 via D3DMetal 4.0b3. Reached the main menu and stayed up 5 min at 60 fps on 3 of 3 cold starts (cellar verify, M5 / macOS 27.0.1, 2026-11-02); playing a save is untested. Crashed on every start on D3DMetal 3.0. SKSE and mods untested."
+protondb                    = "gold"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
 
 [runner]
 # WineForge 0.6.0.8 with D3DMetal 4.0b3, the runtime Planet Coaster 2 moved to. On D3DMetal 3.0

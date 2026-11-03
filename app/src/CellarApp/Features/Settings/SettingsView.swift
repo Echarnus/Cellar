@@ -145,6 +145,16 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    // Kenneth (2026-11-03): every source Cellar pulls knowledge from is credited.
+                    Section("Game reports and facts from") {
+                        ForEach(Credits.sources, id: \.name) { credit in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Link(credit.name, destination: credit.url)
+                                Text(credit.role).font(.caption).foregroundStyle(.secondary)
+                                Text(credit.license).font(.caption2).foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
                 }
                 .formStyle(.grouped)
                 .tabItem { Label(Pane.about.rawValue, systemImage: "info.circle") }

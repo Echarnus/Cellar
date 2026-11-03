@@ -373,7 +373,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         out.append(link("winehq.org", Credits.wine.url))
         out.append(NSAttributedString(string: " · ", attributes: body))
         out.append(link(String(localized: "source"), Credits.wine.sourceURL!))
-        out.append(NSAttributedString(string: "\n\n" + String(localized: "Everyone else Cellar stands on: Settings › About."), attributes: body))
+        out.append(NSAttributedString(string: "\n\n" + String(localized: "Compatibility estimates use reports from ProtonDB, Steam Deck ratings, AreWeAntiCheatYet, AppleGamingWiki and CodeWeavers.") + " ", attributes: body))
+        out.append(NSAttributedString(string: String(localized: "Everyone else Cellar stands on: Settings › About."), attributes: body))
         return out
     }
 }

@@ -27,6 +27,9 @@ requires_account            = "Steam"
 online                      = "single-player + online co-op for up to 4, dedicated servers up to 32"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. There is a Mac edition on the Mac App Store, but it is a separate purchase; this runs the Windows copy you own on Steam."
+protondb                    = "platinum"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

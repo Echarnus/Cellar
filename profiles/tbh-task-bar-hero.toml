@@ -26,6 +26,9 @@ requires_account            = "Steam"
 online                      = "single-player"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. On Windows it docks into the taskbar; a Mac has no taskbar, so it opens as a small window of its own instead."
+protondb                    = "gold"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

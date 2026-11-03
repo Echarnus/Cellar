@@ -25,6 +25,9 @@ requires_account            = "Steam"
 online                      = "online co-op for up to 6, single-player"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. Still in Early Access, so updates can change what works."
+protondb                    = "platinum"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

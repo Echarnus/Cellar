@@ -26,6 +26,7 @@ def load(name):
 check_pr = load("check-pr")
 coverage = load("coverage")
 close_release_issue = load("close-release-issue")
+refresh_evidence = load("refresh-evidence")
 
 GOOD = """## What and why
 
@@ -337,3 +338,82 @@ class CloseReleaseIssueTests(unittest.TestCase):
         close = workflow.index("Scripts/close-release-issue.py")
         self.assertLess(publish, close, "the issue must close only once the release is out")
         self.assertIn("issues: write", workflow)
+
+
+class EvidenceRefreshTests(unittest.TestCase):
+    """refresh-evidence.py (#286): public reports into the profiles, never wiping what it can't read."""
+
+    PROFILE = """[game]
+slug          = "fixture"
+steam_appid   = 42
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+status                      = "untested"        # a comment the scan must survive
+notes                       = "Not yet launched."
+
+[runner]
+id              = "wineforge"
+"""
+
+    def fake(self, protondb=None, deck=None, awacy=None, fail=()):
+        def fetch(url):
+            if any(word in url for word in fail):
+                raise OSError("unreachable")
+            if "protondb" in url:
+                return {"tier": protondb}
+            if "deck" in url:
+                return {"results": {"resolved_category": deck}}
+            return awacy or []
+        return fetch
+
+    def run_on(self, fetch, text=None):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder)
+        path = os.path.join(folder, "fixture.toml")
+        with open(path, "w") as handle:
+            handle.write(text or self.PROFILE)
+        changes = refresh_evidence.refresh(folder, fetch=fetch, today="2026-11-03")
+        with open(path) as handle:
+            return changes, handle.read()
+
+    def test_writes_every_source_into_compatibility(self):
+        awacy = [{"storeIds": {"steam": "42"}, "status": "Denied"}]
+        changes, text = self.run_on(self.fake("gold", 3, awacy))
+        fields = refresh_evidence.read_fields(text)
+        self.assertEqual(fields["protondb"], "gold")
+        self.assertEqual(fields["steam_deck"], "verified")
+        self.assertEqual(fields["anticheat_on_linux"], "denied")
+        self.assertEqual(fields["evidence_checked"], "2026-11-03")
+        self.assertEqual(fields["status"], "untested", "evidence is never a status")
+        self.assertIn("fixture", changes)
+        # Inside [compatibility], before [runner].
+        self.assertLess(text.index("protondb"), text.index("[runner]"))
+        self.assertGreater(text.index("protondb"), text.index("[compatibility]"))
+
+    def test_a_source_that_fails_keeps_its_value(self):
+        _, first = self.run_on(self.fake("gold", 3))
+        changes, text = self.run_on(self.fake("borked", 1, fail=("protondb",)), first)
+        fields = refresh_evidence.read_fields(text)
+        self.assertEqual(fields["protondb"], "gold")
+        self.assertEqual(fields["steam_deck"], "unsupported")
+        self.assertEqual(changes["fixture"], {"steam_deck": ("verified", "unsupported")})
+
+    def test_nothing_new_rewrites_nothing(self):
+        _, first = self.run_on(self.fake("gold", 3))
+        changes, text = self.run_on(self.fake("gold", 3), first)
+        self.assertEqual(changes, {})
+        self.assertEqual(text, first)
+
+    def test_unknown_values_are_dropped(self):
+        changes, text = self.run_on(self.fake("diamond", 9))
+        self.assertEqual(changes, {})
+        self.assertNotIn("protondb", text)
+
+    def test_shipped_profiles_parse_like_the_app(self):
+        for name in os.listdir(os.path.join(os.path.dirname(ROOT), "profiles")):
+            if name.endswith(".toml"):
+                with open(os.path.join(os.path.dirname(ROOT), "profiles", name)) as handle:
+                    fields = refresh_evidence.read_fields(handle.read())
+                self.assertIn("status", fields, name)

@@ -7,7 +7,7 @@ struct ProfileCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "profiles",
         abstract: "Browse the per-game profile database.",
-        subcommands: [List.self, Show.self, Draft.self, Update.self, Version.self]
+        subcommands: [List.self, Show.self, Forecast.self, Draft.self, Update.self, Version.self]
     )
 
     struct List: ParsableCommand {
@@ -46,6 +46,56 @@ struct ProfileCommand: ParsableCommand {
             }
             let text = (try? String(contentsOf: ref.url, encoding: .utf8)) ?? ""
             print(text)
+        }
+    }
+
+    struct Forecast: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Say how likely each game is to work, and why.",
+            discussion: """
+            A tested game says what the test found. Every other game gets Cellar's estimate, from
+            how it is built, what Cellar learned on games built the same way, and how it runs for
+            Linux players. The least likely come first, so they are the ones to test next.
+            See docs/COMPATIBILITY.md.
+
+              cellar profiles forecast              every game, least likely first
+              cellar profiles forecast elden-ring   one game, with every reason
+            """)
+
+        @Argument(help: "Profile slug. Leave out for every game.")
+        var slug: String?
+
+        func run() throws {
+            if let slug {
+                let plan = try Game.plan(slug: slug)
+                let forecast = plan.forecast
+                print(Term.bold("\(plan.name): \(forecast.title)"))
+                print(Term.dim(forecast.detail))
+                for reason in forecast.reasons {
+                    let source = reason.source.map { Term.dim(" (\($0))") } ?? ""
+                    print("  \(reason.symbol) \(reason.text)\(source)")
+                }
+                if let online = forecast.online { print("  \(Term.dim("Online:")) \(online)") }
+                if let checked = plan.facts.evidence.checked {
+                    print(Term.dim("Public reports read \(checked)."))
+                }
+                return
+            }
+            let plans = ProfileStore.all().compactMap { try? Game.plan(slug: $0.slug) }
+                .filter { GameStore.offered.contains($0.store) }
+                .map { ($0, $0.forecast) }
+                .sorted { ($0.1.outlook, $0.1.score, $0.0.name) < ($1.1.outlook, $1.1.score, $1.0.name) }
+            for (plan, forecast) in plans {
+                let title = forecast.title.padding(toLength: 17, withPad: " ", startingAt: 0)
+                let painted: String
+                switch forecast.outlook {
+                case .works, .likely: painted = Term.green(title)
+                case .unsure:         painted = Term.yellow(title)
+                case .unlikely, .wontWork: painted = Term.red(title)
+                }
+                let tested = forecast.basis == .tested ? "tested" : "estimate"
+                print("\(painted) \(plan.slug.padding(toLength: 34, withPad: " ", startingAt: 0)) \(Term.dim(tested))")
+            }
         }
     }
 

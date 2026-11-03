@@ -33,6 +33,10 @@ requires_account            = "Steam"
 online                      = "single-player, with online co-op, invasions and messages that need Easy Anti-Cheat running"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. The game starts through Easy Anti-Cheat the way Steam starts it, and nobody has yet seen that work on a Mac, so neither playing online nor starting at all is promised. DirectX 12 only, so Cellar has one way to run it and no second option to offer if it does not start. Shadow of the Erdtree is a separate purchase on Steam."
+protondb                    = "gold"
+steam_deck                  = "verified"
+anticheat_on_linux          = "supported"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

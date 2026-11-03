@@ -28,6 +28,10 @@ requires_account            = "Steam"
 online                      = "online multiplayer on Valve and community servers; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. A DirectX 9 game: Cellar starts it with the graphics translation made for older DirectX games, and offers a slower, more forgiving one if the game never comes up."
+protondb                    = "gold"
+steam_deck                  = "playable"
+anticheat_on_linux          = "supported"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

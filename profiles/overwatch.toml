@@ -27,6 +27,11 @@ requires_account            = "Steam + a linked Battle.net account"
 online                      = "online only; Blizzard does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. AppleGamingWiki rates it Perfect through a CrossOver preview (2026-03-04) on macOS 26.4. The first start asks you to link a Battle.net account to Steam."
+mac_reports                 = "runs"
+protondb                    = "platinum"
+steam_deck                  = "playable"
+anticheat_on_linux          = "supported"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

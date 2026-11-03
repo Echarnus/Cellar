@@ -27,6 +27,9 @@ requires_account            = "none"
 online                      = "single-player + co-op"
 status                      = "untested"
 notes                       = "Reference case for the fully Steam-free path (cellar install + direct launch)."
+protondb                    = "platinum"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
