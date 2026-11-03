@@ -176,7 +176,7 @@ jobs:
       url: ${{ steps.publish.outputs.url }}
     permissions:
       contents: write     # create the release (and, unless a tag was pushed, its tag)
-      issues: read        # list the issues it closes
+      issues: write       # list the issues it closes, and close the release's own issue
       pull-requests: read
       id-token: write     # build provenance
       attestations: write
@@ -267,3 +267,7 @@ jobs:
           gh release create "$TAG" "$@" --repo "$REPO" --verify-tag $prerelease \
             --title "Cellar $VERSION" --notes-file dist/RELEASE_NOTES.md
           echo "url=https://github.com/$REPO/releases/tag/$TAG" >> "$GITHUB_OUTPUT"
+      # The issue that asked for this release ("Release Cellar 0.6.0") closes once it is out, so a
+      # shipped version never leaves its issue open (0.4.1 and 0.4.2 did).
+      - name: Close the release issue
+        run: python3 Scripts/close-release-issue.py --repo "$REPO" --version "$VERSION" --tag "$TAG"

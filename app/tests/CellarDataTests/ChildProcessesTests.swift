@@ -61,4 +61,24 @@ struct ChildProcessesTests {
         #expect(r3.count == 20_000)
         #expect(buffer.isEmpty)
     }
+
+    @Test("A command that handles its own stop is not cut short by the process-wide one")
+    func leaveStopToCommand() throws {
+        ChildProcesses.stopWithThisProcess()
+        #expect(ChildProcesses.stopsWithThisProcess)
+        ChildProcesses.leaveStopToCommand()
+        #expect(!ChildProcesses.stopsWithThisProcess)
+
+        // What verify's Ctrl-C does to the process. With the process-wide stop still listening this
+        // ends the test run, as it ended `cellar verify` before its teardown ran.
+        let process = try sleeper()
+        ChildProcesses.track(process)
+        raise(SIGINT)
+        usleep(300_000)
+        #expect(process.isRunning, "the command decides what stops, and when")
+        // Only this test's tool: terminateAll would also stop what tests running beside it follow.
+        ChildProcesses.untrack(process)
+        process.terminate()
+        process.waitUntilExit()
+    }
 }

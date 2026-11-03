@@ -13,6 +13,7 @@ for what only a real game shows.
 |---|---|---|
 | #278 | Players without the Steam mobile app couldn't sign in to Steam (QR was the only way) | `SteamPasswordSignInTests.swift` › `conversesOverStdin` |
 | #278 | A Steam password could reach a command line | `SteamPasswordSignInTests.swift` › `passwordNeverAnArgument` |
+| #281 | Shipped releases (0.4.1, 0.4.2) left their "Release Cellar" issue open | `test_scripts.py` › `test_release_workflow_runs_it_after_publishing` |
 | #267 | GTA V's Rockstar launcher said "wine" in the Dock | `DockShimTests.swift` › `launcherWearsTheGamesName` |
 | #267 | The uninstall dialog showed a Terminal command and bottle names | `RemovalSummaryTests.swift` › `plainWords` |
 | #267 | The sidebar said "Sign in" to a signed-in player while loading | `SidebarAccountTests.swift` › `loading` |
@@ -35,4 +36,5 @@ for what only a real game shows.
 | #239 | A game could read the tokens of the shell that started it | `CredentialStorageTests.swift` › `noTokenAtTheProcessBoundary` |
 | #250 | A stopped `cellar verify` left no report and the game running | `VerificationTests.swift` › `interruptedRun` |
 | #270 | A second Ctrl-C (or SIGTERM after SIGINT) during `cellar verify` left the bottle's Steam and wineserver running and the report saying "still running" | `VerificationTests.swift` › `stoppedAtOnce` |
+| #273 | Even one Ctrl-C ended `cellar verify` at once: the CLI's process-wide stop re-raised the signal before verify's own teardown ran, leaving Steam and wineserver running | `ChildProcessesTests.swift` › `leaveStopToCommand` |
 | #258 | `cellar verify` passed a failed Frontier account call | `VerificationTests.swift` › `onlineErrorsFailGameOnline` |
