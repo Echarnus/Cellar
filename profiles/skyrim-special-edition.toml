@@ -41,9 +41,6 @@ windows_version = "win10"
 backend           = "d3dmetal"
 fallback_backend  = "dxmt"
 
-[env]
-MTL_HUD_ENABLED = "1"
-
 [install]
 # Steamworks needs a live Steam client at runtime (needs_live_steam above), and Cellar now keeps one
 # shared Steam install behind every bottle — so the client is already there and already signed in.
@@ -60,6 +57,11 @@ exe = "SkyrimSE.exe"
 # 2026-11-01. So Cellar makes the same two copies, only where none exist. High is Cellar's choice of
 # preset (the launcher's own pick depends on the GPU it detects); a file that exists is never overwritten.
 first_run_files = "Skyrim_Default.ini > Documents/My Games/Skyrim Special Edition/Skyrim.ini; High.ini > Documents/My Games/Skyrim Special Edition/SkyrimPrefs.ini"
+# The preset copied above starts the game in a window at a size of its own (a 1518x962 window with a
+# title bar on an M5, 2026-11-03). Full screen or window is the player's choice on the game's page,
+# written into [Display] here before every start; this game starts full screen unless they pick otherwise.
+display_ini  = "Documents/My Games/Skyrim Special Edition/SkyrimPrefs.ini"
+display_mode = "fullscreen"
 
 [legal]
 drm_circumvention = "never"

@@ -39,9 +39,6 @@ windows_version = "win10"
 backend           = "d3dmetal"
 fallback_backend  = "dxmt"
 
-[env]
-MTL_HUD_ENABLED = "1"
-
 [install]
 method      = "depot"
 steam_appid = 413150

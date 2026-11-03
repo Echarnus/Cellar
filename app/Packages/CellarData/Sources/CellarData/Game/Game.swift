@@ -127,7 +127,9 @@ public enum Game {
             onlineHosts: (fields["online_hosts"] ?? "").split(separator: " ").map(String.init),
             crashProcesses: (fields["crash_processes"] ?? "").split(separator: " ").map(String.init),
             onlineErrors: (fields["online_errors"] ?? "").split(separator: " ").map(String.init),
-            firstRunFiles: FirstRunFiles.parse(fields["first_run_files"])
+            firstRunFiles: FirstRunFiles.parse(fields["first_run_files"]),
+            displaySwitchFile: DisplaySwitchFile.parse(fields["display_switch_file"]),
+            displayIni: DisplayIni.parse(fields["display_ini"])
         )
     }
 

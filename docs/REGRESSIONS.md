@@ -11,6 +11,8 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #310 | Skyrim opened in a small titled window instead of full screen | `DisplayIniTests.swift` › `skyrimFileIsFixed` |
+| #310 | Skyrim, GTA V, Stardew Valley and The Witcher 3 showed Metal's frame-rate overlay to every player | `DisplayIniTests.swift` › `noProfileShowsTheOverlay` |
 | #309 | A game with DLC depots filled the download bar to 100% once per depot (Dark Souls III looked like it downloaded three times) | `DepotDownloadProgressTests.swift` › `oneBarAcrossDepots` |
 | #309 | A resumed download called checking the files already on disk "Downloading" | `DownloadProgressIntegrationTests.swift` › `resumedDownload` |
 | #309 | A downloading game's page showed a greyed-out Install and "The last download stopped before it finished" | `GameSummaryTests.swift` › `noButtonWhileDownloading` |
