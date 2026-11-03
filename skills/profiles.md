@@ -104,6 +104,12 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   lists them apart. Turning one into a shipped profile means testing it and deleting this line.
 - **`[legal]`** — `drm_circumvention = "never"`. It is never anything else.
 
+- **Public evidence** (optional, `[compatibility]`) — `protondb`, `steam_deck`,
+  `anticheat_on_linux`, `evidence_checked`. Written by `app/Scripts/refresh-evidence.py`, never by
+  hand, and never a status: they feed Cellar's estimate for untested games
+  ([`docs/COMPATIBILITY.md`](../docs/COMPATIBILITY.md)). Keep `graphics_api`, `anticheat`, `drm` and
+  `engine` accurate too, because the estimate reads them.
+
 ## Vocabularies the tooling actually knows
 
 `gen-site.py` maps these to labels and CSS classes; a value outside the set silently falls back:

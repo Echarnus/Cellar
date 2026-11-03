@@ -322,9 +322,9 @@ struct GameDetailView: View {
             } else {
                 Chip(game.statusText, system: game.statusSymbol, tint: game.statusTint)
             }
-            // How far this game has been tested — before a two-hour download, not after. The notes
-            // behind it are in Technical Details; the verdict is what a player needs here.
-            if let status = game.facts.status { StatusBadge(status: status) }
+            // How likely it is to work — tested, or Cellar's estimate saying it is one — before a
+            // two-hour download, not after. The reasons are in Technical Details.
+            ForecastBadge(forecast: game.forecast)
             if game.store == .gog { Chip("DRM-free", system: "lock.open.fill") }
             // (A store's AppID or product code is in Technical Details: a support detail, not a fact
             // about the game.)

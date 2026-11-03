@@ -29,12 +29,13 @@ struct TechnicalDetailsView: View {
                     Spacer(minLength: 0)
                 }
 
+                ForecastReasons(forecast: game.forecast)
+
                 if let notes = game.facts.notes, !notes.isEmpty {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 6) {
                             Text("Profile notes").font(.caption.weight(.bold)).foregroundStyle(.secondary)
                                 .kerning(0.5).textCase(.uppercase)
-                            if let status = game.facts.status { StatusBadge(status: status) }
                         }
                         Text(notes).font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

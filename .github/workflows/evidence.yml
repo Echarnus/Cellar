@@ -1,0 +1,38 @@
+name: Compatibility evidence
+
+# Reads what public sources say about each Steam game (ProtonDB, Steam Deck, AreWeAntiCheatYet)
+# and shows how the profiles would change (#286, docs/COMPATIBILITY.md). It never pushes: the
+# job's summary and log carry the diff, and a pull request brings it in like any other change.
+# ProtonDB and Steam are only reachable from here, not from every agent's sandbox.
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays
+  workflow_dispatch:
+  pull_request:
+    paths: ["app/Scripts/refresh-evidence.py", ".github/workflows/evidence.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the sources into the profiles
+        run: python3 app/Scripts/refresh-evidence.py
+      - name: Show what changed
+        run: |
+          if git diff --quiet -- profiles; then
+            echo "Every profile's public evidence is current." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### Profiles with new public evidence"
+              echo '```diff'
+              git diff -- profiles
+              echo '```'
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
