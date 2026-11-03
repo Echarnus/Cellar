@@ -515,10 +515,32 @@ class HomePageTests(unittest.TestCase):
         self.assertEqual(page.count("Screenshot coming soon</span>"), len(self.site.SHOTS))
 
     def test_sponsoring_never_shows_a_button_that_leads_nowhere(self):
-        self.assertEqual(self.site.SPONSOR_URL, "")
-        page = self.site.render_index(self.site.load_games(), None)
-        self.assertIn("Sponsoring Opens Soon", page)
-        self.assertNotIn('href=""', page)
+        # #299: until there is a payment account, both pages say so instead of a dead button, and
+        # the home page only points at the sponsor page (one switch: SPONSOR_LINKS).
+        self.assertEqual(self.site.SPONSOR_LINKS, [])
+        games = self.site.load_games()
+        for page in (self.site.render_index(games, None), self.site.render_sponsor(games, None)):
+            self.assertIn("Sponsoring Opens Soon", page)
+            self.assertNotIn('href=""', page)
+        self.assertIn('href="sponsor.html"', self.site.render_index(games, None))
+
+    def test_sponsor_page_shows_the_payment_links_once_they_exist(self):
+        links = [("Sponsor on GitHub", "https://github.com/sponsors/example")]
+        original = self.site.SPONSOR_LINKS
+        self.site.SPONSOR_LINKS = links
+        self.addCleanup(setattr, self.site, "SPONSOR_LINKS", original)
+        page = self.site.render_sponsor(self.site.load_games(), None)
+        self.assertIn('href="https://github.com/sponsors/example"', page)
+        self.assertNotIn("Sponsoring Opens Soon", page)
+        self.assertIn("Nothing is locked", page)
+
+    def test_every_test_mac_bought_is_listed(self):
+        original = self.site.TEST_MACS_BOUGHT
+        self.site.TEST_MACS_BOUGHT = [("MacBook Air", "M1", "€430", "2026-12")]
+        self.addCleanup(setattr, self.site, "TEST_MACS_BOUGHT", original)
+        page = self.site.render_sponsor(self.site.load_games(), None)
+        self.assertIn("<td>MacBook Air</td><td>M1</td><td>€430</td><td>2026-12</td>", page)
+        self.assertNotIn("Nothing yet.", page)
 
     def test_every_game_has_a_page_the_list_links_to(self):
         # docs/SITE-DESIGN.md §11-12: a page per game, so "<game> on Mac" finds it.
