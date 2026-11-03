@@ -1,0 +1,73 @@
+# Cellar game profile — ELDEN RING
+#
+# FromSoftware's 2022 open-world action RPG, published by Bandai Namco. Windows only on Steam; there
+# is no Mac version. DirectX 12 only, 64-bit. Facts below are from the Steam store page and SteamDB's
+# config for app 1245620, read 2026-11-03.
+#
+# Easy Anti-Cheat: Steam starts the game through start_protected_game.exe, which brings EAC up and
+# then starts Game/eldenring.exe. EAC guards online play only (co-op, invasions, messages). It is
+# user-space, not kernel-level, and Cellar leaves it exactly as Steam ships it: `start_exe` below
+# makes Cellar start that same program Steam would, so EAC is never changed, skipped or replaced.
+# Whether EAC comes up under Cellar has not been seen yet, so online play is not promised.
+# (Dark Souls III's profile once claimed this anti-cheat by mistake, issue 274; it belongs here.)
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "elden-ring"
+name          = "ELDEN RING"
+developer     = "FromSoftware"
+publisher     = "Bandai Namco Entertainment"
+steam_appid   = 1245620
+engine        = "Dantelion"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2022-02-25"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "Easy Anti-Cheat (online play only)"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player, with online co-op, invasions and messages that need Easy Anti-Cheat running"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. The game starts through Easy Anti-Cheat the way Steam starts it, and nobody has yet seen that work on a Mac, so neither playing online nor starting at all is promised. DirectX 12 only, so Cellar has one way to run it and no second option to offer if it does not start. Shadow of the Erdtree is a separate purchase on Steam."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DirectX 12 only: DXVK and DXMT stop at DX11 and no VKD3D-Proton build ships with the runners, so
+# there is deliberately no fallback_backend that could never start it (as for Kingdom Come II).
+backend           = "d3dmetal"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 1245620
+# The game binary is Game/eldenring.exe, and that is what Cellar watches. Steam's launch option is
+# Game/start_protected_game.exe, EAC's starter in the same folder, so that is what Cellar starts
+# (start_exe is resolved beside exe), the way Red Dead Redemption 2 starts PlayRDR2.exe.
+install_dir = "ELDEN RING"
+exe         = "Game/eldenring.exe"
+start_exe   = "start_protected_game.exe"
+
+[acceptance]
+# What `cellar verify elden-ring` will hold this game to. Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts start_protected_game.exe beside a running Steam, eldenring.exe
+#   comes up, and it survives the watch window (default 5 min). If EAC shows an error and the game
+#   never starts, that is a launch fail to record in the notes, not something to work around.
+# - dlc: Shadow of the Erdtree (app 2778580) shows as owned in the game when the account owns it.
+# - dock: the Dock says ELDEN RING, never wine or start_protected_game.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+# After the first run: add online_hosts only for hosts the game's process was seen holding, and
+# save_paths once the run shows where it writes saves (expected AppData/Roaming/EldenRing).
+
+[legal]
+# Steamworks and Easy Anti-Cheat run untouched inside the layer. Only ever used with a copy the
+# player owns.
+drm_circumvention = "never"
