@@ -11,6 +11,7 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #281 | Shipped releases (0.4.1, 0.4.2) left their "Release Cellar" issue open | `test_scripts.py` › `test_release_workflow_runs_it_after_publishing` |
 | #267 | GTA V's Rockstar launcher said "wine" in the Dock | `DockShimTests.swift` › `launcherWearsTheGamesName` |
 | #267 | The uninstall dialog showed a Terminal command and bottle names | `RemovalSummaryTests.swift` › `plainWords` |
 | #267 | The sidebar said "Sign in" to a signed-in player while loading | `SidebarAccountTests.swift` › `loading` |

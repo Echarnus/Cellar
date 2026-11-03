@@ -143,7 +143,9 @@ Whichever way it starts, [`release.yml`](../.github/workflows/release.yml) runs:
    - signs the app zip and writes `appcast.xml` for the in-app updater, once
      `app/Resources/sparkle-public-key` and the `SPARKLE_ED_PRIVATE_KEY` secret exist;
    - attests build provenance for every download;
-   - publishes the GitHub Release with the DMG, both zips, the checksums and the feed.
+   - publishes the GitHub Release with the DMG, both zips, the checksums and the feed;
+   - closes the issue that asked for this version ("Release Cellar 0.6.0" or "Bump Cellar to
+     0.6.0") as completed, with a link to the release (`app/Scripts/close-release-issue.py`).
 
 To preview the notes before tagging: `GH_TOKEN=… python3 app/Scripts/release-notes.py --repo
 Echarnus/Cellar --tag HEAD --out /tmp/notes.md`. A manual run without `publish` builds the downloads for

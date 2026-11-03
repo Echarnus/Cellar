@@ -25,6 +25,7 @@ def load(name):
 
 check_pr = load("check-pr")
 coverage = load("coverage")
+close_release_issue = load("close-release-issue")
 
 GOOD = """## What and why
 
@@ -299,3 +300,40 @@ class RegressionLedgerTests(unittest.TestCase):
             pattern = {".py": f"def {func}(", ".c": f" {func}("}.get(os.path.splitext(name)[1], f"func {func}(")
             with open(paths[0], encoding="utf-8") as handle:
                 self.assertIn(pattern, handle.read(), f"{name} has no {func}: {row.strip()}")
+
+
+class CloseReleaseIssueTests(unittest.TestCase):
+    """The release workflow closes the issue that asked for the release (0.4.1 and 0.4.2 stayed open)."""
+
+    def issue(self, number, title, state="open", **extra):
+        return dict(number=number, title=title, state=state, **extra)
+
+    def test_closes_this_versions_release_issue(self):
+        issues = [
+            self.issue(275, "Release Cellar 0.6.0"),
+            self.issue(276, "Bump Cellar to 0.6.0"),
+            self.issue(211, "Add a verify report to every game"),
+        ]
+        self.assertEqual(close_release_issue.release_issues(issues, "0.6.0"), [275, 276])
+
+    def test_leaves_other_versions_closed_issues_and_pull_requests(self):
+        issues = [
+            self.issue(198, "Release Cellar 0.4.2"),
+            self.issue(300, "Release Cellar 0.6.01"),
+            self.issue(301, "Release Cellar 0.6.0", state="closed"),
+            self.issue(302, "Release Cellar 0.6.0", pull_request={}),
+            self.issue(303, "Release Cellar 0.6.0 notes are wrong"),
+        ]
+        self.assertEqual(close_release_issue.release_issues(issues, "0.6.0"), [])
+
+    def test_matches_a_v_prefix_and_case_but_not_a_regex_dot(self):
+        issues = [self.issue(1, "release cellar v0.6.0"), self.issue(2, "Release Cellar 0x6x0")]
+        self.assertEqual(close_release_issue.release_issues(issues, "0.6.0"), [1])
+
+    def test_release_workflow_runs_it_after_publishing(self):
+        with open(os.path.join(os.path.dirname(ROOT), ".github", "workflows", "release.yml")) as f:
+            workflow = f.read()
+        publish = workflow.index("gh release create")
+        close = workflow.index("Scripts/close-release-issue.py")
+        self.assertLess(publish, close, "the issue must close only once the release is out")
+        self.assertIn("issues: write", workflow)
