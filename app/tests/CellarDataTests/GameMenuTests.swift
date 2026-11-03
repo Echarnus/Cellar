@@ -167,4 +167,14 @@ struct GameMenuTests {
         #expect(facts.overview.map(\.label) == ["Developer", "Released"])
         #expect(facts.technical.map(\.label) == ["Engine", "Graphics API"])
     }
+
+    /// Kenneth right-clicked Fallout Shelter to uninstall it and found only Play and Settings (#304).
+    /// The app is an executable no test can import, so the line is held on its source: both menus
+    /// render the one `GameMenuContent`, and so cannot drift apart again.
+    @Test("The library's right-click menu and the page's \"…\" menu show the same entries",
+          arguments: ["CellarApp/Features/Library/LibraryView.swift", "CellarApp/Features/GameDetail/GameDetailView.swift"])
+    func bothMenusShareTheContent(_ path: String) throws {
+        let text = try String(contentsOf: Repo.source(path), encoding: .utf8)
+        #expect(text.contains("GameMenuContent("), "\(path) builds its own game menu instead of GameMenuContent")
+    }
 }
