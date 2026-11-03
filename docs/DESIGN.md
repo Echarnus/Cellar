@@ -29,9 +29,11 @@ that happens one level down and is never in the way.
 
 ## 2. Plain words: never the plumbing
 
-- A player never reads **wine, bottle, prefix, runner, D3DMetal, DXVK, profile, manifest, depot or
+- A player never reads **wine, prefix, runner, D3DMetal, DXVK, profile, manifest, depot or
   log** on a player screen (delivery checklist **P2**). Technical Details is the one exception,
-  because it exists to show those things.
+  because it exists to show those things. **"Bottle" is the exception that is allowed**: it is the
+  Cellar wordplay (a cellar keeps bottles; each game gets its own), and the launch screen already
+  says "Preparing the bottle" (Kenneth, 2026-11-03).
 - **"wine" never appears as the name of anything a player can see**, including the Dock tooltip,
   ⌘-Tab, the menu bar and Force Quit. Every process Cellar starts for a game shows the game's
   name: the game itself, the store's stub (`PlayGTAV.exe`), and a publisher launcher (the Rockstar

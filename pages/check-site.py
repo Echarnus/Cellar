@@ -11,7 +11,7 @@ Fails (exit 1) on:
     lang or <title>, template text that leaked into the page ({…}), or copy implying a game
     can come from no store, or that names a store the site does not offer yet (gen-site.py's
     OFFERED; the first release is Steam only) outside a game card's own profile facts
-  - a technical word (Wine, bottle, runner, D3DMetal, profile…) in the player-facing copy of the
+  - a technical word (Wine, runner, D3DMetal, profile…) in the player-facing copy of the
     home, games, sponsor or 404 page (docs/DESIGN.md §2; the FAQ explains them, and the footer credits Wine)
   - a <video> without a poster and an English captions <track>, or a screenshot or video in
     media/ larger than MEDIA_LIMITS
@@ -29,6 +29,7 @@ import glob
 import html.parser
 import importlib.util
 import os
+import posixpath
 import re
 import sys
 import urllib.error
@@ -38,9 +39,16 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # docs/DESIGN.md §2: a player never reads the plumbing. Checked on the pages a player lands on;
-# faq.html has a question that explains these words, and the footer's credit names Wine.
-PLAIN_PAGES = ("index.html", "games.html", "sponsor.html", "404.html")
-JARGON = re.compile(r"\b(wine|bottles?|wineprefix|prefix(es)?|runners?|d3dmetal|dxvk|moltenvk|"
+# faq.html has a question that explains these words, and the footer's credit names Wine. "Bottle"
+# is not plumbing: it is the cellar wordplay the app itself uses ("Preparing the bottle"), allowed
+# by Kenneth on 2026-11-03.
+PLAIN_PAGES = ("index.html", "games.html", "sponsor.html", "404.html")  # and every games/<slug>.html
+# docs/SITE-DESIGN.md §9: phrases that read as generated copy. Banned on every page.
+CLICHES = re.compile(r"\b(seamless(ly)?|effortless(ly)?|gets? out of (the|your) way|everything you need|unleash|"
+                     r"supercharge[ds]?|game[- ]changer|the way it likes|free for now)\b", re.I)
+# docs/SITE-DESIGN.md §12: what a search result shows.
+TITLE_MAX, DESCRIPTION_RANGE = 70, (90, 175)
+JARGON = re.compile(r"\b(wine|wineprefix|prefix(es)?|runners?|d3dmetal|dxvk|moltenvk|"
                     r"profiles?|manifests?|depots?)\b", re.I)
 # Bytes per file in media/, so a capture can't make the page slow to open (skills/web.md: Fast).
 MEDIA_LIMITS = {".png": 600_000, ".jpg": 600_000, ".mp4": 15_000_000, ".vtt": 50_000}
@@ -72,6 +80,8 @@ class Page(html.parser.HTMLParser):
         self._card = None      # stack depth of the game card being read
         self.plain = False     # hold the copy to PLAIN_PAGES' rule
         self._exempt = None    # stack depth of a .legal credit or a card's profile facts
+        self.meta = {}         # name/property → content
+        self.canonical = None
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -80,6 +90,10 @@ class Page(html.parser.HTMLParser):
             self.ids.append((a["id"], line))
         if tag == "html":
             self.lang = a.get("lang")
+        if tag == "meta" and (a.get("name") or a.get("property")):
+            self.meta[a.get("name") or a.get("property")] = a.get("content") or ""
+        if tag == "link" and a.get("rel") == "canonical":
+            self.canonical = a.get("href")
         if tag in ("script", "style"):
             self._raw += 1
             if tag == "script" and a.get("src"):
@@ -160,11 +174,15 @@ class Page(html.parser.HTMLParser):
         if re.search(r"\bno[- ]store\b|without (a|the|any) store\b|manual download", data, re.I):
             self.problems.append(f"line {self.getpos()[0]}: implies a store-less path: {data.strip()[:60]!r}")
         # Steam only for now (Kenneth, 2026-11-02): no hidden store in the site's own copy. A card's
-        # facts are its profile's words (a Steam game's DRM may name another account), so they pass.
-        if self._card is None:
+        # facts, and a game page's, are its profile's words (a Steam game's DRM may name another account),
+        # so they pass.
+        if self._card is None and self._exempt is None:
             for name in self.HIDDEN:
                 if re.search(rf"\b{re.escape(name)}\b", data, re.I):
                     self.problems.append(f"line {self.getpos()[0]}: names {name}, a store the site doesn't offer yet: {data.strip()[:60]!r}")
+        m = CLICHES.search(data)
+        if m:
+            self.problems.append(f"line {self.getpos()[0]}: {m.group(0)!r} reads as generated copy (docs/SITE-DESIGN.md §9)")
         if self.plain and self._exempt is None:
             m = JARGON.search(data)
             if m:
@@ -223,17 +241,18 @@ def main():
     Page.HIDDEN = tuple(n for k, label in gen.STORES.items() if k not in gen.OFFERED
                         for n in {label, gen.OWNERS[k]})
     site = os.path.abspath(args.site)
-    pages = sorted(glob.glob(os.path.join(site, "*.html")))
+    pages = sorted(glob.glob(os.path.join(site, "*.html")) + glob.glob(os.path.join(site, "games", "*.html")))
     if not pages:
         sys.exit(f"error: no pages in {site} — run pages/gen-site.py first")
 
     parsed, problems, external, covers = {}, [], set(), set()
     for path in pages:
         p = Page()
-        p.plain = os.path.basename(path) in PLAIN_PAGES
+        name = os.path.relpath(path, site).replace(os.sep, "/")
+        p.plain = name in PLAIN_PAGES or name.startswith("games/")
         with open(path, encoding="utf-8") as f:
             p.feed(f.read())
-        parsed[os.path.basename(path)] = p
+        parsed[name] = p
 
     repo_main = gen.REPO + "/blob/main/"
     for name, p in parsed.items():
@@ -243,6 +262,15 @@ def main():
             problems.append(f"{where}: <html> has no lang")
         if not p.title.strip():
             problems.append(f"{where}: no <title>")
+        elif len(p.title.strip()) > TITLE_MAX:
+            problems.append(f"{where}: <title> is {len(p.title.strip())} characters; search results cut it after {TITLE_MAX}")
+        desc = p.meta.get("description", "")
+        if not DESCRIPTION_RANGE[0] <= len(desc) <= DESCRIPTION_RANGE[1]:
+            problems.append(f"{where}: meta description is {len(desc)} characters (want {DESCRIPTION_RANGE[0]}–{DESCRIPTION_RANGE[1]})")
+        if name != "404.html" and not (p.canonical or "").startswith(gen.SITE_URL):
+            problems.append(f"{where}: no canonical URL on {gen.SITE_URL}")
+        if not p.meta.get("og:image"):
+            problems.append(f"{where}: no og:image for sharing")
         h1 = [line for level, line in p.headings if level == 1]
         if len(h1) != 1:
             problems.append(f"{where}: {len(h1)} <h1> elements (expected exactly one)")
@@ -291,7 +319,10 @@ def main():
             elif target_path.startswith("/"):
                 problems.append(f"{where}: line {line}: {href} is rooted outside {gen.SITE_PATH}")
                 continue
-            target = os.path.basename(target_path) if target_path else name
+            elif target_path:
+                # Relative to the page's own folder: a game page links up with ../
+                target_path = posixpath.normpath(posixpath.join(posixpath.dirname(name), target_path))
+            target = target_path if target_path else name
             if target_path and not os.path.exists(os.path.join(site, target_path)):
                 problems.append(f"{where}: line {line}: {href} — no {target_path} in the site")
                 continue

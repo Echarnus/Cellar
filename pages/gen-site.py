@@ -168,6 +168,8 @@ DARK = {
 }
 # The hero band is the brand colour in both appearances, with white type on it.
 HERO = ("#a52a52", "#8e1f3d", "#4a0f22")
+# The launch section is the page's one dark moment, the same in both appearances.
+DEEP = {"deep": "#1c0b12", "deep-2": "#26111a", "deep-muted": "#cdb9c1"}
 # Status badges sit on cover art, so they carry their own solid colours in both appearances.
 BADGES = {"ok": "#1f7a3d", "warn": "#9a5a00", "muted": "#5f5960"}
 
@@ -185,6 +187,9 @@ for _theme, _p in (("light", LIGHT), ("dark", DARK)):
     for _k in STORES:
         CONTRAST.append((f"{_theme}: {_k} chip", _p[_k], _p[f"{_k}-bg"], 4.5))
     CONTRAST.append((f"{_theme}: primary button", _p["on-primary"], _p["primary"], 4.5))
+for _k in ("deep", "deep-2"):
+    CONTRAST += [(f"white text on {_k}", "#ffffff", DEEP[_k], 4.5),
+                 (f"secondary text on {_k}", DEEP["deep-muted"], DEEP[_k], 4.5)]
 for _stop in HERO:
     CONTRAST.append((f"hero text on {_stop}", "#ffffff", _stop, 4.5))
 for _k, _c in BADGES.items():
@@ -202,50 +207,59 @@ THEME_CSS = (f":root{{color-scheme:light dark;{_tokens(LIGHT)}}}\n"
              f":root[data-theme=dark]{{{_tokens(DARK)}}}\n"
              f":root[data-theme=light]{{color-scheme:light}}:root[data-theme=dark]{{color-scheme:dark}}\n"
              f":root{{--hero-1:{HERO[0]};--hero-2:{HERO[1]};--hero-3:{HERO[2]};"
-             + "".join(f"--badge-{k}:{v};" for k, v in BADGES.items()) + "}\n")
+             + "".join(f"--badge-{k}:{v};" for k, v in BADGES.items()) + _tokens(DEEP) + "}\n")
 
 # One stylesheet for every page, inlined — no build step, no extra request. A plain string (single
 # braces), interpolated into the page f-strings.
 CSS = THEME_CSS + """
+/* Built from docs/SITE-DESIGN.md: its type scale (§4) and spacing (§5) are these tokens. Wine is the
+   accent, not the wallpaper (§3); sections are separated by space, hairlines only inside lists (§6). */
+:root{--display:clamp(44px,7vw,76px);--title-1:clamp(32px,5vw,52px);--title-2:clamp(26px,3vw,32px);
+  --title-3:20px;--lede:clamp(19px,2.2vw,23px);--footnote:14px;--caption:12px;
+  --section:120px;--gutter:22px}
+@media (max-width:700px){:root{--section:80px}}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);
-  font:17px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",sans-serif;
-  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  font:17px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  letter-spacing:-.022em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 img,svg{max-width:100%}
-a{color:var(--link);text-underline-offset:.18em}
-a:hover{text-decoration-thickness:2px}
+a{color:var(--link);text-underline-offset:.18em;text-decoration:none}
+a:hover{text-decoration:underline}
 :focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:8px}
-h1,h2,h3{line-height:1.15;letter-spacing:-.022em;margin:0}
+h1,h2,h3{line-height:1.1;letter-spacing:-.015em;margin:0;font-weight:700}
 p{margin:0 0 1em}
 code{font:.86em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface-2);
-  padding:2px 6px;border-radius:6px;overflow-wrap:anywhere}
-.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  padding:2px 6px;border-radius:6px;overflow-wrap:anywhere;letter-spacing:0}
+.wrap{max-width:1068px;margin:0 auto;padding:0 var(--gutter)}
+.narrow{max-width:760px;margin-left:auto;margin-right:auto}
+.center{text-align:center}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .skip{position:absolute;left:12px;top:-60px;z-index:20;background:var(--surface);color:var(--fg);
   padding:12px 18px;border-radius:10px;border:1px solid var(--line);font-weight:600}
 .skip:focus{top:12px}
 
-/* Top bar */
-.top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 86%,transparent);
-  -webkit-backdrop-filter:saturate(180%) blur(14px);backdrop-filter:saturate(180%) blur(14px);
-  border-bottom:1px solid var(--line)}
-@supports not (background:color-mix(in srgb,red 50%,blue)){.top{background:var(--bg)}}
-.top .wrap{display:flex;align-items:center;gap:8px;min-height:60px;flex-wrap:wrap}
-.brand{display:inline-flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none;
-  font-weight:750;font-size:1.08rem;margin-right:auto;min-height:44px}
-.brand img{width:30px;height:30px;border-radius:7px}
-.nav{display:flex;gap:2px;order:3;width:100%;overflow-x:auto;margin:0 -8px;padding:0 0 6px;scrollbar-width:none}
+/* Top bar: translucent, 52px, small type, like the menu of any Apple page */
+.top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 80%,transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+@supports not (background:color-mix(in srgb,red 50%,blue)){.top{background:var(--bg);border-bottom-color:var(--line)}}
+.top .wrap{display:flex;align-items:center;gap:6px;min-height:52px;flex-wrap:wrap}
+.brand{display:inline-flex;align-items:center;gap:9px;color:var(--fg);text-decoration:none;
+  font-weight:600;font-size:1.05rem;margin-right:auto;min-height:44px}
+.brand:hover{text-decoration:none}
+.brand img{width:28px;height:28px}
+.nav{display:flex;gap:0;order:3;width:100%;overflow-x:auto;margin:0 -10px;padding:0 0 4px;scrollbar-width:none}
 .nav::-webkit-scrollbar{display:none}
-.nav a{color:var(--muted);text-decoration:none;padding:0 12px;border-radius:9px;font-size:.95rem;
+.nav a{color:var(--muted);text-decoration:none;padding:0 10px;font-size:var(--footnote);letter-spacing:-.01em;
   min-height:44px;display:inline-flex;align-items:center;white-space:nowrap}
-.nav a:hover{color:var(--fg);background:var(--surface-2)}
-.nav a[aria-current=page]{color:var(--fg);font-weight:600}
-@media (min-width:760px){.nav{order:0;width:auto;margin:0 6px 0 0;padding:0;overflow:visible}}
-.icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:11px;
-  border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
-.icon-btn:hover{background:var(--surface-2)}
-.icon-btn svg{width:20px;height:20px}
+.nav a:hover{color:var(--fg)}
+.nav a[aria-current=page]{color:var(--fg)}
+@media (min-width:760px){.nav{order:0;width:auto;margin:0 8px 0 0;padding:0;overflow:visible}}
+.icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:50%;
+  border:0;background:transparent;color:var(--muted);cursor:pointer}
+.icon-btn:hover{color:var(--fg);background:var(--surface-2)}
+.icon-btn svg{width:18px;height:18px}
 .icon-btn .moon{display:none}
 :root[data-theme=dark] .icon-btn .sun{display:none}
 :root[data-theme=dark] .icon-btn .moon{display:block}
@@ -253,210 +267,271 @@ code{font:.86em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(-
   :root:not([data-theme=light]) .icon-btn .moon{display:block}}
 .no-js .icon-btn{display:none}
 
-/* Buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;
-  padding:10px 18px;border-radius:12px;font-weight:650;text-decoration:none;border:1px solid transparent;
-  transition:transform .15s ease,box-shadow .15s ease,background-color .15s ease}
-.btn svg{width:18px;height:18px;flex:none}
+/* Buttons: one filled pill for the one action; everything else is a text link with a chevron */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;
+  padding:10px 22px;border-radius:980px;font-weight:500;text-decoration:none;border:1px solid transparent;
+  transition:background-color .15s ease,color .15s ease,border-color .15s ease;cursor:pointer}
+.btn:hover{text-decoration:none}
+.btn svg{width:17px;height:17px;flex:none}
 .btn-primary{background:var(--primary);color:var(--on-primary)}
-.btn-primary:hover{box-shadow:0 8px 22px var(--shadow);transform:translateY(-1px)}
-.btn-small{padding:8px 14px;font-size:.92rem}
-.btn-light{background:#fff;color:#1c1a1d;box-shadow:0 12px 32px rgba(0,0,0,.28)}
-.btn-light:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(0,0,0,.34)}
-.btn-ghost{color:#fff;border-color:rgba(255,255,255,.55)}
-.btn-ghost:hover{background:rgba(255,255,255,.12)}
-.btn-big{padding:14px 24px;font-size:1.05rem;border-radius:14px}
-.btn-big .lines{display:flex;flex-direction:column;text-align:left;line-height:1.25}
-.btn-big small{font-weight:500;font-size:.78rem;color:#4a454b}
-.hero .btn:focus-visible,.band .btn:focus-visible,.hero a:focus-visible,.band a:focus-visible{outline-color:#fff}
+.btn-primary:hover{background:color-mix(in srgb,var(--primary) 88%,#000)}
+.btn-small{padding:4px 14px;min-height:32px;font-size:.8rem;margin:6px 0}
+.btn-big{padding:13px 28px;font-size:1.06rem}
+.btn-ghost{color:var(--fg);border-color:var(--line);background:transparent}
+.btn-ghost:hover{border-color:var(--muted)}
+.btn-ghost-dark{color:var(--link);border-color:var(--link);background:transparent}
+.btn-ghost-dark:hover{background:var(--link);color:var(--bg)}
+.chev{display:inline-flex;align-items:center;min-height:44px;font-size:1.06rem}
+.chev::after{content:"";display:inline-block;width:.42em;height:.42em;margin-left:.42em;
+  border-right:1.6px solid currentColor;border-top:1.6px solid currentColor;transform:rotate(45deg)}
+.fine{color:var(--muted);font-size:var(--footnote);line-height:1.43;letter-spacing:-.01em}
 
-/* Hero */
-.hero{color:#fff;background:radial-gradient(120% 120% at 15% -10%,var(--hero-1) 0%,var(--hero-2) 45%,var(--hero-3) 100%);
-  overflow:hidden}
-.hero .wrap{display:grid;gap:44px;align-items:center;padding-top:64px;padding-bottom:72px}
-@media (min-width:900px){.hero .wrap{grid-template-columns:1.05fr .95fr;padding-top:88px;padding-bottom:96px}}
-.eyebrow{display:inline-flex;gap:8px;align-items:center;font-size:.85rem;font-weight:600;letter-spacing:.02em;
-  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:5px 12px;border-radius:99px;margin-bottom:22px}
-.hero h1{font-size:clamp(2.4rem,5.6vw,3.7rem);font-weight:800;letter-spacing:-.035em}
-.hero .lede{font-size:clamp(1.08rem,2.1vw,1.25rem);max-width:36ch;margin:20px 0 30px;color:#fff}
-.hero .ctas{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.hero .fine{margin:18px 0 0;font-size:.9rem;color:#fff}
-.hero .fine a{color:#fff}
-.hero .fine.sum{margin-top:8px;font-size:.82rem}
-.hero .fine code{overflow-wrap:anywhere;background:rgba(0,0,0,.28);color:#fff}
-.shelf{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:1.08/1}
-@media (max-width:600px){.shelf{display:none}}
-.shelf .cover{position:absolute;width:44%;aspect-ratio:2/3;border-radius:14px;overflow:hidden;
-  box-shadow:0 26px 60px rgba(0,0,0,.45);background:linear-gradient(160deg,#c4466e,#4a0f22)}
-.shelf .cover img{width:100%;height:100%;object-fit:cover;display:block}
-.shelf .c1{left:2%;top:14%;transform:rotate(-8deg)}
-.shelf .c2{left:28%;top:2%;z-index:2;width:46%}
-.shelf .c3{right:2%;top:14%;transform:rotate(8deg)}
-/* The icon overlaps the bottom edge of the middle cover by about 40% of its height: enough to
-   tie it to the shelf, low enough to leave cover titles clear. Its PNG carries macOS's transparent
-   margin and its own rounded tile: the shadow follows the tile (drop-shadow), and height:auto
-   keeps it square — the height attribute alone would pin it at 256px tall. */
-.shelf .appicon{position:absolute;z-index:3;left:50%;bottom:8%;transform:translateX(-50%);width:24%;height:auto;
-  aspect-ratio:1/1;filter:drop-shadow(0 14px 22px rgba(0,0,0,.45))}
-.page-head{color:#fff;background:radial-gradient(120% 140% at 15% -20%,var(--hero-1) 0%,var(--hero-2) 50%,var(--hero-3) 100%)}
-.page-head .wrap{padding-top:56px;padding-bottom:56px}
-.page-head h1{font-size:clamp(2.1rem,5vw,3rem);font-weight:800}
-.page-head p{margin:14px 0 0;max-width:56ch;font-size:1.12rem;color:#fff}
+/* Hero: plain page, centred; the picture carries it */
+.hero{text-align:center;padding:72px 0 0;overflow:hidden}
+.hero .appicon{width:96px;height:96px;margin:0 auto 18px;display:block}
+.hero h1{font-size:var(--display);line-height:1.05;max-width:15ch;margin:0 auto}
+.hero .lede{font-size:var(--lede);line-height:1.38;color:var(--muted);max-width:34ch;
+  margin:22px auto 30px;letter-spacing:-.01em}
+.hero .ctas{display:flex;gap:10px 28px;flex-wrap:wrap;align-items:center;justify-content:center}
+.hero .fine{margin:22px auto 0;max-width:60ch}
+.hero .fine.sum{margin-top:6px}
+.stage{position:relative;margin:56px auto 0;max-width:980px}
+.stage::before{content:"";position:absolute;inset:8% 4% -6%;z-index:-1;border-radius:50%;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--primary) 30%,transparent),transparent);filter:blur(30px)}
+.page-head{padding:64px 0 8px}
+.page-head h1{font-size:var(--title-1);max-width:20ch}
+.page-head p{margin:16px 0 0;max-width:58ch;font-size:var(--lede);line-height:1.38;color:var(--muted)}
+
+/* A Mac window: frames a screenshot, or stands in for one until it is captured */
+.window{border-radius:12px;overflow:hidden;background:var(--surface);
+  box-shadow:0 0 0 1px var(--line),0 30px 70px -28px var(--shadow)}
+.window .bar{height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--surface-2);
+  border-bottom:1px solid var(--line)}
+.window .bar i{width:12px;height:12px;border-radius:50%;background:var(--line)}
+.window img,.window video{display:block;width:100%;height:auto}
+.soon{aspect-ratio:16/10;display:grid;place-items:center;align-content:center;gap:8px;padding:24px;text-align:center;
+  color:var(--muted);background:radial-gradient(70% 60% at 50% 45%,color-mix(in srgb,var(--primary) 9%,var(--surface)),var(--surface))}
+.soon b{color:var(--fg);font-weight:600;font-size:1.05rem}
+.soon .tag{font-size:.75rem;font-weight:600;letter-spacing:.02em;color:var(--link);
+  border:1px solid currentColor;border-radius:980px;padding:2px 10px}
+.soon span{max-width:40ch;font-size:.92rem}
 
 /* Sections */
-section.block{padding:84px 0 0}
-.section-head{max-width:680px;margin-bottom:34px}
-.kicker{color:var(--link);font-weight:700;font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px}
-.section-head h2{font-size:clamp(1.8rem,3.6vw,2.5rem)}
-.section-head p{color:var(--muted);font-size:1.08rem;margin:14px 0 0}
-.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);
-  border-radius:18px;overflow:hidden;margin:-36px 0 0;position:relative}
-@media (min-width:760px){.stats{grid-template-columns:repeat(4,1fr)}}
-.stats div{background:var(--surface);padding:18px 20px}
-.stats b{display:block;font-size:1.6rem;letter-spacing:-.02em}
-.stats span{color:var(--muted);font-size:.92rem}
+section.block{padding:var(--section) 0 0}
+.section-head{max-width:760px;margin:0 0 48px}
+.section-head.center{margin-left:auto;margin-right:auto}
+.section-head h2{font-size:var(--title-1);line-height:1.08}
+.section-head p{color:var(--muted);font-size:var(--lede);line-height:1.38;margin:18px 0 0;max-width:44ch}
+.section-head.center p{margin-left:auto;margin-right:auto;max-width:44ch}
 
-.features{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));list-style:none;margin:0;padding:0}
-.feature{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px}
-.feature .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--surface-2);color:var(--link);margin-bottom:16px}
-.feature .ic svg{width:24px;height:24px}
-.feature h3{font-size:1.15rem;margin-bottom:8px}
-.feature p{color:var(--muted);margin:0}
+/* Feature rows: text on one side, the picture on the other, alternating */
+.rows{list-style:none;margin:0;padding:0;display:grid;gap:96px}
+.row{display:grid;gap:28px;align-items:center}
+@media (min-width:900px){.row{grid-template-columns:5fr 7fr;gap:64px}
+  .row:nth-child(even){grid-template-columns:7fr 5fr}.row:nth-child(even) .copy{order:2}}
+.row h2{font-size:var(--title-2);line-height:1.14;letter-spacing:-.012em;margin-bottom:14px}
+.row p{color:var(--muted);font-size:1.06rem;margin:0}
+.row p b{color:var(--fg);font-weight:600}
+.row figure{margin:0}
 
-.steps{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));list-style:none;margin:0;padding:0;counter-reset:step}
-.steps li{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px 24px 24px 76px;counter-increment:step}
-.tour-video{margin:0 0 56px}
-.tour-video video,.shot img,.hero-shot img{display:block;width:100%;height:auto;border-radius:14px;
-  border:1px solid var(--line);background:var(--surface-2);box-shadow:0 24px 60px -24px var(--shadow)}
-.tour-video figcaption{color:var(--muted);font-size:.95rem;margin-top:12px}
-.shots{list-style:none;margin:0;padding:0;display:grid;gap:56px}
-.shot figure{margin:0;display:grid;gap:22px;align-items:center}
-@media (min-width:900px){.shot figure{grid-template-columns:1.55fr 1fr;gap:48px}
-  .shot:nth-child(even) figure{grid-template-columns:1fr 1.55fr}
-  .shot:nth-child(even) img{order:2}}
-.shot h3{font-size:1.45rem;margin-bottom:10px}
-.shot p{color:var(--muted);margin:0}
-.hero-shot{justify-self:center;width:100%;max-width:620px}
-.hero-shot img{border-color:rgba(255,255,255,.18);box-shadow:0 40px 80px -30px rgba(0,0,0,.6)}
-.steps li::before{content:counter(step);position:absolute;left:24px;top:22px;width:36px;height:36px;border-radius:50%;
-  background:var(--primary);color:var(--on-primary);display:grid;place-items:center;font-weight:750}
-.steps h3{font-size:1.1rem;margin-bottom:6px}
+
+/* Launch: the one dark moment on the page, in both appearances */
+.launch{margin-top:var(--section);padding:var(--section) 0;background:var(--deep);color:#fff}
+.launch .section-head p{color:var(--deep-muted)}
+.launch a{color:#fff;text-decoration:underline}
+.launch-grid{display:grid;gap:40px;align-items:center}
+@media (min-width:900px){.launch-grid{grid-template-columns:5fr 7fr;gap:64px}}
+.launch-grid .section-head{margin:0}
+.launch .window{background:var(--deep-2);box-shadow:0 0 0 1px rgba(255,255,255,.1),0 40px 80px -30px #000}
+.launch .window .bar{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.08)}
+.launch .window .bar i{background:rgba(255,255,255,.18)}
+.launch figcaption{color:var(--deep-muted);font-size:var(--footnote);margin-top:12px}
+.stages{list-style:none;margin:0;padding:28px 28px 22px;display:grid;gap:4px}
+.stages li{display:grid;grid-template-columns:22px 1fr;gap:14px;align-items:start;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,.08);color:var(--deep-muted)}
+.stages li:last-child{border-bottom:0}
+.stages b{display:block;color:#fff;font-weight:600}
+.stages small{font-size:.86rem;line-height:1.4}
+.stages .dot{width:18px;height:18px;margin-top:3px;border-radius:50%;border:1.6px solid rgba(255,255,255,.35);position:relative}
+.stages .dot::after{content:"";position:absolute;left:5px;top:2px;width:4px;height:8px;border:solid;
+  border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
+/* Each stage ticks in turn on a 12-second loop; with reduced motion they all show done. */
+.stages .dot{color:transparent;animation:12s infinite}
+.stages .dot::after{border-color:currentColor;opacity:1}
+@keyframes s1{0%,4%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}6%,90%{background:var(--primary);border-color:var(--primary);color:#fff}94%,100%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}}
+@keyframes s2{0%,18%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}20%,90%{background:var(--primary);border-color:var(--primary);color:#fff}94%,100%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}}
+@keyframes s3{0%,32%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}34%,90%{background:var(--primary);border-color:var(--primary);color:#fff}94%,100%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}}
+@keyframes s4{0%,46%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}48%,90%{background:var(--primary);border-color:var(--primary);color:#fff}94%,100%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}}
+@keyframes s5{0%,60%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}62%,90%{background:var(--primary);border-color:var(--primary);color:#fff}94%,100%{background:transparent;border-color:rgba(255,255,255,.35);color:transparent}}
+.stages li:nth-child(1) .dot{animation-name:s1}.stages li:nth-child(2) .dot{animation-name:s2}.stages li:nth-child(3) .dot{animation-name:s3}.stages li:nth-child(4) .dot{animation-name:s4}.stages li:nth-child(5) .dot{animation-name:s5}
+.stages-tag{display:inline-block;margin:0 28px 22px;font-size:.75rem;font-weight:600;color:#fff;
+  border:1px solid rgba(255,255,255,.4);border-radius:980px;padding:2px 10px}
+
+/* "Everything else": a spec grid, no boxes */
+.specs{list-style:none;margin:0;padding:0;display:grid;gap:0 40px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.specs li{padding:22px 0 24px;border-top:1px solid var(--line)}
+.specs svg{width:26px;height:26px;color:var(--link);margin-bottom:12px;display:block}
+.specs h3{font-size:var(--title-3);line-height:1.25;margin-bottom:6px;font-weight:600}
+.specs p{color:var(--muted);margin:0;font-size:.98rem}
+
+/* Free: one statement on a quiet field */
+.free{margin-top:var(--section);padding:var(--section) 0;background:var(--surface-2)}
+.free .section-head{margin-bottom:56px}
+.three{list-style:none;margin:0;padding:0;display:grid;gap:32px 48px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.three h3{font-size:var(--title-3);margin-bottom:8px;font-weight:600}
+.three p{color:var(--muted);margin:0}
+.sponsor{margin:64px auto 0;max-width:640px;text-align:center;padding-top:40px;border-top:1px solid var(--line)}
+.sponsor p{color:var(--muted);margin:0 0 18px}
+
+/* Getting started: big quiet numerals, no circles */
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:40px 48px;counter-reset:step;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.steps li{counter-increment:step}
+.steps li::before{content:counter(step);display:block;font-size:3.4rem;font-weight:200;line-height:1;color:var(--muted);margin-bottom:16px;letter-spacing:-.03em}
+.steps h3{font-size:var(--title-3);margin-bottom:8px;font-weight:600}
 .steps p{margin:0;color:var(--muted)}
 
 /* Games */
-.toolbar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;margin:0 0 22px}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;margin:0 0 20px}
 .no-js .toolbar{display:none}
-.search{position:relative;flex:1 1 240px;max-width:360px}
-.search svg{position:absolute;left:13px;top:50%;width:18px;height:18px;transform:translateY(-50%);color:var(--muted);pointer-events:none}
-.search input{width:100%;min-height:44px;padding:10px 14px 10px 40px;border-radius:12px;border:1px solid var(--muted);
+.search{position:relative;flex:1 1 240px;max-width:340px}
+.search svg{position:absolute;left:12px;top:50%;width:17px;height:17px;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.search input{width:100%;min-height:44px;padding:10px 14px 10px 38px;border-radius:10px;border:1px solid var(--muted);
   background:var(--surface);color:var(--fg);font:inherit;font-size:1rem}
-.seg{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:13px;background:var(--surface-2);border:1px solid var(--line)}
-.seg button{min-height:38px;padding:6px 13px;border:0;border-radius:9px;background:transparent;color:var(--fg);
-  font:inherit;font-size:.93rem;cursor:pointer}
-.seg button:hover{background:var(--surface)}
-.seg button[aria-pressed=true]{background:var(--surface);font-weight:650;box-shadow:0 1px 3px var(--shadow),inset 0 0 0 1px var(--line)}
-.seg .n{color:var(--muted);font-weight:500;margin-left:4px}
-.count{color:var(--muted);font-size:.95rem;margin:0 0 16px}
-.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));list-style:none;margin:0;padding:0}
-.card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;
-  transition:transform .18s ease,box-shadow .18s ease}
-.card:hover{transform:translateY(-3px);box-shadow:0 18px 36px var(--shadow)}
+.seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;border-radius:9px;background:var(--surface-2)}
+.seg button{min-height:40px;padding:6px 14px;border:0;border-radius:7px;background:transparent;color:var(--fg);
+  font:inherit;font-size:.9rem;cursor:pointer}
+.seg button:hover{background:color-mix(in srgb,var(--surface) 60%,transparent)}
+.seg button[aria-pressed=true]{background:var(--surface);font-weight:600;box-shadow:0 1px 3px var(--shadow)}
+.seg .n{color:var(--muted);font-weight:400;margin-left:5px}
+.count{color:var(--muted);font-size:.9rem;margin:0 0 18px}
+.grid{display:grid;gap:36px 24px;grid-template-columns:repeat(auto-fill,minmax(min(100%,176px),1fr));list-style:none;margin:0;padding:0}
+.card{display:flex;flex-direction:column}
 .card[hidden]{display:none}
-.card .art{position:relative;aspect-ratio:2/3;background:linear-gradient(160deg,var(--hero-1),var(--hero-3));color:#fff}
-.card .art .ph{position:absolute;inset:0;display:grid;place-items:center;padding:18px;text-align:center;font-weight:750;font-size:1.25rem;line-height:1.2}
+.card .art{position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:var(--surface-2);color:var(--muted);
+  box-shadow:0 0 0 1px var(--line),0 14px 30px -18px var(--shadow);transition:transform .25s ease}
+.card:hover .art{transform:scale(1.02)}
+.card .art .ph{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;font-weight:600;font-size:1.05rem;line-height:1.25}
 .card .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .card .art img.broken{display:none}
-.badge{position:absolute;top:10px;left:10px;display:inline-flex;align-items:center;gap:5px;color:#fff;font-size:.78rem;
-  font-weight:700;padding:4px 10px 4px 8px;border-radius:99px;background:var(--badge-muted);box-shadow:0 2px 8px rgba(0,0,0,.3)}
-.badge svg{width:14px;height:14px}
+.badge{position:absolute;top:8px;left:8px;display:inline-flex;align-items:center;gap:5px;color:#fff;font-size:.72rem;
+  font-weight:600;padding:3px 9px 3px 7px;border-radius:980px;background:var(--badge-muted);letter-spacing:0}
+.badge svg{width:13px;height:13px}
 .badge.ok{background:var(--badge-ok)}.badge.warn{background:var(--badge-warn)}
-.card .meta{padding:16px 16px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
-/* On a phone, a row per game: a full-width 2:3 cover would make the list ten screens long. */
-@media (max-width:540px){.card{flex-direction:row}.card .art{width:108px;flex:none;aspect-ratio:auto;min-height:162px}
-  .card .art .ph{font-size:.85rem;padding:8px}.badge{top:6px;left:6px;font-size:.7rem;padding:3px 7px 3px 5px}
-  .card .meta{padding:12px 14px}}
-.card h3{font-size:1.06rem;line-height:1.25}
-.chip{display:inline-block;font-size:.8rem;font-weight:650;padding:3px 10px;border-radius:7px}
+.card .meta{padding:14px 2px 0;display:flex;flex-direction:column;gap:8px;flex:1}
+@media (max-width:540px){.card{flex-direction:row;gap:14px}.card .art{width:96px;flex:none;aspect-ratio:auto;min-height:144px}
+  .card .art .ph{font-size:.8rem;padding:8px}.badge{top:5px;left:5px;font-size:.66rem;padding:2px 6px 2px 4px}
+  .card .meta{padding:0}}
+.card{position:relative}
+.card h3{font-size:1rem;line-height:1.25;font-weight:600}
+.card h3 a{color:var(--fg)}
+.card h3 a:hover{text-decoration:none}
+.stretch::after{content:"";position:absolute;inset:0;z-index:1;border-radius:12px}
+.stretch:focus-visible{outline:none}.stretch:focus-visible::after{outline:3px solid var(--focus);outline-offset:4px}
+
+/* A game's page */
+.crumbs{display:flex;gap:8px;align-items:center;padding:32px 0 0;font-size:var(--footnote);color:var(--muted)}
+.crumbs a{min-height:44px;display:inline-flex;align-items:center}
+.game-head{display:grid;gap:32px 56px;padding:24px 0 0;align-items:start}
+@media (min-width:760px){.game-head{grid-template-columns:minmax(200px,320px) 1fr}}
+.game-cover{position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:var(--surface-2);color:var(--muted);
+  box-shadow:0 0 0 1px var(--line),0 30px 60px -30px var(--shadow);max-width:320px}
+.game-cover .ph{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;font-weight:600}
+.game-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.game-cover img.broken{display:none}
+@media (max-width:759px){.game-cover{max-width:180px}}
+.game-head h1{font-size:var(--title-1);line-height:1.08}
+.game-head .lede{font-size:var(--lede);line-height:1.38;color:var(--muted);margin:16px 0 28px;max-width:40ch}
+dl.spec{display:block;margin:0 0 16px;border-top:1px solid var(--line);font-size:1rem}
+dl.spec div{display:grid;gap:2px 24px;padding:12px 0;border-bottom:1px solid var(--line)}
+@media (min-width:540px){dl.spec div{grid-template-columns:150px 1fr}}
+.spec dt{color:var(--muted)}
+.spec dd{margin:0}
+.spec .why{display:block;color:var(--muted);font-size:var(--footnote)}
+.status{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.status svg{width:17px;height:17px}
+.status.ok{color:var(--ok)}.status.warn{color:var(--warn)}.status.muted{color:var(--untested)}
+.reports{list-style:none;margin:0;padding:0;display:grid;gap:24px 48px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.reports li{padding-top:20px;border-top:1px solid var(--line)}
+.reports b{display:block;font-size:var(--title-2);letter-spacing:-.012em;margin-bottom:4px}
+.reports span{display:block;color:var(--muted);margin-top:6px}
+.chip{display:inline-block;font-size:.76rem;font-weight:600;padding:2px 9px;border-radius:6px}
 .chip.steam{color:var(--steam);background:var(--steam-bg)}
 .chip.battlenet{color:var(--battlenet);background:var(--battlenet-bg)}
 .chip.gog{color:var(--gog);background:var(--gog-bg)}
-.facts{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.88rem}
+.facts{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:.8rem;line-height:1.4}
 .facts dt{color:var(--muted)}
 .facts dd{margin:0;overflow-wrap:anywhere}
-.card .more{margin-top:auto;font-size:.88rem;font-weight:600;min-height:44px;display:inline-flex;align-items:center}
+.card .more{margin-top:auto;font-size:.8rem;min-height:44px;display:inline-flex;align-items:center}
 .no-js .grid[data-cap]>.card:nth-child(n+11){display:none}
-.more-games{text-align:center;margin:28px 0 0}
-.btn-ghost-dark{border:1px solid var(--line);color:var(--fg);background:var(--surface)}
-.btn-ghost-dark:hover{border-color:var(--link);color:var(--link)}
-.games-page{padding-top:8px}
+.more-games{text-align:center;margin:40px 0 0}
+.games-page{padding-top:32px}
 .empty{text-align:center;color:var(--muted);padding:40px 0}
-.legend{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));margin:28px 0 0;padding:0;list-style:none}
-.legend li{display:flex;gap:10px;align-items:flex-start;color:var(--muted);font-size:.93rem}
-.legend b{color:var(--fg)}
-.legend svg{width:18px;height:18px;flex:none;margin-top:3px}
+.legend{display:grid;gap:12px 32px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));margin:48px 0 0;padding:24px 0 0;
+  list-style:none;border-top:1px solid var(--line)}
+.legend li{display:flex;gap:10px;align-items:flex-start;color:var(--muted);font-size:.88rem}
+.legend b{color:var(--fg);font-weight:600}
+.legend svg{width:17px;height:17px;flex:none;margin-top:2px}
 .legend .ok{color:var(--ok)}.legend .warn{color:var(--warn)}.legend .muted{color:var(--untested)}
-.callout{margin:28px 0 0;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:14px;padding:18px 22px}
-.callout h3{font-size:1.05rem;margin-bottom:4px}
+.callout{margin:40px 0 0;padding:24px 0 0;border-top:1px solid var(--line)}
+.callout h3{font-size:1.1rem;margin-bottom:6px;font-weight:600}
 .callout p{margin:0;color:var(--muted)}
 
-/* Requirements */
-.reqs{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));list-style:none;margin:0;padding:0}
-.reqs li{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}
-.reqs b{display:block;font-size:1.05rem;margin-bottom:4px}
-.reqs span{color:var(--muted)}
-
-/* FAQ */
+/* FAQ: rows divided by hairlines */
 .qa-list{max-width:820px}
-details.qa{background:var(--surface);border:1px solid var(--line);border-radius:14px;margin:10px 0;scroll-margin-top:84px}
-details.qa>summary{cursor:pointer;list-style:none;padding:14px 18px;font-weight:650;display:flex;gap:14px;align-items:center;min-height:52px;border-radius:14px}
+details.qa{border-bottom:1px solid var(--line);scroll-margin-top:72px}
+details.qa:first-of-type{border-top:1px solid var(--line)}
+details.qa>summary{cursor:pointer;list-style:none;padding:18px 2px;font-weight:600;display:flex;gap:14px;align-items:center;min-height:56px;font-size:var(--title-3);letter-spacing:-.01em}
 details.qa>summary::-webkit-details-marker{display:none}
-details.qa>summary::after{content:"";flex:none;margin-left:auto;width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+details.qa>summary::after{content:"";flex:none;margin-left:auto;width:8px;height:8px;border-right:1.6px solid var(--muted);border-bottom:1.6px solid var(--muted);
   transform:rotate(45deg) translate(-2px,-2px);transition:transform .2s ease}
 details.qa[open]>summary::after{transform:rotate(225deg) translate(-2px,-2px)}
-details.qa[open]>summary{border-bottom:1px solid var(--line);border-radius:14px 14px 0 0}
-details.qa .a{padding:16px 18px 4px}
+details.qa .a{padding:0 2px 10px;color:var(--fg)}
 details.qa .a p,details.qa .a ul,details.qa .a ol{margin:0 0 14px}
 details.qa .a ul,details.qa .a ol{padding-left:20px}
 details.qa .a pre{margin:0 0 14px;overflow-x:auto}
 details.qa .a li{margin:5px 0}
-.faq-layout{display:grid;gap:36px;padding:44px 0 0}
-@media (min-width:960px){.faq-layout{grid-template-columns:240px 1fr}}
+.faq-layout{display:grid;gap:36px;padding:48px 0 0}
+@media (min-width:960px){.faq-layout{grid-template-columns:220px 1fr}}
 .toc{align-self:start}
-@media (min-width:960px){.toc{position:sticky;top:84px}}
-.toc h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
+@media (min-width:960px){.toc{position:sticky;top:76px}}
+.toc h2{font-size:.8rem;color:var(--muted);margin:0 0 8px;font-weight:600}
 .toc ol{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px}
 @media (min-width:960px){.toc ol{flex-direction:column}}
-.toc a{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border-radius:9px;color:var(--fg);text-decoration:none;
-  background:var(--surface-2)}
-@media (min-width:960px){.toc a{background:none;display:flex}}
-.toc a:hover{background:var(--surface-2)}
-.faq-section{margin:0 0 44px;scroll-margin-top:84px}
-.faq-section h2{font-size:1.55rem}
-.faq-section .lede{color:var(--muted);margin:6px 0 14px}
-.more-link{display:inline-flex;align-items:center;min-height:44px;font-weight:650}
+.toc a{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border-radius:8px;color:var(--fg);text-decoration:none;
+  background:var(--surface-2);font-size:.92rem}
+@media (min-width:960px){.toc a{background:none;display:flex;padding:0 10px}}
+.toc a:hover{background:var(--surface-2);text-decoration:none}
+.faq-section{margin:0 0 56px;scroll-margin-top:72px}
+.faq-section h2{font-size:1.7rem;margin-bottom:6px}
+.faq-section .lede{color:var(--muted);margin:0 0 16px}
+.more-link{margin-top:20px}
 
-/* Closing band + footer */
-.band{margin:96px 0 0;color:#fff;background:radial-gradient(120% 160% at 85% 120%,var(--hero-1) 0%,var(--hero-2) 50%,var(--hero-3) 100%)}
-.band .wrap{padding-top:64px;padding-bottom:64px;display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between}
-.band h2{font-size:clamp(1.7rem,3.4vw,2.3rem)}
-.band p{margin:10px 0 0;color:#fff;max-width:48ch}
-footer.site{border-top:1px solid var(--line);padding:48px 0 56px;color:var(--muted);font-size:.93rem}
-footer.site .cols{display:grid;gap:28px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:32px}
-footer.site h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--fg);margin:0 0 8px}
+/* Closing call + footer */
+.band{margin:var(--section) 0 0;padding:var(--section) 0;text-align:center;border-top:1px solid var(--line)}
+.band img{width:88px;height:88px;display:block;margin:0 auto 20px}
+.band h2{font-size:var(--title-1)}
+.band p{margin:14px auto 28px;color:var(--muted);max-width:44ch;font-size:var(--lede);line-height:1.38}
+.band .fine{margin:16px 0 0}
+footer.site{background:var(--surface-2);padding:40px 0 48px;color:var(--muted);font-size:var(--caption);line-height:1.5}
+footer.site .cols{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:28px;
+  padding-bottom:24px;border-bottom:1px solid var(--line)}
+footer.site h2{font-size:var(--caption);color:var(--fg);margin:0 0 6px;font-weight:600;letter-spacing:-.01em}
 footer.site ul{list-style:none;margin:0;padding:0}
-footer.site li a{display:inline-flex;align-items:center;min-height:36px;color:var(--muted);text-decoration:none}
-footer.site li a:hover{color:var(--fg);text-decoration:underline}
-footer.site .legal{max-width:80ch;margin:0}
-.notfound{padding:96px 0 40px;text-align:center}
-.notfound h1{font-size:clamp(2rem,5vw,3rem);margin-bottom:12px}
-.notfound p{color:var(--muted)}
-.notfound .ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:24px}
-.notfound .btn-ghost{color:var(--fg);border-color:var(--line)}
+footer.site li a{display:inline-flex;align-items:center;min-height:32px;color:var(--muted)}
+footer.site li a:hover{color:var(--fg)}
+footer.site .legal{max-width:90ch;margin:0 0 10px}
+footer.site .legal a{color:var(--fg)}
+.notfound{padding:120px 22px 80px;text-align:center}
+.notfound h1{font-size:clamp(2.2rem,5vw,3.2rem);margin-bottom:14px}
+.notfound p{color:var(--muted);font-size:1.15rem}
+.notfound .ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px}
 
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}
-  .card:hover,.btn:hover{transform:none}}
+  .card:hover .art{transform:none}
+  .stages .dot{background:var(--primary);border-color:var(--primary);color:#fff}}
 @media (prefers-contrast:more){:root{--line:var(--muted)}.seg button[aria-pressed=true]{outline:2px solid var(--fg)}}
-@media print{.top,.toolbar,.band{display:none}body{background:#fff;color:#000}}
+@media print{.top,.toolbar,.band,.launch{display:none}body{background:#fff;color:#000}}
 """
 
 # Runs before first paint, so a visitor who chose a theme never sees the other one flash. Storage
@@ -539,13 +614,20 @@ ICONS = {
     "profile": '<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
     "gauge": '<path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 13 4-4"/><circle cx="12" cy="13" r="1.3"/>',
     "shield": '<path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>',
+    "window": '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 8.5h18"/><path d="M14 12.5h4v4"/><path d="M10 16.5H6v-4"/>',
+    "controller": '<path d="M7 7h10a4 4 0 0 1 3.9 3.1l1 4.6a2.6 2.6 0 0 1-4.6 2.1L15.5 15h-7l-1.8 1.8a2.6 2.6 0 0 1-4.6-2.1l1-4.6A4 4 0 0 1 7 7z"/><path d="M8 10v3M6.5 11.5h3"/><path d="M15.5 11h.01M17.5 12.5h.01"/>',
+    "dock": '<rect x="3" y="15" width="18" height="5" rx="2"/><rect x="6" y="9" width="5" height="5" rx="1.2"/><rect x="13" y="9" width="5" height="5" rx="1.2"/><path d="M8.5 6V4.5"/>',
+    "dlc": '<path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="m4 7 8 4 8-4M12 11v10"/>',
+    "repair": '<path d="M14.5 6.5a4 4 0 0 0 5 5L12 19a2.1 2.1 0 0 1-3-3l7.5-7.5"/><path d="M14.5 6.5 17 4l3 3-2.5 2.5"/>',
+    "update": '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4.5h-4.5"/>',
+    "bottle": '<path d="M10 2.5h4M10.5 2.5v4.2c0 .8-.4 1.4-1 2-1.4 1.2-2 2.6-2 4.3v6.5a2 2 0 0 0 2 2h5a2 2 0 0 0 2-2V13c0-1.7-.6-3.1-2-4.3-.6-.6-1-1.2-1-2V2.5"/><path d="M7.5 14h9"/>',
+    "heart": '<path d="M12 20s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.6-7.5 10-7.5 10z"/>',
     "search": '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
     "sun": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     "moon": '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
     "ok": '<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/>',
     "warn": '<path d="M12 3.5 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2v.1"/>',
     "muted": '<circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v.1M12 11v5"/>',
-    "heart": '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     "github": '<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>',
 }
 
@@ -618,6 +700,14 @@ def load_games():
             "client": bool(needs_client),
             "portrait": str(portrait),
             "profile": f"profiles/{os.path.basename(path)}",
+            # For the game's own page: who made it, when, and what other platforms report.
+            "appid": str(appid),
+            "developer": str(g.get("developer", "")).strip(),
+            "year": str(g.get("released", ""))[:4],
+            "anticheat": str(comp.get("anticheat", "")).strip(),
+            "online": str(comp.get("online", "")).strip(),
+            "protondb": str(comp.get("protondb", "")).strip().lower(),
+            "steam_deck": str(comp.get("steam_deck", "")).strip().lower(),
         })
     # A store the site doesn't offer yet keeps its profiles valid (checked above) but off the page.
     games = [g for g in games if g["store"] in OFFERED]
@@ -702,9 +792,16 @@ def parse_checksum(text, name):
 # ---------------------------------------------------------------------------------------------
 # Shared chrome
 # ---------------------------------------------------------------------------------------------
-def head(title, description, path, base=""):
+def head(title, description, path, base="", ld=None):
+    """The <head> every page shares (docs/SITE-DESIGN.md §12): title, description, canonical URL,
+    sharing cards and, when given, the page's structured data."""
     n = html.escape
     url = SITE_URL + ("" if path == "index.html" else path)
+    shot = find_media().get(HERO_SHOT[0])
+    share = SITE_URL + (f"media/{shot[0]}" if shot else "icon.png")
+    card = "summary_large_image" if shot else "summary"
+    data = ('\n<script type="application/ld+json">' + json.dumps(ld).replace("<", "\\u003c") + "</script>"
+            if ld else "")
     return f'''<!doctype html>
 <html lang="en" class="no-js"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -715,20 +812,20 @@ def head(title, description, path, base=""):
 <link rel="canonical" href="{n(url)}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Cellar">
 <meta property="og:title" content="{n(title)}"><meta property="og:description" content="{n(description)}">
-<meta property="og:url" content="{n(url)}"><meta property="og:image" content="{SITE_URL}icon.png">
-<meta name="twitter:card" content="summary">
+<meta property="og:url" content="{n(url)}"><meta property="og:image" content="{n(share)}">
+<meta name="twitter:card" content="{card}">
 <link rel="icon" href="{base}icon.png"><link rel="apple-touch-icon" href="{base}icon.png">
-{HEAD_JS}
+{HEAD_JS}{data}
 <style>{CSS}</style></head><body>
 <a class="skip" href="#main">Skip to content</a>'''
 
 
 def topbar(current, release, base=""):
     n = html.escape
-    tour = [(f"{base}index.html#tour", "See it work", None)] if tour_section(find_media()) else []
-    pages = tour + [(f"{base}index.html#features", "Features", None),
+    pages = [(f"{base}index.html#features", "Features", None),
+             (f"{base}index.html#tour", "See It Work", None),
              (f"{base}games.html", "Games", "games"),
-             (f"{base}faq.html", "FAQ", "faq"),
+             (f"{base}faq.html", "Questions", "faq"),
              (f"{base}sponsor.html", "Sponsor", "sponsor"),
              (REPO, "GitHub", None)]
     current_mark = ' aria-current="page"'
@@ -736,10 +833,10 @@ def topbar(current, release, base=""):
         f'<a href="{n(href)}"{current_mark if key and key == current else ""}>{label}</a>'
         for href, label, key in pages)
     return f'''<header class="top"><div class="wrap">
-  <a class="brand" href="{base}index.html"><img src="{base}icon.png" alt="" width="30" height="30">Cellar</a>
+  <a class="brand" href="{base}index.html"><img src="{base}icon.png" alt="" width="28" height="28">Cellar</a>
   <nav class="nav" aria-label="Main">{links}</nav>
   <button class="icon-btn" id="theme" type="button" aria-pressed="false" aria-label="Switch to dark mode">{icon("sun", "sun")}{icon("moon", "moon")}</button>
-  <a class="btn btn-primary btn-small" href="{n(download_href(release))}">{icon("download")}Download</a>
+  <a class="btn btn-primary btn-small" href="{n(download_href(release))}">Download</a>
 </div></header>'''
 
 
@@ -759,18 +856,18 @@ def download_href(release):
 
 def download_detail(release):
     bits = ([f"Version {release['version']}", release["size"]] if release else []) + \
-           [f"Apple Silicon · macOS {MIN_MACOS} or later"]
+           [f"Apple silicon · macOS {MIN_MACOS} or later"]
     return " · ".join(bits)
 
 
 def closing_band(release, base=""):
     n = html.escape
     return f'''<section class="band" aria-labelledby="band-h"><div class="wrap">
-  <div>
-    <h2 id="band-h">Bring your library over.</h2>
-    <p>Download Cellar, sign in to {your_stores("the stores you already use", "the Steam account you already have")}, and play the games you own.</p>
-  </div>
-  <a class="btn btn-light btn-big" href="{n(download_href(release))}">{icon("download")}<span class="lines">Download for Mac<small>{n(download_detail(release))}</small></span></a>
+  <img src="{base}icon.png" alt="" width="88" height="88">
+  <h2 id="band-h">Your games are waiting.</h2>
+  <p>Download Cellar, sign in to {your_stores("the stores you already use", "the Steam account you already have")}, and play the games you own.</p>
+  <a class="btn btn-primary btn-big" href="{n(download_href(release))}">{icon("download")}Download for Mac</a>
+  <p class="fine">{n(download_detail(release))} · Free</p>
 </div></section>'''
 
 
@@ -800,9 +897,17 @@ def site_footer(games, base=""):
   </div>
   <p class="legal">{len(games)} games set up, {playable} confirmed playable. Cellar is free software
   under GPL-3.0 and is not affiliated with Apple, {", ".join(OWNERS[k] for k in OFFERED)}, CodeWeavers or any game
-  publisher; their names appear only to say where a game comes from. Built on
-  <a href="https://www.winehq.org/">Wine</a>, the Windows compatibility layer — Cellar is a launcher
-  over it, and the hard part is theirs.</p>
+  publisher; their names appear only to say where a game comes from.</p>
+  <p class="legal">Cellar is built on <a href="https://www.winehq.org/">Wine</a>, the open-source
+  Windows compatibility layer, and the work of everyone credited in the app&rsquo;s About window.
+  The Mac each game needs, and the estimate for untested games, draw on
+  <a href="https://www.protondb.com">ProtonDB</a>, Valve&rsquo;s Steam Deck ratings,
+  <a href="https://areweanticheatyet.com">AreWeAntiCheatYet</a>,
+  <a href="https://www.pcgamingwiki.com">PCGamingWiki</a>,
+  <a href="https://www.applegamingwiki.com">AppleGamingWiki</a>, the
+  <a href="https://www.codeweavers.com/compatibility">CodeWeavers Compatibility Center</a> and
+  <a href="https://steamdb.info">SteamDB</a>, each under its own terms. Cover art belongs to each
+  game&rsquo;s publisher.</p>
 </div></footer>'''
 
 
@@ -813,47 +918,48 @@ def scripts(*bodies):
 # ---------------------------------------------------------------------------------------------
 # Landing page
 # ---------------------------------------------------------------------------------------------
-FEATURES = [
-    ("play", "One button from download to playing",
-     "Cellar downloads the game, gives it its own space on your Mac and sets up everything it needs "
-     "to start. No Terminal, no Windows licence, no virtual machine."),
-    ("stores", your_stores("Your stores, your library", "Your Steam library"),
-     f"{stores_phrase()}. Sign in once{your_stores(' per store', '')}, not once per game, and "
-     "Cellar shows the games you own there."),
-    ("chip", "Drawn by your Mac's own graphics",
-     "A game's graphics run on the Apple GPU through Metal, the way Mac games draw. If a game "
-     "looks wrong one way, Cellar knows a second way to try."),
-    ("profile", "Each game set up the way it likes",
-     "What a game needs to start well is worked out once and shared, so every player gets it "
-     "right the first time. Anyone can add a game."),
-    ("gauge", "Your Mac stays a Mac",
-     "The game shows up in the Dock under its own name, plays in a normal Mac window or full "
-     "screen, and leaves nothing running when you quit."),
-    ("shield", "Free, open and private",
-     "GPL-3.0, no Cellar account, no telemetry. Games come from your own accounts, and their DRM "
-     "runs untouched."),
-]
-
-# ---------------------------------------------------------------------------------------------
 # Screenshots and video. Real captures of the shipping app only — never a mock-up (docs/SHOWCASE.md
-# is the shot list and how to take them). Each entry renders only when its file is in pages/media/,
-# so the page never shows an empty frame: (id, title, caption). An image is <id>.png or <id>.jpg;
-# the video is tour.mp4 with tour.vtt (captions) and tour-poster.jpg, all three or none.
+# is the shot list and how to take them). Until a capture is in pages/media/, its slot shows a
+# labelled "coming soon" frame carrying the same message, so the page reads complete today and the
+# capture drops in without a copy change. An image is <id>.png or <id>.jpg; the video is tour.mp4
+# with tour.vtt (captions) and tour-poster.jpg, all three or none.
 # ---------------------------------------------------------------------------------------------
 MEDIA = os.environ.get("CELLAR_SITE_MEDIA") or os.path.join(ROOT, "pages", "media")
-HERO_SHOT = ("hero", "Cellar showing a Steam library on a Mac")
+HERO_SHOT = ("hero", "Cellar showing a Steam library on a Mac",
+             "Your Steam library in Cellar, with Play one click away.")
+# The four feature rows on the home page, each beside its screenshot: (id, title, body, alt).
 SHOTS = [
-    ("library", "Your Steam library, on your Mac",
-     "Sign in once and Cellar lists the Windows games you own, with what is known about each."),
-    ("game", "One button, and a sentence saying what it does",
-     "Each game has a page with its state and a single next step: Install, Set up or Play."),
-    ("installing", "Cellar does the setting up",
-     "It downloads the game from your own account and prepares everything it needs. You can "
-     "watch, or go and do something else."),
-    ("playing", "Then it&rsquo;s just the game",
-     "The game opens in its own window, under its own name in the Dock, and quits cleanly."),
+    ("library", "Sign in once. Your whole library is there.",
+     "One Steam sign-in covers every game: scan the code with the Steam app on your phone, or use "
+     "your password. Cellar then lists <b>exactly the games Steam says you own</b>, and downloads "
+     "each one&rsquo;s DLC along with it.",
+     "Cellar listing the Windows games in a Steam library"),
+    ("game", "Know which Mac a game needs, before you download it.",
+     "Every game names the <b>slowest Apple chip it should run on and the one it&rsquo;s best on</b>, "
+     "worked out from the publisher&rsquo;s own PC requirements. Nobody tried it on a Mac yet? The "
+     "page says so, and gives an estimate of how likely it is to work, and where that came from.",
+     "A game's page in Cellar, with the Mac it needs and one button"),
+    ("installing", "Press Install, and go do something else.",
+     "Cellar downloads the game from your own account and builds its <b>bottle</b>: a sealed space "
+     "for that one game, so games never get in each other&rsquo;s way and uninstalling leaves "
+     "nothing behind.",
+     "Cellar installing a game, with its progress"),
+    ("playing", "Then it&rsquo;s just the game.",
+     "It opens under <b>its own name and icon in the Dock</b>, full screen or in a window, as you "
+     "chose for that game. Switch any time with &#8984;&nbsp;Return.",
+     "A Windows game running on a Mac, named in the Dock"),
 ]
-TOUR_VIDEO = ("tour", "From signing in to playing, in about a minute.")
+# The launch screen, word for word: LaunchStage.title/detail in
+# app/Packages/CellarDomain/Sources/CellarDomain/Launch/LaunchStage.swift, for a Steam game.
+LAUNCH_GAME = "Planet Coaster 2"
+LAUNCH_STAGES = [
+    ("Preparing the bottle", "Checking everything this game needs is in place."),
+    ("Opening Steam", "Steam starts in the background, with no window."),
+    (f"Starting {LAUNCH_GAME}", "The game itself, under its own name."),
+    (f"Waiting for {LAUNCH_GAME} to appear", "Some games take a couple of tries. Cellar handles that."),
+    ("Playing", "Quit the game and Cellar closes everything behind it."),
+]
+TOUR_VIDEO = ("tour", "Pressing Play in Cellar, from the first step to the game.")
 IMAGE_EXTS = (".png", ".jpg")
 
 
@@ -877,7 +983,7 @@ def image_size(path):
 def find_media():
     """The captures present in MEDIA: {id: (filename, (w, h))}, plus the video as {"tour": {...}}."""
     found = {}
-    for ident in [HERO_SHOT[0]] + [sid for sid, _t, _c in SHOTS] + [TOUR_VIDEO[0] + "-poster"]:
+    for ident in [HERO_SHOT[0]] + [s[0] for s in SHOTS] + [TOUR_VIDEO[0] + "-poster"]:
         for ext in IMAGE_EXTS:
             path = os.path.join(MEDIA, ident + ext)
             if os.path.exists(path):
@@ -895,73 +1001,128 @@ def find_media():
     return found
 
 
-def tour_section(media):
-    """The "See it work" section, or nothing when there is no capture to show."""
+WINDOW_BAR = '<div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>'
+
+
+def shot_frame(media, ident, alt, soon, lazy=True):
+    """A screenshot in a Mac window, or, until it is captured, the same window saying what it will show."""
     n = html.escape
-    shots = [(sid, t, c) for sid, t, c in SHOTS if sid in media]
+    if ident in media:
+        file, (w, h) = media[ident]
+        load = ' loading="lazy" decoding="async"' if lazy else ""
+        inner = f'<img{load} src="media/{n(file)}" width="{w}" height="{h}" alt="{n(alt)}">'
+    else:
+        inner = (f'<div class="soon" role="img" aria-label="Screenshot coming soon: {n(alt)}">'
+                 f'<span class="tag">Screenshot coming soon</span><b>{n(alt)}</b><span>{soon}</span></div>')
+    return f'<div class="window">{WINDOW_BAR}{inner}</div>'
+
+
+def launch_section(media):
+    """What pressing Play looks like: the video once captured, the launch steps until then."""
+    n = html.escape
     video = media.get(TOUR_VIDEO[0])
-    if not shots and not video:
-        return ""
-    vid_html = ""
     if video:
         (pw, ph) = video["poster"][1]
-        vid_html = (f'<figure class="tour-video"><video controls playsinline preload="none" width="{pw}" height="{ph}"'
-                    f' poster="media/{n(video["poster"][0])}" aria-describedby="tour-cap">'
-                    f'<source src="media/{n(video["src"])}" type="video/mp4">'
-                    f'<track kind="captions" src="media/{n(video["captions"])}" srclang="en" label="English" default>'
-                    f'</video><figcaption id="tour-cap">{TOUR_VIDEO[1]}</figcaption></figure>')
-    items = "".join(
-        f'<li class="shot"><figure><img loading="lazy" decoding="async" src="media/{n(media[sid][0])}"'
-        f' width="{media[sid][1][0]}" height="{media[sid][1][1]}" alt="Cellar: {n(html.unescape(title))}">'
-        f'<figcaption><h3>{title}</h3><p>{caption}</p></figcaption></figure></li>'
-        for sid, title, caption in shots)
+        visual = (f'<video controls playsinline preload="none" width="{pw}" height="{ph}"'
+                  f' poster="media/{n(video["poster"][0])}" aria-describedby="launch-cap">'
+                  f'<source src="media/{n(video["src"])}" type="video/mp4">'
+                  f'<track kind="captions" src="media/{n(video["captions"])}" srclang="en" label="English" default>'
+                  f'</video>')
+        cap = TOUR_VIDEO[1]
+    else:
+        stages = "".join(f'<li><span class="dot" aria-hidden="true"></span><span><b>{n(t)}</b>'
+                         f'<small>{n(d)}</small></span></li>' for t, d in LAUNCH_STAGES)
+        visual = (f'<ol class="stages" aria-label="The steps Cellar shows while a game starts">{stages}</ol>'
+                  f'<span class="tag stages-tag">Video coming soon</span>')
+        cap = "The steps are the ones Cellar shows, word for word. A screen recording replaces this soon."
     return f'''
-  <section class="block" id="tour" aria-labelledby="tour-h">
-    <div class="section-head"><p class="kicker">See it work</p>
-      <h2 id="tour-h">From your library to playing.</h2>
-      <p>Real screenshots of Cellar on a Mac, nothing staged.</p></div>
-    {vid_html}<ol class="shots">{items}</ol>
-  </section>'''
+<section class="launch" id="tour" aria-labelledby="launch-h"><div class="wrap launch-grid">
+  <div class="section-head">
+    <h2 id="launch-h">Press Play. Cellar does the rest.</h2>
+    <p>No settings to find and nothing to type. While the game starts, Cellar shows you each step
+    in plain words, so a pause never looks like a hang. The first start of a game can take a
+    minute or two.</p>
+  </div>
+  <figure style="margin:0"><div class="window">{WINDOW_BAR}{visual}</div>
+    <figcaption id="launch-cap">{cap}</figcaption></figure>
+</div></section>'''
 
+
+# The rest of what Cellar does, as a spec grid under the feature rows: (icon, title, body).
+SPECS = [
+    ("gauge", "Game Mode",
+     "Each game is a proper Mac game to macOS, so Game Mode gives it first call on the CPU and GPU "
+     "and lowers Bluetooth latency for controllers and AirPods."),
+    ("chip", "Drawn by Metal",
+     "Graphics run on your Mac&rsquo;s own GPU, the way Mac games draw. If a game looks wrong one "
+     "way, Cellar knows a second way to try."),
+    ("window", "Full screen or a window",
+     "Choose per game, and switch while playing with &#8984;&nbsp;Return."),
+    ("controller", "Controllers",
+     "Cellar shows which controllers are connected, and what each game is known to do with one."),
+    ("dock", "Its own name in the Dock",
+     "The game shows as itself in the Dock, in &#8984;&nbsp;Tab and in Force Quit. Steam stays out of "
+     "sight."),
+    ("dlc", "DLC included",
+     "The expansions you own download with the game and are there when it starts."),
+    ("repair", "Repairs itself",
+     "Before a game starts, Cellar checks what it needs and puts back anything damaged or missing. "
+     "You never open Terminal."),
+    ("update", "Keeps itself current",
+     "Cellar tells you when there&rsquo;s a new version and installs it in one click. What it knows "
+     "about games updates too."),
+    ("bottle", "A bottle per game",
+     "Games never share settings or files, so fixing one can&rsquo;t break another, and removing "
+     "one removes all of it."),
+]
 
 STEPS = [
-    ("Install Cellar", "Open the download and drag Cellar to Applications. It sets up what it needs the "
-     "first time a game asks for it."),
-    (your_stores("Sign in to your stores", "Sign in to Steam"),
-     f"{stores_phrase('or')}, with your own account. Once{your_stores(' per store', '')}; you can "
-     "also skip it and do it later."),
-    ("Pick a game and play", "Choose a game you own, press Install, then Play. Cellar sets the game up "
-     "the way it is known to run best."),
+    ("Download and open Cellar",
+     "Drag it to Applications. macOS asks once before it opens an app from the web: "
+     "<a href=\"faq.html#macos-says-cellar-can-t-be-opened\">here&rsquo;s the one extra click</a>."),
+    ("Sign in to Steam",
+     "With the QR code and the Steam app on your phone, or your password. Meanwhile Cellar gets "
+     "ready in the background: a few gigabytes, once."),
+    ("Pick a game and press Play",
+     "Install it, then Play. The first time takes a few minutes longer; after that it&rsquo;s one "
+     "click."),
 ]
 
 
-def card(g):
+
+def game_href(g, base=""):
+    return f"{base}games/{g['slug']}.html"
+
+
+def mac_needed(g):
+    return f'{g["mac_min"]}, {g["mac_min_memory"]} GB'
+
+
+def mac_best(g):
+    return f'{g["mac_rec"]}, {g["mac_rec_memory"]} GB'
+
+
+def card(g, base=""):
+    """A game in the list: its cover, what is known, the Mac it needs, and a link to its page
+    (docs/SITE-DESIGN.md §7). Everything else about it lives on that page."""
     n = html.escape
     label, cls, _meaning = STATUS[g["status"]]
     store = STORES[g["store"]]
     art = (f'<img loading="lazy" decoding="async" src="{n(g["portrait"])}" alt="" width="600" height="900"'
            f' onerror="this.classList.add(\'broken\')">') if g["portrait"] else ""
-    # Every game comes through its store; this only says whether the store's app also has to be
-    # running while you play. Worded so it never reads as "no store".
-    client = (f"{n(store)} app runs alongside" if g["client"] else "Just the game")
-    facts = []
-    if g["api"]:
-        facts.append(("Graphics", n(g["api"])))
-    facts.append(("DRM", n(g["drm"]) or "Not stated"))
-    facts.append(("While playing", client))
     # Estimated from the publisher's PC requirements, not tested; the title says so on hover.
-    facts.append(("Needs", f'<span title="Estimated from the publisher&rsquo;s PC requirements">'
-                           f'{n(g["mac_min"])}, {n(str(g["mac_min_memory"]))} GB</span>'))
-    facts.append(("Best on", f'{n(g["mac_rec"])}, {n(str(g["mac_rec_memory"]))} GB'))
+    facts = [("Needs", f'<span title="Estimated from the publisher&rsquo;s PC requirements">{n(mac_needed(g))}</span>'),
+             ("Best on", n(mac_best(g)))]
     dl = "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in facts)
+    # Which store a game is from only tells games apart once the site offers more than one.
+    chip = f'<div><span class="chip {n(g["store"])}">{n(store)}</span></div>' if len(OFFERED) > 1 else ""
     return f'''
     <li class="card" data-name="{n(g['name'].lower())}" data-status="{n(g['status'])}" data-store="{n(g['store'])}">
       <div class="art"><span class="ph" aria-hidden="true">{n(g['name'])}</span>{art}<span class="badge {cls}">{icon(cls)}{n(label)}</span></div>
       <div class="meta">
-        <h3>{n(g['name'])}</h3>
-        <div><span class="chip {n(g['store'])}">{n(store)}</span></div>
+        <h3><a class="stretch" href="{n(game_href(g, base))}">{n(g['name'])}</a></h3>
+        {chip}
         <dl class="facts">{dl}</dl>
-        <a class="more" href="{REPO}/blob/main/{n(g['profile'])}">Technical details<span class="sr-only"> for {n(g['name'])}</span></a>
       </div>
     </li>'''
 
@@ -1023,122 +1184,206 @@ def seg(key, label, options):
 
 
 def render_index(games, release):
+    """The home page, in the order docs/SITE-DESIGN.md §11 sets: hero, what it does, press Play,
+    the details, the games, free, the closing call. Seven sections; a new one replaces one."""
     n = html.escape
     total = len(games)
-    playable = sum(1 for g in games if g["status"] == "playable")
     media = find_media()
-    covers = [g for g in games if g["portrait"]][:3]
-    shelf = "".join(
-        f'<div class="cover c{i + 1}"><img src="{n(g["portrait"])}" alt="" width="600" height="900"'
-        f' onerror="this.remove()"></div>' for i, g in enumerate(covers))
-
-    features = "".join(
-        f'<li class="feature"><div class="ic">{icon(ic)}</div><h3>{title}</h3><p>{body}</p></li>'
-        for ic, title, body in FEATURES)
-    steps = "".join(f"<li><h3>{title}</h3><p>{body}</p></li>" for title, body in STEPS)
-    teaser_ids = ["what-is-cellar", "which-macs-does-it-work-on",
-                  "macos-says-cellar-can-t-be-opened", "what-about-games-with-anti-cheat"]
-    teaser = "".join(qa_html(q, a) for _t, _anchor, _l, qs in FAQ_SECTIONS for q, a in qs
-                     if slugify(q) in teaser_ids)
-
-    if HERO_SHOT[0] in media:
-        file, (w, h) = media[HERO_SHOT[0]]
-        hero_visual = (f'<div class="hero-shot"><img src="media/{n(file)}" width="{w}" height="{h}"'
-                       f' alt="{n(HERO_SHOT[1])}"></div>')
-    else:
-        hero_visual = (f'<div class="shelf" aria-hidden="true">{shelf}<img class="appicon" src="icon.png"'
-                       ' alt="" width="256" height="256"></div>')
-
-    release_line = (f'Version {n(release["version"])} · <a href="{n(release["notes"])}">what&rsquo;s new</a>'
-                    if release else f'<a href="{RELEASES}">All releases</a>')
-    ld = json.dumps({
+    hero_visual = shot_frame(media, HERO_SHOT[0], HERO_SHOT[1], HERO_SHOT[2], lazy=False)
+    rows = "".join(
+        f'<li class="row"><div class="copy"><h2>{title}</h2><p>{body}</p></div>'
+        f'<figure>{shot_frame(media, sid, alt, "")}</figure></li>'
+        for sid, title, body, alt in SHOTS)
+    specs = "".join(f'<li>{icon(ic)}<h3>{title}</h3><p>{body}</p></li>' for ic, title, body in SPECS)
+    # The home page only points at the sponsor page; whether giving is open yet, and how, lives
+    # there (SPONSOR_LINKS), so there is one place to switch it on.
+    sponsor = ('<a class="chev" href="sponsor.html">See What Sponsoring Buys</a>'
+               if SPONSOR_LINKS else
+               f'<a class="pending" href="sponsor.html">{icon("heart")}Sponsoring Opens Soon</a>')
+    release_line = (f'Version {n(release["version"])} · <a href="{n(release["notes"])}">what&rsquo;s new</a> · '
+                    if release else "")
+    ld = {
         "@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Cellar",
-        "operatingSystem": f"macOS {MIN_MACOS} or later (Apple Silicon)",
-        "applicationCategory": "GameApplication", "url": SITE_URL,
+        "description": "Plays the Windows games you own on Steam on a Mac with Apple silicon.",
+        "operatingSystem": f"macOS {MIN_MACOS} or later (Apple silicon)",
+        "applicationCategory": "GameApplication", "url": SITE_URL, "image": SITE_URL + "icon.png",
         "downloadUrl": download_href(release), "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+        "isAccessibleForFree": True,
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
         **({"softwareVersion": release["version"]} if release else {}),
-    }).replace("<", "\\u003c")
+    }
 
-    return f'''{head("Cellar — Windows games on your Mac",
-                 "Cellar plays the Windows games you own on Apple Silicon Macs, straight from your "
-                 f"own {stores_phrase()} {your_stores('accounts', 'account')}. One button to install, "
-                 "one to play. Free and open source.", "index.html")}
+    return f'''{head("Play Windows Steam games on your Mac — Cellar",
+                 f"Cellar plays the Windows games you own on {stores_phrase()} on any Mac with Apple "
+                 "silicon. Sign in once, press Play. Free, open source, and every game says which Mac "
+                 "it needs.", "index.html", ld=ld)}
 {topbar("home", release)}
 <main id="main">
 <section class="hero" aria-labelledby="hero-h"><div class="wrap">
-  <div>
-    <p class="eyebrow">Free and open source · For Apple Silicon</p>
-    <h1 id="hero-h">Your Windows games, on your Mac.</h1>
-    <p class="lede">Cellar plays the Windows games you already own on Apple Silicon. {your_stores("Sign in to your stores once", "Sign in to Steam once")},
-    pick a game, press Play. Cellar sets everything up and then gets out of the way.</p>
-    <div class="ctas">
-      <a class="btn btn-light btn-big" href="{n(download_href(release))}">{icon("download")}<span class="lines">Download for Mac<small>{n(download_detail(release))}</small></span></a>
-      <a class="btn btn-ghost btn-big" href="#games">See supported games</a>
-    </div>
-    <p class="fine">{release_line} · Cellar isn&rsquo;t notarised by Apple, so macOS asks once:
-    <a href="faq.html#macos-says-cellar-can-t-be-opened">how to open Cellar the first time</a></p>{checksum_line(release)}
+  <img class="appicon" src="icon.png" alt="" width="96" height="96">
+  <h1 id="hero-h">Play your Windows {stores_phrase()} games on your Mac.</h1>
+  <p class="lede">Sign in once, pick a game you own and press Play. Cellar sets up the rest.
+  Free, and made for Apple silicon.</p>
+  <div class="ctas">
+    <a class="btn btn-primary btn-big" href="{n(download_href(release))}">{icon("download")}Download for Mac</a>
+    <a class="chev" href="games.html">Find your game</a>
   </div>
-  {hero_visual}
+  <p class="fine">{release_line}{n(download_detail(release))} · Free and open source<br>
+  First time opening it? macOS asks once: <a href="faq.html#macos-says-cellar-can-t-be-opened">here&rsquo;s the one extra click</a>.</p>{checksum_line(release)}
+  <div class="stage">{hero_visual}</div>
 </div></section>
 
 <div class="wrap">
-  <dl class="stats">
-    <div><dt class="sr-only">Games set up</dt><dd style="margin:0"><b>{total}</b><span>games set up</span></dd></div>
-    <div><dt class="sr-only">Confirmed playable</dt><dd style="margin:0"><b>{playable}</b><span>confirmed playable</span></dd></div>
-    <div><dt class="sr-only">Stores</dt><dd style="margin:0"><b>{len(OFFERED) if len(OFFERED) > 1 else stores_phrase()}</b><span>{"stores: " + stores_phrase() if len(OFFERED) > 1 else "your own library"}</span></dd></div>
-    <div><dt class="sr-only">Price</dt><dd style="margin:0"><b>Free</b><span>GPL-3.0, no telemetry</span></dd></div>
-  </dl>
-{tour_section(media)}
-  <section class="block" id="features" aria-labelledby="features-h">
-    <div class="section-head"><p class="kicker">Features</p>
-      <h2 id="features-h">Everything a game needs, set up for you.</h2>
-      <p>Cellar is to the Mac what Proton is to Linux: the Windows game runs much as it does on a
-      PC, with nothing for you to configure.</p></div>
-    <ul class="features">{features}</ul>
+  <section class="block" id="features" aria-label="What Cellar does">
+    <ol class="rows">{rows}</ol>
   </section>
-
-  <section class="block" id="how" aria-labelledby="how-h">
-    <div class="section-head"><p class="kicker">How it works</p>
-      <h2 id="how-h">Three steps, once.</h2></div>
-    <ol class="steps">{steps}</ol>
+</div>
+{launch_section(media)}
+<div class="wrap">
+  <section class="block" id="details" aria-labelledby="details-h">
+    <div class="section-head"><h2 id="details-h">The details, already handled.</h2>
+      <p>The things you&rsquo;d otherwise go looking for in a forum.</p></div>
+    <ul class="specs">{specs}</ul>
   </section>
 
   <section class="block" id="games" aria-labelledby="games-h">
-    <div class="section-head"><p class="kicker">Supported games</p>
-      <h2 id="games-h">The games Cellar knows today.</h2>
-      <p>Each card says exactly what is known about a game, and nothing more: <b>Playable</b> means
-      someone played it on a named Mac. Search all {total} here, or
-      <a href="games.html">see the full list</a>.</p></div>
+    <div class="section-head">
+      <h2 id="games-h">Will your game run?</h2>
+      <p>Every game says what is known about it and which Mac it needs. <b>Playable</b> means
+      someone played it on a Mac; <b>Untested</b> means Cellar knows how to set it up and nobody
+      has confirmed it yet.</p></div>
     {games_block(games, GAMES_CAP)}
   </section>
-
-  <section class="block" id="requirements" aria-labelledby="req-h">
-    <div class="section-head"><p class="kicker">Requirements</p>
-      <h2 id="req-h">What your Mac needs.</h2>
-      <p>Open Cellar and it tells you what is missing before anything fails, and offers to fix
-      it.</p></div>
-    <ul class="reqs">
-      <li><b>Apple Silicon</b><span>M1 or later. Intel Macs are not supported.</span></li>
-      <li><b>macOS {MIN_MACOS} or later</b><span>Every M1 Mac can run it; Software Update has it.</span></li>
-      <li><b>Rosetta 2</b><span>Apple&rsquo;s own translator for Intel apps. Cellar asks macOS to install it when it&rsquo;s missing.</span></li>
-      <li><b>A game you own</b><span>On {stores_phrase("or")}, from your own account.</span></li>
-    </ul>
-  </section>
-
-  <section class="block" id="faq" aria-labelledby="faq-h">
-    <div class="section-head"><p class="kicker">Questions</p>
-      <h2 id="faq-h">The ones people ask first.</h2></div>
-    <div class="qa-list">{teaser}</div>
-    <a class="more-link" href="faq.html">All questions and answers</a>
-  </section>
 </div>
+
+<section class="free" id="free" aria-labelledby="free-h"><div class="wrap">
+  <div class="section-head center"><h2 id="free-h">Free. Always.</h2>
+    <p>Cellar will never be sold, and nothing in it is locked behind a payment.</p></div>
+  <ul class="three">
+    <li><h3>Open source</h3><p>Every line is public under GPL-3.0. Anyone can read it, fix it, or
+      add a game.</p></li>
+    <li><h3>Private</h3><p>There is no Cellar account, and Cellar collects nothing about you or how
+      you play.</p></li>
+    <li><h3>Your games, as they are</h3><p>Games come from your own Steam account, and their copy
+      protection runs as the publisher built it.</p></li>
+  </ul>
+  <div class="sponsor">
+    <p>Want to help? Sponsoring buys Macs of every chip to test games on, so more of them can be
+    called playable. Entirely optional; it unlocks nothing.</p>
+    {sponsor}
+  </div>
+</div></section>
 
 {closing_band(release)}
 </main>
 {site_footer(games)}
-<script type="application/ld+json">{ld}</script>
 {scripts(THEME_JS, GAMES_JS)}
+</body></html>
+'''
+
+
+# ---------------------------------------------------------------------------------------------
+# A page per game (docs/SITE-DESIGN.md §11): answers "will this game work on my Mac?", and is
+# what a search for "<game> on Mac" finds.
+# ---------------------------------------------------------------------------------------------
+# Other platforms' ratings, said as theirs: (label, link, how to read it, credited source).
+PROTONDB = {"platinum": "Platinum", "gold": "Gold", "silver": "Silver", "bronze": "Bronze", "borked": "Borked"}
+STEAM_DECK = {"verified": "Verified", "playable": "Playable", "unsupported": "Unsupported"}
+
+
+def game_lede(g):
+    name, need, best = g["name"], mac_needed(g), mac_best(g)
+    if g["status"] == "playable":
+        return (f"{name} has been played on a Mac with Cellar. It needs at least {need}, and plays "
+                f"best on {best}.")
+    if g["status"] == "experimental":
+        return (f"{name} runs on a Mac with Cellar, with caveats. It needs at least {need}, and "
+                f"plays best on {best}.")
+    return (f"Cellar knows how to set {name} up on a Mac; nobody has confirmed it plays yet. From "
+            f"the publisher&rsquo;s PC requirements, it should need at least {need} and play best "
+            f"on {best}.")
+
+
+def render_game(g, games, release):
+    n = html.escape
+    base = "../"
+    name = g["name"]
+    label, cls, meaning = STATUS[g["status"]]
+    store = STORES[g["store"]]
+    store_link = (f'<a href="https://store.steampowered.com/app/{n(g["appid"])}/">{n(store)}</a>'
+                  if g["store"] == "steam" and g["appid"] else n(store))
+    facts = [("Status", f'<span class="status {cls}">{icon(cls)}{n(label)}</span> <span class="why">{n(meaning)}</span>'),
+             ("Needs", f'{n(mac_needed(g))} <span class="why">From the publisher&rsquo;s PC requirements.</span>'),
+             ("Best on", n(mac_best(g))),
+             ("Store", store_link)]
+    if g["developer"]:
+        facts.append(("Made by", n(g["developer"]) + (f", {n(g['year'])}" if g["year"] else "")))
+    if g["online"]:
+        facts.append(("Online", n(g["online"][:1].upper() + g["online"][1:])))
+    facts.append(("Anti-cheat", n(g["anticheat"][:1].upper() + g["anticheat"][1:]) if g["anticheat"] else "Not stated"))
+    facts.append(("Copy protection", n(g["drm"]) or "Not stated"))
+    facts.append(("While playing", f"{n(store)} runs in the background, out of sight" if g["client"] else "Just the game"))
+    if g["api"]:
+        facts.append(("Graphics", n(g["api"])))
+    dl = "".join(f"<div><dt>{k}</dt><dd>{v}</dd></div>" for k, v in facts)
+
+    reports = []
+    if g["protondb"] in PROTONDB:
+        reports.append(f'<li><b>{PROTONDB[g["protondb"]]}</b> on <a href="https://www.protondb.com/app/{n(g["appid"])}">ProtonDB</a>'
+                       f'<span>Linux players&rsquo; reports of how it runs there.</span></li>')
+    if g["steam_deck"] in STEAM_DECK:
+        reports.append(f'<li><b>{STEAM_DECK[g["steam_deck"]]}</b> on Steam Deck'
+                       f'<span>Valve&rsquo;s own rating for its handheld.</span></li>')
+    reports_html = (f'''
+  <section class="block" aria-labelledby="reports-h">
+    <div class="section-head"><h2 id="reports-h">What other players report.</h2>
+      <p>These come from other platforms, not from a Mac, so they are a hint rather than a
+      promise. Cellar&rsquo;s own estimate in the app weighs them.</p></div>
+    <ul class="reports">{"".join(reports)}</ul>
+  </section>''' if reports else "")
+
+    steps = [("Download Cellar", f'Drag it to Applications and open it. It&rsquo;s free.'),
+             (f"Sign in to {store}", f"With the account that owns {n(name)}. Once, for every game."),
+             ("Install, then Play", f"Find {n(name)} in your library, press Install, then Play. "
+                                    "Cellar sets up the rest.")]
+    steps_html = "".join(f"<li><h3>{t}</h3><p>{b}</p></li>" for t, b in steps)
+    url = SITE_URL + game_href(g)
+    ld = {"@context": "https://schema.org", "@graph": [
+        {"@type": "BreadcrumbList", "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Cellar", "item": SITE_URL},
+            {"@type": "ListItem", "position": 2, "name": "Games", "item": SITE_URL + "games.html"},
+            {"@type": "ListItem", "position": 3, "name": name, "item": url}]},
+        {"@type": "VideoGame", "name": name, "url": url, "image": g["portrait"],
+         **({"author": {"@type": "Organization", "name": g["developer"]}} if g["developer"] else {}),
+         **({"datePublished": g["year"]} if g["year"] else {})}]}
+
+    return f'''{head(f"{name} on Mac — Cellar",
+                 f"Play {name} on a Mac with Apple silicon: the Mac it needs, what is known about it, "
+                 f"and how Cellar sets it up from {store}.",
+                 game_href(g), base, ld=ld)}
+{topbar("games", release, base)}
+<main id="main">
+<div class="wrap">
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{base}games.html">Games</a><span aria-hidden="true">›</span><span aria-current="page">{n(name)}</span></nav>
+  <div class="game-head">
+    <div class="game-cover art"><span class="ph" aria-hidden="true">{n(name)}</span><img src="{n(g["portrait"])}" alt="{n(name)} cover art" width="600" height="900" onerror="this.classList.add(\'broken\')"></div>
+    <div>
+      <h1>{n(name)} on Mac</h1>
+      <p class="lede">{game_lede(g)}</p>
+      <dl class="facts spec">{dl}</dl>
+      <p class="fine"><a href="{REPO}/blob/main/{n(g['profile'])}">Technical details</a> for the curious.</p>
+    </div>
+  </div>
+{reports_html}
+  <section class="block" aria-labelledby="how-h">
+    <div class="section-head"><h2 id="how-h">How to play {n(name)} on your Mac.</h2></div>
+    <ol class="steps">{steps_html}</ol>
+  </section>
+</div>
+{closing_band(release, base)}
+</main>
+{site_footer(games, base)}
+{scripts(THEME_JS)}
 </body></html>
 '''
 
@@ -1247,8 +1492,10 @@ FAQ_SECTIONS = [
          "signing in lives on the <b>Accounts</b> screen — your account at the bottom of the sidebar, ⌘⇧A, or "
          "Settings → Manage accounts — and not on each game's page.</p>"),
         ("Does Cellar see my password?",
-         "<p>No. Steam's sign-in is Steam's own QR device flow: you approve it in the Steam mobile "
-         "app. "
+         "<p>Cellar never keeps it. The quickest way in is Steam's own QR code: you approve it in the "
+         "Steam mobile app and type no password at all. Without the app, you can use your account "
+         "name and password, with a Steam Guard code if Steam asks for one; Cellar hands them straight "
+         "to Steam and keeps only the sign-in Steam gives back, in your macOS Keychain. "
          + only("gog", "GOG uses its normal login page and hands back an OAuth token, which Cellar "
                 "keeps in your macOS Keychain. ")
          + only("battlenet", "Battle.net's sign-in happens entirely inside Blizzard's client.")
@@ -1516,10 +1763,14 @@ def render_faq(games, release):
       <p class="lede">{html.escape(lede)}</p>
       {"".join(qa_html(q, a) for q, a in questions)}
     </section>''' for title, anchor, lede, questions in FAQ_SECTIONS)
-    return f'''{head("Questions & answers — Cellar",
-                 "How Cellar runs Windows games on an Apple Silicon Mac: what it needs, why it asks "
-                 "you to sign in, what the compatibility ratings mean, and what to do when a game "
-                 "will not start.", "faq.html")}
+    ld = {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+        {"@type": "Question", "name": q,
+         "acceptedAnswer": {"@type": "Answer", "text": " ".join(html.unescape(re.sub(r"<[^>]+>", " ", a)).split())}}
+        for _t, _anchor, _l, qs in FAQ_SECTIONS for q, a in qs]}
+    return f'''{head("Questions about playing Windows games on a Mac — Cellar",
+                 "How Cellar runs Windows games on a Mac with Apple silicon: what it needs, why it asks "
+                 "you to sign in, what the ratings mean, and what to do when a game will not start.",
+                 "faq.html", ld=ld)}
 {topbar("faq", release)}
 <main id="main">
 <div class="page-head"><div class="wrap">
@@ -1546,16 +1797,16 @@ def render_faq(games, release):
 
 def render_games(games, release):
     playable = sum(1 for g in games if g["status"] == "playable")
-    return f'''{head("Games — Cellar",
-                 f"The {len(games)} Windows games Cellar knows how to set up on a Mac, and what is "
-                 "known about each: playable, experimental or untested.", "games.html")}
+    return f'''{head("Windows games you can play on a Mac — Cellar",
+                 f"The {len(games)} Windows Steam games Cellar sets up on a Mac with Apple silicon, "
+                 "with the Mac each one needs and whether it has been played on one yet.", "games.html")}
 {topbar("games", release)}
 <main id="main">
 <div class="page-head"><div class="wrap">
-  <h1>Games</h1>
-  <p>{len(games)} Windows games Cellar knows how to set up, {playable} of them confirmed playable.
-  Each card says exactly what is known about the game, and nothing more. A game that isn&rsquo;t
-  here may still run — this is what has been written down, not the limit.</p>
+  <h1>Games you can play on your Mac.</h1>
+  <p>{len(games)} Windows games Cellar knows how to set up, {playable} of them played on a Mac so
+  far. Open one to see the Mac it needs and what is known about it. A game that isn&rsquo;t here
+  may still run; this is what has been written down, not the limit.</p>
 </div></div>
 <div class="wrap">
   <section class="block games-page" id="games" aria-labelledby="all-h">
@@ -1573,41 +1824,39 @@ def render_games(games, release):
 
 
 SPONSOR_CSS = """
-.tiers{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));list-style:none;margin:0;padding:0}
-.tier{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px}
-.tier h3{font-size:1.3rem;margin-bottom:8px}
-.tier p{color:var(--muted);margin:0 0 12px}
-.tier .price{color:var(--fg);font-weight:600;margin:0}
-.promises{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-.promises li{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px}
-.promises b{display:block}
-.promises span{color:var(--muted)}
-.give{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
-.bought{width:100%;border-collapse:collapse}
-.bought th,.bought td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+/* Sponsor page: the tiers reuse .specs, the promise reuses the statement band (.free + .three) */
+.specs .price{color:var(--fg);font-weight:600;margin-top:10px}
+.bought{width:100%;border-collapse:collapse;max-width:760px}
+.bought th,.bought td{text-align:left;padding:12px 0;border-top:1px solid var(--line)}
+.bought th{color:var(--muted);font-weight:400;font-size:var(--footnote)}
+.give{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.pending{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 22px;border-radius:980px;
+  border:1px dashed var(--muted);color:var(--muted);font-weight:500}
+.pending svg{width:17px;height:17px}
+.give-note{color:var(--muted);max-width:60ch;margin:20px 0 0}
 """
 CSS += SPONSOR_CSS  # one stylesheet, in <head>, for every page
 
 
 def sponsor_give():
-    """How to give: the payment buttons, or — before there is an account — an honest "not yet"."""
+    """How to give: the payment links, or — before there is an account — an honest "not yet"."""
     n = html.escape
     if SPONSOR_LINKS:
-        buttons = "".join(f'<a class="btn btn-primary" href="{n(url)}">{icon("heart")}{n(label)}</a>'
+        buttons = "".join(f'<a class="btn btn-ghost" href="{n(url)}">{icon("heart")}{n(label)}</a>'
                           for label, url in SPONSOR_LINKS)
-        return (f'<div class="give">{buttons}</div>\n    <p class="fine">Any amount helps, once or '
-                "monthly. Sponsoring unlocks nothing in Cellar &mdash; it works the same for everyone.</p>")
-    return ('<div class="callout"><h3>Sponsoring opens soon.</h3>\n'
-            "      <p>There is no way to give yet; this page gets a button the day there is. Until then the best\n"
-            f'      help is free: tell a friend with a Mac, or <a href="{REPO}/issues">report how a game runs</a>\n'
-            "      on yours, naming the Mac you played on.</p></div>")
+        return (f'<div class="give">{buttons}</div>\n    <p class="give-note">Any amount helps, once or '
+                "monthly. Sponsoring unlocks nothing in Cellar; it works the same for everyone.</p>")
+    return (f'<div class="give"><span class="pending">{icon("heart")}Sponsoring Opens Soon</span></div>\n'
+            '    <p class="give-note">There is no way to give yet; this page gets a button the day there is. '
+            "Until then the best help is free: tell a friend with a Mac, or "
+            f'<a href="{REPO}/issues">report how a game runs</a> on yours, naming the Mac you played on.</p>')
 
 
 def sponsor_bought():
     """Every test Mac sponsoring paid for, or a plain "nothing yet"."""
     n = html.escape
     if not TEST_MACS_BOUGHT:
-        return "<p>Nothing yet. Each Mac appears here the day it is bought, with what it cost.</p>"
+        return '<p class="give-note">Nothing yet. Each Mac appears here the day it is bought, with what it cost.</p>'
     rows = "".join(f"<tr><td>{n(mac)}</td><td>{n(chip)}</td><td>{n(price)}</td><td>{n(when)}</td></tr>"
                    for mac, chip, price, when in TEST_MACS_BOUGHT)
     return ('<table class="bought"><thead><tr><th scope="col">Mac</th><th scope="col">Chip</th>'
@@ -1616,9 +1865,9 @@ def sponsor_bought():
 
 def render_sponsor(games, release):
     n = html.escape
-    tiers = "".join(f'<li class="tier"><h3>{n(chip)}</h3><p>{n(why)}</p><p class="price">{n(price)}</p></li>'
+    tiers = "".join(f'<li>{icon("chip")}<h3>{n(chip)}</h3><p>{n(why)}</p><p class="price">{n(price)}</p></li>'
                     for chip, why, price in TEST_MAC_TIERS)
-    return f'''{head("Sponsor — Cellar",
+    return f'''{head("Sponsor Cellar: Macs to test games on — Cellar",
                  "Cellar is free for everyone, with nothing behind a payment. Sponsoring buys Macs "
                  "of every chip to test games on, and this page lists every one it has bought.",
                  "sponsor.html")}
@@ -1631,43 +1880,43 @@ def render_sponsor(games, release):
 </div></div>
 <div class="wrap">
   <section class="block" id="why" aria-labelledby="why-h">
-    <div class="section-head"><p class="kicker">Why it matters</p>
+    <div class="section-head">
       <h2 id="why-h">A game runs differently on every chip.</h2>
-      <p>A game can play smoothly on an M4 Max and struggle on an M1. Cellar tells you which Mac
-      a game needs; today most of that advice is worked out from the game&rsquo;s PC
-      requirements. A Mac of each kind turns that estimate into a result: Cellar starts the game
-      on it, checks that it really plays, and writes down what happened.</p></div>
+      <p>A game can play smoothly on an M4 Max and struggle on an M1. Each game names the Mac it
+      needs, mostly worked out from its PC requirements. A Mac of each kind turns that estimate
+      into a result: Cellar starts the game on it, checks that it really plays, and writes down
+      what happened.</p></div>
   </section>
 
   <section class="block" id="buys" aria-labelledby="buys-h">
-    <div class="section-head"><p class="kicker">What the money buys</p>
+    <div class="section-head">
       <h2 id="buys-h">One test Mac for each kind of chip.</h2>
       <p>Prices are rough guides, second-hand where that is cheaper. All of it goes to test Macs;
       once every kind is covered, the next chips Apple releases come next.</p></div>
-    <ul class="tiers">{tiers}</ul>
+    <ul class="specs">{tiers}</ul>
   </section>
 
   <section class="block" id="bought" aria-labelledby="bought-h">
-    <div class="section-head"><p class="kicker">Out in the open</p>
-      <h2 id="bought-h">Bought so far.</h2></div>
+    <div class="section-head"><h2 id="bought-h">Bought so far.</h2></div>
     {sponsor_bought()}
   </section>
+</div>
 
-  <section class="block" id="promise" aria-labelledby="promise-h">
-    <div class="section-head"><p class="kicker">The promise</p>
-      <h2 id="promise-h">What sponsoring never changes.</h2></div>
-    <ul class="promises">
-      <li><b>Nothing is locked.</b><span>Every feature, every game, every update is for everyone,
-      whether they give or not.</span></li>
-      <li><b>No account, no tracking.</b><span>Cellar still has no sign-up and sends nothing about
-      you anywhere.</span></li>
-      <li><b>Every euro is accounted for.</b><span>What it bought is listed on this page.</span></li>
-    </ul>
-  </section>
+<section class="free" id="promise" aria-labelledby="promise-h"><div class="wrap">
+  <div class="section-head center"><h2 id="promise-h">Sponsoring never changes Cellar.</h2></div>
+  <ul class="three">
+    <li><h3>Nothing is locked</h3><p>Every feature, every game and every update is for everyone,
+      whether they give or not.</p></li>
+    <li><h3>Nothing about you</h3><p>Cellar still has no sign-up and sends nothing about you
+      anywhere.</p></li>
+    <li><h3>Every euro accounted for</h3><p>What sponsoring bought is listed on this page, with
+      what it cost.</p></li>
+  </ul>
+</div></section>
 
+<div class="wrap">
   <section class="block" id="give" aria-labelledby="give-h">
-    <div class="section-head"><p class="kicker">Sponsor</p>
-      <h2 id="give-h">How to help.</h2></div>
+    <div class="section-head"><h2 id="give-h">How to help.</h2></div>
     {sponsor_give()}
   </section>
 </div>
@@ -1681,7 +1930,8 @@ def render_sponsor(games, release):
 
 def render_404(games, release):
     base = SITE_PATH
-    return f'''{head("Page not found — Cellar", "This page does not exist on the Cellar site.",
+    return f'''{head("Page not found — Cellar", "This page does not exist on the Cellar site. Everything "
+                 "about playing Windows games on your Mac is one click from the home page.",
                  "404.html", base)}
 {topbar("", release, base)}
 <main id="main" class="wrap notfound">
@@ -1730,6 +1980,12 @@ def main():
     write("faq.html", render_faq(games, release))
     write("sponsor.html", render_sponsor(games, release))
     write("404.html", render_404(games, release))
+    games_dir = os.path.join(OUT, "games")
+    if os.path.isdir(games_dir):
+        shutil.rmtree(games_dir)
+    os.makedirs(games_dir)
+    for g in games:
+        write(game_href(g), render_game(g, games, release))
     write("robots.txt", f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}sitemap.xml\n")
     write("sitemap.xml",
           '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1738,12 +1994,13 @@ def main():
           f"  <url><loc>{SITE_URL}games.html</loc></url>\n"
           f"  <url><loc>{SITE_URL}faq.html</loc></url>\n"
           f"  <url><loc>{SITE_URL}sponsor.html</loc></url>\n"
-          "</urlset>\n")
+          + "".join(f"  <url><loc>{SITE_URL}{game_href(g)}</loc></url>\n" for g in games)
+          + "</urlset>\n")
     write(".nojekyll", "")
     answers = sum(len(questions) for _t, _a, _l, questions in FAQ_SECTIONS)
     parser = "fallback parser" if tomllib is None or os.environ.get("CELLAR_TOML_FALLBACK") == "1" else "tomllib"
     print(f"Wrote {OUT}/index.html — {len(games)} games ({parser})")
-    print(f"Wrote {OUT}/games.html — {len(games)} games")
+    print(f"Wrote {OUT}/games.html — {len(games)} games, and a page for each in games/")
     print(f"Wrote {OUT}/faq.html — {len(FAQ_SECTIONS)} sections, {answers} answers")
     print("Download: " + (f"{release['version']} → {release['url']}" if release
                           else f"{RELEASES}/latest (no release resolved)"))
