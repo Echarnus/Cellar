@@ -5,7 +5,9 @@ description: Best practices for the Cellar static site — the HTML, CSS and JS 
 
 # Cellar — web / static site
 
-The full guide is [`skills/web.md`](../../../skills/web.md); read it. Key rules:
+The design base is [`docs/SITE-DESIGN.md`](../../../docs/SITE-DESIGN.md): principles, palette, type,
+spacing, components, words, search. Read it first. The build guide is
+[`skills/web.md`](../../../skills/web.md); read it. Key rules:
 
 - The site is **generated** by `pages/gen-site.py` into `pages/dist/index.html` — no framework, no build
   step, inline CSS/JS. Edit the **generator**, not the HTML.
