@@ -79,7 +79,8 @@ struct Install: ParsableCommand {
             event.deliver(progress: { line in
                 // A per-file line from the depot download is what the app's bar is drawn from. Sent
                 // as prose as well, it was thousands of lines the app had to read and keep.
-                if output.isOn, DepotProgress.fraction(in: line) != nil { return }
+                // So is a resume's "Validating <file>", one per file already on disk (#309).
+                if output.isOn, DepotProgress.fraction(in: line) != nil || line.hasPrefix("Validating ") { return }
                 print("  " + Term.dim(line))
             }, install: report)
         }

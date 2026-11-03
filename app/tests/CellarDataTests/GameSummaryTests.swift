@@ -58,6 +58,23 @@ struct GameSummaryTests {
         #expect(!summary(store: store, gameInstalled: false).actionHint.contains("stopped"))
     }
 
+    @Test("While a game downloads or waits its turn, its page has no dead Install and no 'stopped' hint (#309)")
+    func noButtonWhileDownloading() {
+        var resuming = summary(gameInstalled: false)
+        resuming.installInterrupted = true
+        // Dark Souls III, 2026-11-03: a greyed-out Install and "The last download stopped before it
+        // finished" beside a bar at 85%. The note is still in the bottle while the resume runs.
+        for activity: GameActivity in [.working(InstallProgress(.downloading, fraction: 0.85)),
+                                       .working(InstallProgress(.checkingDownload, fraction: 0.4)),
+                                       .working(nil), .queued(position: 1)] {
+            #expect(!resuming.showsPrimaryAction(during: activity))
+            #expect(resuming.hint(during: activity) == nil)
+        }
+        // Idle, the stopped download is said and Install resumes it.
+        #expect(resuming.showsPrimaryAction(during: nil))
+        #expect(resuming.hint(during: nil)?.contains("picks up where it left off") == true)
+    }
+
     @Test("Setup survives only as repair: the game is there, what it runs on is not")
     func setupIsRepair() {
         #expect(summary(runnerInstalled: false).nextStep == .setup)
