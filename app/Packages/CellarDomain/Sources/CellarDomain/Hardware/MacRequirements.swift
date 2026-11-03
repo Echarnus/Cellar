@@ -73,9 +73,9 @@ public struct MacRequirements: Sendable, Equatable {
     /// The requirements a profile states. Nil when it states none, or names a chip Cellar can't
     /// read — the profile lint says which.
     public init?(fields: [String: String]) {
-        guard let minChip = fields[Key.macMinimum].flatMap(MacChip.init),
+        guard let minChip = fields[Key.macMinimum].flatMap({ MacChip($0) }),
               let minMemory = fields[Key.macMemoryMinimum].flatMap({ Int($0) }),
-              let recChip = fields[Key.macRecommended].flatMap(MacChip.init),
+              let recChip = fields[Key.macRecommended].flatMap({ MacChip($0) }),
               let recMemory = fields[Key.macMemoryRecommended].flatMap({ Int($0) }) else { return nil }
         self.init(minimum: MacRequirement(chip: minChip, memoryGB: minMemory),
                   recommended: MacRequirement(chip: recChip, memoryGB: recMemory),

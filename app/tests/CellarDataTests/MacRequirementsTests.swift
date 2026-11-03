@@ -191,6 +191,20 @@ struct MacRequirementsTests {
         }
     }
 
+    @Test("Every game's requirements name where they were read, and that source is credited in About",
+          arguments: ProfileDatabaseTests.slugs)
+    func everySourceIsCredited(_ slug: String) throws {
+        let source = try Self.fields(slug)[MacRequirements.Key.source] ?? ""
+        let credited = Credits.sources.map(\.name).filter { source.contains($0) }
+        #expect(!credited.isEmpty,
+                "'\(slug)': pc_requirements_source \"\(source)\" names no source in Credits.sources — credit it there (Kenneth: credit where credit is due)")
+    }
+
+    @Test("The benchmarks behind the chip and card tables are credited")
+    func benchmarksAreCredited() {
+        #expect(Credits.sources.contains { $0.name == "Notebookcheck" })
+    }
+
     @Test("The real Game.plan path carries the Mac requirements to the game page")
     func planCarriesIt() throws {
         _ = Self.staged

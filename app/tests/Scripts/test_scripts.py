@@ -417,3 +417,50 @@ id              = "wineforge"
                 with open(os.path.join(os.path.dirname(ROOT), "profiles", name)) as handle:
                     fields = refresh_evidence.read_fields(handle.read())
                 self.assertIn("status", fields, name)
+
+
+class MacRequirementsSiteTests(unittest.TestCase):
+    """The site says which Mac each game needs (#298), and refuses to build without it."""
+
+    @classmethod
+    def setUpClass(cls):
+        path = os.path.join(os.path.dirname(ROOT), "pages", "gen-site.py")
+        spec = importlib.util.spec_from_file_location("gen_site", path)
+        cls.site = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.site)
+
+    def profiles(self):
+        folder = os.path.join(os.path.dirname(ROOT), "profiles")
+        return sorted(os.path.join(folder, name) for name in os.listdir(folder) if name.endswith(".toml"))
+
+    def test_every_profile_names_both_macs_through_both_parsers(self):
+        # tomllib in CI, the hand-rolled fallback on a Mac's system Python: both must read [mac].
+        for path in self.profiles():
+            for parse in (self.site._parse_toml_fallback, self.site.parse_toml):
+                mac = parse(path).get("mac", {})
+                for key in ("mac_minimum", "mac_recommended", "pc_requirements_source"):
+                    self.assertTrue(str(mac.get(key, "")).strip(), f"{os.path.basename(path)}: no {key}")
+                for key in ("mac_memory_minimum", "mac_memory_recommended"):
+                    self.assertIsInstance(mac.get(key), int, f"{os.path.basename(path)}: {key} is a number of GB")
+
+    def test_the_cards_say_needs_and_best_on(self):
+        games = self.site.load_games()
+        html = self.site.card(games[0])
+        self.assertIn("<dt>Needs</dt>", html)
+        self.assertIn("<dt>Best on</dt>", html)
+        self.assertIn(games[0]["mac_rec"], html)
+
+    def test_a_profile_without_mac_fails_the_build(self):
+        source = open(self.profiles()[0], encoding="utf-8").read()
+        without = source.split("\n[mac]")[0] + "\n"
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        os.makedirs(os.path.join(tmp, "profiles"))
+        with open(os.path.join(tmp, "profiles", "fixture.toml"), "w", encoding="utf-8") as f:
+            f.write(without)
+        original = self.site.ROOT
+        self.site.ROOT = tmp
+        self.addCleanup(setattr, self.site, "ROOT", original)
+        with self.assertRaises(SystemExit) as raised:
+            self.site.load_games()
+        self.assertIn("[mac]", str(raised.exception))

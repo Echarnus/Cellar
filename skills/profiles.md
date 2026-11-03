@@ -103,6 +103,15 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   installed game's PE header. Drafts live in the player's own profiles, are always `untested`, and the app
   lists them apart. Turning one into a shipped profile means testing it and deleting this line.
 - **`[legal]`** — `drm_circumvention = "never"`. It is never anything else.
+- **`[mac]`** (required) — which Mac the game needs and which it is best on (#298). The publisher's
+  own PC requirements as written (`pc_gpu_minimum`, `pc_memory_minimum`, `pc_gpu_recommended`,
+  `pc_memory_recommended`, the NVIDIA card where two are named), where they were read
+  (`pc_requirements_source`, naming a source credited in `Credits.sources`) and when
+  (`requirements_checked`), then the Macs: `mac_minimum`, `mac_memory_minimum`, `mac_recommended`,
+  `mac_memory_recommended`. The Mac lines are what `MacRequirements.derive` gives, never a guess:
+  `MacRequirementsTests` prints the right answer when they differ. A card it doesn't know is added to
+  `PCGraphicsCard.all` with a benchmarked score. Asking for more than the rule needs `mac_reason`.
+  The rule and how to read a store page into it: [`docs/MAC-REQUIREMENTS.md`](../docs/MAC-REQUIREMENTS.md).
 
 - **Public evidence** (optional, `[compatibility]`) — `protondb`, `steam_deck`,
   `anticheat_on_linux`, `evidence_checked`. Written by `app/Scripts/refresh-evidence.py`, never by

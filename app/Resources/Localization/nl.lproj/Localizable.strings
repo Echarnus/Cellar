@@ -590,7 +590,7 @@
 "Won't work" = "Werkt niet";
 "Works" = "Werkt";
 "Compatibility estimates use reports from ProtonDB, Steam Deck ratings, AreWeAntiCheatYet, AppleGamingWiki and CodeWeavers." = "Inschattingen van compatibiliteit gebruiken meldingen van ProtonDB, Steam Deck-beoordelingen, AreWeAntiCheatYet, AppleGamingWiki en CodeWeavers.";
-"Game reports and facts from" = "Meldingen en feiten over games van";
+"Game reports, facts and requirements from" = "Meldingen, feiten en systeemeisen van games van";
 
 /* Mac requirements (#298) */
 "%@ · %lld GB memory" = "%@ · %lld GB geheugen";
@@ -604,3 +604,4 @@
 "%@, %lld GB: enough to play. Expect to lower the graphics settings." = "%@, %lld GB: genoeg om te spelen. Reken erop dat je de grafische instellingen lager zet.";
 "%@, %lld GB: below what this game needs. It may not start, or run poorly." = "%@, %lld GB: minder dan dit spel nodig heeft. Het start misschien niet, of draait slecht.";
 "%@, or an %@" = "%@, of een %@";
+"Which Mac a game needs comes from its publisher's PC requirements, read through System Requirements Lab, and Notebookcheck's graphics benchmarks." = "Welke Mac een game nodig heeft, volgt uit de pc-systeemeisen van de uitgever, gelezen via System Requirements Lab, en de grafische benchmarks van Notebookcheck.";
