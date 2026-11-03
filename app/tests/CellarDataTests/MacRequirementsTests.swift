@@ -62,7 +62,8 @@ struct MacRequirementsTests {
         let m6Pro = MacChip(generation: 6, tier: .pro)
         #expect(m6Pro.specs == nil)
         #expect(m6Pro.atLeast(MacChip(generation: 4, tier: .pro)) == true)
-        #expect(m6Pro.atLeast(Self.m1Max) == true, "an M4 Pro already covers an M1 Max")
+        #expect(m6Pro.atLeast(MacChip(generation: 1, tier: .pro)) == true, "an M4 Pro already covers an M1 Pro")
+        #expect(m6Pro.atLeast(Self.m1Max) == nil, "no Pro Cellar knows draws like an M1 Max, so it doesn't guess")
         #expect(MacChip(generation: 6, tier: .base).atLeast(Self.m4Max) == nil,
                 "nothing vouches for a base chip against a Max: Cellar says nothing rather than guess")
         #expect(Self.m4.atLeast(m6Pro) == nil, "a requirement Cellar has no numbers for can't be met or missed")
