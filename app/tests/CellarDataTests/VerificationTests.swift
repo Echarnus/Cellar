@@ -356,6 +356,47 @@ struct VerifyRunTests {
         #expect(markdown.contains("stopped during run 1"))
     }
 
+    @Test("Stopped at once mid-watch, verify still shuts the bottle's Wine down and rewrites the report (#270)")
+    func stoppedAtOnce() throws {
+        let (plan, exeName) = try game(lifetime: 60)
+        defer {
+            ProcessWatch.kill([exeName])
+            try? FileManager.default.removeItem(at: plan.prefix)
+        }
+        var verify = verify(plan, surviveSeconds: 40)
+        verify.runs = 2
+        // No tidy stop is asked for: only the second Ctrl-C's `stopNow`, as when a harness sends
+        // SIGTERM straight after SIGINT. `run()` then winds down by itself.
+        let progress = verify.progress
+        verify.isInterrupted = { progress.isAbandoned }
+        let running = StopNowBox(verify)
+        let finished = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            _ = running.verify.run()
+            finished.signal()
+        }
+        let start = Date()
+        while !ProcessWatch.isRunning(exeName), Date().timeIntervalSince(start) < 20 {
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        #expect(ProcessWatch.isRunning(exeName), "the fake game started")
+        Thread.sleep(forTimeInterval: 2)
+        FakeWine.reset()
+
+        let folder = try #require(running.verify.stopNow())
+        #expect(!ProcessWatch.isRunning(exeName), "the game is gone before stopNow returns")
+        #expect(FakeWine.calls().contains { $0.tool == "wineserver" && $0.arguments == ["-k"] },
+                "the bottle's wineserver, and with it Steam, was told to end everything")
+        let markdown = try String(contentsOf: folder.appendingPathComponent("report.md"), encoding: .utf8)
+        #expect(markdown.contains("stopped at once during run 1"))
+        #expect(!markdown.contains("still running"), "the report for the run under way was rewritten")
+        #expect(running.verify.stopNow() == nil, "a third signal does nothing more")
+
+        #expect(finished.wait(timeout: .now() + 60) == .success)
+        let after = try String(contentsOf: folder.appendingPathComponent("report.md"), encoding: .utf8)
+        #expect(after == markdown, "run() writes nothing over the report stopNow wrote")
+    }
+
     @Test("A game that quits early fails stays-up, saying after how long")
     func earlyExit() throws {
         let (plan, exeName) = try game(lifetime: 6)
@@ -660,4 +701,10 @@ struct CrashDumpTests {
         #expect(failed.verdict == .fail, "the PC2 pilot: connected to css-api, and its account call still failed")
         #expect(failed.evidence.filter { $0.hasPrefix("f386.dmp:") }.count == 2)
     }
+}
+
+/// Hands a verify to the thread that runs it in `stoppedAtOnce`, as `VerifyCommand.StopNow` does.
+private final class StopNowBox: @unchecked Sendable {
+    let verify: VerifyGame
+    init(_ verify: VerifyGame) { self.verify = verify }
 }

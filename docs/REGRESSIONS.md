@@ -16,6 +16,10 @@ for what only a real game shows.
 | #267 | The sidebar said "Sign in" to a signed-in player while loading | `SidebarAccountTests.swift` › `loading` |
 | #267 | The library filter's segments changed width with the selection | `EqualSegmentedPickerTests.swift` › `stableAcrossSelection` |
 | #272 | Free-to-play games the player never added showed in the library | `SteamOwnershipCheckTests.swift` › `claimedFreeIsNotOwned` |
+| #246 | Skyrim closed at once: the settings files its launcher writes were never made | `FirstRunFilesTests.swift` › `playWritesThemFirst` |
+| #246 | Skyrim's downloaded copy never reached Steam's library while another game's Steam was open | `SteamLibraryEntryOrderTests.swift` › `registersAfterTheHandOverAndBeforeTheClient` |
+| #246 | Skyrim crashed on D3DMetal 3.0 even with its settings; it needs D3DMetal 4 | `FirstRunFilesTests.swift` › `skyrimProfile` |
+| #246 | Every game's failed start read as Planet Coaster 2 hitting "the D3DMetal startup race" | `StartSupervisorTests.swift` › `givingUpNamesTheGame` |
 | #261 | Planet Coaster 2's Workshop never loaded (stock wineserver) | `RunnerIntegrityTests.swift` › `stockWineserverIsDamage` |
 | #248 | macOS killed every game: the copied loader's signature broke | `GameAppTests.swift` › `resignsTheCopiedLoader` |
 | #236 | Steam asked to sign in again after it hung | `SteamClientSignInTests.swift` › `silentThenLoggedOnAfterRestart` |
@@ -27,4 +31,5 @@ for what only a real game shows.
 | #212 | A test run overwrote the real runner with a fake Wine | `CellarSandboxTests.swift` › `cloneIsIndependent` |
 | #239 | A game could read the tokens of the shell that started it | `CredentialStorageTests.swift` › `noTokenAtTheProcessBoundary` |
 | #250 | A stopped `cellar verify` left no report and the game running | `VerificationTests.swift` › `interruptedRun` |
+| #270 | A second Ctrl-C (or SIGTERM after SIGINT) during `cellar verify` left the bottle's Steam and wineserver running and the report saying "still running" | `VerificationTests.swift` › `stoppedAtOnce` |
 | #258 | `cellar verify` passed a failed Frontier account call | `VerificationTests.swift` › `onlineErrorsFailGameOnline` |

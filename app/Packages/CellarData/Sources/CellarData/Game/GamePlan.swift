@@ -59,6 +59,9 @@ public struct GamePlan {
     /// runs, which hands off to Rockstar's launcher and exits. `launchExe` stays the game itself
     /// (`RDR2.exe`), because that is the process Cellar watches and shuts the layer down behind.
     public var startExe: String? = nil
+    /// `env` as it would be with the profile's crash workarounds the player switched off put back
+    /// (`PerformanceSettings.Resolved.crashWorkaroundsSwitchedOff`); nil when none were.
+    public var workaroundEnv: [String: String]? = nil
     /// `online_hosts`: the servers the game itself talks to (`css-api.zaonce.net` for Planet Coaster
     /// 2), which `cellar verify` expects the game's own process to connect to. Not the addresses
     /// `network_check` probes from the bottle: those prove the bottle can reach a server, and only
@@ -70,6 +73,9 @@ public struct GamePlan {
     /// `ShowNetworkError`). `cellar verify` fails `game-online` when one shows up in the Wine log or
     /// a crash dump's comment: a connection that opened is not a call that worked (#210).
     public var onlineErrors: [String] = []
+    /// `first_run_files`: settings files the game's own launcher would write before its first run,
+    /// which Cellar writes instead because it starts the game itself (`FirstRunFiles`).
+    public var firstRunFiles: [FirstRunFiles.Copy] = []
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
@@ -135,7 +141,41 @@ public struct GamePlan {
     /// `env`, plus what makes the running game show up as itself rather than as "wine" (`DockShim`).
     /// Every launch route starts its processes with this; opening the store client on its own
     /// uses `env`, because a client the player opened is not this game.
-    public var launchEnv: [String: String] {
+    public var launchEnv: [String: String] { launchEnv(over: env) }
+
+    /// `launchEnv` with the profile's crash workarounds back on, for a launch that died as it
+    /// started with them off. Nil when the player switched none off: then there is nothing to try.
+    public var launchEnvWithWorkarounds: [String: String]? { workaroundEnv.map { launchEnv(over: $0) } }
+
+    /// The crash workarounds the player switched off — what a launch that dies puts back.
+    public var crashWorkaroundsSwitchedOff: [PerformanceSetting] { performance.crashWorkaroundsSwitchedOff }
+
+    /// Give the profile back its say over the workarounds the player switched off, once a launch has
+    /// shown the game needs them: the bottle's lines go, so the app's switches and `cellar perf`
+    /// read "profile" again. The player can switch them off again; nothing else is touched.
+    public func restoreCrashWorkarounds() {
+        let file = BottleConfig.url(forBottle: bottleName)
+        for setting in crashWorkaroundsSwitchedOff {
+            do {
+                try BottleConfig.unset(setting, in: file)
+                CellarLog.warn(.launch, "\(name) died as it started with \(setting.key) off; "
+                    + "it stayed up with the profile's \(setting.key) on, so the bottle's override is removed.", subject: slug)
+            } catch {
+                CellarLog.failure(.launch, "Couldn't put \(setting.key) back for \(name)", error, subject: slug)
+            }
+        }
+    }
+
+    /// The sentence a launch shows when it puts the workarounds back.
+    public var restoringWorkaroundsMessage: String? {
+        let names = crashWorkaroundsSwitchedOff.map(\.displayName)
+        guard !names.isEmpty else { return nil }
+        let list = names.joined(separator: " and ")
+        return "\(name) crashed as it started with \(list) off. Its profile turns that on to stop exactly this crash, "
+            + "so Cellar is turning it back on and trying again."
+    }
+
+    private func launchEnv(over env: [String: String]) -> [String: String] {
         // Every program of this launch that can show a window wears the game's name: the game, the
         // stub a store starts it through, and a publisher launcher in between. Anything left out
         // is called "wine" in the Dock, which no player should ever read (#266).
@@ -144,9 +184,9 @@ public struct GamePlan {
             if let startExe { exe.append((startExe as NSString).lastPathComponent) }
             exe += publisherLauncher?.windowedExecutables ?? []
         }
-        var env = DockShim.environment(naming: name, executables: exe)
-        for (key, value) in self.env { env[key] = value }
-        return env
+        var result = DockShim.environment(naming: name, executables: exe)
+        for (key, value) in env { result[key] = value }
+        return result
     }
 
     public var gameProcessNeedles: [String] {

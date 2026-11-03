@@ -19,6 +19,9 @@ struct GameSettingsSection: View {
     /// Loaded after the first layout, never from the body (skills/swift.md).
     @State private var values: [PerformanceSetting: String] = [:]
     @State private var failure: String?
+    /// The switches this game's profile turns on to stop a crash — said beside the switch, so
+    /// turning one off is never a surprise.
+    @State private var crashWorkarounds: Set<PerformanceSetting> = []
 
     /// The switches this page shows, in order. MetalFX only where the game runs on D3DMetal, the one
     /// backend that offers it.
@@ -37,6 +40,11 @@ struct GameSettingsSection: View {
                     Toggle(setting.displayTitle, isOn: binding(setting))
                     Text(setting.tradeOff).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if crashWorkarounds.contains(row.setting) {
+                        Text("\(game.name) needs this on: without it, it crashes as it starts. If you switch it off and that happens, Cellar switches it back on.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             Text(advanced ? String(localized: "Changes apply the next time \(game.name) starts.")
@@ -57,6 +65,7 @@ struct GameSettingsSection: View {
     private func load() {
         guard let plan = try? Game.plan(slug: game.slug) else { return }
         values = Dictionary(uniqueKeysWithValues: plan.performance.entries.map { ($0.setting, $0.value) })
+        crashWorkarounds = Set(plan.performance.crashWorkaroundsInProfile)
     }
 
     private func save(_ setting: PerformanceSetting, _ on: Bool) {
@@ -64,6 +73,9 @@ struct GameSettingsSection: View {
             try BottleConfig.set(setting, to: on ? "true" : "false", in: BottleConfig.url(forBottle: game.bottleName))
             values[setting] = on ? "true" : "false"
             failure = nil
+            // The CLI logs every `cellar perf set`; a switch flipped here has to leave the same trace,
+            // or a game that stops starting has no record of why.
+            CellarLog.info(.app, "\(setting.key) set to \(on) for \(game.name) in the app.", subject: game.slug)
         } catch {
             failure = "Couldn't save that: \(CellarLog.describe(error))"
         }
