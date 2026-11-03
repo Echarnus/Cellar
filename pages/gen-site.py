@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the static Cellar site from profiles/*.toml into pages/dist/.
 
-Pages: index.html (landing page + supported games), faq.html, 404.html, plus sitemap.xml and
+Pages: index.html (landing page + supported games), games.html, faq.html, sponsor.html, 404.html, plus sitemap.xml and
 robots.txt. Data-driven: every game card comes from a profile, so the page can't drift from what
 Cellar supports, and the Download button names the real installer of the latest release.
 
@@ -76,6 +76,28 @@ OWNER_REPO = "Echarnus/Cellar"
 REPO = f"https://github.com/{OWNER_REPO}"
 RELEASES = f"{REPO}/releases"
 SITE_URL = "https://echarnus.github.io/Cellar/"
+
+# Sponsoring (sponsor.html). Cellar is free and nothing in it is ever behind a payment; sponsoring
+# buys test Macs. Each entry is (label, url): the payment pages, once an account exists, e.g.
+# ("Sponsor on GitHub", "https://github.com/sponsors/Echarnus"). Empty, the page says sponsoring
+# opens soon instead of showing a button that leads nowhere. When filling it in, also flip
+# `Sponsorship.isOpen` in app/Packages/CellarData/Sources/CellarData/Core/Sponsorship.swift, so the
+# app's one-time invitation can be shown.
+SPONSOR_LINKS = []
+# What sponsoring is for: one Mac per chip tier, so a game's chip advice comes from a real run.
+# (tier, why it matters, rough price). Rough guides, second-hand where that is cheaper.
+TEST_MAC_TIERS = [
+    ("M1", "The oldest chip Cellar supports. A game that runs well here runs well on any Apple silicon Mac.",
+     "About €450, a second-hand MacBook Air"),
+    ("M2 and M3", "What most people own: the Mac most players will check a game against.",
+     "About €700, second-hand"),
+    ("M4", "Today’s entry Mac, where a new player starts.", "About €720, a new Mac mini"),
+    ("Pro and Max", "The chips demanding games recommend. Shows what a game asks for at its best.",
+     "About €1,500 and up"),
+]
+# Every test Mac sponsoring has paid for: (Mac, chip, price paid, month bought). Added the day it
+# is bought, so the page always says where the money went.
+TEST_MACS_BOUGHT = []
 # Where the site lives on its host. Only 404.html needs it: GitHub Pages serves that page for any
 # missing path, at any depth, so its links cannot be relative.
 SITE_PATH = "/Cellar/"
@@ -360,9 +382,6 @@ section.block{padding:var(--section) 0 0}
 .three p{color:var(--muted);margin:0}
 .sponsor{margin:64px auto 0;max-width:640px;text-align:center;padding-top:40px;border-top:1px solid var(--line)}
 .sponsor p{color:var(--muted);margin:0 0 18px}
-.sponsor .pending{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 22px;border-radius:980px;
-  border:1px dashed var(--muted);color:var(--muted);font-weight:500}
-.sponsor .pending svg{width:17px;height:17px}
 
 /* Getting started: big quiet numerals, no circles */
 .steps{list-style:none;margin:0;padding:0;display:grid;gap:40px 48px;counter-reset:step;
@@ -807,6 +826,7 @@ def topbar(current, release, base=""):
              (f"{base}index.html#tour", "See It Work", None),
              (f"{base}games.html", "Games", "games"),
              (f"{base}faq.html", "Questions", "faq"),
+             (f"{base}sponsor.html", "Sponsor", "sponsor"),
              (REPO, "GitHub", None)]
     current_mark = ' aria-current="page"'
     links = "".join(
@@ -867,6 +887,8 @@ def site_footer(games, base=""):
       <li><a href="{REPO}/issues">Report a problem</a></li>
     </ul></div>
     <div><h2>Project</h2><ul>
+      <li><a href="{base}sponsor.html">Sponsor test Macs</a></li>
+      <li><a href="{base}faq.html#why-is-it-called-cellar">Why it&rsquo;s called Cellar</a></li>
       <li><a href="{REPO}">Source code</a></li>
       <li><a href="{REPO}/blob/main/CONTRIBUTING.md">Add a game</a></li>
       <li><a href="{REPO}/blob/main/LICENSE">Licence (GPL-3.0)</a></li>
@@ -1066,9 +1088,6 @@ STEPS = [
      "click."),
 ]
 
-# Sponsoring (the sponsor page and its link land with #299). While this is empty the page says
-# sponsoring opens soon instead of showing a button that leads nowhere. Nothing is ever paywalled.
-SPONSOR_URL = ""
 
 
 def game_href(g, base=""):
@@ -1176,9 +1195,11 @@ def render_index(games, release):
         f'<figure>{shot_frame(media, sid, alt, "")}</figure></li>'
         for sid, title, body, alt in SHOTS)
     specs = "".join(f'<li>{icon(ic)}<h3>{title}</h3><p>{body}</p></li>' for ic, title, body in SPECS)
-    sponsor = (f'<a class="btn btn-ghost" href="{n(SPONSOR_URL)}">{icon("heart")}Sponsor Cellar</a>'
-               if SPONSOR_URL else
-               f'<span class="pending">{icon("heart")}Sponsoring Opens Soon</span>')
+    # The home page only points at the sponsor page; whether giving is open yet, and how, lives
+    # there (SPONSOR_LINKS), so there is one place to switch it on.
+    sponsor = ('<a class="chev" href="sponsor.html">See What Sponsoring Buys</a>'
+               if SPONSOR_LINKS else
+               f'<a class="pending" href="sponsor.html">{icon("heart")}Sponsoring Opens Soon</a>')
     release_line = (f'Version {n(release["version"])} · <a href="{n(release["notes"])}">what&rsquo;s new</a> · '
                     if release else "")
     ld = {
@@ -1444,9 +1465,18 @@ FAQ_SECTIONS = [
          f"<a href=\"{REPO}/issues/new\">tell us</a> if it still doesn't match.</p>"
          "<p>Get Cellar only from this site or the GitHub releases page. Any other copy is not "
          "ours.</p>"),
+        ("Why is it called Cellar?",
+         "<p>Because a cellar is where you keep your wine. Cellar is built on "
+         "<a href=\"https://www.winehq.org/\">Wine</a> (short for <i>Wine Is Not an Emulator</i>), "
+         "the free software that lets Windows games run on other systems, and in Wine's world each "
+         "Windows setup is called a <i>bottle</i>. Cellar gives every game a bottle of its own and "
+         "keeps them racked side by side, each one left alone to age in peace. You never have to "
+         "handle a bottle yourself; that part is only the joke in the name.</p>"),
         ("Is it free? Do I need an account with you?",
          "<p>Free, GPL-3.0, and there is no Cellar account, no sign-up and no telemetry. The only "
-         f"{your_stores('accounts involved are the game stores you already have', 'account involved is the Steam account you already have')}.</p>"),
+         f"{your_stores('accounts involved are the game stores you already have', 'account involved is the Steam account you already have')}. "
+         "Every part of Cellar works for everyone; nothing is ever behind a payment. If you want to "
+         "help, <a href=\"sponsor.html\">sponsoring</a> buys Macs to test games on.</p>"),
     ]),
 
     ("Accounts and signing in", "accounts",
@@ -1793,6 +1823,111 @@ def render_games(games, release):
 '''
 
 
+SPONSOR_CSS = """
+/* Sponsor page: the tiers reuse .specs, the promise reuses the statement band (.free + .three) */
+.specs .price{color:var(--fg);font-weight:600;margin-top:10px}
+.bought{width:100%;border-collapse:collapse;max-width:760px}
+.bought th,.bought td{text-align:left;padding:12px 0;border-top:1px solid var(--line)}
+.bought th{color:var(--muted);font-weight:400;font-size:var(--footnote)}
+.give{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.pending{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 22px;border-radius:980px;
+  border:1px dashed var(--muted);color:var(--muted);font-weight:500}
+.pending svg{width:17px;height:17px}
+.give-note{color:var(--muted);max-width:60ch;margin:20px 0 0}
+"""
+CSS += SPONSOR_CSS  # one stylesheet, in <head>, for every page
+
+
+def sponsor_give():
+    """How to give: the payment links, or — before there is an account — an honest "not yet"."""
+    n = html.escape
+    if SPONSOR_LINKS:
+        buttons = "".join(f'<a class="btn btn-ghost" href="{n(url)}">{icon("heart")}{n(label)}</a>'
+                          for label, url in SPONSOR_LINKS)
+        return (f'<div class="give">{buttons}</div>\n    <p class="give-note">Any amount helps, once or '
+                "monthly. Sponsoring unlocks nothing in Cellar; it works the same for everyone.</p>")
+    return (f'<div class="give"><span class="pending">{icon("heart")}Sponsoring Opens Soon</span></div>\n'
+            '    <p class="give-note">There is no way to give yet; this page gets a button the day there is. '
+            "Until then the best help is free: tell a friend with a Mac, or "
+            f'<a href="{REPO}/issues">report how a game runs</a> on yours, naming the Mac you played on.</p>')
+
+
+def sponsor_bought():
+    """Every test Mac sponsoring paid for, or a plain "nothing yet"."""
+    n = html.escape
+    if not TEST_MACS_BOUGHT:
+        return '<p class="give-note">Nothing yet. Each Mac appears here the day it is bought, with what it cost.</p>'
+    rows = "".join(f"<tr><td>{n(mac)}</td><td>{n(chip)}</td><td>{n(price)}</td><td>{n(when)}</td></tr>"
+                   for mac, chip, price, when in TEST_MACS_BOUGHT)
+    return ('<table class="bought"><thead><tr><th scope="col">Mac</th><th scope="col">Chip</th>'
+            f'<th scope="col">Paid</th><th scope="col">Bought</th></tr></thead><tbody>{rows}</tbody></table>')
+
+
+def render_sponsor(games, release):
+    n = html.escape
+    tiers = "".join(f'<li>{icon("chip")}<h3>{n(chip)}</h3><p>{n(why)}</p><p class="price">{n(price)}</p></li>'
+                    for chip, why, price in TEST_MAC_TIERS)
+    return f'''{head("Sponsor Cellar: Macs to test games on — Cellar",
+                 "Cellar is free for everyone, with nothing behind a payment. Sponsoring buys Macs "
+                 "of every chip to test games on, and this page lists every one it has bought.",
+                 "sponsor.html")}
+{topbar("sponsor", release)}
+<main id="main">
+<div class="page-head"><div class="wrap">
+  <h1>Help Cellar test on more Macs.</h1>
+  <p>Cellar is free and stays free: every part of it works for everyone, and nothing is ever
+  behind a payment. What it can&rsquo;t do for free is buy the Macs games are tested on.</p>
+</div></div>
+<div class="wrap">
+  <section class="block" id="why" aria-labelledby="why-h">
+    <div class="section-head">
+      <h2 id="why-h">A game runs differently on every chip.</h2>
+      <p>A game can play smoothly on an M4 Max and struggle on an M1. Each game names the Mac it
+      needs, mostly worked out from its PC requirements. A Mac of each kind turns that estimate
+      into a result: Cellar starts the game on it, checks that it really plays, and writes down
+      what happened.</p></div>
+  </section>
+
+  <section class="block" id="buys" aria-labelledby="buys-h">
+    <div class="section-head">
+      <h2 id="buys-h">One test Mac for each kind of chip.</h2>
+      <p>Prices are rough guides, second-hand where that is cheaper. All of it goes to test Macs;
+      once every kind is covered, the next chips Apple releases come next.</p></div>
+    <ul class="specs">{tiers}</ul>
+  </section>
+
+  <section class="block" id="bought" aria-labelledby="bought-h">
+    <div class="section-head"><h2 id="bought-h">Bought so far.</h2></div>
+    {sponsor_bought()}
+  </section>
+</div>
+
+<section class="free" id="promise" aria-labelledby="promise-h"><div class="wrap">
+  <div class="section-head center"><h2 id="promise-h">Sponsoring never changes Cellar.</h2></div>
+  <ul class="three">
+    <li><h3>Nothing is locked</h3><p>Every feature, every game and every update is for everyone,
+      whether they give or not.</p></li>
+    <li><h3>Nothing about you</h3><p>Cellar still has no sign-up and sends nothing about you
+      anywhere.</p></li>
+    <li><h3>Every euro accounted for</h3><p>What sponsoring bought is listed on this page, with
+      what it cost.</p></li>
+  </ul>
+</div></section>
+
+<div class="wrap">
+  <section class="block" id="give" aria-labelledby="give-h">
+    <div class="section-head"><h2 id="give-h">How to help.</h2></div>
+    {sponsor_give()}
+  </section>
+</div>
+{closing_band(release)}
+</main>
+{site_footer(games)}
+{scripts(THEME_JS)}
+</body></html>
+'''
+
+
 def render_404(games, release):
     base = SITE_PATH
     return f'''{head("Page not found — Cellar", "This page does not exist on the Cellar site. Everything "
@@ -1843,6 +1978,7 @@ def main():
     write("index.html", render_index(games, release))
     write("games.html", render_games(games, release))
     write("faq.html", render_faq(games, release))
+    write("sponsor.html", render_sponsor(games, release))
     write("404.html", render_404(games, release))
     games_dir = os.path.join(OUT, "games")
     if os.path.isdir(games_dir):
@@ -1857,6 +1993,7 @@ def main():
           f"  <url><loc>{SITE_URL}</loc></url>\n"
           f"  <url><loc>{SITE_URL}games.html</loc></url>\n"
           f"  <url><loc>{SITE_URL}faq.html</loc></url>\n"
+          f"  <url><loc>{SITE_URL}sponsor.html</loc></url>\n"
           + "".join(f"  <url><loc>{SITE_URL}{game_href(g)}</loc></url>\n" for g in games)
           + "</urlset>\n")
     write(".nojekyll", "")

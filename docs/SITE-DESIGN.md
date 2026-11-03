@@ -175,8 +175,7 @@ in the app (`Credits.sources`).
 | **A game** (`games/<slug>.html`) | Answer "will *this* game work on my Mac?", and rank for "<game> on Mac". | "<Game> on Mac" headline and its status in a sentence, cover + facts (the Mac it needs, what is known), what other platforms report (credited), how to play it in three steps, Download. |
 | **Questions** (`faq.html`) | Everything else, including the technical "how". | Contents + grouped disclosure rows. The one page allowed to explain the plumbing. |
 | **404** | Get back. | Headline, one sentence, two links. |
-
-The sponsor page joins these when sponsoring opens (#299).
+| **Sponsor** (`sponsor.html`) | Say openly what sponsoring buys (#299). | Headline, why every chip matters, the tiers (spec grid), "Bought so far", the promise (statement band), how to help. Payment links come from `SPONSOR_LINKS` in `gen-site.py`; empty, it says "Sponsoring Opens Soon". The home page only links here. |
 
 ## 12. Search engines and sharing
 

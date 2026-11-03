@@ -12,7 +12,7 @@ Fails (exit 1) on:
     can come from no store, or that names a store the site does not offer yet (gen-site.py's
     OFFERED; the first release is Steam only) outside a game card's own profile facts
   - a technical word (Wine, runner, D3DMetal, profile…) in the player-facing copy of the
-    home, games or 404 page (docs/DESIGN.md §2; the FAQ explains them, and the footer credits Wine)
+    home, games, sponsor or 404 page (docs/DESIGN.md §2; the FAQ explains them, and the footer credits Wine)
   - a <video> without a poster and an English captions <track>, or a screenshot or video in
     media/ larger than MEDIA_LIMITS
   - a game card whose cover has no <img> (every game ships real cover art; the generated
@@ -42,7 +42,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # faq.html has a question that explains these words, and the footer's credit names Wine. "Bottle"
 # is not plumbing: it is the cellar wordplay the app itself uses ("Preparing the bottle"), allowed
 # by Kenneth on 2026-11-03.
-PLAIN_PAGES = ("index.html", "games.html", "404.html")  # and every games/<slug>.html
+PLAIN_PAGES = ("index.html", "games.html", "sponsor.html", "404.html")  # and every games/<slug>.html
 # docs/SITE-DESIGN.md §9: phrases that read as generated copy. Banned on every page.
 CLICHES = re.compile(r"\b(seamless(ly)?|effortless(ly)?|gets? out of (the|your) way|everything you need|unleash|"
                      r"supercharge[ds]?|game[- ]changer|the way it likes|free for now)\b", re.I)
