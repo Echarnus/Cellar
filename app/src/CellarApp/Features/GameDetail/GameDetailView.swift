@@ -325,6 +325,7 @@ struct GameDetailView: View {
             // How likely it is to work — tested, or Cellar's estimate saying it is one — before a
             // two-hour download, not after. The reasons are in Technical Details.
             ForecastBadge(forecast: game.forecast)
+            if let mac = game.facts.macRequirements { macChip(mac) }
             if game.store == .gog { Chip("DRM-free", system: "lock.open.fill") }
             // (A store's AppID or product code is in Technical Details: a support detail, not a fact
             // about the game.)
@@ -337,6 +338,14 @@ struct GameDetailView: View {
             if let update = game.update { updateChip(update) }
             Spacer()
         }
+    }
+
+    /// The Mac this game is best on, from the publisher's PC requirements. Orange when this Mac is
+    /// below even the minimum, so the warning comes before the download, not after it.
+    private func macChip(_ mac: MacRequirements) -> some View {
+        let verdict = mac.verdict(for: SystemEnvironment.thisMac)
+        return Chip(mac.tag, system: "laptopcomputer", tint: verdict == .belowMinimum ? .orange : .secondary)
+            .help(mac.explanation)
     }
 
     /// Whether this copy is Steam's current build. Only for a game Cellar downloaded: Steam keeps
@@ -377,7 +386,7 @@ struct GameDetailView: View {
     @ViewBuilder private var information: some View {
         let facts = game.facts
         VStack(alignment: .leading, spacing: 14) {
-            if !facts.overview.isEmpty || !facts.compatibility.isEmpty {
+            if !facts.overview.isEmpty || !facts.compatibility.isEmpty || facts.macRequirements != nil {
                 // Two columns when the pane is wide enough for them, one when it isn't. At the
                 // window's minimum width the side-by-side version wraps every value onto three
                 // lines, which reads as broken rather than compact.
@@ -467,6 +476,9 @@ struct GameDetailView: View {
     @ViewBuilder private func factColumns(_ facts: GameFacts) -> some View {
         if !facts.overview.isEmpty { FactList(title: String(localized: "About"), rows: facts.overview) }
         if !facts.compatibility.isEmpty { FactList(title: String(localized: "Compatibility"), rows: facts.compatibility) }
+        if let mac = facts.macRequirements {
+            FactList(title: String(localized: "Mac"), rows: mac.rows(thisMac: SystemEnvironment.thisMac))
+        }
     }
 
     /// Saves live in the bottle; Cellar copies them out before anything that could lose them. This

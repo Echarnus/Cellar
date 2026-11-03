@@ -51,3 +51,18 @@ exe         = "Palworld.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through PCGamesN"
+pc_gpu_minimum         = "GeForce GTX 1050"
+pc_memory_minimum      = 16
+pc_gpu_recommended     = "GeForce RTX 2070"
+pc_memory_recommended  = 32
+mac_minimum            = "M2"
+mac_memory_minimum     = 24
+mac_recommended        = "M2 Max"
+mac_memory_recommended = 48
+requirements_checked   = "2026-11-03"
