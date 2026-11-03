@@ -46,6 +46,7 @@ evidence-based expectation, said plainly, with its reasons one level down.
 | Denuvo | profile `drm` | note: may count the Mac as a new PC |
 | Creation Engine / Gamebryo, on the D3DMetal 4 runtime | Cellar lesson #246 (Skyrim) | +1, else −1 |
 | Frontier's COBRA engine | Cellar lesson #261 (patched wineserver, PC2 Workshop) | +1 |
+| Mac players report it runs / runs with problems / fails (CrossOver, Whisky) | `mac_reports`, by hand from a report named in `notes` | +2 / +1 / −4 |
 | ProtonDB Platinum / Gold / Silver / Bronze / Borked | `protondb` | +3 / +2 / +1 / 0 / −3 |
 | Steam Deck Verified or Playable / Unsupported | `steam_deck` | +1 / −1 |
 | Anti-cheat runs on Linux (AreWeAntiCheatYet) | `anticheat_on_linux` | note only (below) |
@@ -69,6 +70,12 @@ steam_deck                  = "verified"
 anticheat_on_linux          = "supported"
 evidence_checked            = "2026-11-03"
 ```
+
+`mac_reports = "runs" | "issues" | "fails"` sits beside them: what Mac players report running the
+game through another Wine-based app. No source publishes that in a form a script can read, so it is
+written by hand, and only from a report the profile's `notes` names. It outweighs the Linux
+evidence: Enshrouded is Gold on Linux, but Mac players see it stop at start, so it is "Unlikely to
+work".
 
 `app/Scripts/refresh-evidence.py` writes them from ProtonDB's summary API, Valve's Steam Deck
 report and AreWeAntiCheatYet's `games.json`, by Steam AppID. A source that can't be reached keeps

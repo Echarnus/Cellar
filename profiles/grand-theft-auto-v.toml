@@ -23,6 +23,10 @@ requires_account            = "Steam + Rockstar Games account"
 online                      = "story mode only; GTA Online needs BattlEye (unsupported here)"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. RAGE, DirectX 11. Needs the Rockstar Games Launcher, which Cellar installs in the bottle; the first Play opens its window to sign in to a Rockstar Games account, and that sign-in window is the step most often reported failing under Wine."
+protondb                    = "gold"
+steam_deck                  = "unsupported"
+anticheat_on_linux          = "denied"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

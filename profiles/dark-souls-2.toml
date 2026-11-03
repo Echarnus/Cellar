@@ -26,6 +26,9 @@ requires_account            = "Steam"
 online                      = "single-player, with online co-op, invasions and messages through FromSoftware's servers"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. This is Scholar of the First Sin, the edition Steam sells; the original 2014 Dark Souls II is a separate game."
+protondb                    = "platinum"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

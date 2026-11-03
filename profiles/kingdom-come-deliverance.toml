@@ -28,6 +28,10 @@ requires_account            = "Steam"
 online                      = "single-player only"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. CodeWeavers rates it Runs Great on CrossOver 26.1 for macOS. Older AppleGamingWiki reports (CrossOver 21, M1 Max and M1 MacBook Air) saw 15 to 35 FPS whatever the settings, from before D3DMetal existed. D3DMetal first, DXVK as the fallback."
+mac_reports                 = "runs"
+protondb                    = "gold"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

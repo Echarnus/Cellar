@@ -25,6 +25,9 @@ requires_account            = "Steam"
 online                      = "single-player, with online co-op, invasions and messages through FromSoftware's servers"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar."
+protondb                    = "platinum"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
 
 # WineForge, as for every Steam title: the current Steam client needs a modern Wine, and Steamworks
 # needs that client running beside the game.

@@ -77,6 +77,22 @@ struct CompatibilityForecastTests {
         #expect(read.checked == "2026-11-03")
     }
 
+    @Test("Mac players' reports outweigh Linux ones: a game Mac players see fail is not Should work")
+    func macReportsWin() {
+        let fails = forecast(api: "Vulkan", anticheat: "none",
+                             evidence: CompatibilityEvidence(protonDB: "gold", steamDeck: "verified", onMac: "fails"))
+        #expect(fails.outlook == .unlikely)
+        let runs = forecast(api: "DirectX 12", anticheat: "none", evidence: CompatibilityEvidence(onMac: "runs"))
+        #expect(runs.evidenceCount == 2)
+        #expect(runs.score > forecast(api: "DirectX 12", anticheat: "none").score)
+    }
+
+    @Test("Enshrouded, which Mac players report not starting, is never estimated to work")
+    func enshrouded() throws {
+        let fields = try #require(Self.shipped().first { $0.slug == "enshrouded" }?.fields)
+        #expect(Self.forecast(fields).outlook <= .unlikely)
+    }
+
     // MARK: - Anti-cheat
 
     @Test("An anti-cheat that only accepts Windows itself means Won't work, whatever else is true")
@@ -200,6 +216,7 @@ struct CompatibilityForecastTests {
             "protondb": ["platinum", "gold", "silver", "bronze", "borked", "pending"],
             "steam_deck": ["verified", "playable", "unsupported", "unknown"],
             "anticheat_on_linux": ["supported", "running", "planned", "broken", "denied"],
+            "mac_reports": ["runs", "issues", "fails"],
         ]
         for (slug, fields) in Self.shipped() {
             for (key, values) in known {

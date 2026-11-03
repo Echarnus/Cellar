@@ -27,6 +27,10 @@ requires_account            = "Steam"
 online                      = "single-player + online co-op for up to 16"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. It draws only through Vulkan, and players trying it through CrossOver on Apple Silicon report it stopping at start with a GPU not found error, so expect it not to start until that is solved."
+mac_reports                 = "fails"
+protondb                    = "gold"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

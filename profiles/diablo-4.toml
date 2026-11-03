@@ -39,6 +39,7 @@ requires_account            = "Battle.net"
 online                      = "always-online (shared world, seasons, co-op)"
 status                      = "untested"
 notes                       = "Configured from CrossOver/Proton evidence, not yet run on Kenneth's M5. CrossOver reports Diablo IV working on macOS 26.x with D3DMetal when a fast sync is on (Cellar turns on the one your runner has — WFUSync on WineForge, msync on Sikarugir). A Season 14 (patch 3.1.0, 2026-06-30) launch crash was reported on CrossOver 26.2 / macOS 26.5.2 — expect turbulence around patch days."
+mac_reports                 = "issues"
 
 [runner]
 # Same runner as the Steam titles: Wine 11.17 + CrossOver patches, carrying Apple D3DMetal 3.0.

@@ -216,6 +216,22 @@ public struct CompatibilityForecast: Sendable, Equatable {
             reasons.append(Reason(.helps, String(localized: "Planet Coaster 2 is built the same way, and Cellar carries the fix that brought its online features back."), source: "#261"))
         }
 
+        // What Mac players report through other apps that run Windows games the same way: the
+        // nearest thing to a Mac test short of Cellar's own.
+        switch s.facts.evidence.onMac {
+        case "runs":
+            score += 2; evidence += 1
+            reasons.append(Reason(.helps, String(localized: "Mac players report it running through other apps that run Windows games the same way.")))
+        case "issues":
+            score += 1; evidence += 1
+            reasons.append(Reason(.note, String(localized: "Mac players report it running through other apps that run Windows games the same way, with problems.")))
+        case "fails":
+            score -= 4; evidence += 1
+            reasons.append(Reason(.hurts, String(localized: "Mac players report it not starting through other apps that run Windows games the same way.")))
+        default:
+            break
+        }
+
         // How it runs for Linux players, through the same kind of layer.
         let e = s.facts.evidence
         if let tier = e.protonDB {

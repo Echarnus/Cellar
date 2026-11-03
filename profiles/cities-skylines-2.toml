@@ -32,6 +32,10 @@ requires_account            = "Steam (a Paradox account is optional, for Paradox
 online                      = "single-player (Paradox Mods and Steam Cloud are optional)"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. Public reports all run it through D3DMetal: CrossOver 24 on an M1 MacBook Pro 16 GB rated playable at about 15 FPS, Whisky on an M1 Max 32 GB playable on the Very Low preset, and GPTK 2 on an M3 Pro on High (about 25 FPS reported on an M1 Pro, 30 on an M1 Max). Known under Wine: switching away from the game can leave its lighting or input broken until a restart, and borderless windowed mode can run in slow motion, so pick full screen. Expect a large city to be limited by the CPU, as it is on Windows. DXVK is the fallback."
+mac_reports                 = "issues"
+protondb                    = "gold"
+steam_deck                  = "unsupported"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

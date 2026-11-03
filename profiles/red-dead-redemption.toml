@@ -29,6 +29,9 @@ requires_account            = "Steam + Rockstar Games account"
 online                      = "single-player only"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar, and no report of it on Apple Silicon was found. Needs the Rockstar Games Launcher, which Cellar installs in the bottle; the first Play opens its window to sign in to a Rockstar Games account, and that sign-in window is the step most often reported failing under Wine for Rockstar's other games."
+protondb                    = "platinum"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"

@@ -108,7 +108,9 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   `anticheat_on_linux`, `evidence_checked`. Written by `app/Scripts/refresh-evidence.py`, never by
   hand, and never a status: they feed Cellar's estimate for untested games
   ([`docs/COMPATIBILITY.md`](../docs/COMPATIBILITY.md)). Keep `graphics_api`, `anticheat`, `drm` and
-  `engine` accurate too, because the estimate reads them.
+  `engine` accurate too, because the estimate reads them. `mac_reports = "runs" | "issues" |
+  "fails"` is the one written by hand: what Mac players report through another Wine-based app, only
+  from a report `notes` names.
 
 ## Vocabularies the tooling actually knows
 

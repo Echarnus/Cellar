@@ -32,6 +32,10 @@ status                      = "untested"
 wheel                       = "untested"
 wheel_setup                 = "Start the game, open Options, then Controls, and pick the preset closest to your wheel, or New for a custom one. Run the calibration wizard so steering rotation and each pedal are measured, then set Steer Lock to the rotation your wheel base is set to."
 notes                       = "Not yet launched under Cellar. A CrossOver report (AppleGamingWiki, M1 Max, macOS 12.7.1, 2560x1440) rates it playable through D3DMetal at about 70 FPS on Epic, with one known bug: the game can stop on some tracks when racing against opponents, at any graphics setting. DXVK is the fallback."
+mac_reports                 = "issues"
+protondb                    = "gold"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
