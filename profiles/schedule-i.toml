@@ -1,0 +1,59 @@
+# Cellar game profile — Schedule I
+#
+# TVGS's 2025 Early Access business sim. Windows only, 64-bit, Unity on DirectX 11. Online co-op
+# runs through Steam; no anti-cheat. Facts below are from SteamDB's info and config pages, read
+# 2026-11-03. ProtonDB and Steam Deck ratings are from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "schedule-i"
+name          = "Schedule I"
+developer     = "TVGS"
+publisher     = "TVGS"
+steam_appid   = 3164500
+engine        = "Unity"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2025-03-24"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player with online co-op through Steam"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 11, which Cellar has two ways to run, so it can offer the second if the first does not start. Co-op through Steam has not been seen working on a Mac yet."
+protondb                    = "platinum"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 3164500
+# Steam's launch option is Schedule I.exe at the top of the folder (SteamDB config).
+install_dir = "Schedule I"
+exe         = "Schedule I.exe"
+
+[acceptance]
+# What `cellar verify schedule-i` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts Schedule I.exe beside a running Steam and it survives the watch.
+# - dock: the Dock says Schedule I, never wine.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"

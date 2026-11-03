@@ -1,0 +1,64 @@
+# Cellar game profile — Grand Theft Auto III
+#
+# The original 2001 Liberty City game. Rockstar took it off sale on Steam in 2021, when the
+# Definitive Edition came out, but it stays in the library of everyone who bought it and Steam still
+# downloads it for them, which is who this profile is for. Cellar only shows it to an account Steam
+# says owns it. Windows only, 32-bit, DirectX 8; no Rockstar Games Launcher. Facts below are from
+# SteamDB's info and config pages, read 2026-11-03. ProtonDB and Steam Deck ratings are from the
+# same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "grand-theft-auto-iii"
+name          = "Grand Theft Auto III"
+developer     = "Rockstar North"
+publisher     = "Rockstar Games"
+steam_appid   = 12100
+engine        = "RenderWare"
+graphics_api  = "DirectX 8"
+architecture  = "x86"
+released      = "2008-01-04"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steam"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. No longer sold on Steam since 2021; this is for players who already own it. DirectX 8, which Cellar runs one way only, the slower and more forgiving one, so there is no second way to offer if it does not start."
+protondb                    = "gold"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DirectX 8: D3DMetal stops at 11 and 12, and Cellar's DXVK overrides cover 9 to 11, so Wine's own
+# renderer (WineD3D, on OpenGL) is the one that can draw it. There is deliberately no fallback that
+# could never start it.
+backend           = "wined3d"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 12100
+# Steam's launch option is gta3.exe at the top of the folder (SteamDB config).
+install_dir = "Grand Theft Auto 3"
+exe         = "gta3.exe"
+
+[acceptance]
+# What `cellar verify grand-theft-auto-iii` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts gta3.exe beside a running Steam and it survives the watch.
+# - dock: the Dock says Grand Theft Auto III, never wine or gta3.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"

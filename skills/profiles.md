@@ -82,7 +82,9 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   its store. Only `"rockstar"` exists: Steam's Rockstar games hand off to the Rockstar Games Launcher,
   which setup installs into the bottle (`RockstarLauncher`). With it, **`start_exe`** — the program to
   start when it is not the game's own process (`PlayRDR2.exe`, Steam's stub); `exe` stays the game
-  (`RDR2.exe`), because that is what Cellar watches. An unknown launcher value is refused by
+  (`RDR2.exe`), because that is what Cellar watches. `start_exe` is looked for beside `exe` first,
+  then at the top of the game's folder, where the GTA Definitive Editions keep their stub while the
+  game runs from `Gameface/Binaries/Win64` (#290). An unknown launcher value is refused by
   `Game.plan`. See `red-dead-redemption-2.toml`.
 - **`[runner]`** — `id`, `windows_version`. **`[graphics]`** — `backend`, `fallback_backend`.
   `fallback_backend` is live: when a launch starts the game but it never comes up, the launch window

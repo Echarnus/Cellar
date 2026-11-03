@@ -1,0 +1,64 @@
+# Cellar game profile — Grand Theft Auto: San Andreas
+#
+# The original 2004 San Andreas game. Rockstar took it off sale on Steam in 2021, when the
+# Definitive Edition came out, but it stays in the library of everyone who bought it and Steam still
+# downloads it for them, which is who this profile is for. Cellar only shows it to an account Steam
+# says owns it. Windows only, 32-bit, DirectX 9; no Rockstar Games Launcher. Facts below are from
+# SteamDB's info and config pages, read 2026-11-03. ProtonDB and Steam Deck ratings are from the
+# same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "grand-theft-auto-san-andreas"
+name          = "Grand Theft Auto: San Andreas"
+developer     = "Rockstar North"
+publisher     = "Rockstar Games"
+steam_appid   = 12120
+engine        = "RenderWare"
+graphics_api  = "DirectX 9"
+architecture  = "x86"
+released      = "2008-01-04"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steam"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. No longer sold on Steam since 2021; this is for players who already own it. DirectX 9, which Cellar has two ways to run, so it can offer the second if the first does not start."
+protondb                    = "gold"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal only translates DirectX 11 and 12. DXVK covers DirectX 9; WineD3D is the forgiving
+# fallback the launch window offers once.
+backend           = "dxvk"
+fallback_backend  = "wined3d"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 12120
+# Steam's launch option is gta-sa.exe at the top of the folder (SteamDB config).
+install_dir = "Grand Theft Auto San Andreas"
+exe         = "gta-sa.exe"
+
+[acceptance]
+# What `cellar verify grand-theft-auto-san-andreas` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts gta-sa.exe beside a running Steam and it survives the watch.
+# - dock: the Dock says Grand Theft Auto: San Andreas, never wine or gta-sa.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"

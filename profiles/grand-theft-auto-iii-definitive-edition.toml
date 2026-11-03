@@ -1,0 +1,71 @@
+# Cellar game profile — Grand Theft Auto III – The Definitive Edition
+#
+# The 2021 Unreal Engine remaster of the Liberty City game, sold on Steam since January 2023 on its
+# own and in The Trilogy bundle. Windows only, 64-bit. Like every Rockstar game on Steam it starts
+# through the Rockstar Games Launcher: Cellar starts Steam's stub, which hands off to the launcher,
+# which signs the player in to a Rockstar Games account and then starts the game. Cellar's setup
+# installs the launcher (RockstarLauncher.swift). Facts below are from SteamDB's info and config
+# pages, read 2026-11-03. ProtonDB and Steam Deck ratings are from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "grand-theft-auto-iii-definitive-edition"
+name          = "Grand Theft Auto III – The Definitive Edition"
+developer     = "Grove Street Games"
+publisher     = "Rockstar Games"
+steam_appid   = 1546970
+engine        = "Unreal Engine 4"
+graphics_api  = "DirectX 11 (DirectX 12 optional)"
+architecture  = "x86-64"
+released      = "2023-01-19"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steamworks + Rockstar Games Launcher (needs a Rockstar Games account)"
+needs_live_session          = true
+requires_account            = "Steam + Rockstar Games account"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 11, which Cellar has two ways to run, so it can offer the second if the first does not start. It starts through the Rockstar Games Launcher, which Cellar sets up; the first Play opens its window to sign in to a Rockstar Games account, the step most often reported failing on a Mac."
+protondb                    = "platinum"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DirectX 11 by default (Steam players add -dx12 for DirectX 12). D3DMetal first; DXVK covers DirectX 11
+# too, through MoltenVK, if D3DMetal doesn't bring it up.
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method             = "windows-steam-in-bottle"
+steam_appid        = 1546970
+# Steam's only launch option is PlayGTA3.exe at the top of the folder (SteamDB config). The game runs from
+# Gameface/Binaries/Win64, where mods put their loaders; Cellar finds a start_exe at the top of the
+# folder when it isn't beside the game (issue 290). The binary's name, LibertyCity.exe, follows the
+# Unreal project and is unverified; the install_dir needle catches the game either way.
+install_dir        = "GTA III - The Definitive Edition"
+exe                = "Gameface/Binaries/Win64/LibertyCity.exe"
+start_exe          = "PlayGTA3.exe"
+publisher_launcher = "rockstar"
+
+[acceptance]
+# What `cellar verify grand-theft-auto-iii-definitive-edition` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts PlayGTA3.exe beside a running Steam, the Rockstar Games Launcher
+#   signs in (the first time it waits for the player), and LibertyCity.exe comes up and survives the watch.
+# - dock: the Dock says Grand Theft Auto III – The Definitive Edition, never wine, PlayGTA3 or Launcher.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks and the Rockstar Games Launcher run untouched inside the layer. Only ever used with a
+# copy the player owns.
+drm_circumvention = "never"

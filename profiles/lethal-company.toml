@@ -1,0 +1,59 @@
+# Cellar game profile — Lethal Company
+#
+# Zeekerss's co-op horror game, in Early Access. Windows only, 64-bit, Unity on DirectX 11. Online
+# co-op runs through Steam's own lobbies; no anti-cheat. Facts below are from SteamDB's info and
+# config pages, read 2026-11-03. ProtonDB and Steam Deck ratings are from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "lethal-company"
+name          = "Lethal Company"
+developer     = "Zeekerss"
+publisher     = "Zeekerss"
+steam_appid   = 1966720
+engine        = "Unity"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2023-10-23"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "online co-op through Steam lobbies, and solo"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 11, which Cellar has two ways to run, so it can offer the second if the first does not start. Co-op through Steam's lobbies has not been seen working on a Mac yet."
+protondb                    = "platinum"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 1966720
+# Steam's launch option is Lethal Company.exe at the top of the folder (SteamDB config).
+install_dir = "Lethal Company"
+exe         = "Lethal Company.exe"
+
+[acceptance]
+# What `cellar verify lethal-company` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts Lethal Company.exe beside a running Steam and it survives the watch.
+# - dock: the Dock says Lethal Company, never wine.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
