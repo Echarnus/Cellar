@@ -609,3 +609,9 @@
 "Picking up where it stopped. Nothing downloads twice." = "Verder waar het stopte. Niets wordt twee keer gedownload.";
 "Checking %@" = "Controleren %@";
 "Checking" = "Controleren";
+"Game’s Choice" = "Keuze van het spel";
+"Full Screen" = "Volledig scherm";
+"Start In" = "Starten in";
+"Start %@ in" = "%@ starten in";
+"Full screen, or a window you can move and resize beside other apps." = "Volledig scherm, of een venster dat je naast andere apps kunt verplaatsen en groter of kleiner maken.";
+"While playing, ⌘Return switches between full screen and a window in many games." = "Tijdens het spelen wissel je in veel games met ⌘Return tussen volledig scherm en een venster.";

@@ -6,7 +6,7 @@ import Foundation
 struct PerfCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "perf",
-        abstract: "Show or change a game's performance switches (Wine logging, Metal validation, MetalFX, HUD).",
+        abstract: "Show or change a game's performance switches (Wine logging, Metal validation, MetalFX, HUD, full screen or window).",
         discussion: """
         Your choices are kept in the game's bottle (bottle.toml) and win over the game's profile, so a
         profile update never undoes them. They apply from the next launch.
@@ -14,6 +14,7 @@ struct PerfCommand: ParsableCommand {
           cellar perf planet-coaster-2                          what is on, and where it comes from
           cellar perf set planet-coaster-2 wine_debug off       stop Wine's debug logging
           cellar perf set planet-coaster-2 metal_validation off try without the validation layer
+          cellar perf set hogwarts-legacy display_mode window   start in a window (fullscreen, or game to let it decide)
           cellar perf reset planet-coaster-2 metal_validation   back to the profile's choice
           cellar perf measure planet-coaster-2                  frame rate of the last minute, and what limits it
         """,
@@ -65,6 +66,10 @@ struct PerfCommand: ParsableCommand {
 
     /// What would make a switch do less than it says, checked rather than assumed.
     static func printCaveats(_ plan: GamePlan) {
+        if plan.performance.displayMode != .game, !plan.canChooseDisplayMode {
+            print(Term.yellow("\(plan.name) can't be told how to start, so display_mode does nothing for it.")
+                + " Switch while playing with ⌘Return instead.")
+        }
         if plan.performance.metalFXUpscaling {
             if plan.graphicsBackend != .d3dmetal {
                 print(Term.yellow("MetalFX only works on D3DMetal; this game runs on \(plan.backend), so it does nothing."))
@@ -113,10 +118,10 @@ struct PerfCommand: ParsableCommand {
         @Argument(help: "Profile slug, e.g. 'planet-coaster-2'.")
         var slug: String
 
-        @Argument(help: "Switch: wine_debug, metal_validation, metalfx_upscaling, metal_hud, retina.")
+        @Argument(help: "Switch: wine_debug, metal_validation, metalfx_upscaling, metal_hud, retina, display_mode.")
         var key: String
 
-        @Argument(help: "on/off, or for wine_debug: off or Wine channels such as err+all.")
+        @Argument(help: "on/off; for wine_debug: off or Wine channels such as err+all; for display_mode: game, fullscreen or window.")
         var value: String
 
         func run() throws {
