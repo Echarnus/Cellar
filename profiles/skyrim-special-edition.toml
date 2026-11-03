@@ -1,5 +1,5 @@
 # Cellar game profile — The Elder Scrolls V: Skyrim Special Edition
-# Schema version 0. Untested on M5 — sensible defaults, validate before trusting.
+# Schema version 0. Verified to the main menu on an M5 (2026-11-02); gameplay not yet tested.
 
 [game]
 slug          = "skyrim-special-edition"
@@ -23,11 +23,15 @@ drm                         = "Steamworks"
 needs_live_steam            = true
 requires_account            = "Steam"
 online                      = "single-player"
-status                      = "untested"
-notes                       = "DX11 via D3DMetal 3.0 should be well-behaved; SKSE/mods untested under Wine."
+status                      = "playable"
+notes                       = "DX11 via D3DMetal 4.0b3. Reached the main menu and stayed up 5 min at 60 fps on 3 of 3 cold starts (cellar verify, M5 / macOS 27.0.1, 2026-11-02); playing a save is untested. Crashed on every start on D3DMetal 3.0. SKSE and mods untested."
 
 [runner]
-id              = "wineforge"
+# WineForge 0.6.0.8 with D3DMetal 4.0b3, the runtime Planet Coaster 2 moved to. On D3DMetal 3.0
+# (runner "wineforge") SkyrimSE.exe died about 6 s in with 0xC0000094 on 9 starts out of 9, even
+# with its settings files in place. On this one it stayed up 300 s at 60 fps (cellar verify, M5 /
+# macOS 27.0.1, 2026-11-02).
+id              = "wineforge-d3dmetal4"
 windows_version = "win10"
 
 [graphics]
@@ -47,6 +51,12 @@ steam_appid = 489830
 
 [launch]
 exe = "SkyrimSE.exe"
+# Steam's own Play starts SkyrimSELauncher.exe, which on its first run copies Skyrim_Default.ini and
+# a quality preset into My Games before the player presses Play there. Cellar starts SkyrimSE.exe
+# itself, and without those two files it crashed (0xC0000005) on every start, on an M5 / macOS 27 on
+# 2026-11-01. So Cellar makes the same two copies, only where none exist. High is Cellar's choice of
+# preset (the launcher's own pick depends on the GPU it detects); a file that exists is never overwritten.
+first_run_files = "Skyrim_Default.ini > Documents/My Games/Skyrim Special Edition/Skyrim.ini; High.ini > Documents/My Games/Skyrim Special Edition/SkyrimPrefs.ini"
 
 [legal]
 drm_circumvention = "never"
