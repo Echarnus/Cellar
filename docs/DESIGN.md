@@ -81,7 +81,9 @@ that happens one level down and is never in the way.
   `.hoverAutomatic`. Use `.hoverHighlight(.backdrop)` on menus and icon buttons. Disabled controls
   don't react.
 - **Right-click works where a Mac user expects it.** A game in the sidebar has a context menu with
-  its big action and Settings…, the way Steam's library does.
+  its big action and Settings…, the way Steam's library does, then every entry of the game page's
+  "…" menu, Uninstall included. Both menus render the one `GameMenuContent`, so they never differ
+  (#304).
 - **Title-style capitalization** for buttons, menu items and window titles ("Check for Updates",
   "Show Logs in Finder"). Use sentence case for labels, descriptions and alerts' informative text.
   An item that opens a window or asks something more ends in "…".

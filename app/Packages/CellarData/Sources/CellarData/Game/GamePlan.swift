@@ -145,6 +145,7 @@ public struct GamePlan {
     /// start-up switch Cellar knows, and Cellar is the one starting it. A publisher launcher sits
     /// between Steam's stub and the game and starts the game itself, dropping whatever it was given;
     /// Battle.net is always the one starting its games (`--exec`), and takes no arguments for them.
+<<<<<<< HEAD
     /// A game that reads its switches from a file of its own (`displaySwitchFile`) gets them whoever
     /// starts it, launcher included.
     /// A game that keeps the choice in its own settings file (`displayIni`) gets it the same way.
@@ -153,12 +154,20 @@ public struct GamePlan {
         if displayIni != nil, DisplayIni.supports(engine: facts.engine) { return true }
         guard DisplayMode.isChoosable(engine: facts.engine) else { return false }
         return displaySwitchFile != nil || publisherLauncher == nil
+=======
+    public var canChooseDisplayMode: Bool {
+        store != .battlenet && publisherLauncher == nil && DisplayMode.isChoosable(engine: facts.engine)
+>>>>>>> origin/main
     }
 
     /// What goes on the game's command line after its exe for the player's `display_mode`: the
     /// engine's own switch, or nothing when the game decides, or when Cellar can't choose for it.
     public var displayArguments: [String] {
+<<<<<<< HEAD
         guard canChooseDisplayMode, displaySwitchFile == nil, displayIni == nil else { return [] }
+=======
+        guard canChooseDisplayMode else { return [] }
+>>>>>>> origin/main
         return performance.displayMode.arguments(engine: facts.engine) ?? []
     }
 

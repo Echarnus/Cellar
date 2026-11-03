@@ -11,8 +11,13 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+<<<<<<< HEAD
 | #310 | Skyrim opened in a small titled window instead of full screen | `DisplayIniTests.swift` › `skyrimFileIsFixed` |
 | #310 | Skyrim, GTA V, Stardew Valley and The Witcher 3 showed Metal's frame-rate overlay to every player | `DisplayIniTests.swift` › `noProfileShowsTheOverlay` |
+=======
+| #304 | An uninstalled game still said "Installed": only one of its copies was removed (Cellar's download, not the Steam client's own) | `UninstallEveryCopyTests.swift` › `removesEveryCopy` |
+| #304 | Right-clicking a game offered only Play and Settings, not Uninstall and the rest of the "…" menu | `GameMenuTests.swift` › `bothMenusShareTheContent` |
+>>>>>>> origin/main
 | #278 | Players without the Steam mobile app couldn't sign in to Steam (QR was the only way) | `SteamPasswordSignInTests.swift` › `conversesOverStdin` |
 | #278 | A Steam password could reach a command line | `SteamPasswordSignInTests.swift` › `passwordNeverAnArgument` |
 | #281 | Shipped releases (0.4.1, 0.4.2) left their "Release Cellar" issue open | `test_scripts.py` › `test_release_workflow_runs_it_after_publishing` |

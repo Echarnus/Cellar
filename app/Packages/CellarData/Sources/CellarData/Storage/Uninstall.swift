@@ -162,8 +162,13 @@ public enum Uninstall {
     static func gameFileItems(_ game: GamePlan) -> [RemovalItem] {
         var items: [RemovalItem] = []
 
-        if let root = installedRoot(game) {
-            items.append(item("Game files", root, gameData: true))
+        // Every copy, not only the one a launch would pick. A Steam game Cellar downloaded can also
+        // have the bottle's Steam client's own copy beside it, and `Game.isGameInstalled` finds the
+        // game in either — so removing only the first left the library saying "Installed" after an
+        // uninstall that reported success (#304).
+        let roots = installedRoots(game)
+        for (index, root) in roots.enumerated() {
+            items.append(item(index == 0 ? "Game files" : "Another copy of the game files", root, gameData: true))
         }
 
         switch game.store {
@@ -194,7 +199,8 @@ public enum Uninstall {
 
         // A depot download lands in the bottle even for a store-installed game, so it is checked
         // for whatever the store is — unless it is already the install root above.
-        if installedRoot(game)?.standardizedFileURL != game.depotGameDir.standardizedFileURL {
+        let depot = game.depotGameDir.resolvingSymlinksInPath().standardizedFileURL.path
+        if !roots.contains(where: { $0.standardizedFileURL.path == depot }) {
             items.append(item("Downloaded game files", game.depotGameDir, gameData: true))
         }
 
@@ -208,11 +214,8 @@ public enum Uninstall {
     /// chose. Falls back to Steam's own answer (the `installdir` in its appmanifest) for a Steam
     /// game whose profile names no exe.
     public static func installedRoot(_ game: GamePlan) -> URL? {
-        if let exe = game.directLaunchExe, let relative = game.launchExe {
-            let depth = relative.split(separator: "/").count
-            var root = exe
-            for _ in 0..<depth { root = root.deletingLastPathComponent() }
-            let candidate = root.resolvingSymlinksInPath()
+        if let exe = game.directLaunchExe {
+            guard let candidate = root(of: exe, game) else { return nil }
             return isDeletable(candidate) ? candidate : nil
         }
         if game.store == .steam, let appID = game.appID,
@@ -224,6 +227,46 @@ public enum Uninstall {
             return candidate
         }
         return nil
+    }
+
+    /// Every folder on disk that holds a copy of the game: each install root the profile's exe is
+    /// found under, plus Steam's own answer for its copy. Resolved, de-duplicated, and only what
+    /// Cellar may delete — the launch's own copy first.
+    ///
+    /// `Game.isGameInstalled` says "Installed" when *any* root has the exe (`GamePlan.directLaunchExe`
+    /// searches them all), so an uninstall that leaves one of them behind leaves the game installed.
+    public static func installedRoots(_ game: GamePlan) -> [URL] {
+        var roots: [URL] = []
+        func add(_ url: URL?) {
+            guard let url, isDeletable(url),
+                  !roots.contains(where: { $0.standardizedFileURL.path == url.standardizedFileURL.path })
+            else { return }
+            roots.append(url)
+        }
+        add(installedRoot(game))
+        if let relative = game.launchExe {
+            for base in game.installRoots {
+                let exe = base.appendingPathComponent(relative)
+                if FileManager.default.fileExists(atPath: exe.path) { add(root(of: exe, game)) }
+            }
+        }
+        if game.store == .steam, let appID = game.appID,
+           let dir = SteamBottle.installDirectory(in: game.prefix, appID: appID) {
+            let candidate = SteamBottle.steamDirectory(in: game.prefix)
+                .resolvingSymlinksInPath()
+                .appendingPathComponent("steamapps/common/\(dir)", isDirectory: true)
+                .resolvingSymlinksInPath()
+            if FileManager.default.fileExists(atPath: candidate.path) { add(candidate) }
+        }
+        return roots
+    }
+
+    /// The game's folder for an exe found on disk: the profile's relative `exe` stripped back off.
+    static func root(of exe: URL, _ game: GamePlan) -> URL? {
+        guard let relative = game.launchExe else { return nil }
+        var root = exe
+        for _ in 0..<relative.split(separator: "/").count { root = root.deletingLastPathComponent() }
+        return root.resolvingSymlinksInPath()
     }
 
     /// What Cellar generated on the player's behalf for *this game*: the launcher in
