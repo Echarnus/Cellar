@@ -76,6 +76,48 @@ public enum Credits {
                url: "https://sparkle-project.org"),
     ]
 
+    /// Where Cellar's knowledge about games comes from: the facts in its profiles and the reports
+    /// behind its compatibility estimates (`docs/COMPATIBILITY.md`). Credited wherever Cellar
+    /// thanks anyone (Kenneth, 2026-11-03: credit where credit is due), each with the terms its
+    /// data comes under. `CreditsTests` fails when a source the estimate or
+    /// `refresh-evidence.py` reads is missing here.
+    public static let sources: [Credit] = [
+        Credit(name: "ProtonDB",
+               role: "Linux players' reports of how each game runs, read as its summary rating for Cellar's estimates.",
+               license: "ODbL 1.0 (database), DbCL 1.0 (contents)",
+               url: "https://www.protondb.com",
+               sourceURL: "https://github.com/bdefore/protondb-data"),
+        Credit(name: "Steam Deck compatibility ratings",
+               role: "Valve's Verified, Playable and Unsupported ratings, quoted in Cellar's estimates.",
+               license: "Valve's ratings, quoted with attribution",
+               url: "https://store.steampowered.com/steamdeck"),
+        Credit(name: "AreWeAntiCheatYet",
+               role: "Which games' anti-cheat accepts a Windows layer, and which publishers block it.",
+               license: "MIT",
+               url: "https://areweanticheatyet.com",
+               sourceURL: "https://github.com/AreWeAntiCheatYet/AreWeAntiCheatYet"),
+        Credit(name: "AppleGamingWiki",
+               role: "Mac players' reports of games running through CrossOver and Whisky, cited in game notes.",
+               license: "CC BY-NC-SA 3.0",
+               url: "https://www.applegamingwiki.com"),
+        Credit(name: "CodeWeavers Compatibility Center",
+               role: "CrossOver's ratings of games on the Mac, cited in game notes.",
+               license: "CodeWeavers' ratings, quoted with attribution",
+               url: "https://www.codeweavers.com/compatibility"),
+        Credit(name: "PCGamingWiki",
+               role: "Game facts: engines, graphics, anti-cheat and DRM, checked when a game is added.",
+               license: "CC BY-NC-SA 3.0",
+               url: "https://www.pcgamingwiki.com"),
+        Credit(name: "SteamDB",
+               role: "Steam's own app records (executables, install folders, depots), checked when a game is added.",
+               license: "Facts, cited with attribution",
+               url: "https://steamdb.info"),
+        Credit(name: "Steam",
+               role: "Cover art and store facts, shown from Steam's own servers; © Valve and each game's publisher.",
+               license: "Valve and publishers, shown, never bundled",
+               url: "https://store.steampowered.com"),
+    ]
+
     /// The non-affiliation line, in one place.
     public static let nonAffiliation =
         "Cellar is GPL-3.0 and not affiliated with the Wine project, Apple, Valve, Blizzard, GOG, CodeWeavers or any game publisher."

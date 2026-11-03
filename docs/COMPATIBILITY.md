@@ -83,6 +83,13 @@ its old value, so a network failure never wipes evidence. `.github/workflows/evi
 every Monday and prints the diff; a pull request brings it in. Because it lives in the profiles,
 it reaches players with the next profile update, without an app release.
 
+## Credit where it's due
+
+Every source above is credited in Settings › About and named in the About panel
+(`Credits.sources`), with the terms its data comes under (`THIRD_PARTY_LICENSES.md` → *Data
+sources*): ProtonDB's data is ODbL, AreWeAntiCheatYet is MIT, the wikis are CC BY-NC-SA. Adding a
+source means adding its `Credit` in the same PR; `CreditsTests` fails otherwise.
+
 ## Where it shows
 
 - **Game page**: the badge beside the game's state ("Might work · Not tested"), with the one-line
