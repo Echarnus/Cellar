@@ -54,6 +54,10 @@ jobs:
       # notice if it stopped compiling.
       - name: Build the Dock shim (universal)
         run: sh Scripts/build-dock-shim.sh
+      # The shim's recvmsg fix (Steam's networking asserts under Wine without it), over a real
+      # loopback packet, through the built library.
+      - name: Test the shim
+        run: sh Scripts/test-shim.sh
       - name: Self-test (VDF/CRC/shortcut codecs)
         run: swift run -c release cellar selftest
       # The release path itself: the bundle with its own CLI and Sparkle.framework, sealed and verified

@@ -291,11 +291,11 @@ class RegressionLedgerTests(unittest.TestCase):
         self.assertGreater(len(rows), 10)
         tests = os.path.join(ROOT, "tests")
         for row in rows:
-            found = re.search(r"`([\w+.]+\.(?:swift|py))` › `(\w+)`", row)
+            found = re.search(r"`([\w+.-]+\.(?:swift|py|c))` › `(\w+)`", row)
             self.assertIsNotNone(found, f"no test named in: {row.strip()}")
             name, func = found.groups()
             paths = [os.path.join(d, name) for d, _, files in os.walk(tests) if name in files]
             self.assertTrue(paths, f"{name} not found under app/tests")
-            pattern = f"def {func}(" if name.endswith(".py") else f"func {func}("
+            pattern = {".py": f"def {func}(", ".c": f" {func}("}.get(os.path.splitext(name)[1], f"func {func}(")
             with open(paths[0], encoding="utf-8") as handle:
                 self.assertIn(pattern, handle.read(), f"{name} has no {func}: {row.strip()}")
