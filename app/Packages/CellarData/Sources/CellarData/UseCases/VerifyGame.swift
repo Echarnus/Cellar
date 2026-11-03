@@ -34,8 +34,11 @@ public struct VerifyGame {
     public var runs: Int
     /// How long each launch has to stay up.
     public var surviveSeconds: Int
-    /// How often the process table and the game's connections are read.
+    /// How often the process table is read, for crash reporters and the game still running.
     public var sampleSeconds: TimeInterval
+    /// How often the game's connections are read in between: a short HTTPS call would slip between
+    /// two process-table samples.
+    public var connectionPollSeconds: TimeInterval = 1
     /// Where reports are written: one folder per run of `cellar verify`.
     public var reportsRoot: URL
     /// Bring a Cellar-downloaded game up to date first, as Play does.
@@ -312,11 +315,17 @@ public struct VerifyGame {
             }
             for host in hosts { watch.hostAddresses[host, default: []].formUnion(GameConnections.addresses(of: host)) }
             if elapsed >= surviveSeconds { break }
-            // A second at a time, so a Ctrl-C is answered within one.
+            // A second at a time, so a Ctrl-C is answered within one. The game's connections are
+            // read on each of those seconds too: a game's HTTPS call can open and close inside one
+            // sample (Fallout Shelter's analytics does), and would otherwise go unseen.
+            let step = min(1, max(0.1, connectionPollSeconds))
             var slept = 0.0
             while slept < sampleSeconds, !isInterrupted() {
-                Thread.sleep(forTimeInterval: min(1, sampleSeconds - slept))
-                slept += 1
+                Thread.sleep(forTimeInterval: min(step, sampleSeconds - slept))
+                slept += step
+                if !pids.isEmpty, slept < sampleSeconds {
+                    watch.endpoints.formUnion(GameConnections.established(pids: pids))
+                }
             }
             if isInterrupted() {
                 watch.interrupted = true
