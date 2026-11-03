@@ -834,7 +834,7 @@ def image_size(path):
         if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
             return int.from_bytes(data[i + 7:i + 9], "big"), int.from_bytes(data[i + 5:i + 7], "big")
         i += 2 + length
-    sys.exit(f"error: {path}: not a PNG or JPEG whose size can be read")
+    raise SystemExit(f"error: {path}: not a PNG or JPEG whose size can be read")
 
 
 def find_media():
@@ -934,7 +934,6 @@ def games_block(games, cap=None):
     One component in both places. With `cap`, at most that many matching cards show, and a link
     under them opens games.html with the same search and filters; without JavaScript the first
     `cap` cards show and the link opens the full list."""
-    n = html.escape
     total = len(games)
     stores_present = [k for k in STORES if any(g["store"] == k for g in games)]
     statuses_present = [k for k in STATUS if any(g["status"] == k for g in games)]
