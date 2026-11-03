@@ -40,7 +40,7 @@ struct GameSettingsSection: View {
                     Toggle(setting.displayTitle, isOn: binding(setting))
                     Text(setting.tradeOff).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if crashWorkarounds.contains(row.setting) {
+                    if crashWorkarounds.contains(setting) {
                         Text("\(game.name) needs this on: without it, it crashes as it starts. If you switch it off and that happens, Cellar switches it back on.")
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
