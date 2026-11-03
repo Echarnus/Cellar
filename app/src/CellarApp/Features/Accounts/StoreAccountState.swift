@@ -31,12 +31,22 @@ nonisolated struct StoreAccountState: Sendable {
         // The app reads this itself instead of asking the CLI, so the two can disagree — and when
         // they do, this line beside the CLI's is the only place it shows.
         CellarLog.debug(.account, SteamAccount.diagnosis)
-        return StoreAccountState(
+        let state = StoreAccountState(
             steam: SteamAccount.state,
             steamClientAccount: SteamBottle.sharedLoggedInAccount,
             gogSignedIn: GOGAuth.isSignedIn,
             gogAccount: GOGAuth.cachedUsername,
             battleNetAdded: StoreLibrary.BattleNetAccount.isAdded,
             isLoaded: true)
+        return Showcase.isOn() ? state.showcased : state
+    }
+
+    /// `CELLAR_SHOWCASE=1`: every account named "Cellar", for the website's captures.
+    var showcased: StoreAccountState {
+        var copy = self
+        copy.steam = Showcase.masking(steam)
+        copy.steamClientAccount = Showcase.masking(steamClientAccount)
+        copy.gogAccount = Showcase.masking(gogAccount)
+        return copy
     }
 }
