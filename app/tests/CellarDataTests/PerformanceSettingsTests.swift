@@ -53,7 +53,7 @@ struct PerformanceSettingsTests {
         #expect(PerformanceSetting.metalFXUpscaling.rawValue == "metalfx_upscaling")
         #expect(PerformanceSetting.metalHUD.rawValue == "metal_hud")
         #expect(Set(PerformanceSetting.allCases.map(\.rawValue))
-                == ["wine_debug", "metal_validation", "metalfx_upscaling", "metal_hud", "retina"])
+                == ["wine_debug", "metal_validation", "metalfx_upscaling", "metal_hud", "retina", "display_mode"])
     }
 
     @Test("named() finds every setting by its key and nothing else")
