@@ -1,0 +1,80 @@
+# Cellar game profile — Satisfactory
+#
+# Coffee Stain's factory-building game, out of Early Access in 2024. The Steam copy has a Linux
+# build but no Mac one; Cellar runs the Windows build, 64-bit. DirectX 12 by default, DirectX 11 in
+# its settings. Facts below are from SteamDB's info and config pages, read 2026-11-03. ProtonDB and
+# Steam Deck ratings are from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "satisfactory"
+name          = "Satisfactory"
+developer     = "Coffee Stain Studios"
+publisher     = "Coffee Stain Publishing"
+steam_appid   = 526870
+engine        = "Unreal Engine 5"
+graphics_api  = "DirectX 12 (DirectX 11 from its settings)"
+architecture  = "x86-64"
+released      = "2024-09-10"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player with online co-op"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 12 by default, which Cellar runs one way; set to DirectX 11 in the game's own settings, it gives Cellar a second way to offer if the first does not start. Online co-op has not been seen working on a Mac yet."
+protondb                    = "platinum"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DirectX 12 on D3DMetal by default. DXVK translates DirectX 11 only, so the fallback helps a player who
+# set the game to DirectX 11 in its settings, which every Unreal 5 game offers.
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 526870
+# Steam's launch option is FactoryGameSteam.exe -NO_EOS_OVERLAY (SteamDB config); the argument only hides an
+# overlay and is not passed yet (issue 294). The exe at the top of the folder starts the Unreal binary under Engine/Binaries/Win64; the install_dir needle
+# catches either as the game.
+install_dir = "Satisfactory"
+exe         = "FactoryGameSteam.exe"
+
+[acceptance]
+# What `cellar verify satisfactory` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts FactoryGameSteam.exe beside a running Steam and the game survives the watch.
+# - dock: the Dock says Satisfactory, never wine or FactoryGameSteam.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through GameRequirementsLab"
+pc_gpu_minimum         = "GeForce GTX 1650"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce RTX 2070"
+pc_memory_recommended  = 16
+mac_minimum            = "M1 Pro"
+mac_memory_minimum     = 16
+mac_recommended        = "M2 Max"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

@@ -75,6 +75,29 @@ struct RockstarLauncherTests {
         #expect(plan.gameProcessNeedles.first == "RDR2.exe")
     }
 
+    @Test("A start_exe that isn't beside the game is found at the top of its folder (#290)")
+    func startExeResolvesAtTheInstallRoot() throws {
+        // The GTA Definitive Editions: Steam's stub at the top, the Unreal binary three folders down.
+        let plan = try TestHome.plan("""
+        [install]
+        steam_appid = "1547000"
+        exe         = "Gameface/Binaries/Win64/SanAndreas.exe"
+        start_exe   = "PlayGTASanAndreas.exe"
+        """, slug: "rockstar-root-start")
+        try TestHome.installFakeGame(into: plan, at: "Gameface/Binaries/Win64/SanAndreas.exe")
+        let game = try #require(plan.directLaunchExe)
+        #expect(plan.directStartExe == game, "no stub on disk: the game itself, never a missing file")
+
+        try TestHome.installFakeGame(into: plan, at: "PlayGTASanAndreas.exe")
+        #expect(plan.directStartExe?.standardizedFileURL
+                == plan.depotGameDir.appendingPathComponent("PlayGTASanAndreas.exe").standardizedFileURL)
+        #expect(plan.directLaunchExe == game, "what is watched stays the game itself")
+
+        // A stub beside the game still wins over one at the top, as for every Rockstar game before.
+        try TestHome.installFakeGame(into: plan, at: "Gameface/Binaries/Win64/PlayGTASanAndreas.exe")
+        #expect(plan.directStartExe == game.deletingLastPathComponent().appendingPathComponent("PlayGTASanAndreas.exe"))
+    }
+
     // MARK: - Installing it
 
     private func bottle(_ label: String) throws -> (plan: GamePlan, wine: WineRunner) {

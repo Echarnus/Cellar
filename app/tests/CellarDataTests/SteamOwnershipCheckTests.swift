@@ -77,6 +77,36 @@ struct SteamOwnershipCheckTests {
         #expect(second["730"] == .notOwned)
     }
 
+    @Test("The library follows Steam's own list: a free licence nobody played is not in it (#288)")
+    func libraryFollowsSteamsList() {
+        // What GetOwnedGames returns with include_free_sub=false: paid games and played free ones.
+        let response: [String: Any] = ["response": ["game_count": 2,
+                                                    "games": [["appid": 374320], ["appid": 271590]]]]
+        let library = SteamOwnedGames.appIDs(inResponse: response)
+        #expect(library == [374320, 271590])
+
+        // Overwatch 2 holds a free licence an older check claimed, but was never played: not listed.
+        let answers = SteamOwnedGames.answers(for: [374320, 271590, 2357570], library: library ?? [])
+        #expect(answers["374320"] == .owned)
+        #expect(answers["271590"] == .owned)
+        #expect(answers["2357570"] == .notOwned)
+
+        // The request leaves unused free licences out and played free games in.
+        let form = SteamOwnedGames.ownedForm(access: "a", steamID: "76561197960287930")
+        #expect(form["include_free_sub"] == "false")
+        #expect(form["include_played_free_games"] == "true")
+    }
+
+    @Test("An answer Steam wouldn't give is 'couldn't ask', never 'owns nothing'")
+    func refusedListIsNotEmptyLibrary() {
+        #expect(SteamOwnedGames.appIDs(inResponse: ["response": [String: Any]()]) == nil)
+        #expect(SteamOwnedGames.appIDs(inResponse: [:]) == nil)
+        #expect(SteamOwnedGames.appIDs(inResponse: ["response": ["game_count": 0]]) == [])
+        #expect(SteamOwnedGames.accessToken(["response": ["access_token": "tok"]]) == "tok")
+        #expect(SteamOwnedGames.accessToken(["response": ["access_token": ""]]) == nil)
+        #expect(SteamOwnedGames.tokenForm(refresh: "r", steamID: "s") == ["refresh_token": "r", "steamid": "s"])
+    }
+
     @Test("Concurrent logon ids stay clear of DepotDownloader's default")
     func loginIDsAvoidDefault() {
         let defaultID: UInt32 = 0x534B32 // "SK2", used by a download started without -loginid

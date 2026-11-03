@@ -169,10 +169,20 @@ public enum StoreLibrary {
         guard !appIDs.isEmpty else { return [:] }
 
         let cached = loadSteamCache()
-        var answers = cached?.apps ?? [:]
-        var claimedFree = Set(cached?.claimedFree ?? [])
         let total = appIDs.count
         progress(steamCheckProgress(total: total, answered: 0))
+
+        // Steam's own library list first: it is the player's library exactly, and asking it never
+        // adds a free licence to the account (#288). Game by game is the fallback when it can't answer.
+        if let library = SteamOwnedGames.appIDs(account: account) {
+            let answers = SteamOwnedGames.answers(for: appIDs, library: library)
+            saveSteamCache(SteamCache(checkedAt: Date(), account: account, apps: answers,
+                                      claimedFree: cached?.claimedFree))
+            return answers
+        }
+
+        var answers = cached?.apps ?? [:]
+        var claimedFree = Set(cached?.claimedFree ?? [])
         let verdicts = askSideBySide(appIDs.sorted(), width: steamCheckWidth) { appID, slot in
             DepotTool.access(appID: appID, credentials: credentials,
                              loginID: steamLoginIDBase + UInt32(slot))

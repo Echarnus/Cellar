@@ -323,3 +323,25 @@ Five Steam games Kenneth asked for by name, none with a Mac version. All are pro
 - **Planet Zoo doesn't inherit PC2's fixes unproven.** Frontier's crash reporter is already in
   `CrashSigns`, so verify catches it. `metal_validation` and `online_hosts` wait for a run that
   shows they're needed.
+
+## Update 2026-11-03: every GTA on Steam, Hogwarts Legacy, Sleeping Dogs, and nine popular games (#290–#293)
+
+Kenneth asked for every Grand Theft Auto game on Steam, Hogwarts Legacy and Sleeping Dogs, and
+for the popular games Cellar still missed. Facts are from SteamDB's info and config pages, with
+ProtonDB tiers and Steam Deck ratings, all read 2026-11-03. Every profile is `untested`.
+
+| Game | AppID | Graphics | Route | Why |
+|---|---|---|---|---|
+| GTA IV: The Complete Edition (#290) | 12210 | DX9, 32-bit | DXVK, then WineD3D | Starts `GTAIV/PlayGTAIV.exe`, which hands off to the Rockstar Games Launcher. ProtonDB Gold. |
+| GTA III / Vice City / San Andreas – The Definitive Edition (#290) | 1546970 / 1546990 / 1547000 | DX11 (DX12 optional), 64-bit | D3DMetal, then DXVK | Unreal Engine 4. Steam's stub (`PlayGTA3.exe`, …) sits at the top of the folder while the game runs from `Gameface/Binaries/Win64`, so `start_exe` is now also looked for at the install root. The binary names (`LibertyCity.exe`, `ViceCity.exe`, `SanAndreas.exe`) are unverified; the folder needle catches the game either way. |
+| GTA III / Vice City / San Andreas, originals (#290) | 12100 / 12110 / 12120 | DX8, DX8, DX9; 32-bit | WineD3D; WineD3D; DXVK then WineD3D | Off sale since 2021 but still downloadable by owners, and Cellar only lists a game Steam says the account owns. No Rockstar launcher. Cellar's DXVK overrides cover DX9–11 only, so DX8 gets WineD3D and no fallback. |
+| Hogwarts Legacy (#291) | 990080 | DX12 only | D3DMetal | Denuvo. Steam starts it with `-SaveToUserDir -UserDir="Hogwarts Legacy"`; Cellar's direct start passes no arguments yet (#294), so saves may not meet Steam Cloud's. |
+| Sleeping Dogs: Definitive Edition (#292) | 307690 | DX11 | D3DMetal, then DXVK | Steam also has an old Intel-only Mac build; Cellar runs the Windows one. |
+| Sekiro, Monster Hunter: World, God of War, Lethal Company, Schedule I (#293) | 814380, 582010, 1593500, 1966720, 3164500 | DX11 | D3DMetal, then DXVK | No anti-cheat, no third-party DRM. ProtonDB Gold or Platinum. |
+| Monster Hunter Wilds, Black Myth: Wukong, Clair Obscur: Expedition 33 (#293) | 2246340, 2358720, 1903340 | DX12 only | D3DMetal | Wilds and Wukong carry Denuvo. Wukong is rated Unsupported on Steam Deck for performance. |
+| Satisfactory (#293) | 526870 | DX12, DX11 in its settings | D3DMetal, then DXVK | The fallback only helps once the game is set to DX11. |
+
+Looked at and skipped: GTA: Episodes from Liberty City is part of the Complete Edition now; GTA
+1, 2 and London left Steam long ago. Baldur's Gate 3, Hades II and Valheim have Mac versions.
+Marvel Rivals, Dead by Daylight and anything on Easy Anti-Cheat that guards starting the game wait
+for proof that it runs. Split Fiction and It Takes Two need the EA app, which Cellar can't set up.
