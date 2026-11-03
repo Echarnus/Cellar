@@ -31,26 +31,17 @@ public enum DisplayMode: String, CaseIterable, Sendable {
     /// The engine families Cellar knows a start-up switch for, by the words a profile's `engine`
     /// uses. Each switch is the engine maker's own documented command-line option:
     /// Unreal (`-fullscreen` / `-windowed`), Unity's standalone player (`-screen-fullscreen 1|0`),
-<<<<<<< HEAD
     /// Valve's Source and Source 2 (`-fullscreen` / `-windowed`), and Rockstar's RAGE
     /// (`-fullscreen` / `-windowed`, Rockstar's own list for GTA V, the same switches in GTA IV).
     enum Engine: CaseIterable {
         case unreal, unity, source, rage
-=======
-    /// and Valve's Source and Source 2 (`-fullscreen` / `-windowed`).
-    enum Engine: CaseIterable {
-        case unreal, unity, source
->>>>>>> origin/main
 
         init?(_ engine: String?) {
             guard let words = engine?.lowercased() else { return nil }
             if words.contains("unreal") { self = .unreal }
             else if words.hasPrefix("unity") { self = .unity }
             else if words == "source" || words.hasPrefix("source ") { self = .source }
-<<<<<<< HEAD
             else if words == "rage" || words.hasPrefix("rage ") { self = .rage }
-=======
->>>>>>> origin/main
             else { return nil }
         }
     }
@@ -61,13 +52,8 @@ public enum DisplayMode: String, CaseIterable, Sendable {
         guard let family = Engine(engine) else { return nil }
         switch (self, family) {
         case (.game, _):                          return []
-<<<<<<< HEAD
         case (.fullScreen, .unreal), (.fullScreen, .source), (.fullScreen, .rage): return ["-fullscreen"]
         case (.window, .unreal), (.window, .source), (.window, .rage):             return ["-windowed"]
-=======
-        case (.fullScreen, .unreal), (.fullScreen, .source): return ["-fullscreen"]
-        case (.window, .unreal), (.window, .source):         return ["-windowed"]
->>>>>>> origin/main
         case (.fullScreen, .unity):               return ["-screen-fullscreen", "1"]
         case (.window, .unity):                   return ["-screen-fullscreen", "0"]
         }
@@ -76,15 +62,12 @@ public enum DisplayMode: String, CaseIterable, Sendable {
     /// Whether Cellar can start a game on `engine` full screen or in a window.
     public static func isChoosable(engine: String?) -> Bool { Engine(engine) != nil }
 
-<<<<<<< HEAD
     /// Every switch any choice on `engine` can put on a command line — what a switch file is cleared
     /// of before the current choice is written (`DisplaySwitchFile`).
     public static func allSwitches(engine: String?) -> Set<String> {
         Set(allCases.compactMap { $0.arguments(engine: engine) }.joined())
     }
 
-=======
->>>>>>> origin/main
     /// The segment's label on a game's page.
     public var displayTitle: String {
         switch self {
