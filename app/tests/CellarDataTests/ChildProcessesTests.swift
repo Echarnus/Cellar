@@ -76,6 +76,9 @@ struct ChildProcessesTests {
         raise(SIGINT)
         usleep(300_000)
         #expect(process.isRunning, "the command decides what stops, and when")
-        ChildProcesses.terminateAll()
+        // Only this test's tool: terminateAll would also stop what tests running beside it follow.
+        ChildProcesses.untrack(process)
+        process.terminate()
+        process.waitUntilExit()
     }
 }
