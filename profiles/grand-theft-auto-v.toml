@@ -36,9 +36,6 @@ windows_version = "win10"
 backend           = "d3dmetal"
 fallback_backend  = "dxmt"
 
-[env]
-MTL_HUD_ENABLED = "1"
-
 [install]
 method             = "windows-steam-in-bottle"
 steam_appid        = 271590
@@ -50,6 +47,9 @@ install_dir        = "Grand Theft Auto V"
 exe                = "GTA5.exe"
 start_exe          = "PlayGTAV.exe"
 publisher_launcher = "rockstar"
+# Rockstar's launcher drops the stub's command line, but the game also reads commandline.txt beside
+# its exe (Rockstar's GTA V command-line list): the full screen or window choice is written there.
+display_switch_file = "commandline.txt"
 
 [legal]
 drm_circumvention = "never"

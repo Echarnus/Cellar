@@ -84,6 +84,12 @@ public struct LaunchGame {
         // game itself (Skyrim crashed on every start without its INIs). After any update, so the
         // files are copied from the build that is about to run.
         FirstRunFiles.seed(plan, progress: progress)
+        // The full screen or window choice, for a game that reads it from a file of its own (GTA's
+        // `commandline.txt`): written whichever route starts the game, launcher included.
+        DisplaySwitchFile.apply(plan)
+        // …or from its own settings file (Skyrim's SkyrimPrefs.ini), after the first-run copy above
+        // has made it.
+        DisplayIni.apply(plan)
 
         // No live-session DRM and the exe is on disk → run it directly, no client at all.
         if plan.canLaunchStoreFree && !forceStore {

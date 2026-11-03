@@ -76,6 +76,13 @@ public struct GamePlan {
     /// `first_run_files`: settings files the game's own launcher would write before its first run,
     /// which Cellar writes instead because it starts the game itself (`FirstRunFiles`).
     public var firstRunFiles: [FirstRunFiles.Copy] = []
+    /// `display_switch_file`: a file beside the game's exe that the game reads its command line from
+    /// (Rockstar's `commandline.txt`), so the full screen or window choice reaches the game even when
+    /// a launcher starts it. See `DisplaySwitchFile`.
+    public var displaySwitchFile: String? = nil
+    /// `display_ini`: the game's own settings file, relative to the Windows user folder, where its
+    /// full screen or window setting lives (Skyrim's `SkyrimPrefs.ini`). See `DisplayIni`.
+    public var displayIni: String? = nil
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
@@ -138,14 +145,20 @@ public struct GamePlan {
     /// start-up switch Cellar knows, and Cellar is the one starting it. A publisher launcher sits
     /// between Steam's stub and the game and starts the game itself, dropping whatever it was given;
     /// Battle.net is always the one starting its games (`--exec`), and takes no arguments for them.
+    /// A game that reads its switches from a file of its own (`displaySwitchFile`) gets them whoever
+    /// starts it, launcher included.
+    /// A game that keeps the choice in its own settings file (`displayIni`) gets it the same way.
     public var canChooseDisplayMode: Bool {
-        store != .battlenet && publisherLauncher == nil && DisplayMode.isChoosable(engine: facts.engine)
+        guard store != .battlenet else { return false }
+        if displayIni != nil, DisplayIni.supports(engine: facts.engine) { return true }
+        guard DisplayMode.isChoosable(engine: facts.engine) else { return false }
+        return displaySwitchFile != nil || publisherLauncher == nil
     }
 
     /// What goes on the game's command line after its exe for the player's `display_mode`: the
     /// engine's own switch, or nothing when the game decides, or when Cellar can't choose for it.
     public var displayArguments: [String] {
-        guard canChooseDisplayMode else { return [] }
+        guard canChooseDisplayMode, displaySwitchFile == nil, displayIni == nil else { return [] }
         return performance.displayMode.arguments(engine: facts.engine) ?? []
     }
 

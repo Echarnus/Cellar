@@ -18,6 +18,8 @@ struct DisplayModeTests {
             ("Unity (HDRP)", DisplayMode.window, ["-screen-fullscreen", "0"]),
             ("Source", DisplayMode.window, ["-windowed"]),
             ("Source 2", DisplayMode.fullScreen, ["-fullscreen"]),
+            ("RAGE", DisplayMode.window, ["-windowed"]),
+            ("RAGE", DisplayMode.fullScreen, ["-fullscreen"]),
           ])
     func engineSwitches(_ engine: String, _ mode: DisplayMode, _ expected: [String]) {
         #expect(mode.arguments(engine: engine) == expected)
@@ -31,7 +33,7 @@ struct DisplayModeTests {
     }
 
     @Test("An engine with no known switch is never offered the choice",
-          arguments: ["COBRA", "RAGE", "Creation Engine", "REDengine 3", "not published", "Sourcery", ""])
+          arguments: ["COBRA", "Creation Engine", "REDengine 3", "not published", "Sourcery", ""])
     func unknownEnginesAreNotChoosable(_ engine: String) {
         #expect(!DisplayMode.isChoosable(engine: engine))
         #expect(DisplayMode.window.arguments(engine: engine) == nil)

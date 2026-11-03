@@ -164,7 +164,10 @@ switch, so `cellar perf` shows what the game really gets. Add a new switch there
 variable: Wine has no switch that puts every game in a window, so `GamePlan.displayArguments` turns
 it into the engine's own start-up switch (Unreal and Source `-fullscreen`/`-windowed`, Unity
 `-screen-fullscreen 1|0`) after the exe. Only offered where it can work (`canChooseDisplayMode`): a
-known engine, not Battle.net, no publisher launcher. While playing, the game's Alt+Enter is ⌘Return —
+known engine, not Battle.net, and no publisher launcher, unless the profile names a
+`display_switch_file` the game reads its own switches from (GTA IV/V's `commandline.txt`, #308), or a `display_ini` it keeps the setting in (Creation Engine `[Display]`, #310).
+Then `DisplaySwitchFile.apply` rewrites the display switches in that file before every launch and
+keeps every other line. While playing, the game's Alt+Enter is ⌘Return —
 the Mac driver sends Command as Alt by default, so never set `LeftCommandIsCtrl` without changing
 that hint.
 

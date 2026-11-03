@@ -101,6 +101,17 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   `exe`, the destination relative to the Windows user folder, like `save_paths`. Copied before each
   launch only where nothing exists yet (`FirstRunFiles`). Only for a game you have seen fail
   without them: Skyrim SE crashed on every start until `Skyrim.ini` and `SkyrimPrefs.ini` existed.
+- **`display_mode`** (optional) — `game`, `fullscreen` or `window`: how the game starts unless the
+  player picks otherwise on its page (#306). Becomes the engine's own switch (Unreal, Unity, Source,
+  RAGE), so it does nothing on another engine.
+- **`display_switch_file`** (optional, `[launch]`) — a plain file name beside `exe` that the game reads
+  extra command-line switches from (`"commandline.txt"` for GTA IV and V, #308). For a game whose
+  publisher launcher drops the command line: the full screen or window choice is written there.
+- **`display_ini`** (optional, `[launch]`) — for a Creation Engine game, its settings file relative to
+  the Windows user folder (`"Documents/My Games/Skyrim Special Edition/SkyrimPrefs.ini"`, #310). The
+  choice is written into its `[Display]` before each start (`DisplayIni`); a file the game hasn't
+  written yet is left alone. Never put `MTL_HUD_ENABLED` or `metal_hud` in a shipped profile: the
+  overlay is the player's choice (`DisplayIniTests.noProfileShowsTheOverlay`).
 - **`generated = "true"`** — a draft Cellar wrote itself (`DraftProfile`, `cellar profiles draft`) from an
   installed game's PE header. Drafts live in the player's own profiles, are always `untested`, and the app
   lists them apart. Turning one into a shipped profile means testing it and deleting this line.

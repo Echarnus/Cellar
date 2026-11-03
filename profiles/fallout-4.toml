@@ -53,6 +53,9 @@ exe         = "Fallout4.exe"
 # (issue 245). So Cellar makes the same two copies, only where none exist; the preset step is left to
 # the game's own options menu. Read by FirstRunFiles (PR 246); until that lands the key is ignored.
 first_run_files = "Fallout4_Default.ini > Documents/My Games/Fallout4/Fallout4.ini; Fallout4/Fallout4Prefs.ini > Documents/My Games/Fallout4/Fallout4Prefs.ini"
+# The same engine as Skyrim SE, the same [Display] keys: full screen or window is written here.
+display_ini  = "Documents/My Games/Fallout4/Fallout4Prefs.ini"
+display_mode = "fullscreen"
 
 [legal]
 drm_circumvention = "never"

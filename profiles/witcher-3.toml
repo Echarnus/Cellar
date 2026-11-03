@@ -33,9 +33,6 @@ windows_version = "win10"
 backend           = "d3dmetal"
 fallback_backend  = "dxvk"
 
-[env]
-MTL_HUD_ENABLED = "1"
-
 [install]
 # Cellar downloads the Windows installer the player owns and runs it silently into C:\Games\witcher-3.
 method          = "gog-installer"
