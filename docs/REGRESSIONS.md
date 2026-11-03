@@ -27,5 +27,5 @@ for what only a real game shows.
 | #239 | A game could read the tokens of the shell that started it | `CredentialStorageTests.swift` › `noTokenAtTheProcessBoundary` |
 | #250 | A stopped `cellar verify` left no report and the game running | `VerificationTests.swift` › `interruptedRun` |
 | #270 | A second Ctrl-C (or SIGTERM after SIGINT) during `cellar verify` left the bottle's Steam and wineserver running and the report saying "still running" | `VerificationTests.swift` › `stoppedAtOnce` |
-| 2026-11-03 | Even one Ctrl-C ended `cellar verify` at once: the CLI's process-wide stop re-raised the signal before verify's own teardown ran, leaving Steam and wineserver running | `ChildProcessesTests.swift` › `leaveStopToCommand` |
+| #273 | Even one Ctrl-C ended `cellar verify` at once: the CLI's process-wide stop re-raised the signal before verify's own teardown ran, leaving Steam and wineserver running | `ChildProcessesTests.swift` › `leaveStopToCommand` |
 | #258 | `cellar verify` passed a failed Frontier account call | `VerificationTests.swift` › `onlineErrorsFailGameOnline` |
