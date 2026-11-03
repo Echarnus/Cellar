@@ -14,6 +14,12 @@ public enum PerformanceSettings {
         /// The game's environment from the profile and bottle layers, on top of the runner's own.
         public let env: [String: String]
         public let entries: [Entry]
+        /// Crash workarounds the profile turns on and the player's bottle switched off — the
+        /// settings a launch that dies as it starts puts back (`GamePlan.launchEnvWithWorkarounds`).
+        public var crashWorkaroundsSwitchedOff: [PerformanceSetting] = []
+        /// Crash workarounds the profile turns on, whatever the bottle says — what the app warns
+        /// about beside the switch.
+        public var crashWorkaroundsInProfile: [PerformanceSetting] = []
 
         public func value(_ setting: PerformanceSetting) -> String {
             entries.first { $0.setting == setting }?.value ?? setting.defaultValue
@@ -56,7 +62,23 @@ public enum PerformanceSettings {
             let (value, source) = values[setting] ?? (setting.defaultValue, .cellarDefault)
             return Entry(setting: setting, value: value, source: source)
         }
-        return Resolved(env: env, entries: entries)
+        var resolved = Resolved(env: env, entries: entries)
+        let inProfile = PerformanceSetting.allCases.filter {
+            $0.isCrashWorkaround && profileValue($0, fields: profileFields, env: profileEnv) == "true"
+        }
+        resolved.crashWorkaroundsInProfile = inProfile
+        resolved.crashWorkaroundsSwitchedOff = entries.filter { entry in
+            inProfile.contains(entry.setting) && entry.source == .bottle && entry.value == "false"
+                // Only the switch: a raw variable in the bottle's [env] was typed by hand, on purpose.
+                && entry.setting.value(fromEnv: bottleEnv) == nil
+        }.map(\.setting)
+        return resolved
+    }
+
+    /// What the profile alone says about `setting`: its raw `[env]` beats its switch, as above.
+    static func profileValue(_ setting: PerformanceSetting, fields: [String: String], env: [String: String]) -> String? {
+        if let value = setting.value(fromEnv: env) { return value }
+        return fields[setting.key].flatMap { try? setting.normalise($0) }
     }
 
     private static func apply(_ setting: PerformanceSetting, _ value: String, to env: inout [String: String]) {
