@@ -16,6 +16,7 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
 | Steam account name + dates | `shared/steam-account.json` | `0600` (`PrivateFiles.write`). Not a secret, but it says whose library this is. |
 | GOG username | `shared/gog-account` | `0600`. One file both binaries read, so the app never fetches the name with the token. |
 | Battle.net | — | Cellar holds nothing: Blizzard's client keeps its own session in the bottle. |
+| Steam password and Steam Guard code (only while signing in) | Typed into Accounts (or the terminal), then passed app → `cellar steam login --password` → DepotDownloader, each hop **on stdin** (`ActivityStore.run(_:input:)`, `DepotTool.converse`) | Never an argument, a file, a log line or part of the sign-in record: the form clears it once handed over, the CLI reads it with `readpassphrase` at a terminal, and DepotDownloader RSA-encrypts it to Steam's key. Prompts naming the account are answered, not shown. Only the resulting refresh token is kept, as above. (#278) |
 | Steam sign-in QR code (live while shown) | Only the Accounts panel that draws it (`QRCodePanel`) | Never kept as text: `ActivityStore` and every redaction pass (`Diagnostics.redactSignInCodes`) swap its rows for one placeholder line, so it reaches no activity pane, log or diagnostics report. (#165) |
 
 ## The rules

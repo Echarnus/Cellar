@@ -21,6 +21,9 @@ public enum CellarCommand: Equatable, Sendable {
 
     // Accounts
     case steamSignIn
+    /// Account name and password, for a player without the Steam mobile app. Both go to the CLI on
+    /// stdin, never in these arguments — see `ActivityStore.run(_:input:…)`.
+    case steamPasswordSignIn
     case steamSignOut
     case gogSignIn(code: String)
     case gogSignOut
@@ -65,6 +68,7 @@ public enum CellarCommand: Equatable, Sendable {
         case .updateProfiles(let quiet): return ["profiles", "update"] + (quiet ? ["--quiet"] : [])
 
         case .steamSignIn: return ["steam", "login"]
+        case .steamPasswordSignIn: return ["steam", "login", "--password"]
         case .steamSignOut: return ["steam", "login", "--forget"]
         case .gogSignIn(let code): return ["gog", "login", "--code", code]
         case .gogSignOut: return ["gog", "logout"]
@@ -115,7 +119,7 @@ public enum CellarCommand: Equatable, Sendable {
     public var game: String? {
         switch self {
         case .prepare, .uninstallCellar, .refreshLibrary, .draftProfiles, .updateProfiles,
-             .steamSignIn, .steamSignOut, .gogSignIn, .gogSignOut, .gogStatus,
+             .steamSignIn, .steamPasswordSignIn, .steamSignOut, .gogSignIn, .gogSignOut, .gogStatus,
              .battleNetAdd, .battleNetForget, .cleanStorage:
             return nil
         case .setUp(let slug), .install(let slug, _), .launch(let slug, _, _), .update(let slug),
@@ -133,7 +137,7 @@ public enum CellarCommand: Equatable, Sendable {
     public static let examples: [CellarCommand] = [
         .prepare, .uninstallCellar(keepSaves: true), .uninstallCellar(keepSaves: false),
         .refreshLibrary, .draftProfiles, .updateProfiles(quiet: false), .updateProfiles(quiet: true),
-        .steamSignIn, .steamSignOut, .gogSignIn(code: "code"), .gogSignOut, .gogStatus,
+        .steamSignIn, .steamPasswordSignIn, .steamSignOut, .gogSignIn(code: "code"), .gogSignOut, .gogStatus,
         .battleNetAdd, .battleNetForget,
         .setUp(slug: "game"),
         .install(slug: "game", machineProgress: false), .install(slug: "game", machineProgress: true),

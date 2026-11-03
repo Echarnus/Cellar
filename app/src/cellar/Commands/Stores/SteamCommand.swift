@@ -1,6 +1,7 @@
 import CellarDomain
 import ArgumentParser
 import CellarData
+import Foundation
 
 struct SteamCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -42,6 +43,12 @@ struct SteamCommand: ParsableCommand {
             never sees a password — you approve it in the Steam mobile app, and Steam hands back a
             token that every later run reuses silently.
 
+            No Steam mobile app? Use --password: sign in with your account name and password, and
+            type the code Steam emails you or the one from your authenticator when it asks. The
+            password goes straight to Steam and is never stored; only Steam's session is kept, in
+            the keychain. When stdin is not a terminal, the account name and the password are read
+            as its first two lines, and each code as one more line after Cellar asks for it.
+
             This one sign-in is what tells Cellar which games you own and lets it download them.
             Sessions last a few months and Steam can end one early; when that happens Cellar says so
             and asks for one more scan, rather than failing a download for no visible reason.
@@ -49,6 +56,9 @@ struct SteamCommand: ParsableCommand {
 
         @Flag(help: "Sign out instead: forget the session and the list of what you own.")
         var forget = false
+
+        @Flag(help: "Sign in with your account name and password instead of the QR code.")
+        var password = false
 
         func run() throws {
             if forget {
@@ -71,12 +81,20 @@ struct SteamCommand: ParsableCommand {
             case .signedOut:
                 break
             }
-            print(Term.bold("Sign in to Steam"))
-            print(Term.dim("  Scan the QR code below with the Steam mobile app. Nothing to type."))
-            let state = try SteamAccount.signIn { print("  " + $0) }
-            guard case .signedIn(let account, _, _) = state else {
-                print(Term.yellow("Sign-in didn't complete.") + " Run it again: cellar steam login")
-                return
+            let account: String
+            if password {
+                guard let signedIn = try signInWithPassword() else { throw ExitCode(1) }
+                account = signedIn
+            } else {
+                print(Term.bold("Sign in to Steam"))
+                print(Term.dim("  Scan the QR code below with the Steam mobile app. Nothing to type."))
+                print(Term.dim("  No Steam app? Sign in with your password: cellar steam login --password"))
+                let state = try SteamAccount.signIn { print("  " + $0) }
+                guard case .signedIn(let name, _, _) = state else {
+                    print(Term.yellow("Sign-in didn't complete.") + " Run it again: cellar steam login")
+                    return
+                }
+                account = name
             }
             print(Term.green("Signed in as \(account)."))
             print(Term.dim("  Checking which games you own…"))
@@ -85,6 +103,75 @@ struct SteamCommand: ParsableCommand {
         }
     }
 
+    // MARK: login --password (account name and password, for players without the Steam app)
+
+    /// How the password sign-in gets its answers: typed at a terminal, or — when the app drives the
+    /// CLI — one line at a time on stdin. The password is never an argument (`ps` shows arguments to
+    /// every account on the Mac) and never printed.
+    enum Answers {
+        static var interactive: Bool { isatty(STDIN_FILENO) == 1 }
+
+        static func line(prompt: String) -> String? {
+            if interactive {
+                print(prompt + " ", terminator: "")
+                fflush(stdout)
+            } else {
+                // The app reads this as the question; it has to arrive before the CLI waits.
+                print(prompt)
+                fflush(stdout)
+            }
+            return readLine(strippingNewline: true)
+        }
+
+        /// The password, not echoed at a terminal.
+        static func secret(prompt: String) -> String? {
+            guard interactive else { return readLine(strippingNewline: true) }
+            let size = 512
+            var buffer = [CChar](repeating: 0, count: size)
+            guard let read = readpassphrase(prompt + " ", &buffer, size, RPP_REQUIRE_TTY) else { return nil }
+            let text = String(cString: read)
+            buffer.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
+            return text
+        }
+    }
+}
+
+extension SteamCommand.Login {
+    /// The account name and password route. Returns the account that signed in, or nil after
+    /// telling the player why not.
+    func signInWithPassword() throws -> String? {
+        typealias Answers = SteamCommand.Answers
+        if Answers.interactive {
+            print(Term.bold("Sign in to Steam with your account name and password"))
+            print(Term.dim("  Your password goes straight to Steam. Cellar never stores it."))
+        }
+        guard let name = Answers.interactive ? Answers.line(prompt: "Steam account name:") : readLine(),
+              !name.trimmingCharacters(in: .whitespaces).isEmpty,
+              let secret = Answers.secret(prompt: "Password:"), !secret.isEmpty else {
+            print(Term.yellow(SteamPasswordSignIn.Failure.cancelled.sentence))
+            return nil
+        }
+        if Answers.interactive { print(Term.dim("  Signing in…")) }
+        let result = try SteamAccount.signIn(username: name, password: secret, askForCode: { request in
+            Answers.line(prompt: request.sentence)
+        }, output: { line in
+            // Steam's own progress lines, minus any that name the account: the app's activity
+            // pane ends up in screenshots. The app follows the sign-in by `SteamAccount.signInPhase`.
+            guard !line.localizedCaseInsensitiveContains(name) else { return }
+            print("  " + Term.dim(line))
+            fflush(stdout)
+        })
+        switch result {
+        case .signedIn(let account):
+            return account
+        case .failed(let failure):
+            print(Term.yellow(failure.sentence))
+            return nil
+        }
+    }
+}
+
+extension SteamCommand {
     // MARK: share (one Steam install for every bottle)
 
     struct Share: ParsableCommand {

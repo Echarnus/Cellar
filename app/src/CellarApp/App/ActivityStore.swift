@@ -107,14 +107,33 @@ final class ActivityStore {
     /// Only a command that reports its steps (`CellarCommand.reportsStages`) has its output read
     /// for markers: every other command's output belongs to the player verbatim, and a line that
     /// happened to start with the marker prefix should not vanish from the activity log.
+    ///
+    /// `input`, when given, is written to the command's stdin as lines the moment it starts, and the
+    /// pipe stays open for `reply(_:)`. It is how a password reaches the CLI without ever being an
+    /// argument (which `ps`, the activity log and the rolling log would all see). The lines are
+    /// written and dropped, never kept.
     func run(_ command: CellarCommand, title: String,
+             input: [String]? = nil,
              observe: (@MainActor (String) -> Void)? = nil,
              then: (@MainActor () -> Void)? = nil) {
         run(arguments: command.arguments, title: title, stages: command.reportsStages,
-            game: command.game, observe: observe, then: then)
+            game: command.game, input: input, observe: observe, then: then)
     }
 
+    /// Answer the running command's question: one line on its stdin. Only for a command started
+    /// with `input`; otherwise it has no stdin to write to and this does nothing.
+    func reply(_ line: String) {
+        guard let handle = inputHandle else { return }
+        let clean = line.replacingOccurrences(of: "\n", with: "").replacingOccurrences(of: "\r", with: "")
+        // A command that already exited closed its end; the write then fails, harmlessly.
+        try? handle.write(contentsOf: Data((clean + "\n").utf8))
+    }
+
+    /// The running command's stdin, when it was started with `input`.
+    @ObservationIgnored private var inputHandle: FileHandle?
+
     private func run(arguments args: [String], title: String, stages: Bool, game: String?,
+                     input: [String]? = nil,
                      observe: (@MainActor (String) -> Void)?,
                      then: (@MainActor () -> Void)?) {
         guard !busy else { return }
@@ -141,6 +160,13 @@ final class ActivityStore {
         process.arguments = args
         self.process = process
         let binaryPath = binary
+        if input != nil {
+            // Writing to a pipe whose reader has exited raises SIGPIPE, which would end the app.
+            signal(SIGPIPE, SIG_IGN)
+            let stdin = Pipe()
+            process.standardInput = stdin
+            inputHandle = stdin.fileHandleForWriting
+        }
 
         Task.detached {
             let pipe = Pipe()
@@ -153,6 +179,11 @@ final class ActivityStore {
             }
             do {
                 try process.run()
+                if let input {
+                    // The pipe's buffer takes a few lines without a reader, so this never blocks.
+                    let text = input.map { $0.replacingOccurrences(of: "\n", with: "") + "\n" }.joined()
+                    try? (process.standardInput as? Pipe)?.fileHandleForWriting.write(contentsOf: Data(text.utf8))
+                }
             } catch {
                 // The CLI is how the app does everything — if it can't be started, the player sees
                 // a button that does nothing, so make sure the reason is on record.
@@ -165,6 +196,8 @@ final class ActivityStore {
                     self.absorb(["", "Cellar's command-line helper isn't at \(helperPath).",
                                  "Reinstall Cellar, or run: sh app/Scripts/install-app.sh"])
                     self.publish()
+                    try? self.inputHandle?.close()
+                    self.inputHandle = nil
                     self.busy = false
                     self.phase = .idle
                     then?()
@@ -185,6 +218,8 @@ final class ActivityStore {
                 if let last = self.lines.finish() { self.absorb([last]) }
                 self.absorb(["", "(exit \(status))"])
                 self.lineObserver = nil
+                try? self.inputHandle?.close()
+                self.inputHandle = nil
                 self.process = nil
                 self.busy = false
                 self.phase = .idle

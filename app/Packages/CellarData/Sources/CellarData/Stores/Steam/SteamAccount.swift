@@ -131,7 +131,8 @@ public enum SteamAccount {
 
     // MARK: - Signing in
 
-    /// Sign in by QR — the only sign-in Cellar asks for.
+    /// Sign in by QR — the sign-in Cellar offers first: one scan, nothing to type. A player without
+    /// the Steam mobile app uses `signIn(username:password:askForCode:)` instead.
     ///
     /// `output` receives DepotDownloader's lines as they arrive, which is how the app turns the
     /// drawn challenge into a scannable code. Capturing the account name is what makes every
@@ -183,6 +184,60 @@ public enum SteamAccount {
         CellarLog.info(.account, "Steam sign-in completed after \(seconds)s, account read from the "
             + "\(capturedFrom) — \(diagnosis)")
         return state
+    }
+
+    /// How a password sign-in ended.
+    public enum PasswordSignInResult: Equatable, Sendable {
+        case signedIn(account: String)
+        case failed(SteamPasswordSignIn.Failure)
+    }
+
+    /// Sign in with an account name and password — for a player without the Steam mobile app.
+    ///
+    /// `askForCode` is asked for each Steam Guard code Steam wants (an emailed code, or the one in
+    /// the Steam app's authenticator), and nil from it stops the sign-in. An account with Steam
+    /// Guard off is never asked. The password goes to DepotDownloader on stdin and is held nowhere
+    /// else: not in the record, not in the log, not in the tail kept to explain a failure.
+    ///
+    /// The tool prints no line naming the account on this route, so the name is the token store's
+    /// (Steam's own spelling of it), falling back to the name as typed once the store holds it.
+    @discardableResult
+    public static func signIn(username: String, password: String,
+                              askForCode: (SteamSignInRequest) -> String?,
+                              output: ((String) -> Void)? = nil) throws -> PasswordSignInResult {
+        let name = username.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, !password.isEmpty else { return .failed(.cancelled) }
+        let started = Date()
+        let before = Set(DepotTool.storedAccounts.flatMap(\.names).map { $0.lowercased() })
+        CellarLog.info(.account, "Steam password sign-in started — \(diagnosis)")
+        var conversation = SteamPasswordSignIn.Conversation(password: password)
+        var tail: [String] = []
+        try DepotTool.signIn(username: name, answer: { prompt in
+            conversation.answer(prompt, askForCode: askForCode)
+        }, output: { line in
+            conversation.read(line)
+            note(line)
+            // Kept to explain a failure in the log, so never a line that names the account.
+            if !line.localizedCaseInsensitiveContains(name) {
+                tail.append(Diagnostics.redactCredentials(line))
+                if tail.count > 8 { tail.removeFirst() }
+            }
+            output?(line)
+        })
+        let seconds = Int(Date().timeIntervalSince(started))
+        let stored = DepotTool.storedAccounts
+        let account = accountName(storedSince: started, previously: before, stores: stored)
+            ?? (Set(stored.flatMap(\.names).map { $0.lowercased() }).contains(name.lowercased())
+                && conversation.established ? name : nil)
+        guard let account, conversation.failure == nil || conversation.established else {
+            let failure = conversation.failure ?? .other("no session")
+            CellarLog.warn(.account, "Steam password sign-in didn't complete after \(seconds)s: \(failure). "
+                + "Last output: \(tail.isEmpty ? "none" : tail.joined(separator: " · "))")
+            return .failed(failure)
+        }
+        write(SignIn(accountName: account, signedInAt: Date(), lastUsedAt: Date()))
+        CellarLog.info(.account, "Steam password sign-in completed after \(seconds)s — \(diagnosis)")
+        return .signedIn(account: account)
     }
 
     /// Where a running `cellar steam login` has got to, read from one line of its output — so the app

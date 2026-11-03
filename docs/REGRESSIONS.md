@@ -11,6 +11,8 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #278 | Players without the Steam mobile app couldn't sign in to Steam (QR was the only way) | `SteamPasswordSignInTests.swift` › `conversesOverStdin` |
+| #278 | A Steam password could reach a command line | `SteamPasswordSignInTests.swift` › `passwordNeverAnArgument` |
 | #267 | GTA V's Rockstar launcher said "wine" in the Dock | `DockShimTests.swift` › `launcherWearsTheGamesName` |
 | #267 | The uninstall dialog showed a Terminal command and bottle names | `RemovalSummaryTests.swift` › `plainWords` |
 | #267 | The sidebar said "Sign in" to a signed-in player while loading | `SidebarAccountTests.swift` › `loading` |

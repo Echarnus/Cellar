@@ -525,3 +525,24 @@
 "%@'s settings are here once it is installed." = "De instellingen van %@ verschijnen hier zodra de game geïnstalleerd is.";
 "Frees %@ on this Mac. Cellar backs up your save games first. You still own %@ on %@, so you can download it again any time." = "Maakt %@ vrij op deze Mac. Cellar maakt eerst een reservekopie van je opgeslagen spellen. Je bezit %@ nog steeds op %@, dus je kunt de game altijd opnieuw downloaden.";
 "Frees %@ on this Mac. You still own %@ on %@, and your sign-in stays, so you can download it again any time." = "Maakt %@ vrij op deze Mac. Je bezit %@ nog steeds op %@ en je blijft ingelogd, dus je kunt de game altijd opnieuw downloaden.";
+
+/* Steam sign-in with account name and password (#278). */
+"Signing in to Steam" = "Inloggen bij Steam";
+"Signing in to Steam…" = "Inloggen bij Steam…";
+"Sign In with Account Name and Password…" = "Inloggen met accountnaam en wachtwoord…";
+"Sign in with your account name and password" = "Log in met je accountnaam en wachtwoord";
+"For a Steam account without the Steam mobile app. If Steam emails you a code, or your account uses the Steam Guard authenticator, Cellar asks for the code next. Your password goes straight to Steam and is never stored." = "Voor een Steam-account zonder de mobiele Steam-app. Als Steam je een code mailt, of je account de Steam Guard-authenticator gebruikt, vraagt Cellar daarna om die code. Je wachtwoord gaat rechtstreeks naar Steam en wordt nooit bewaard.";
+"Sign In" = "Inloggen";
+"Code" = "Code";
+"Account name" = "Accountnaam";
+"Password" = "Wachtwoord";
+"That code didn't work. Enter the code from Steam's newest email to your address at %@." = "Die code werkte niet. Vul de code in uit de nieuwste e-mail van Steam aan je adres bij %@.";
+"Steam emailed a sign-in code to your address at %@. Enter it here." = "Steam heeft een inlogcode gemaild naar je adres bij %@. Vul die hier in.";
+"That code didn't work. Enter the code from Steam's newest email." = "Die code werkte niet. Vul de code in uit de nieuwste e-mail van Steam.";
+"Steam emailed you a sign-in code. Enter it here." = "Steam heeft je een inlogcode gemaild. Vul die hier in.";
+"That code didn't work. The code changes every 30 seconds, so enter the one showing now." = "Die code werkte niet. De code verandert elke 30 seconden, dus vul de code in die nu wordt getoond.";
+"Open the Steam app on your phone and enter the Steam Guard code it shows." = "Open de Steam-app op je telefoon en vul de Steam Guard-code in die daar staat.";
+"Steam didn't accept that account name and password. Check both and try again." = "Steam heeft die accountnaam en dat wachtwoord niet geaccepteerd. Controleer ze allebei en probeer het opnieuw.";
+"Steam has seen too many sign-in attempts. Wait a few minutes, then try again." = "Steam heeft te veel inlogpogingen gezien. Wacht een paar minuten en probeer het dan opnieuw.";
+"Steam didn't sign you in. Try again in a moment." = "Steam heeft je niet ingelogd. Probeer het zo meteen opnieuw.";
+"Checking the code with Steam…" = "De code wordt gecontroleerd bij Steam…";
