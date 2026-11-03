@@ -171,6 +171,22 @@ public struct GameSummary: Identifiable, Sendable {
         }
     }
 
+    /// Whether the page offers the big button at all, given what Cellar is doing with this game.
+    ///
+    /// While the game downloads, installs or waits in the queue, the bar (or the queue line) and its
+    /// Cancel are the page's one action. A greyed-out Install beside them was a second, dead one —
+    /// and it carried "The last download stopped before it finished" while the download was
+    /// running (#309).
+    public func showsPrimaryAction(during activity: GameActivity?) -> Bool {
+        activity == nil
+    }
+
+    /// The sentence under the button, or nil while there is no button to explain. The bar's own
+    /// line says what is happening then.
+    public func hint(during activity: GameActivity?) -> String? {
+        showsPrimaryAction(during: activity) ? actionHint : nil
+    }
+
     /// Whether playing this game will bring a store client up alongside it.
     public let needsClientAtRuntime: Bool
 

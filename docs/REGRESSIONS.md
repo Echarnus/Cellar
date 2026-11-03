@@ -11,6 +11,9 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #309 | A game with DLC depots filled the download bar to 100% once per depot (Dark Souls III looked like it downloaded three times) | `DepotDownloadProgressTests.swift` › `oneBarAcrossDepots` |
+| #309 | A resumed download called checking the files already on disk "Downloading" | `DownloadProgressIntegrationTests.swift` › `resumedDownload` |
+| #309 | A downloading game's page showed a greyed-out Install and "The last download stopped before it finished" | `GameSummaryTests.swift` › `noButtonWhileDownloading` |
 | #278 | Players without the Steam mobile app couldn't sign in to Steam (QR was the only way) | `SteamPasswordSignInTests.swift` › `conversesOverStdin` |
 | #278 | A Steam password could reach a command line | `SteamPasswordSignInTests.swift` › `passwordNeverAnArgument` |
 | #281 | Shipped releases (0.4.1, 0.4.2) left their "Release Cellar" issue open | `test_scripts.py` › `test_release_workflow_runs_it_after_publishing` |

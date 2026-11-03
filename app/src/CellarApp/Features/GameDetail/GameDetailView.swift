@@ -20,10 +20,12 @@ struct GameDetailView: View {
                 hero
                 VStack(alignment: .leading, spacing: 18) {
                     actions
-                    Text(game.actionHint)
-                        .font(.callout).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let hint = game.hint(during: activity) {
+                        Text(hint)
+                            .font(.callout).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     if let drive = game.missingDrive {
                         Label("\(game.name) is on the drive “\(drive)”, which isn't connected. Connect it to play.",
                               systemImage: "externaldrive.badge.xmark")
@@ -93,27 +95,32 @@ struct GameDetailView: View {
 
     private var actions: some View {
         HStack(spacing: 12) {
-            Button { primary() } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: queuesOnPress ? "text.badge.plus" : game.actionSymbol).font(.title3)
-                    Text(queuesOnPress ? String(localized: "Add to Queue") : game.actionTitle).fontWeight(.semibold)
-                }
-                .frame(minWidth: 168).padding(.vertical, 6)
-            }
-            .buttonStyle(.hoverProminent).controlSize(.large)
-            // Green means "go" for Play; every other step is tinted by the store whose client is
-            // about to appear, so the button and the window that opens belong to each other.
-            .tint(game.nextStep == .play ? .green : game.store.tint)
-            .disabled((runner.busy && !queuesOnPress) || activity != nil || model.measuringRemoval)
-            .keyboardShortcut(.defaultAction)
-            .help(queuesOnPress
-                  ? String(localized: "\(game.name) downloads as soon as what Cellar is doing now, and anything queued before it, has finished.")
-                  : game.actionHint)
-
+            // While this game downloads or waits its turn, the bar or the queue line and its
+            // Cancel take the button's place (#309).
+            if game.showsPrimaryAction(during: activity) { primaryButton }
             status
             Spacer()
             overflowMenu
         }
+    }
+
+    private var primaryButton: some View {
+        Button { primary() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: queuesOnPress ? "text.badge.plus" : game.actionSymbol).font(.title3)
+                Text(queuesOnPress ? String(localized: "Add to Queue") : game.actionTitle).fontWeight(.semibold)
+            }
+            .frame(minWidth: 168).padding(.vertical, 6)
+        }
+        .buttonStyle(.hoverProminent).controlSize(.large)
+        // Green means "go" for Play; every other step is tinted by the store whose client is
+        // about to appear, so the button and the window that opens belong to each other.
+        .tint(game.nextStep == .play ? .green : game.store.tint)
+        .disabled((runner.busy && !queuesOnPress) || activity != nil || model.measuringRemoval)
+        .keyboardShortcut(.defaultAction)
+        .help(queuesOnPress
+              ? String(localized: "\(game.name) downloads as soon as what Cellar is doing now, and anything queued before it, has finished.")
+              : game.actionHint)
     }
 
     /// What Cellar is doing right now, beside the button that started it.

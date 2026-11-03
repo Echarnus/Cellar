@@ -20,6 +20,7 @@ struct InstallProgressBarTests {
         ("Diablo IV", .battlenet, InstallProgress(.client)),
         ("Planet Coaster 2", .steam, InstallProgress(.clientUpdate, fraction: 0.16)),
         ("Planet Coaster 2", .steam, InstallProgress(.downloading, fraction: 0.42)),
+        ("DARK SOULS III", .steam, InstallProgress(.checkingDownload, fraction: 0.61)),
         ("The Witcher 3", .gog, InstallProgress(.installing)),
         ("Planet Coaster 2", .steam, InstallProgress(.updateCheck)),
         ("Planet Coaster 2", .steam, InstallProgress(.updating, fraction: 0.07)),

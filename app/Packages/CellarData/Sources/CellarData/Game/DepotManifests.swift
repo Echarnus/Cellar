@@ -49,6 +49,45 @@ public enum DepotManifests {
         return result
     }
 
+    /// How many bytes depot `depot`'s build `manifest` holds once installed, read from the manifest
+    /// DepotDownloader saved in `directory` before it started fetching (#309). Nil when the file is
+    /// not there or does not parse — never a guess.
+    public static func totalSize(in directory: URL, depot: UInt32, manifest: UInt64) -> UInt64? {
+        let file = directory.appendingPathComponent(".DepotDownloader/\(depot)_\(manifest).manifest")
+        guard let data = try? Data(contentsOf: file) else { return nil }
+        return decodeTotalSize(Array(data))
+    }
+
+    /// SteamKit's manifest file: sections of `u32 magic, i32 length, protobuf`, little-endian. The
+    /// payload (every file and chunk) comes first and is skipped; the metadata after it carries
+    /// `cb_disk_original` (field 5), the uncompressed size of every file in the depot.
+    static func decodeTotalSize(_ bytes: [UInt8]) -> UInt64? {
+        let payloadMagic: UInt32 = 0x71F6_17D0
+        let metadataMagic: UInt32 = 0x1F48_12BE
+        var offset = 0
+        func u32() -> UInt32? {
+            guard offset + 4 <= bytes.count else { return nil }
+            defer { offset += 4 }
+            return bytes[offset..<offset + 4].reversed().reduce(0) { $0 << 8 | UInt32($1) }
+        }
+        while let magic = u32() {
+            guard let length = u32().map({ Int($0) }), length >= 0, offset + length <= bytes.count else { return nil }
+            let section = Array(bytes[offset..<offset + length])
+            offset += length
+            if magic == metadataMagic {
+                var reader = ProtoReader(section)
+                while !reader.isAtEnd {
+                    guard let (field, wire) = reader.tag() else { return nil }
+                    if field == 5, wire == 0 { return reader.varint() }
+                    guard reader.skip(wire: wire) else { return nil }
+                }
+                return nil
+            }
+            guard magic == payloadMagic else { return nil }
+        }
+        return nil
+    }
+
     /// Follows a `-manifest-only` run line by line and collects which manifest Steam serves for
     /// each depot. Knows when it has them all, so the run can be stopped before it bothers to
     /// download manifest bodies it does not need.

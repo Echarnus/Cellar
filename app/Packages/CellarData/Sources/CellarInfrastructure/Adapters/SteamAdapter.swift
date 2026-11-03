@@ -60,11 +60,14 @@ public struct SteamAdapter: StoreAdapter {
         // `progress` is non-escaping and the download does not outlive this call — the tool's
         // output is handed over line by line while it runs.
         phase(InstallProgress(.downloading))
+        // One bar for the whole game, not one per depot, and a resume says it is checking (#309).
+        var bar = DepotDownloadProgress(phase: .downloading)
+        let directory = plan.depotGameDir
         try withoutActuallyEscaping(progress) { report in
             try withoutActuallyEscaping(phase) { phase in
-                try DepotTool.fetch(appID: appID, into: plan.depotGameDir, credentials: credentials) { line in
-                    if let fraction = DepotProgress.fraction(in: line) {
-                        phase(InstallProgress(.downloading, fraction: fraction))
+                try DepotTool.fetch(appID: appID, into: directory, credentials: credentials) { line in
+                    if let now = bar.read(line, size: { DepotManifests.totalSize(in: directory, depot: $0, manifest: $1) }) {
+                        phase(now)
                     }
                     report(line)
                 }
