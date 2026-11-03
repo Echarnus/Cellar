@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var accountsWindow: NSWindow?
     var folderAccessWindow: NSWindow?
     var welcomeTourWindow: NSWindow?
+    var sponsorWindow: NSWindow?
 
     /// The Dock icon's menu: the last few games played, newest first. Reads the playtime record
     /// only — no store is asked anything from a right-click.
@@ -117,6 +118,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { [weak self] in self?.showWelcomeTour() }
         } else if !HomeFolderAccess.hasAsked {
             showWelcome()
+        } else if !useDiagnostic && SponsorInvite().isOwed(firstRunDone: true, hasPlayed: Self.hasPlayedAGame) {
+            // The sponsor invitation, once ever: only after the first run is over and a game has
+            // actually been played, and only when there is somewhere to give (`Sponsorship.isOpen`).
+            DispatchQueue.main.async { [weak self] in self?.presentSponsor(invited: true) }
         }
 
         // The parts every game shares start downloading now, behind the tour, so the first
@@ -172,6 +177,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // raise a question it cannot answer. Settings › Updates says why.
         if let updates = model.updater.makeMenuItem() { appMenu.addItem(updates) }
         appMenu.addItem(withTitle: String(localized: "Welcome to \(appName)…"), action: #selector(showWelcomeTour), keyEquivalent: "")
+            .target = self
+        appMenu.addItem(withTitle: String(localized: "Support \(appName)…"), action: #selector(showSponsor), keyEquivalent: "")
             .target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: String(localized: "Settings…"), action: #selector(showSettings), keyEquivalent: ",")
@@ -340,6 +347,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         WelcomeTour.markSeen()
         welcomeTourWindow?.makeKeyAndOrderFront(nil)
+        NSApp.bringToFront()
+    }
+
+    /// Whether any game has been played through Cellar — the playtime record, nothing asked of a store.
+    private static var hasPlayedAGame: Bool {
+        Playtime.all().values.contains { $0.lastPlayed != nil }
+    }
+
+    @objc private func showSponsor() { presentSponsor(invited: false) }
+
+    /// The sponsor window. Its own fixed-size window for the same reason as the tour. Opening it by
+    /// any route counts as the one invitation, so it never also arrives uninvited later.
+    private func presentSponsor(invited: Bool) {
+        sponsorWindow?.close()
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 440),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        w.title = String(localized: "Support Cellar")
+        w.isReleasedWhenClosed = false
+        w.center()
+        w.contentView = NSHostingView(rootView: SponsorView(invited: invited) { [weak self] in
+            self?.sponsorWindow?.close()
+        }.buttonStyle(.hoverAutomatic))
+        sponsorWindow = w
+        SponsorInvite().markSeen()
+        w.makeKeyAndOrderFront(nil)
         NSApp.bringToFront()
     }
 

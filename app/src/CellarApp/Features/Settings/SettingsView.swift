@@ -124,6 +124,7 @@ struct SettingsView: View {
                         LabeledContent("Version", value: appVersion)
                         Link("Cellar on GitHub", destination: Links.repository)
                         Link("Supported games", destination: Links.supportedGames)
+                        Link("Support Cellar — help buy test Macs", destination: Sponsorship.pageURL)
                         Text(Credits.nonAffiliation)
                             .font(.caption).foregroundStyle(.secondary)
                     }

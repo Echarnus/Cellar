@@ -12,7 +12,7 @@ Fails (exit 1) on:
     can come from no store, or that names a store the site does not offer yet (gen-site.py's
     OFFERED; the first release is Steam only) outside a game card's own profile facts
   - a technical word (Wine, bottle, runner, D3DMetal, profile…) in the player-facing copy of the
-    home, games or 404 page (docs/DESIGN.md §2; the FAQ explains them, and the footer credits Wine)
+    home, games, sponsor or 404 page (docs/DESIGN.md §2; the FAQ explains them, and the footer credits Wine)
   - a <video> without a poster and an English captions <track>, or a screenshot or video in
     media/ larger than MEDIA_LIMITS
   - a game card whose cover has no <img> (every game ships real cover art; the generated
@@ -39,7 +39,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # docs/DESIGN.md §2: a player never reads the plumbing. Checked on the pages a player lands on;
 # faq.html has a question that explains these words, and the footer's credit names Wine.
-PLAIN_PAGES = ("index.html", "games.html", "404.html")
+PLAIN_PAGES = ("index.html", "games.html", "sponsor.html", "404.html")
 JARGON = re.compile(r"\b(wine|bottles?|wineprefix|prefix(es)?|runners?|d3dmetal|dxvk|moltenvk|"
                     r"profiles?|manifests?|depots?)\b", re.I)
 # Bytes per file in media/, so a capture can't make the page slow to open (skills/web.md: Fast).

@@ -100,6 +100,15 @@ that happens one level down and is never in the way.
 Kenneth's rule, and the player's: **no manual steps.** No Terminal, no re-running jobs, no
 copying files. If something can break, Cellar notices it and repairs it, and says so in one line.
 
+## 6a. Sponsoring never gets in the way
+
+Kenneth's rule (2026-11-03): Cellar is free and **nothing is ever behind a payment** — no feature,
+no game, no update. Sponsoring buys test Macs, and the site's sponsor page says exactly what it
+bought. In the app it is asked about **once**: after the first run is over and a game has been
+played, never in front of the tour or the folder ask, and never while there is nowhere to give
+(`SponsorInvite`, `SponsorInviteTests`). Closing it by any route counts as the answer. After that it
+lives only in the app menu (*Support Cellar…*) and Settings › About.
+
 ## 7. How a change is checked against this page
 
 1. Before writing the code: which of the rules above does the change touch?
