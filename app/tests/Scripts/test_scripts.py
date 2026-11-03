@@ -5,6 +5,7 @@
 A gate nobody tested is a gate that either lets everything through or blocks the next honest PR, so
 both are exercised here on the shapes they meet in CI. Standard library only, like the scripts.
 """
+import html
 import importlib.util
 import json
 import os
@@ -516,5 +517,22 @@ class HomePageTests(unittest.TestCase):
     def test_sponsoring_never_shows_a_button_that_leads_nowhere(self):
         self.assertEqual(self.site.SPONSOR_URL, "")
         page = self.site.render_index(self.site.load_games(), None)
-        self.assertIn("Sponsoring opens soon", page)
+        self.assertIn("Sponsoring Opens Soon", page)
         self.assertNotIn('href=""', page)
+
+    def test_every_game_has_a_page_the_list_links_to(self):
+        # docs/SITE-DESIGN.md §11-12: a page per game, so "<game> on Mac" finds it.
+        games = self.site.load_games()
+        for g in games:
+            self.assertIn(f'href="games/{g["slug"]}.html"', self.site.card(g))
+            page = self.site.render_game(g, games, None)
+            self.assertEqual(page.count("<h1"), 1)
+            self.assertIn(f"{html.escape(g['name'])} on Mac</h1>", page)
+            self.assertIn('"@type": "VideoGame"', page)
+            self.assertIn(g["mac_min"], page)
+
+    def test_an_untested_game_says_so_on_its_page(self):
+        games = self.site.load_games()
+        untested = next(g for g in games if g["status"] == "untested")
+        page = self.site.render_game(untested, games, None)
+        self.assertIn("nobody has confirmed it plays yet", page)
