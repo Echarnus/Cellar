@@ -26,6 +26,7 @@ public enum PerformanceSettings {
         }
         public var metalFXUpscaling: Bool { value(.metalFXUpscaling) == "true" }
         public var metalHUD: Bool { value(.metalHUD) == "true" }
+        public var displayMode: DisplayMode { DisplayMode(rawValue: value(.displayMode)) ?? .game }
     }
 
     /// Layers, later wins: Cellar's default → the player's every-game choice in Settings
@@ -99,6 +100,8 @@ public enum PerformanceSettings {
             break   // not an env var of its own: WineRunner picks the GPU identity from it
         case .retina:
             break   // a registry value, written before launch (`WineRunner.setRetinaMode`)
+        case .displayMode:
+            break   // the engine's own start-up switch, on the command line (`GamePlan.displayArguments`)
         }
     }
 }

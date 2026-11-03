@@ -641,7 +641,7 @@ public extension SteamBottle {
                                 game: String = "the game", expectsSignIn: Bool = false,
                                 attempts: Int = 8,
                                 start: URL? = nil, publisherLauncher: PublisherLauncher? = nil,
-                                workaround: LaunchWorkaround? = nil,
+                                workaround: LaunchWorkaround? = nil, arguments: [String] = [],
                                 progress: (String) -> Void = { _ in },
                                 stage: (LaunchStage) -> Void = { _ in }) throws {
         SteamDRM.markAppDirectory(exe.deletingLastPathComponent(), appID: appID)
@@ -703,7 +703,7 @@ public extension SteamBottle {
             cleanup: { ProcessWatch.kill([watched, started.lastPathComponent, "crash_reporter.exe"]) },
             start: {
                 attemptBegan = Date()
-                try runner.spawn([started.path], extraEnv: env, log: log, bundledLoader: bundledLoader)
+                try runner.spawn([started.path] + arguments, extraEnv: env, log: log, bundledLoader: bundledLoader)
             },
             isUp: { ProcessWatch.isRunning(watched) },
             keepWaiting: keepWaiting,

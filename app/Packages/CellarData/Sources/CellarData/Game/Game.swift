@@ -263,7 +263,7 @@ public enum Game {
         let wineLog = Paths.logs.appendingPathComponent("game-\(plan.slug).log")
         CellarLog.debug(.launch, "Starting \(exe.lastPathComponent) directly; Wine output → "
             + wineLog.lastPathComponent, subject: plan.slug)
-        try wine.spawn([exe.path], extraEnv: env, log: wineLog,
+        try wine.spawn([exe.path] + plan.displayArguments, extraEnv: env, log: wineLog,
                        bundledLoader: GameApp.prepare(for: plan, runner: wine))
     }
 

@@ -160,6 +160,14 @@ raw `[env]` variable (`WINEDEBUG`, `MTL_DEBUG_LAYER`, `MTL_HUD_ENABLED`) counts 
 switch, so `cellar perf` shows what the game really gets. Add a new switch there, not as another
 `[env]` convention.
 
+`display_mode` (`game` | `fullscreen` | `window`, #306) is layered the same way but is no environment
+variable: Wine has no switch that puts every game in a window, so `GamePlan.displayArguments` turns
+it into the engine's own start-up switch (Unreal and Source `-fullscreen`/`-windowed`, Unity
+`-screen-fullscreen 1|0`) after the exe. Only offered where it can work (`canChooseDisplayMode`): a
+known engine, not Battle.net, no publisher launcher. While playing, the game's Alt+Enter is ⌘Return —
+the Mac driver sends Command as Alt by default, so never set `LeftCommandIsCtrl` without changing
+that hint.
+
 ## Diagnosing a game that won't start
 
 Work down the layer, not across the internet:
