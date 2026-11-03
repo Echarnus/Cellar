@@ -605,3 +605,9 @@
 "%@, %lld GB: below what this game needs. It may not start, or run poorly." = "%@, %lld GB: minder dan dit spel nodig heeft. Het start misschien niet, of draait slecht.";
 "%@, or an %@" = "%@, of een %@";
 "Which Mac a game needs comes from its publisher's PC requirements, read through System Requirements Lab, and Notebookcheck's graphics benchmarks." = "Welke Mac een game nodig heeft, volgt uit de pc-systeemeisen van de uitgever, gelezen via System Requirements Lab, en de grafische benchmarks van Notebookcheck.";
+"Game’s Choice" = "Keuze van het spel";
+"Full Screen" = "Volledig scherm";
+"Start In" = "Starten in";
+"Start %@ in" = "%@ starten in";
+"Full screen, or a window you can move and resize beside other apps." = "Volledig scherm, of een venster dat je naast andere apps kunt verplaatsen en groter of kleiner maken.";
+"While playing, ⌘Return switches between full screen and a window in many games." = "Tijdens het spelen wissel je in veel games met ⌘Return tussen volledig scherm en een venster.";
