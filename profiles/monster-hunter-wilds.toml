@@ -61,3 +61,18 @@ exe         = "MonsterHunterWilds.exe"
 [legal]
 # Steamworks and Denuvo run untouched inside the layer. Only ever used with a copy the player owns.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 1660 Super"
+pc_memory_minimum      = 16
+pc_gpu_recommended     = "GeForce RTX 2070 Super"
+pc_memory_recommended  = 16
+mac_minimum            = "M4 Pro"
+mac_memory_minimum     = 24
+mac_recommended        = "M3 Max"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

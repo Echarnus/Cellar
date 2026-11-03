@@ -95,3 +95,7 @@ fails when the estimate or `app/Scripts/refresh-evidence.py` reads a source not 
 | [PCGamingWiki](https://www.pcgamingwiki.com) | Engine, graphics, anti-cheat and DRM facts | CC BY-NC-SA 3.0 |
 | [SteamDB](https://steamdb.info) | Steam app records (executables, install folders, depots) | Facts, cited with attribution |
 | [Steam](https://store.steampowered.com) | Cover art and store facts, loaded from Steam's servers | © Valve and each game's publisher; shown, never bundled |
+| [System Requirements Lab](https://www.systemrequirementslab.com) | Publishers' PC requirements, for which Mac each game needs (`[mac]`, docs/MAC-REQUIREMENTS.md) | Facts, cited with attribution |
+| [Notebookcheck](https://www.notebookcheck.net) | Graphics benchmarks placing PC cards against Apple chips (`PCGraphicsCard`, `MacChip`) | Facts, cited with attribution |
+| [Rockstar Games](https://support.rockstargames.com), [CD PROJEKT RED](https://support.cdprojektred.com) | Their own PC requirements pages | Facts, cited with attribution |
+| [GTABase](https://www.gtabase.com), [PCGamesN](https://www.pcgamesn.com), [Pindrop](https://pindrop.gg), [Beebom](https://beebom.com), [GameRequirementsLab](https://www.gamerequirementslab.com), [PCGameBenchmark](https://www.pcgamebenchmark.com) | Published PC requirements where the store page was out of reach (named per game in `pc_requirements_source`) | Facts, cited with attribution |

@@ -30,15 +30,20 @@ public struct GameFacts: Sendable {
     /// What players outside Cellar report, read from public sources and dated (`evidence_checked`).
     /// Evidence for `CompatibilityForecast`, never a status: see `docs/COMPATIBILITY.md`.
     public let evidence: CompatibilityEvidence
+    /// The Mac the game needs, and the Mac it is best on (`MacRequirements`). Every shipped profile
+    /// has it; a player's own draft may not.
+    public let macRequirements: MacRequirements?
 
     public init(developer: String? = nil, released: String? = nil, engine: String? = nil,
                 graphicsAPI: String? = nil, anticheat: String? = nil, drm: String? = nil,
                 online: String? = nil, requiresAccount: String? = nil, status: String? = nil,
                 notes: String? = nil, controller: String? = nil, wheel: String? = nil,
                 wheelSetup: String? = nil, architecture: String? = nil,
-                evidence: CompatibilityEvidence = CompatibilityEvidence()) {
+                evidence: CompatibilityEvidence = CompatibilityEvidence(),
+                macRequirements: MacRequirements? = nil) {
         self.architecture = architecture
         self.evidence = evidence
+        self.macRequirements = macRequirements
         self.controller = controller
         self.wheel = wheel
         self.wheelSetup = wheelSetup

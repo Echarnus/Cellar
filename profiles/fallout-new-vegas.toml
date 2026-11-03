@@ -56,3 +56,18 @@ first_run_files = "Fallout_default.ini > Documents/My Games/FalloutNV/Fallout.in
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab; the publisher lists only a minimum"
+pc_gpu_minimum         = "GeForce 6600 GT"
+pc_memory_minimum      = 2
+pc_gpu_recommended     = "GeForce 6600 GT"
+pc_memory_recommended  = 2
+mac_minimum            = "M1"
+mac_memory_minimum     = 8
+mac_recommended        = "M1"
+mac_memory_recommended = 8
+requirements_checked   = "2026-11-03"

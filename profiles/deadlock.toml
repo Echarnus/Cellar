@@ -55,3 +55,18 @@ exe         = "game/bin/win64/deadlock.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Valve publishes no requirements while Deadlock is a playtest; these are PCGameBenchmark's estimate"
+pc_gpu_minimum         = "GeForce GTX 960"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce RTX 2080"
+pc_memory_recommended  = 16
+mac_minimum            = "M3"
+mac_memory_minimum     = 16
+mac_recommended        = "M3 Max"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

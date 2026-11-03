@@ -44,7 +44,7 @@ both use them.
 | `profiles/*.toml` | The per-game profile database — one file per game. Adding a game = adding a profile. |
 | `app/Shim/` | `cellar-dock-shim.c` — the repo's own C. Inserted into a bottle's storefront client so it does not take a Dock icon while a game starts, and into the game to give it its name. `cellar-recvtos.c`, in the same library, hands Wine a UDP packet's TOS byte under the label Wine knows, so Steam's networking does not assert (#243); `app/Scripts/test-shim.sh` tests it. Built by `app/Scripts/build-dock-shim.sh`, never by SwiftPM (it has to be universal). |
 | `app/Scripts/` | Build/packaging: `install-app.sh`, `package.sh`, `build-dock-shim.sh`, `make-dmg.sh` (+ `make-dmg-background.swift`), `sign-app.sh`, `notarize.sh`, `import-signing-identity.sh`, `make-icon.swift`, `release-notes.py` (a release's notes, from the issues it closed), `close-release-issue.py` (closes a release's own issue once it is published), `test.sh` (the test runner), `coverage.py` (the coverage ratchet), `check-pr.py` (the PR checklist). |
-| `docs/` | `ARCHITECTURE.md`, `COMPATIBILITY.md` (how untested games get an estimate), `APP-ARCHITECTURE.md` (code layering + migration plan), `DESIGN.md` (design principles, mandatory for UI work), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`, `TESTING.md`, `DELIVERY-CHECKLIST.md`, `SHOWCASE.md` (the site's screenshots and video: shot list, storyboard, how to capture). |
+| `docs/` | `ARCHITECTURE.md`, `COMPATIBILITY.md` (how untested games get an estimate), `MAC-REQUIREMENTS.md` (which Mac each game needs), `APP-ARCHITECTURE.md` (code layering + migration plan), `DESIGN.md` (design principles, mandatory for UI work), `RELEASING.md`, `RESEARCH.md`, `ROADMAP.md`, `LEGAL.md`, `TESTING.md`, `DELIVERY-CHECKLIST.md`, `SHOWCASE.md` (the site's screenshots and video: shot list, storyboard, how to capture). |
 | `.github/` | Workflows (`ci`, `pr-checklist`, `codeql`, `dependency-review`, `scorecard`, `release`, `pages`, `labels`, `dependabot-auto-merge`), Dependabot, issue forms, the PR template, labels, rulesets. See `docs/RELEASING.md`. |
 | `skills/`, `agents/` | Portable AI guidance (see below). Claude's copies are under `.claude/`. |
 
@@ -275,7 +275,11 @@ A game is a `profiles/<slug>.toml` — copy the closest existing one (`planet-co
 `diablo-4` for Battle.net, `witcher-3` for GOG). Name its **`store`**, record verified facts (AppID *or* `product_code` +
 `install_dir` + `exe`, engine, graphics API, arch), state DRM/anti-cheat **honestly**, pick `backend`
 + `fallback_backend`, and give a `status` + `notes` naming the hardware you tested on. The app shows
-those facts verbatim, so "untested" must say so. See [`skills/profiles.md`](skills/profiles.md) for
+those facts verbatim, so "untested" must say so. Every game also says **which Mac it needs and which
+it is best on**: a `[mac]` section with the publisher's PC cards and memory, their source, and the
+Mac chips Cellar's rule maps them to ([`docs/MAC-REQUIREMENTS.md`](docs/MAC-REQUIREMENTS.md)).
+`MacRequirementsTests` fails a profile without one, or with chips the rule doesn't give, and the
+source it names must be credited in `Credits.sources`. See [`skills/profiles.md`](skills/profiles.md) for
 the schema and its parser traps, and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Git & releases

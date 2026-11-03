@@ -146,7 +146,7 @@ struct SettingsView: View {
                         }
                     }
                     // Kenneth (2026-11-03): every source Cellar pulls knowledge from is credited.
-                    Section("Game reports and facts from") {
+                    Section("Game reports, facts and requirements from") {
                         ForEach(Credits.sources, id: \.name) { credit in
                             VStack(alignment: .leading, spacing: 2) {
                                 Link(credit.name, destination: credit.url)

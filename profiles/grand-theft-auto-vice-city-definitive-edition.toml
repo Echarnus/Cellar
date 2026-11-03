@@ -69,3 +69,18 @@ publisher_launcher = "rockstar"
 # Steamworks and the Rockstar Games Launcher run untouched inside the layer. Only ever used with a
 # copy the player owns.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab, for The Trilogy"
+pc_gpu_minimum         = "GeForce GTX 760"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 970"
+pc_memory_recommended  = 16
+mac_minimum            = "M2"
+mac_memory_minimum     = 16
+mac_recommended        = "M5"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

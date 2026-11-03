@@ -574,12 +574,23 @@ def load_games():
         # `needs_live_steam` is the original spelling of `needs_live_session`; both still read.
         needs_client = comp.get("needs_live_session", comp.get("needs_live_steam", True))
         drm = str(comp.get("drm", "")).strip()
+        # The Mac it needs and the Mac it is best on (#298, docs/MAC-REQUIREMENTS.md). Every game
+        # has both; the app's MacRequirementsTests checks how they were worked out.
+        mac = d.get("mac", {})
+        mac_min, mac_rec = str(mac.get("mac_minimum", "")).strip(), str(mac.get("mac_recommended", "")).strip()
+        if not mac_min or not mac_rec:
+            fail(path, "no [mac] section: every game says which Mac it needs and which it is best on "
+                       "(mac_minimum, mac_recommended; see docs/MAC-REQUIREMENTS.md)")
         games.append({
             "name": str(g["name"]),
             "slug": str(g["slug"]),
             "api": str(g.get("graphics_api", "")).strip(),
             "drm": DRM_LABELS.get(drm, drm),
             "status": status,
+            "mac_min": mac_min,
+            "mac_min_memory": mac.get("mac_memory_minimum", ""),
+            "mac_rec": mac_rec,
+            "mac_rec_memory": mac.get("mac_memory_recommended", ""),
             "store": storekey,
             "client": bool(needs_client),
             "portrait": str(portrait),
@@ -912,6 +923,10 @@ def card(g):
         facts.append(("Graphics", n(g["api"])))
     facts.append(("DRM", n(g["drm"]) or "Not stated"))
     facts.append(("While playing", client))
+    # Estimated from the publisher's PC requirements, not tested; the title says so on hover.
+    facts.append(("Needs", f'<span title="Estimated from the publisher&rsquo;s PC requirements">'
+                           f'{n(g["mac_min"])}, {n(str(g["mac_min_memory"]))} GB</span>'))
+    facts.append(("Best on", f'{n(g["mac_rec"])}, {n(str(g["mac_rec_memory"]))} GB'))
     dl = "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in facts)
     return f'''
     <li class="card" data-name="{n(g['name'].lower())}" data-status="{n(g['status'])}" data-store="{n(g['store'])}">
@@ -1237,6 +1252,17 @@ FAQ_SECTIONS = [
          "</ul>"
          "<p>Every card on the games list is generated from a profile in the repository, so this "
          "site cannot claim more than the profile does.</p>"),
+        ("Which Mac do I need for a game?",
+         "<p>Every card says two Macs. <b>Needs</b> is the Mac the game starts and plays on at low "
+         "settings; <b>Best on</b> is the Mac for a smooth game at good settings. Both come from the "
+         "publisher&rsquo;s own PC requirements: Cellar matches the graphics card they name to the "
+         "Apple chip that draws as well, with room for what running a Windows game on a Mac costs, "
+         "and adds the PC&rsquo;s memory to the card&rsquo;s, because a Mac shares one pool between "
+         "the two.</p>"
+         "<p>It is an estimate, not a test. Chips are compared by their graphics, so an M2 Pro or "
+         "an M1 Max covers a game that is best on an M5; the game&rsquo;s page in the app says how "
+         "your own Mac compares. "
+         f"How the matching works: <a href=\"{REPO}/blob/main/docs/MAC-REQUIREMENTS.md\">MAC-REQUIREMENTS.md</a>.</p>"),
         ("My game isn't listed. Can I still play it?",
          "<p>Often, yes — the list is what has been <i>profiled</i>, not the limit of what works. A "
          "profile is a small text file naming the game's store, its AppID or install folder, its "
