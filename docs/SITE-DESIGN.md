@@ -170,7 +170,7 @@ in the app (`Credits.sources`).
 
 | Page | Purpose | Sections, in order |
 |---|---|---|
-| **Home** (`index.html`) | Answer §1's three questions and get the download. | Hero (headline, lede, Download, the app in a window) → what it does (four feature rows) → press Play (launch steps) → the details (grid) → the games (search + ten) → free (statement + sponsoring) → closing call. |
+| **Home** (`index.html`) | Answer §1's three questions and get the download. | Hero (headline, lede, Download, the app in a window) → what it does (four feature rows) → press Play (launch steps) → the details (grid) → the games (exactly ten, a search box and a link that open the games page) → free (statement + sponsoring) → closing call. |
 | **Games** (`games.html`) | Find your game. | Headline, search and filters, every game, "Don't see your game?". |
 | **A game** (`games/<slug>.html`) | Answer "will *this* game work on my Mac?", and rank for "<game> on Mac". | "<Game> on Mac" headline and its status in a sentence, cover + facts (the Mac it needs, what is known), what other platforms report (credited), how to play it in three steps, Download. |
 | **Questions** (`faq.html`) | Everything else, including the technical "how". | Contents + grouped disclosure rows. The one page allowed to explain the plumbing. |
