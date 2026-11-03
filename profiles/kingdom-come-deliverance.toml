@@ -28,6 +28,10 @@ requires_account            = "Steam"
 online                      = "single-player only"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. CodeWeavers rates it Runs Great on CrossOver 26.1 for macOS. Older AppleGamingWiki reports (CrossOver 21, M1 Max and M1 MacBook Air) saw 15 to 35 FPS whatever the settings, from before D3DMetal existed. D3DMetal first, DXVK as the fallback."
+mac_reports                 = "runs"
+protondb                    = "gold"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -50,3 +54,18 @@ exe         = "Bin/Win64/KingdomCome.exe"
 [legal]
 # Steamworks runs untouched inside the layer. Only ever used with a copy the player owns.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 660"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1060"
+pc_memory_recommended  = 16
+mac_minimum            = "M2"
+mac_memory_minimum     = 16
+mac_recommended        = "M5"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

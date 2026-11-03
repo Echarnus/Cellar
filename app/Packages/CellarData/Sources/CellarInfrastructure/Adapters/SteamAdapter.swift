@@ -169,6 +169,7 @@ public struct SteamAdapter: StoreAdapter {
                                             start: plan.directStartExe,
                                             publisherLauncher: plan.publisherLauncher,
                                             workaround: plan.launchWorkaround,
+                                            arguments: plan.displayArguments,
                                             progress: progress, stage: stage)
             return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
         }
@@ -178,6 +179,12 @@ public struct SteamAdapter: StoreAdapter {
         }
         try SteamBottle.closeClientsElsewhere(runner: wine, game: plan.name, progress: progress)
         let signsItself = SteamBottle.handOverSession(runner: wine, progress: progress).signsInByItself
+        // Steam starts the game on this route, with no arguments from Cellar: a `steam://run` URL that
+        // carried them would put Steam's "launch with these options?" dialog in front of the player.
+        if !plan.displayArguments.isEmpty {
+            CellarLog.info(.launch, "Steam starts \(plan.name) itself this time, so it opens the way it last saved, "
+                + "not \(plan.performance.displayMode.rawValue) as chosen.", subject: plan.slug)
+        }
         progress("Launching \(plan.name) via Steam (AppID \(appID)) — runner \(plan.runnerID), backend \(plan.backend)…")
         if let launcher = plan.publisherLauncher {
             progress("Steam hands \(plan.name) to the \(launcher.displayName). If it asks, sign in with your \(launcher.accountNoun) there.")

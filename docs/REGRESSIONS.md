@@ -11,6 +11,8 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #304 | An uninstalled game still said "Installed": only one of its copies was removed (Cellar's download, not the Steam client's own) | `UninstallEveryCopyTests.swift` › `removesEveryCopy` |
+| #304 | Right-clicking a game offered only Play and Settings, not Uninstall and the rest of the "…" menu | `GameMenuTests.swift` › `bothMenusShareTheContent` |
 | #278 | Players without the Steam mobile app couldn't sign in to Steam (QR was the only way) | `SteamPasswordSignInTests.swift` › `conversesOverStdin` |
 | #278 | A Steam password could reach a command line | `SteamPasswordSignInTests.swift` › `passwordNeverAnArgument` |
 | #281 | Shipped releases (0.4.1, 0.4.2) left their "Release Cellar" issue open | `test_scripts.py` › `test_release_workflow_runs_it_after_publishing` |
@@ -19,6 +21,7 @@ for what only a real game shows.
 | #267 | The sidebar said "Sign in" to a signed-in player while loading | `SidebarAccountTests.swift` › `loading` |
 | #267 | The library filter's segments changed width with the selection | `EqualSegmentedPickerTests.swift` › `stableAcrossSelection` |
 | #272 | Free-to-play games the player never added showed in the library | `SteamOwnershipCheckTests.swift` › `claimedFreeIsNotOwned` |
+| #288 | Free games with a licence but never played showed in the library | `SteamOwnershipCheckTests.swift` › `libraryFollowsSteamsList` |
 | #244 | Steam's error reporter opened over Fallout Shelter: Wine on macOS dropped the packet-priority message Steam's networking asks for | `recvtos-test.c` › `real_packet` |
 | #246 | Skyrim closed at once: the settings files its launcher writes were never made | `FirstRunFilesTests.swift` › `playWritesThemFirst` |
 | #246 | Skyrim's downloaded copy never reached Steam's library while another game's Steam was open | `SteamLibraryEntryOrderTests.swift` › `registersAfterTheHandOverAndBeforeTheClient` |

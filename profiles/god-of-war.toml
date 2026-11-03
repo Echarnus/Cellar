@@ -1,0 +1,75 @@
+# Cellar game profile — God of War
+#
+# The 2022 PC release of Santa Monica Studio's 2018 game. Windows only, 64-bit, DirectX 11, single-
+# player. It does not ask for a PlayStation account. Facts below are from SteamDB's info and config
+# pages, read 2026-11-03. ProtonDB and Steam Deck ratings are from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "god-of-war"
+name          = "God of War"
+developer     = "Santa Monica Studio"
+publisher     = "PlayStation Publishing"
+steam_appid   = 1593500
+engine        = "Santa Monica Studio in-house"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2022-01-14"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 11, which Cellar has two ways to run, so it can offer the second if the first does not start."
+protondb                    = "platinum"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 1593500
+# Steam's launch option is GoW.exe at the top of the folder (SteamDB config).
+install_dir = "GodOfWar"
+exe         = "GoW.exe"
+
+[acceptance]
+# What `cellar verify god-of-war` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts GoW.exe beside a running Steam and it survives the watch.
+# - dock: the Dock says God of War, never wine or GoW.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Sony's published requirements, read through PCGamesN"
+pc_gpu_minimum         = "GeForce GTX 960"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1060"
+pc_memory_recommended  = 8
+mac_minimum            = "M3"
+mac_memory_minimum     = 16
+mac_recommended        = "M5"
+mac_memory_recommended = 16
+requirements_checked   = "2026-11-03"

@@ -206,7 +206,8 @@ struct LibraryView: View {
                                 .contentShape(Rectangle())
                                 .onTapGesture { lib.selected = game.slug }
                                 // Right-click, as in Steam's library and every Mac sidebar: the
-                                // game's one big action and its settings, without opening the page.
+                                // game's one big action, its settings, and everything the page's
+                                // "…" menu offers, Uninstall included, without opening the page.
                                 .contextMenu { contextMenu(for: game) }
                         }
                     } header: {
@@ -256,6 +257,14 @@ struct LibraryView: View {
             Label(String(localized: "Settings…"), systemImage: "slider.horizontal.3")
         }
         .disabled(!game.bottleExists)
+        Divider()
+        // The page's "…" menu, entry for entry (#304). Each action selects the game first, so its
+        // page is the one that shows the progress — and the uninstall's "working out what would be
+        // deleted" — and the confirmation that follows is plainly about this game.
+        GameMenuContent(game: game,
+                        actions: GameActions(game: game, runner: runner, onChange: { lib.refresh() },
+                                             before: { lib.selected = game.slug }),
+                        language: Binding(get: { GameLanguageMenu.Selection.load(game) }, set: { _ in }))
     }
 
     /// Games are being withheld because a store hasn't been asked yet — say so, in the library,

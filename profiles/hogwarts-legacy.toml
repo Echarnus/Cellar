@@ -1,0 +1,81 @@
+# Cellar game profile — Hogwarts Legacy
+#
+# Avalanche Software's 2023 open-world action RPG. Windows only on Steam, 64-bit, DirectX 12 only.
+# Denuvo Anti-Tamper is DRM, not anti-cheat; it runs untouched, and may count a Mac as a new PC.
+# Facts below are from SteamDB's info and config pages, read 2026-11-03. ProtonDB and Steam Deck
+# ratings are from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "hogwarts-legacy"
+name          = "Hogwarts Legacy"
+developer     = "Avalanche Software"
+publisher     = "Warner Bros. Games"
+steam_appid   = 990080
+engine        = "Unreal Engine 4"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2023-02-10"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steamworks + Denuvo Anti-Tamper"
+needs_live_session          = true
+requires_account            = "Steam (a WB Games account is optional, for in-game rewards)"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 12 only, so Cellar has one way to run it and no second option to offer. Denuvo checks the copy online the first time it starts. Steam starts it with options that keep saves where Steam Cloud syncs them; Cellar does not pass those yet (issue 294), so a copy Cellar downloaded may not see saves made on a PC."
+protondb                    = "gold"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DirectX 12 only: DXVK and DXMT stop at DX11 and no VKD3D-Proton build ships with the runners, so
+# there is deliberately no fallback_backend that could never start it (as for Kingdom Come II).
+backend           = "d3dmetal"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 990080
+# Steam's default launch option is HogwartsLegacy.exe -SaveToUserDir -UserDir="Hogwarts Legacy" (SteamDB
+# config). The exe at the top starts Phoenix/Binaries/Win64/HogwartsLegacy.exe, which has the same name,
+# so the needle catches both. The arguments are not passed yet: issue 294.
+install_dir = "Hogwarts Legacy"
+exe         = "HogwartsLegacy.exe"
+
+[acceptance]
+# What `cellar verify hogwarts-legacy` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts HogwartsLegacy.exe beside a running Steam and it survives the watch.
+# - dlc: the Deluxe Edition's Dark Arts Pack shows in the game when the account owns it.
+# - dock: the Dock says Hogwarts Legacy, never wine.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+# After the first run: save_paths once the run shows where it writes saves.
+
+[legal]
+# Steamworks and Denuvo run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 960"
+pc_memory_minimum      = 16
+pc_gpu_recommended     = "GeForce GTX 1080 Ti"
+pc_memory_recommended  = 16
+mac_minimum            = "M3"
+mac_memory_minimum     = 24
+mac_recommended        = "M3 Max"
+mac_memory_recommended = 32
+requirements_checked   = "2026-11-03"

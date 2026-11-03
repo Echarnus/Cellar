@@ -34,6 +34,10 @@ status                      = "untested"
 # most reported failure under Wine and Proton (ValveSoftware/Proton issue 3291), so it is named here.
 # Frame rates: iphones.ru's CrossOver 25 review on an M1 Pro. Vulkan crash: AppleGamingWiki report.
 notes                       = "Not yet launched under Cellar. Needs the Rockstar Games Launcher, which Cellar installs in the bottle; the first Play opens its window to sign in to a Rockstar Games account, and that sign-in window is the step most often reported failing under Wine. CrossOver 25 runs it on Apple Silicon: an M1 Pro review measured about 45 FPS at 1080p on low settings and about 25 on medium, with flickering cloud shadows outside towns and memory use that grows until the Mac starts swapping. An older report on an M2 MacBook Air saw Vulkan crash a few minutes in, so if the game starts on Vulkan and crashes, switch Graphics API to DirectX 12 under Settings, Graphics, Advanced Settings."
+mac_reports                 = "issues"
+protondb                    = "gold"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -61,3 +65,18 @@ publisher_launcher = "rockstar"
 [legal]
 # Steamworks and Rockstar's launcher run untouched inside the layer. Only ever a copy the player owns.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 770"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1060"
+pc_memory_recommended  = 12
+mac_minimum            = "M3"
+mac_memory_minimum     = 16
+mac_recommended        = "M5"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

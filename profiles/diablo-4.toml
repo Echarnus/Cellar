@@ -39,6 +39,7 @@ requires_account            = "Battle.net"
 online                      = "always-online (shared world, seasons, co-op)"
 status                      = "untested"
 notes                       = "Configured from CrossOver/Proton evidence, not yet run on Kenneth's M5. CrossOver reports Diablo IV working on macOS 26.x with D3DMetal when a fast sync is on (Cellar turns on the one your runner has — WFUSync on WineForge, msync on Sikarugir). A Season 14 (patch 3.1.0, 2026-06-30) launch crash was reported on CrossOver 26.2 / macOS 26.5.2 — expect turbulence around patch days."
+mac_reports                 = "issues"
 
 [runner]
 # Same runner as the Steam titles: Wine 11.17 + CrossOver patches, carrying Apple D3DMetal 3.0.
@@ -85,3 +86,18 @@ art_hero     = "https://cdn.cloudflare.steamstatic.com/steam/apps/2344520/librar
 # Cellar runs Blizzard's own client and Blizzard's own DRM, untouched. Only ever with an account
 # and a licence you own.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 660"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 970"
+pc_memory_recommended  = 16
+mac_minimum            = "M2"
+mac_memory_minimum     = 16
+mac_recommended        = "M5"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

@@ -26,6 +26,9 @@ changing a profile. Key rules:
   `needs_live_steam` is legacy-but-read, `requires_live_steam_session` is read by nothing.
 - **A publisher's launcher is not a store.** `publisher_launcher = "rockstar"` makes setup install the
   Rockstar Games Launcher into the bottle; `start_exe` is Steam's stub to start, `exe` the game to watch.
+- **Every game says which Mac it needs** — a `[mac]` section: the publisher's PC cards and memory,
+  where they were read (a source credited in `Credits.sources`), and the Mac chips
+  `MacRequirements.derive` maps them to. CI fails a profile without it; see `docs/MAC-REQUIREMENTS.md`.
 - **Artwork:** Steam art is derived from the AppID; non-Steam profiles supply `art_portrait`
   themselves. Never bundle store or publisher artwork in the repo.
 - **Verify:** regenerate the site *and* check the app/CLI, with an awkward value through both parsers.

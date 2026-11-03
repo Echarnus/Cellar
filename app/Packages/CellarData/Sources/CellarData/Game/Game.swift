@@ -113,7 +113,10 @@ public enum Game {
                 notes: fields["notes"],
                 controller: fields["controller"],
                 wheel: fields["wheel"],
-                wheelSetup: fields["wheel_setup"]),
+                wheelSetup: fields["wheel_setup"],
+                architecture: fields["architecture"],
+                evidence: CompatibilityEvidence(fields: fields),
+                macRequirements: MacRequirements(fields: fields)),
             metalFXUpscaling: performance.metalFXUpscaling,
             language: LanguageChoice.resolve(game: BottleConfig.language(bottleFile), global: CellarSettings.language),
             performance: performance,
@@ -260,7 +263,7 @@ public enum Game {
         let wineLog = Paths.logs.appendingPathComponent("game-\(plan.slug).log")
         CellarLog.debug(.launch, "Starting \(exe.lastPathComponent) directly; Wine output → "
             + wineLog.lastPathComponent, subject: plan.slug)
-        try wine.spawn([exe.path], extraEnv: env, log: wineLog,
+        try wine.spawn([exe.path] + plan.displayArguments, extraEnv: env, log: wineLog,
                        bundledLoader: GameApp.prepare(for: plan, runner: wine))
     }
 

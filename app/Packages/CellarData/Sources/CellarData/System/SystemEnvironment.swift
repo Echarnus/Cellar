@@ -277,3 +277,11 @@ public enum SystemEnvironment {
         return checks
     }
 }
+
+extension SystemEnvironment {
+    /// This Mac's chip and memory, for comparing with a game's `MacRequirements`. Read once: neither
+    /// changes while Cellar runs.
+    public static let thisMac: MacRequirements.ThisMac = MacRequirements.ThisMac(
+        chip: MacChip(chipBrand),
+        memoryGB: Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824))
+}

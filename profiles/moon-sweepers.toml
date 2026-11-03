@@ -26,6 +26,9 @@ requires_account            = "Steam"
 online                      = "single-player + online co-op for up to 16"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. Steam's own default starts it in DirectX 11."
+protondb                    = "platinum"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -50,3 +53,18 @@ art_hero     = "https://shared.fastly.steamstatic.com/store_item_assets/steam/ap
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 1650"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1660 Super"
+pc_memory_recommended  = 16
+mac_minimum            = "M1 Pro"
+mac_memory_minimum     = 16
+mac_recommended        = "M4 Pro"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

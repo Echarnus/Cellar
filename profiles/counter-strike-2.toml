@@ -30,6 +30,11 @@ requires_account            = "Steam"
 online                      = "online multiplayer on Valve servers; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. CodeWeavers made CrossOver 23.6 run it out of the box on Apple Silicon, and community guides report it playable through CrossOver at lowered settings. Valve does not support playing it on a Mac this way, so a game or macOS update can break it overnight."
+mac_reports                 = "runs"
+protondb                    = "gold"
+steam_deck                  = "playable"
+anticheat_on_linux          = "supported"
+evidence_checked            = "2026-11-03"
 
 # WineForge, as for every Steam title: the current Steam client needs a modern Wine.
 [runner]
@@ -55,3 +60,18 @@ exe         = "game/bin/win64/cs2.exe"
 [legal]
 # VAC and Steamworks run untouched inside the layer. Only ever used with the player's own account.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab; Valve lists only a minimum, a 1 GB DirectX 11 card, so the recommended card is Cellar's pick"
+pc_gpu_minimum         = "DirectX 11 card with 1 GB"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1060"
+pc_memory_recommended  = 8
+mac_minimum            = "M1"
+mac_memory_minimum     = 16
+mac_recommended        = "M5"
+mac_memory_recommended = 16
+requirements_checked   = "2026-11-03"

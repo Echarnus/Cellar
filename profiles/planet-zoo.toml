@@ -30,6 +30,10 @@ requires_account            = "Steam"
 online                      = "single-player career, sandbox and challenge; Franchise mode and its animal market need Frontier's servers; blueprints come from the Steam Workshop"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. Players report it running at 60 FPS on High at 1920x1200 on an M1 Max MacBook Pro through CrossOver."
+mac_reports                 = "runs"
+protondb                    = "gold"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -49,3 +53,18 @@ exe         = "PlanetZoo.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 770"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1070"
+pc_memory_recommended  = 16
+mac_minimum            = "M3"
+mac_memory_minimum     = 16
+mac_recommended        = "M4 Pro"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

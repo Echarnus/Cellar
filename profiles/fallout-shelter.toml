@@ -31,6 +31,9 @@ requires_account            = "Steam"
 online                      = "single-player (Steam Cloud, timed events and offers need Steam running)"
 status                      = "untested"
 notes                       = "Facts verified 2026-09-09 from Steam's own app record: appid 588430, installdir 'Fallout Shelter', launch executable 'FalloutShelter.exe', Windows-only (no macOS build), ~2 GB, free-to-play. Not yet launched on this Mac — the account it would download with is not signed in, so the Steam integration tier reports skipped rather than passing. Run `cellar steam login`, then `sh Scripts/test.sh --steam` to promote this."
+protondb                    = "gold"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -56,3 +59,18 @@ exe = "FalloutShelter.exe"
 [legal]
 # Free-to-play still means owned: the account doing the downloading must have it in its library.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab; the publisher lists only a minimum"
+pc_gpu_minimum         = "GeForce GTS 250"
+pc_memory_minimum      = 2
+pc_gpu_recommended     = "GeForce GTS 250"
+pc_memory_recommended  = 2
+mac_minimum            = "M1"
+mac_memory_minimum     = 8
+mac_recommended        = "M1"
+mac_memory_recommended = 8
+requirements_checked   = "2026-11-03"

@@ -82,7 +82,9 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   its store. Only `"rockstar"` exists: Steam's Rockstar games hand off to the Rockstar Games Launcher,
   which setup installs into the bottle (`RockstarLauncher`). With it, **`start_exe`** — the program to
   start when it is not the game's own process (`PlayRDR2.exe`, Steam's stub); `exe` stays the game
-  (`RDR2.exe`), because that is what Cellar watches. An unknown launcher value is refused by
+  (`RDR2.exe`), because that is what Cellar watches. `start_exe` is looked for beside `exe` first,
+  then at the top of the game's folder, where the GTA Definitive Editions keep their stub while the
+  game runs from `Gameface/Binaries/Win64` (#290). An unknown launcher value is refused by
   `Game.plan`. See `red-dead-redemption-2.toml`.
 - **`[runner]`** — `id`, `windows_version`. **`[graphics]`** — `backend`, `fallback_backend`.
   `fallback_backend` is live: when a launch starts the game but it never comes up, the launch window
@@ -103,6 +105,31 @@ Copy the closest existing profile: `planet-coaster-2` for Steam, `diablo-4` for 
   installed game's PE header. Drafts live in the player's own profiles, are always `untested`, and the app
   lists them apart. Turning one into a shipped profile means testing it and deleting this line.
 - **`[legal]`** — `drm_circumvention = "never"`. It is never anything else.
+- **`[mac]`** (required) — which Mac the game needs and which it is best on (#298). The publisher's
+  own PC requirements as written (`pc_gpu_minimum`, `pc_memory_minimum`, `pc_gpu_recommended`,
+  `pc_memory_recommended`, the NVIDIA card where two are named), where they were read
+  (`pc_requirements_source`, naming a source credited in `Credits.sources`) and when
+  (`requirements_checked`), then the Macs: `mac_minimum`, `mac_memory_minimum`, `mac_recommended`,
+  `mac_memory_recommended`. The Mac lines are what `MacRequirements.derive` gives, never a guess:
+  `MacRequirementsTests` prints the right answer when they differ. A card it doesn't know is added to
+  `PCGraphicsCard.all` with a benchmarked score. Asking for more than the rule needs `mac_reason`.
+  The rule and how to read a store page into it: [`docs/MAC-REQUIREMENTS.md`](../docs/MAC-REQUIREMENTS.md).
+
+- **Public evidence** (optional, `[compatibility]`) — `protondb`, `steam_deck`,
+  `anticheat_on_linux`, `evidence_checked`. Written by `app/Scripts/refresh-evidence.py`, never by
+  hand, and never a status: they feed Cellar's estimate for untested games
+  ([`docs/COMPATIBILITY.md`](../docs/COMPATIBILITY.md)). Keep `graphics_api`, `anticheat`, `drm` and
+  `engine` accurate too, because the estimate reads them. `mac_reports = "runs" | "issues" |
+  "fails"` is the one written by hand: what Mac players report through another Wine-based app, only
+  from a report `notes` names.
+
+- **Public evidence** (optional, `[compatibility]`) — `protondb`, `steam_deck`,
+  `anticheat_on_linux`, `evidence_checked`. Written by `app/Scripts/refresh-evidence.py`, never by
+  hand, and never a status: they feed Cellar's estimate for untested games
+  ([`docs/COMPATIBILITY.md`](../docs/COMPATIBILITY.md)). Keep `graphics_api`, `anticheat`, `drm` and
+  `engine` accurate too, because the estimate reads them. `mac_reports = "runs" | "issues" |
+  "fails"` is the one written by hand: what Mac players report through another Wine-based app, only
+  from a report `notes` names.
 
 ## Vocabularies the tooling actually knows
 

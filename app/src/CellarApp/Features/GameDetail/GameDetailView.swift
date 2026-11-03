@@ -82,6 +82,10 @@ struct GameDetailView: View {
 
     // MARK: - Actions
 
+    /// Whether an uninstall of this game is working out what it would delete — asked from this
+    /// page's "…" menu or from the library's right-click menu alike.
+    private var measuringRemoval: Bool { runner.measuringRemoval == game.slug }
+
     /// What Cellar is doing with this game: downloading, installing, or waiting in the queue.
     private var activity: GameActivity? { downloads.activity(for: game.slug) }
 
@@ -104,7 +108,7 @@ struct GameDetailView: View {
             // Green means "go" for Play; every other step is tinted by the store whose client is
             // about to appear, so the button and the window that opens belong to each other.
             .tint(game.nextStep == .play ? .green : game.store.tint)
-            .disabled((runner.busy && !queuesOnPress) || activity != nil || model.measuringRemoval)
+            .disabled((runner.busy && !queuesOnPress) || activity != nil || measuringRemoval)
             .keyboardShortcut(.defaultAction)
             .help(queuesOnPress
                   ? String(localized: "\(game.name) downloads as soon as what Cellar is doing now, and anything queued before it, has finished.")
@@ -169,7 +173,7 @@ struct GameDetailView: View {
                     .help("Bring the launch window back.")
             }
         case .idle:
-            if model.measuringRemoval {
+            if measuringRemoval {
                 // Measuring runs before the uninstall sheet appears, and it touches the disk, so the
                 // gap has to be accounted for rather than looking like a dead button.
                 ProgressView().controlSize(.small)
@@ -192,23 +196,12 @@ struct GameDetailView: View {
     }
 
     /// The "…" menu: what a player reaches for, then a Troubleshooting submenu for everything that
-    /// is there to fix something. What goes where, and in which words, is `GameMenu`'s call.
+    /// is there to fix something. What goes where, and in which words, is `GameMenu`'s call; the
+    /// library's right-click menu shows the same entries (`GameMenuContent`).
     private var overflowMenu: some View {
-        let menu = GameMenu(game: game)
-        return Menu {
-            ForEach(Array(menu.main.enumerated()), id: \.offset) { index, group in
-                if index > 0 { Divider() }
-                ForEach(group, id: \.self) { item in menuEntry(item) }
-            }
-            Divider()
-            Menu {
-                ForEach(Array(menu.troubleshooting.enumerated()), id: \.offset) { index, group in
-                    if index > 0 { Divider() }
-                    ForEach(group, id: \.self) { item in menuEntry(item) }
-                }
-            } label: {
-                Text("Troubleshooting")
-            }
+        Menu {
+            GameMenuContent(game: game, actions: GameActions(game: game, runner: runner, onChange: onChange),
+                            language: $model.language)
         } label: {
             Image(systemName: "ellipsis.circle").font(.title3)
         }
@@ -216,67 +209,6 @@ struct GameDetailView: View {
         .hoverHighlight(.backdrop)
         .help("More actions for \(game.name)")
         .accessibilityLabel("More actions")
-    }
-
-    @ViewBuilder private func menuEntry(_ item: GameMenu.Item) -> some View {
-        let title = item.title(for: game)
-        switch item {
-        case .language:
-            GameLanguageMenu(game: game, state: $model.language)
-        case .moveBack:
-            Button(title) { perform(item) }.disabled(game.missingDrive != nil)
-        default:
-            Button(title, role: item.isDestructive ? .destructive : nil) { perform(item) }
-        }
-    }
-
-    private func perform(_ item: GameMenu.Item) {
-        switch item {
-        case .addToApplications:
-            act(.addToApplications(slug: game.slug), String(localized: "Adding to Applications"))
-        case .addToMacSteam:
-            act(.steamAddShortcut(slug: game.slug), String(localized: "Adding"))
-        case .language:
-            break   // a submenu of its own
-        case .moveToDrive:
-            chooseDrive()
-        case .moveBack:
-            act(.moveBack(slug: game.slug), String(localized: "Moving \(game.name) back"))
-        case .uninstall:
-            confirmRemoval(scope: .game)
-        case .repair:
-            act(.setUp(slug: game.slug), String(localized: "Repairing \(game.name)"))
-        case .openClient:
-            if game.store == .battlenet {
-                act(.battleNetOpen(slug: game.slug), String(localized: "Opening Battle.net"))
-            } else {
-                act(.steamOpen(slug: game.slug), String(localized: "Opening Steam"))
-            }
-        case .reapplyClientSettings:
-            act(.battleNetConfigure(slug: game.slug), String(localized: "Configuring"))
-        case .checkForUpdates:
-            act(.checkForUpdate(slug: game.slug), String(localized: "Checking \(game.name) for updates"))
-        case .saveProfile:
-            exportProfile()
-        case .technicalDetails:
-            TechnicalDetailsWindow.present(game: game, runner: runner)
-        case .saveDiagnostics:
-            saveDiagnostics()
-        case .showLogs:
-            NSWorkspace.shared.open(Paths.logs)
-        case .removeEverything:
-            confirmRemoval(scope: .bottle)
-        }
-    }
-
-    /// Write the report and show it in Finder, so the player has the file in hand to attach.
-    private func saveDiagnostics() {
-        Task.detached(priority: .userInitiated) {
-            let url = try? Diagnostics.exportReport(cellarVersion: CellarVersion.current)
-            await MainActor.run {
-                if let url { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-            }
-        }
     }
 
     // MARK: - Notices
@@ -322,9 +254,10 @@ struct GameDetailView: View {
             } else {
                 Chip(game.statusText, system: game.statusSymbol, tint: game.statusTint)
             }
-            // How far this game has been tested — before a two-hour download, not after. The notes
-            // behind it are in Technical Details; the verdict is what a player needs here.
-            if let status = game.facts.status { StatusBadge(status: status) }
+            // How likely it is to work — tested, or Cellar's estimate saying it is one — before a
+            // two-hour download, not after. The reasons are in Technical Details.
+            ForecastBadge(forecast: game.forecast)
+            if let mac = game.facts.macRequirements { macChip(mac) }
             if game.store == .gog { Chip("DRM-free", system: "lock.open.fill") }
             // (A store's AppID or product code is in Technical Details: a support detail, not a fact
             // about the game.)
@@ -337,6 +270,14 @@ struct GameDetailView: View {
             if let update = game.update { updateChip(update) }
             Spacer()
         }
+    }
+
+    /// The Mac this game is best on, from the publisher's PC requirements. Orange when this Mac is
+    /// below even the minimum, so the warning comes before the download, not after it.
+    private func macChip(_ mac: MacRequirements) -> some View {
+        let verdict = mac.verdict(for: SystemEnvironment.thisMac)
+        return Chip(mac.tag, system: "laptopcomputer", tint: verdict == .belowMinimum ? .orange : .secondary)
+            .help(mac.explanation)
     }
 
     /// Whether this copy is Steam's current build. Only for a game Cellar downloaded: Steam keeps
@@ -377,7 +318,7 @@ struct GameDetailView: View {
     @ViewBuilder private var information: some View {
         let facts = game.facts
         VStack(alignment: .leading, spacing: 14) {
-            if !facts.overview.isEmpty || !facts.compatibility.isEmpty {
+            if !facts.overview.isEmpty || !facts.compatibility.isEmpty || facts.macRequirements != nil {
                 // Two columns when the pane is wide enough for them, one when it isn't. At the
                 // window's minimum width the side-by-side version wraps every value onto three
                 // lines, which reads as broken rather than compact.
@@ -467,6 +408,9 @@ struct GameDetailView: View {
     @ViewBuilder private func factColumns(_ facts: GameFacts) -> some View {
         if !facts.overview.isEmpty { FactList(title: String(localized: "About"), rows: facts.overview) }
         if !facts.compatibility.isEmpty { FactList(title: String(localized: "Compatibility"), rows: facts.compatibility) }
+        if let mac = facts.macRequirements {
+            FactList(title: String(localized: "Mac"), rows: mac.rows(thisMac: SystemEnvironment.thisMac))
+        }
     }
 
     /// Saves live in the bottle; Cellar copies them out before anything that could lose them. This
@@ -514,42 +458,5 @@ struct GameDetailView: View {
 
     private func primary() {
         GamePrimaryAction.perform(game, runner: runner, downloads: downloads, onChange: onChange)
-    }
-
-    /// Copy a draft profile out, for contributing it once the game is known to run.
-    private func exportProfile() {
-        guard let source = model.profileFile(of: game) else { return }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = source.lastPathComponent
-        panel.message = String(localized: "Cellar guessed this profile's settings. If \(game.name) runs, set status and notes to what you saw, then contribute it to Cellar's profiles.")
-        guard panel.runModal() == .OK, let target = panel.url else { return }
-        model.exportProfile(from: source, to: target)
-    }
-
-    /// Pick a folder on another drive, then move the game there through the CLI.
-    private func chooseDrive() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.prompt = String(localized: "Move Here")
-        panel.message = String(localized: "Choose a folder on the drive to move \(game.name) to. Cellar puts it in a “Cellar Games” folder there, and the game plays and updates from it while the drive is connected.")
-        panel.directoryURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-        act(.moveToDrive(slug: game.slug, folder: folder.path), String(localized: "Moving \(game.name)"))
-    }
-
-    private func act(_ command: CellarCommand, _ title: String) {
-        runner.run(command, title: title, then: { onChange() })
-    }
-
-    /// Show what removal would take, and only then run it — through the CLI, like every other
-    /// side-effecting action, so the app inherits the same tested path (and its activity log).
-    private func confirmRemoval(scope: RemovalScope) {
-        model.measuringRemoval = true
-        UninstallConfirmation.ask(for: game, scope: scope, measured: { model.measuringRemoval = false }) {
-            act(.uninstall(slug: game.slug, scope: scope),
-                scope == .bottle ? String(localized: "Removing \(game.name)") : String(localized: "Uninstalling"))
-        }
     }
 }

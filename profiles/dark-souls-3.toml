@@ -25,6 +25,9 @@ requires_account            = "Steam"
 online                      = "single-player, with online co-op, invasions and messages through FromSoftware's servers"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar."
+protondb                    = "platinum"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
 
 # WineForge, as for every Steam title: the current Steam client needs a modern Wine, and Steamworks
 # needs that client running beside the game.
@@ -48,3 +51,18 @@ exe         = "Game/DarkSoulsIII.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 750 Ti"
+pc_memory_minimum      = 4
+pc_gpu_recommended     = "GeForce GTX 970"
+pc_memory_recommended  = 8
+mac_minimum            = "M1"
+mac_memory_minimum     = 8
+mac_recommended        = "M5"
+mac_memory_recommended = 16
+requirements_checked   = "2026-11-03"

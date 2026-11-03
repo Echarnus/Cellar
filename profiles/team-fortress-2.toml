@@ -28,6 +28,10 @@ requires_account            = "Steam"
 online                      = "online multiplayer on Valve and community servers; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. A DirectX 9 game: Cellar starts it with the graphics translation made for older DirectX games, and offers a slower, more forgiving one if the game never comes up."
+protondb                    = "gold"
+steam_deck                  = "playable"
+anticheat_on_linux          = "supported"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -51,3 +55,18 @@ exe         = "tf_win64.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab; Valve names a DirectX 8.1 card and up to 1 GB of memory"
+pc_gpu_minimum         = "DirectX 8 card"
+pc_memory_minimum      = 1
+pc_gpu_recommended     = "DirectX 8 card"
+pc_memory_recommended  = 1
+mac_minimum            = "M1"
+mac_memory_minimum     = 8
+mac_recommended        = "M1"
+mac_memory_recommended = 8
+requirements_checked   = "2026-11-03"

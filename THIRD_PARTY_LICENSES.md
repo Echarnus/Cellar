@@ -77,3 +77,25 @@ Run-time components are separate programs and keep their own licences.
 When a new component is added, add a row here, a `Credit` in `app/Packages/CellarData/Sources/CellarData/Core/Credits.swift`, and —
 if it ends up inside a Cellar artifact — its licence text in [`licenses/`](licenses/). The test
 `CreditsTests` fails if a runner or tool is downloaded from a publisher the credits do not name.
+
+## Data sources
+
+Facts and reports Cellar reads about games: copied into `profiles/*.toml` (one word or one quoted
+fact per game, with the source named) and shown in the app's compatibility estimate. Nothing here
+ships code. Credited in Settings › About and the About panel (`Credits.sources`); `CreditsTests`
+fails when the estimate or `app/Scripts/refresh-evidence.py` reads a source not listed there.
+
+| Source | What Cellar uses | Terms |
+|---|---|---|
+| [ProtonDB](https://www.protondb.com) | Each game's summary rating | Reports data under the [Open Database License](https://opendatacommons.org/licenses/odbl/), contents under the [Database Contents License](https://opendatacommons.org/licenses/dbcl/) ([protondb-data](https://github.com/bdefore/protondb-data)). Attribution: "ProtonDB" |
+| [Steam Deck compatibility](https://store.steampowered.com/steamdeck) | Valve's rating per game | Valve's ratings, quoted with attribution |
+| [AreWeAntiCheatYet](https://areweanticheatyet.com) | Anti-cheat status per game | MIT, © 2021 Starz0r, Curve |
+| [AppleGamingWiki](https://www.applegamingwiki.com) | Mac players' reports, cited in notes | CC BY-NC-SA 3.0 |
+| [CodeWeavers Compatibility Center](https://www.codeweavers.com/compatibility) | CrossOver ratings, cited in notes | Quoted with attribution |
+| [PCGamingWiki](https://www.pcgamingwiki.com) | Engine, graphics, anti-cheat and DRM facts | CC BY-NC-SA 3.0 |
+| [SteamDB](https://steamdb.info) | Steam app records (executables, install folders, depots) | Facts, cited with attribution |
+| [Steam](https://store.steampowered.com) | Cover art and store facts, loaded from Steam's servers | © Valve and each game's publisher; shown, never bundled |
+| [System Requirements Lab](https://www.systemrequirementslab.com) | Publishers' PC requirements, for which Mac each game needs (`[mac]`, docs/MAC-REQUIREMENTS.md) | Facts, cited with attribution |
+| [Notebookcheck](https://www.notebookcheck.net) | Graphics benchmarks placing PC cards against Apple chips (`PCGraphicsCard`, `MacChip`) | Facts, cited with attribution |
+| [Rockstar Games](https://support.rockstargames.com), [CD PROJEKT RED](https://support.cdprojektred.com) | Their own PC requirements pages | Facts, cited with attribution |
+| [GTABase](https://www.gtabase.com), [PCGamesN](https://www.pcgamesn.com), [Pindrop](https://pindrop.gg), [Beebom](https://beebom.com), [GameRequirementsLab](https://www.gamerequirementslab.com), [PCGameBenchmark](https://www.pcgamebenchmark.com) | Published PC requirements where the store page was out of reach (named per game in `pc_requirements_source`) | Facts, cited with attribution |

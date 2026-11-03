@@ -25,12 +25,25 @@ public struct GameFacts: Sendable {
     public let wheel: String?
     /// Free text: the in-game steps that bind a wheel, for a game made to be driven with one.
     public let wheelSetup: String?
+    /// `x86-64` / `x86` — what the game's exe is built for.
+    public let architecture: String?
+    /// What players outside Cellar report, read from public sources and dated (`evidence_checked`).
+    /// Evidence for `CompatibilityForecast`, never a status: see `docs/COMPATIBILITY.md`.
+    public let evidence: CompatibilityEvidence
+    /// The Mac the game needs, and the Mac it is best on (`MacRequirements`). Every shipped profile
+    /// has it; a player's own draft may not.
+    public let macRequirements: MacRequirements?
 
     public init(developer: String? = nil, released: String? = nil, engine: String? = nil,
                 graphicsAPI: String? = nil, anticheat: String? = nil, drm: String? = nil,
                 online: String? = nil, requiresAccount: String? = nil, status: String? = nil,
                 notes: String? = nil, controller: String? = nil, wheel: String? = nil,
-                wheelSetup: String? = nil) {
+                wheelSetup: String? = nil, architecture: String? = nil,
+                evidence: CompatibilityEvidence = CompatibilityEvidence(),
+                macRequirements: MacRequirements? = nil) {
+        self.architecture = architecture
+        self.evidence = evidence
+        self.macRequirements = macRequirements
         self.controller = controller
         self.wheel = wheel
         self.wheelSetup = wheelSetup

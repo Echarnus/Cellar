@@ -34,6 +34,10 @@ wheel                       = "untested"
 # Shown on the game page as the in-game steps. Only menus the game really has.
 wheel_setup                 = "Start the game, open Options, then Controls, and choose Wheel as the input method. Pick your wheel in the list, then assign steering, throttle, brake and clutch by moving each one when asked, and set the degrees of rotation to match your wheel base. If the launcher crashes or shows a black window, turn off GPU-accelerated game launcher in Options, General."
 notes                       = "Not yet launched under Cellar. CrossOver reports (AppleGamingWiki) rate it playable on Apple Silicon through DXVK, about 60 to 70 FPS at 1080p, and say the launcher can crash until GPU-accelerated game launcher is turned off in Options, General. A CrossOver user reported that D3DMetal did not work for it, so DXVK is the default here and D3DMetal the fallback. Content Manager and Custom Shaders Patch are third-party add-ons Cellar does not install or test; reports say Content Manager needs .NET Framework 4.5.2 and core fonts in the bottle."
+mac_reports                 = "runs"
+protondb                    = "gold"
+steam_deck                  = "unsupported"
+evidence_checked            = "2026-11-03"
 
 # WineForge, as for every Steam title: the current Steam client needs a modern Wine, and the
 # Steam-in-bottle route is what this game's DRM needs.
@@ -62,3 +66,18 @@ exe         = "AssettoCorsa.exe"
 [legal]
 # Steamworks runs untouched inside the layer. Only ever used with a copy the player owns.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 460"
+pc_memory_minimum      = 2
+pc_gpu_recommended     = "GeForce GTX 970"
+pc_memory_recommended  = 6
+mac_minimum            = "M1"
+mac_memory_minimum     = 8
+mac_recommended        = "M5"
+mac_memory_recommended = 16
+requirements_checked   = "2026-11-03"

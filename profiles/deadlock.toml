@@ -29,6 +29,11 @@ requires_account            = "Steam, with access to the playtest (friend invite
 online                      = "online only; Valve does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. AppleGamingWiki rates it playable through CrossOver 24.0.5 and through Whisky on Apple Silicon. It is still a playtest: Valve changes it often, and access is by friend invite only."
+mac_reports                 = "runs"
+protondb                    = "gold"
+steam_deck                  = "unknown"
+anticheat_on_linux          = "supported"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -50,3 +55,18 @@ exe         = "game/bin/win64/deadlock.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Valve publishes no requirements while Deadlock is a playtest; these are PCGameBenchmark's estimate"
+pc_gpu_minimum         = "GeForce GTX 960"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce RTX 2080"
+pc_memory_recommended  = 16
+mac_minimum            = "M3"
+mac_memory_minimum     = 16
+mac_recommended        = "M3 Max"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-03"

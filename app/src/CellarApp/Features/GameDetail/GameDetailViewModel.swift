@@ -11,9 +11,6 @@ import CellarData
 @MainActor
 @Observable
 final class GameDetailViewModel {
-    /// True while a removal is being measured. Walking a 36 GB Steam library takes a few seconds,
-    /// and a menu item that appears to do nothing for that long reads as broken.
-    var measuringRemoval = false
     /// The game's language submenu, read when the page appears rather than from the body.
     var language = GameLanguageMenu.Selection()
     /// The newest copy of this game's saves, read when the page appears and after a backup or restore.
@@ -62,16 +59,5 @@ final class GameDetailViewModel {
     /// leaves the page as it was: the truth.
     func resetBackend(of game: GameSummary) -> Bool {
         (try? BackendChoice.set(nil, in: BottleConfig.url(forBottle: game.bottleName))) != nil
-    }
-
-    /// The profile file a draft game was guessed into, for "Export profile".
-    func profileFile(of game: GameSummary) -> URL? {
-        ProfileStore.find(game.slug)?.url
-    }
-
-    /// Copy a profile to where the player chose, replacing what was there.
-    func exportProfile(from source: URL, to target: URL) {
-        try? FileManager.default.removeItem(at: target)
-        try? FileManager.default.copyItem(at: source, to: target)
     }
 }

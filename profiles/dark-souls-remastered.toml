@@ -27,6 +27,10 @@ requires_account            = "Steam"
 online                      = "single-player, with online co-op, invasions and messages through FromSoftware's servers"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. Players on Apple Silicon Macs report it running well through one way of drawing the game and crashing often through the other, so Cellar starts it on the steadier one."
+mac_reports                 = "runs"
+protondb                    = "platinum"
+steam_deck                  = "playable"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -46,3 +50,18 @@ exe         = "DarkSoulsRemastered.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 760"
+pc_memory_minimum      = 4
+pc_gpu_recommended     = "GeForce GTX 970"
+pc_memory_recommended  = 8
+mac_minimum            = "M2"
+mac_memory_minimum     = 8
+mac_recommended        = "M5"
+mac_memory_recommended = 16
+requirements_checked   = "2026-11-03"

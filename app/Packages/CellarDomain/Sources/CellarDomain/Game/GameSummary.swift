@@ -254,3 +254,14 @@ public struct GameSummary: Identifiable, Sendable {
         self.bottleName = bottleName
     }
 }
+
+extension GameSummary {
+    /// How likely this game is to work, and why — the tested result when there is one, otherwise
+    /// Cellar's estimate (`CompatibilityForecast`). Uses the profile's graphics choice, not a
+    /// player's switch, so the estimate is the same on every Mac.
+    public var forecast: CompatibilityForecast {
+        CompatibilityForecast(CompatibilitySignals(
+            facts: facts, store: store, runnerID: runnerID, backend: profileBackend ?? backend,
+            fallbackBackend: fallbackBackend, launcher: publisherLauncher))
+    }
+}

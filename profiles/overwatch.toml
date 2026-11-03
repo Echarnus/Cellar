@@ -27,6 +27,11 @@ requires_account            = "Steam + a linked Battle.net account"
 online                      = "online only; Blizzard does not support playing it on a Mac this way, so playing online is at your own risk"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. AppleGamingWiki rates it Perfect through a CrossOver preview (2026-03-04) on macOS 26.4. The first start asks you to link a Battle.net account to Steam."
+mac_reports                 = "runs"
+protondb                    = "platinum"
+steam_deck                  = "playable"
+anticheat_on_linux          = "supported"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -46,3 +51,18 @@ exe         = "Overwatch.exe"
 
 [legal]
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab; the minimum is any GTX 600-series card, so the slowest of them"
+pc_gpu_minimum         = "GeForce GTX 650"
+pc_memory_minimum      = 6
+pc_gpu_recommended     = "GeForce GTX 1060"
+pc_memory_recommended  = 8
+mac_minimum            = "M1"
+mac_memory_minimum     = 8
+mac_recommended        = "M5"
+mac_memory_recommended = 16
+requirements_checked   = "2026-11-03"

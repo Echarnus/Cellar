@@ -115,12 +115,38 @@ public struct GamePlan {
     }
 
     /// The absolute program to start for a direct launch: `startExe` beside the game's exe when the
-    /// profile names one and it is on disk, else the exe itself.
+    /// profile names one and it is on disk, then `startExe` at the top of the game's folder, else the
+    /// exe itself.
+    ///
+    /// The top of the folder is for an Unreal game whose Steam stub sits at the root while the game
+    /// runs from deep inside it: the GTA Definitive Editions start `PlayGTASanAndreas.exe`, and the
+    /// game is `Gameface/Binaries/Win64/SanAndreas.exe` (#290).
     public var directStartExe: URL? {
-        guard let exe = directLaunchExe else { return nil }
+        guard let launchExe, let exe = directLaunchExe else { return nil }
         guard let startExe else { return exe }
-        let start = exe.deletingLastPathComponent().appendingPathComponent(startExe)
-        return FileManager.default.fileExists(atPath: start.path) ? start : exe
+        let fm = FileManager.default
+        let beside = exe.deletingLastPathComponent().appendingPathComponent(startExe)
+        if fm.fileExists(atPath: beside.path) { return beside }
+        // The install root is what `launchExe` was found under: strip its components back off.
+        var root = exe
+        for _ in (launchExe as NSString).pathComponents { root.deleteLastPathComponent() }
+        let atRoot = root.appendingPathComponent(startExe)
+        return fm.fileExists(atPath: atRoot.path) ? atRoot : exe
+    }
+
+    /// Whether Cellar can start this game full screen or in a window (#306): its engine has a
+    /// start-up switch Cellar knows, and Cellar is the one starting it. A publisher launcher sits
+    /// between Steam's stub and the game and starts the game itself, dropping whatever it was given;
+    /// Battle.net is always the one starting its games (`--exec`), and takes no arguments for them.
+    public var canChooseDisplayMode: Bool {
+        store != .battlenet && publisherLauncher == nil && DisplayMode.isChoosable(engine: facts.engine)
+    }
+
+    /// What goes on the game's command line after its exe for the player's `display_mode`: the
+    /// engine's own switch, or nothing when the game decides, or when Cellar can't choose for it.
+    public var displayArguments: [String] {
+        guard canChooseDisplayMode else { return [] }
+        return performance.displayMode.arguments(engine: facts.engine) ?? []
     }
 
     /// True when this store-installed game can be launched without its store's client running.

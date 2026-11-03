@@ -22,6 +22,9 @@ A game is supported by adding a `profiles/<slug>.toml`. Start from the closest e
 - picks a `backend` (`d3dmetal` for modern DX11/12 on Apple Silicon; `dxvk` for DX9/older or as a
   fallback) and a `fallback_backend`;
 - documents the install `method` (`windows-steam-in-bottle`, `battlenet-in-bottle`, or `depot`);
+- says **which Mac the game needs and which it is best on**: a `[mac]` section with the publisher's
+  own PC requirements, where you read them, and the Mac chips they map to. The test tells you the
+  chips if you get them wrong; the rule is in [`docs/MAC-REQUIREMENTS.md`](docs/MAC-REQUIREMENTS.md);
 - includes a `status` (`playable` / `experimental` / `untested` / `broken`) and `notes` with the
   hardware/macOS you tested on. **`untested` is a fine thing to submit; a wrong `playable` is not** —
   the app puts that badge in front of someone about to start a 90 GB download;

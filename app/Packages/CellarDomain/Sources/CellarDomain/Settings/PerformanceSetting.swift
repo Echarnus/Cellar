@@ -17,12 +17,15 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
     /// Wine's Retina mode (`HKCU\Software\Wine\Mac Driver\RetinaMode`): the game renders at the
     /// display's full pixel density. Sharper, and a heavy cost — four times the pixels on most Macs.
     case retina = "retina"
+    /// Whether the game starts full screen or in a window (`DisplayMode`), passed as its engine's own
+    /// start-up switch. Not a performance switch, but a per-game display choice kept the same way.
+    case displayMode = "display_mode"
 
     public var key: String { rawValue }
 
     public static func named(_ key: String) -> PerformanceSetting? { PerformanceSetting(rawValue: key) }
 
-    public var isBool: Bool { self != .wineDebug }
+    public var isBool: Bool { self != .wineDebug && self != .displayMode }
 
     /// The variable a raw `[env]` block would use for the same switch, if it has one.
     public var environmentVariable: String? {
@@ -30,7 +33,7 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
         case .wineDebug:        return "WINEDEBUG"
         case .metalValidation:  return "MTL_DEBUG_LAYER"
         case .metalHUD:         return "MTL_HUD_ENABLED"
-        case .metalFXUpscaling, .retina: return nil
+        case .metalFXUpscaling, .retina, .displayMode: return nil
         }
     }
 
@@ -40,11 +43,17 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
         case .wineDebug:        return env["WINEDEBUG"].map { $0 == "-all" ? "off" : $0 }
         case .metalValidation:  return env["MTL_DEBUG_LAYER"].map { $0 == "0" ? "false" : "true" }
         case .metalHUD:         return env["MTL_HUD_ENABLED"].map { $0 == "0" ? "false" : "true" }
-        case .metalFXUpscaling, .retina: return nil
+        case .metalFXUpscaling, .retina, .displayMode: return nil
         }
     }
 
-    public var defaultValue: String { self == .wineDebug ? "off" : "false" }
+    public var defaultValue: String {
+        switch self {
+        case .wineDebug:   return "off"
+        case .displayMode: return DisplayMode.game.rawValue
+        default:           return "false"
+        }
+    }
 
     /// Whether a profile turns this on to keep a game from crashing, rather than for taste. A player
     /// may still switch it off; when the game then dies as it starts, Cellar turns it back on
@@ -59,6 +68,7 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
         case .metalFXUpscaling: return "MetalFX upscaling"
         case .metalHUD:         return "Show frame rate"
         case .retina:           return "Retina resolution"
+        case .displayMode:      return "Full screen or window"
         }
     }
 
@@ -70,6 +80,7 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
         case .metalFXUpscaling: return "MetalFX upscaling through the game's DLSS option (D3DMetal only)"
         case .metalHUD:         return "Metal performance HUD for this game (the app's overlay setting adds it to every game)"
         case .retina:           return "Retina mode: render at the display's full resolution (sharper, much slower)"
+        case .displayMode:      return "Start full screen or in a window: game, fullscreen or window (Unreal, Unity and Source games)"
         }
     }
 
@@ -81,6 +92,7 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
         case .metalHUD:         return String(localized: "Show frame rate")
         case .metalValidation:  return String(localized: "Metal validation")
         case .wineDebug:        return String(localized: "Wine debug logging")
+        case .displayMode:      return String(localized: "Start In")
         }
     }
 
@@ -92,6 +104,7 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
         case .metalHUD:         return String(localized: "Metal's overlay with frames per second and frame time. Costs next to nothing.")
         case .metalValidation:  return String(localized: "Checks every graphics call. Slower, but it stops some games crashing on D3DMetal.")
         case .wineDebug:        return String(localized: "Records what Wine does. Only for chasing a bug: it slows the game.")
+        case .displayMode:      return String(localized: "Full screen, or a window you can move and resize beside other apps.")
         }
     }
 
@@ -105,6 +118,12 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
             default:
                 throw CellarError.invalidArgument("\(key) is on or off, not '\(value)'.")
             }
+        }
+        if self == .displayMode {
+            guard let mode = DisplayMode.named(trimmed) else {
+                throw CellarError.invalidArgument("\(key) is game, fullscreen or window, not '\(value)'.")
+            }
+            return mode.rawValue
         }
         if ["off", "-all"].contains(trimmed.lowercased()) { return "off" }
         // Written into a TOML line between quotes, and read back by scanners that cut at " #".

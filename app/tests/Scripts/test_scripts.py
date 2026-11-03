@@ -26,6 +26,7 @@ def load(name):
 check_pr = load("check-pr")
 coverage = load("coverage")
 close_release_issue = load("close-release-issue")
+refresh_evidence = load("refresh-evidence")
 
 GOOD = """## What and why
 
@@ -337,3 +338,130 @@ class CloseReleaseIssueTests(unittest.TestCase):
         close = workflow.index("Scripts/close-release-issue.py")
         self.assertLess(publish, close, "the issue must close only once the release is out")
         self.assertIn("issues: write", workflow)
+
+
+class EvidenceRefreshTests(unittest.TestCase):
+    """refresh-evidence.py (#286): public reports into the profiles, never wiping what it can't read."""
+
+    PROFILE = """[game]
+slug          = "fixture"
+steam_appid   = 42
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+status                      = "untested"        # a comment the scan must survive
+notes                       = "Not yet launched."
+
+[runner]
+id              = "wineforge"
+"""
+
+    def fake(self, protondb=None, deck=None, awacy=None, fail=()):
+        def fetch(url):
+            if any(word in url for word in fail):
+                raise OSError("unreachable")
+            if "protondb" in url:
+                return {"tier": protondb}
+            if "deck" in url:
+                return {"results": {"resolved_category": deck}}
+            return awacy or []
+        return fetch
+
+    def run_on(self, fetch, text=None):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder)
+        path = os.path.join(folder, "fixture.toml")
+        with open(path, "w") as handle:
+            handle.write(text or self.PROFILE)
+        changes = refresh_evidence.refresh(folder, fetch=fetch, today="2026-11-03")
+        with open(path) as handle:
+            return changes, handle.read()
+
+    def test_writes_every_source_into_compatibility(self):
+        awacy = [{"storeIds": {"steam": "42"}, "status": "Denied"}]
+        changes, text = self.run_on(self.fake("gold", 3, awacy))
+        fields = refresh_evidence.read_fields(text)
+        self.assertEqual(fields["protondb"], "gold")
+        self.assertEqual(fields["steam_deck"], "verified")
+        self.assertEqual(fields["anticheat_on_linux"], "denied")
+        self.assertEqual(fields["evidence_checked"], "2026-11-03")
+        self.assertEqual(fields["status"], "untested", "evidence is never a status")
+        self.assertIn("fixture", changes)
+        # Inside [compatibility], before [runner].
+        self.assertLess(text.index("protondb"), text.index("[runner]"))
+        self.assertGreater(text.index("protondb"), text.index("[compatibility]"))
+
+    def test_a_source_that_fails_keeps_its_value(self):
+        _, first = self.run_on(self.fake("gold", 3))
+        changes, text = self.run_on(self.fake("borked", 1, fail=("protondb",)), first)
+        fields = refresh_evidence.read_fields(text)
+        self.assertEqual(fields["protondb"], "gold")
+        self.assertEqual(fields["steam_deck"], "unsupported")
+        self.assertEqual(changes["fixture"], {"steam_deck": ("verified", "unsupported")})
+
+    def test_nothing_new_rewrites_nothing(self):
+        _, first = self.run_on(self.fake("gold", 3))
+        changes, text = self.run_on(self.fake("gold", 3), first)
+        self.assertEqual(changes, {})
+        self.assertEqual(text, first)
+
+    def test_unknown_values_are_dropped(self):
+        changes, text = self.run_on(self.fake("diamond", 9))
+        self.assertEqual(changes, {})
+        self.assertNotIn("protondb", text)
+
+    def test_shipped_profiles_parse_like_the_app(self):
+        for name in os.listdir(os.path.join(os.path.dirname(ROOT), "profiles")):
+            if name.endswith(".toml"):
+                with open(os.path.join(os.path.dirname(ROOT), "profiles", name)) as handle:
+                    fields = refresh_evidence.read_fields(handle.read())
+                self.assertIn("status", fields, name)
+
+
+class MacRequirementsSiteTests(unittest.TestCase):
+    """The site says which Mac each game needs (#298), and refuses to build without it."""
+
+    @classmethod
+    def setUpClass(cls):
+        path = os.path.join(os.path.dirname(ROOT), "pages", "gen-site.py")
+        spec = importlib.util.spec_from_file_location("gen_site", path)
+        cls.site = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.site)
+
+    def profiles(self):
+        folder = os.path.join(os.path.dirname(ROOT), "profiles")
+        return sorted(os.path.join(folder, name) for name in os.listdir(folder) if name.endswith(".toml"))
+
+    def test_every_profile_names_both_macs_through_both_parsers(self):
+        # tomllib in CI, the hand-rolled fallback on a Mac's system Python: both must read [mac].
+        for path in self.profiles():
+            for parse in (self.site._parse_toml_fallback, self.site.parse_toml):
+                mac = parse(path).get("mac", {})
+                for key in ("mac_minimum", "mac_recommended", "pc_requirements_source"):
+                    self.assertTrue(str(mac.get(key, "")).strip(), f"{os.path.basename(path)}: no {key}")
+                for key in ("mac_memory_minimum", "mac_memory_recommended"):
+                    self.assertIsInstance(mac.get(key), int, f"{os.path.basename(path)}: {key} is a number of GB")
+
+    def test_the_cards_say_needs_and_best_on(self):
+        games = self.site.load_games()
+        html = self.site.card(games[0])
+        self.assertIn("<dt>Needs</dt>", html)
+        self.assertIn("<dt>Best on</dt>", html)
+        self.assertIn(games[0]["mac_rec"], html)
+
+    def test_a_profile_without_mac_fails_the_build(self):
+        with open(self.profiles()[0], encoding="utf-8") as handle:
+            source = handle.read()
+        without = source.split("\n[mac]")[0] + "\n"
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        os.makedirs(os.path.join(tmp, "profiles"))
+        with open(os.path.join(tmp, "profiles", "fixture.toml"), "w", encoding="utf-8") as f:
+            f.write(without)
+        original = self.site.ROOT
+        self.site.ROOT = tmp
+        self.addCleanup(setattr, self.site, "ROOT", original)
+        with self.assertRaises(SystemExit) as raised:
+            self.site.load_games()
+        self.assertIn("[mac]", str(raised.exception))

@@ -1,0 +1,77 @@
+# Cellar game profile — Monster Hunter: World
+#
+# Capcom's 2018 hunting game with online co-op. Windows only, 64-bit. DirectX 11 by default, DirectX
+# 12 from its settings. No anti-cheat or third-party DRM listed. Facts below are from SteamDB's info
+# and config pages, read 2026-11-03. ProtonDB and Steam Deck ratings are from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "monster-hunter-world"
+name          = "Monster Hunter: World"
+developer     = "Capcom"
+publisher     = "Capcom"
+steam_appid   = 582010
+engine        = "MT Framework"
+graphics_api  = "DirectX 11 (DirectX 12 optional)"
+architecture  = "x86-64"
+released      = "2018-08-09"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none listed"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player with online co-op through Capcom's servers"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 11, which Cellar has two ways to run, so it can offer the second if the first does not start. Online co-op has not been seen working on a Mac yet."
+protondb                    = "gold"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 582010
+# Steam's launch option is MonsterHunterWorld.exe at the top of the folder (SteamDB config).
+install_dir = "Monster Hunter World"
+exe         = "MonsterHunterWorld.exe"
+
+[acceptance]
+# What `cellar verify monster-hunter-world` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts MonsterHunterWorld.exe beside a running Steam and it survives the watch.
+# - dlc: Iceborne (app 1118010) shows in the game when the account owns it.
+# - dock: the Dock says Monster Hunter: World, never wine.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+# After the first run: add online_hosts only for hosts the game's process was seen holding.
+
+[legal]
+# Steamworks run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 760"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1060 3GB"
+pc_memory_recommended  = 8
+mac_minimum            = "M2"
+mac_memory_minimum     = 16
+mac_recommended        = "M5"
+mac_memory_recommended = 16
+requirements_checked   = "2026-11-03"

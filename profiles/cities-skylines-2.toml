@@ -32,6 +32,10 @@ requires_account            = "Steam (a Paradox account is optional, for Paradox
 online                      = "single-player (Paradox Mods and Steam Cloud are optional)"
 status                      = "untested"
 notes                       = "Not yet launched under Cellar. Public reports all run it through D3DMetal: CrossOver 24 on an M1 MacBook Pro 16 GB rated playable at about 15 FPS, Whisky on an M1 Max 32 GB playable on the Very Low preset, and GPTK 2 on an M3 Pro on High (about 25 FPS reported on an M1 Pro, 30 on an M1 Max). Known under Wine: switching away from the game can leave its lighting or input broken until a restart, and borderless windowed mode can run in slow motion, so pick full screen. Expect a large city to be limited by the CPU, as it is on Windows. DXVK is the fallback."
+mac_reports                 = "issues"
+protondb                    = "gold"
+steam_deck                  = "unsupported"
+evidence_checked            = "2026-11-03"
 
 [runner]
 id              = "wineforge"
@@ -56,3 +60,18 @@ exe         = "Cities2.exe"
 # Steamworks runs untouched inside the layer, and Cellar does not edit the game's own files.
 # Only ever used with a copy the player owns.
 drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read through System Requirements Lab"
+pc_gpu_minimum         = "GeForce GTX 970"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce RTX 3080"
+pc_memory_recommended  = 16
+mac_minimum            = "M5"
+mac_memory_minimum     = 16
+mac_recommended        = "M2 Ultra"
+mac_memory_recommended = 32
+requirements_checked   = "2026-11-03"
