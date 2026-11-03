@@ -10,6 +10,7 @@ Run: python3 pages/gen-site.py
 Environment (all optional):
   CELLAR_SITE_OUT        write somewhere other than pages/dist/
   CELLAR_SITE_OFFLINE=1  skip the latest-release lookup (the button then opens the releases page)
+  CELLAR_SITE_MEDIA      read the screenshots and video from somewhere other than pages/media/
   CELLAR_TOML_FALLBACK=1 use the hand-rolled TOML parser even where tomllib exists, so CI can prove
                          both parsers read every profile the same way
   GITHUB_TOKEN           sent with the release lookup, only to lift the anonymous rate limit
@@ -109,9 +110,9 @@ def your_stores(plural, singular):
     return plural if len(OFFERED) > 1 else singular
 
 STATUS = {  # profile status → (label, css class, what it means)
-    "playable": ("Playable", "ok", "Someone ran it on named hardware; the profile says which Mac."),
+    "playable": ("Playable", "ok", "Someone played it on a Mac named in its technical details."),
     "experimental": ("Experimental", "warn", "It runs, with caveats worth reading first."),
-    "untested": ("Untested", "muted", "The profile exists; nobody has confirmed it yet."),
+    "untested": ("Untested", "muted", "Cellar knows how to set it up; nobody has confirmed it plays yet."),
 }
 
 # Profile DRM slugs that read badly as-is. Anything else is shown exactly as the profile says it.
@@ -302,6 +303,19 @@ section.block{padding:84px 0 0}
 
 .steps{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));list-style:none;margin:0;padding:0;counter-reset:step}
 .steps li{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px 24px 24px 76px;counter-increment:step}
+.tour-video{margin:0 0 56px}
+.tour-video video,.shot img,.hero-shot img{display:block;width:100%;height:auto;border-radius:14px;
+  border:1px solid var(--line);background:var(--surface-2);box-shadow:0 24px 60px -24px var(--shadow)}
+.tour-video figcaption{color:var(--muted);font-size:.95rem;margin-top:12px}
+.shots{list-style:none;margin:0;padding:0;display:grid;gap:56px}
+.shot figure{margin:0;display:grid;gap:22px;align-items:center}
+@media (min-width:900px){.shot figure{grid-template-columns:1.55fr 1fr;gap:48px}
+  .shot:nth-child(even) figure{grid-template-columns:1fr 1.55fr}
+  .shot:nth-child(even) img{order:2}}
+.shot h3{font-size:1.45rem;margin-bottom:10px}
+.shot p{color:var(--muted);margin:0}
+.hero-shot{justify-self:center;width:100%;max-width:620px}
+.hero-shot img{border-color:rgba(255,255,255,.18);box-shadow:0 40px 80px -30px rgba(0,0,0,.6)}
 .steps li::before{content:counter(step);position:absolute;left:24px;top:22px;width:36px;height:36px;border-radius:50%;
   background:var(--primary);color:var(--on-primary);display:grid;place-items:center;font-weight:750}
 .steps h3{font-size:1.1rem;margin-bottom:6px}
@@ -348,6 +362,11 @@ section.block{padding:84px 0 0}
 .facts dt{color:var(--muted)}
 .facts dd{margin:0;overflow-wrap:anywhere}
 .card .more{margin-top:auto;font-size:.88rem;font-weight:600;min-height:44px;display:inline-flex;align-items:center}
+.no-js .grid[data-cap]>.card:nth-child(n+11){display:none}
+.more-games{text-align:center;margin:28px 0 0}
+.btn-ghost-dark{border:1px solid var(--line);color:var(--fg);background:var(--surface)}
+.btn-ghost-dark:hover{border-color:var(--link);color:var(--link)}
+.games-page{padding-top:8px}
 .empty{text-align:center;color:var(--muted);padding:40px 0}
 .legend{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));margin:28px 0 0;padding:0;list-style:none}
 .legend li{display:flex;gap:10px;align-items:flex-start;color:var(--muted);font-size:.93rem}
@@ -446,16 +465,32 @@ GAMES_JS = """
   var cards=[].slice.call(document.querySelectorAll('#grid .card'));
   var q=document.getElementById('q'), count=document.getElementById('count'), empty=document.getElementById('empty');
   var state={store:'all',status:'all'};
+  var grid=document.getElementById('grid'), cap=parseInt(grid.dataset.cap||'0',10), more=document.getElementById('more');
+  var params=new URLSearchParams(location.search);
+  if(!cap){ q.value=params.get('q')||'';
+    ['store','status'].forEach(function(k){var v=params.get(k); if(!v) return;
+      var g=document.querySelector('.seg[data-key="'+k+'"]'); if(!g||!g.querySelector('[data-value="'+v+'"]')) return;
+      state[k]=v; [].forEach.call(g.querySelectorAll('button'),function(x){x.setAttribute('aria-pressed',String(x.dataset.value===v));});});}
   function apply(){
-    var term=(q.value||'').trim().toLowerCase(), shown=0;
+    var term=(q.value||'').trim().toLowerCase(), matched=0, shown=0;
     cards.forEach(function(c){
       var ok=(!term||c.dataset.name.indexOf(term)>=0)
         &&(state.store==='all'||c.dataset.store===state.store)
         &&(state.status==='all'||c.dataset.status===state.status);
-      c.hidden=!ok; if(ok) shown++;});
+      if(ok) matched++;
+      var show=ok&&(!cap||matched<=cap);
+      c.hidden=!show; if(show) shown++;});
+    var all=!term&&state.store==='all'&&state.status==='all';
     count.textContent=shown===cards.length? 'Showing all '+cards.length+' games'
-      : 'Showing '+shown+' of '+cards.length+' games';
-    empty.hidden=shown>0;}
+      : all||shown===matched? 'Showing '+shown+' of '+cards.length+' games'
+      : 'Showing '+shown+' of '+matched+' matching games';
+    if(more){
+      var p=new URLSearchParams(); if(term) p.set('q',q.value.trim());
+      if(state.store!=='all') p.set('store',state.store); if(state.status!=='all') p.set('status',state.status);
+      more.href='games.html'+(p.toString()?'?'+p.toString():'');
+      more.hidden=matched<=cap;
+      more.textContent=all? 'Show all '+cards.length+' games' : 'Show all '+matched+' matching games';}
+    empty.hidden=matched>0;}
   [].forEach.call(document.querySelectorAll('.seg'),function(group){
     group.addEventListener('click',function(e){
       var b=e.target.closest('button'); if(!b) return;
@@ -656,8 +691,9 @@ def head(title, description, path, base=""):
 
 def topbar(current, release, base=""):
     n = html.escape
-    pages = [(f"{base}index.html#features", "Features", None),
-             (f"{base}index.html#games", "Games", None),
+    tour = [(f"{base}index.html#tour", "See it work", None)] if tour_section(find_media()) else []
+    pages = tour + [(f"{base}index.html#features", "Features", None),
+             (f"{base}games.html", "Games", "games"),
              (f"{base}faq.html", "FAQ", "faq"),
              (REPO, "GitHub", None)]
     current_mark = ' aria-current="page"'
@@ -711,7 +747,7 @@ def site_footer(games, base=""):
       <li><a href="{RELEASES}/latest">Download</a></li>
       <li><a href="{RELEASES}">All releases</a></li>
       <li><a href="{base}index.html#features">Features</a></li>
-      <li><a href="{base}index.html#games">Supported games</a></li>
+      <li><a href="{base}games.html">Supported games</a></li>
     </ul></div>
     <div><h2>Help</h2><ul>
       <li><a href="{base}faq.html">Questions &amp; answers</a></li>
@@ -725,7 +761,7 @@ def site_footer(games, base=""):
       <li><a href="{REPO}/blob/main/docs/LEGAL.md">Legal</a></li>
     </ul></div>
   </div>
-  <p class="legal">{len(games)} profiled games, {playable} confirmed playable. Cellar is free software
+  <p class="legal">{len(games)} games set up, {playable} confirmed playable. Cellar is free software
   under GPL-3.0 and is not affiliated with Apple, {", ".join(OWNERS[k] for k in OFFERED)}, CodeWeavers or any game
   publisher; their names appear only to say where a game comes from. Built on
   <a href="https://www.winehq.org/">Wine</a>, the Windows compatibility layer — Cellar is a launcher
@@ -741,25 +777,115 @@ def scripts(*bodies):
 # Landing page
 # ---------------------------------------------------------------------------------------------
 FEATURES = [
-    ("play", "One click from download to playing",
-     "Cellar fetches the Wine runner, sets up the graphics layer and builds a bottle for each game. "
-     "No Terminal, no Windows licence, no virtual machine."),
+    ("play", "One button from download to playing",
+     "Cellar downloads the game, gives it its own space on your Mac and sets up everything it needs "
+     "to start. No Terminal, no Windows licence, no virtual machine."),
     ("stores", your_stores("Your stores, your library", "Your Steam library"),
      f"{stores_phrase()}. Sign in once{your_stores(' per store', '')}, not once per game, and "
      "Cellar shows the games you own there."),
-    ("chip", "Apple's D3DMetal, or DXVK",
-     "Direct3D is translated to Metal on the Apple GPU. Where a second backend can run a game, "
-     "its profile names it as the fallback for when the first choice misbehaves."),
-    ("profile", "A profile for every game",
-     "The fixes a game needs are written down once and reused forever, in an open database "
-     "anyone can add to."),
-    ("gauge", "See what limits your frame rate",
-     "Turn on the Metal performance overlay in Settings, or measure a session with "
-     "<code>cellar perf measure</code>."),
+    ("chip", "Drawn by your Mac's own graphics",
+     "A game's graphics run on the Apple GPU through Metal, the way Mac games draw. If a game "
+     "looks wrong one way, Cellar knows a second way to try."),
+    ("profile", "Each game set up the way it likes",
+     "What a game needs to start well is worked out once and shared, so every player gets it "
+     "right the first time. Anyone can add a game."),
+    ("gauge", "Your Mac stays a Mac",
+     "The game shows up in the Dock under its own name, plays in a normal Mac window or full "
+     "screen, and leaves nothing running when you quit."),
     ("shield", "Free, open and private",
      "GPL-3.0, no Cellar account, no telemetry. Games come from your own accounts, and their DRM "
      "runs untouched."),
 ]
+
+# ---------------------------------------------------------------------------------------------
+# Screenshots and video. Real captures of the shipping app only — never a mock-up (docs/SHOWCASE.md
+# is the shot list and how to take them). Each entry renders only when its file is in pages/media/,
+# so the page never shows an empty frame: (id, title, caption). An image is <id>.png or <id>.jpg;
+# the video is tour.mp4 with tour.vtt (captions) and tour-poster.jpg, all three or none.
+# ---------------------------------------------------------------------------------------------
+MEDIA = os.environ.get("CELLAR_SITE_MEDIA") or os.path.join(ROOT, "pages", "media")
+HERO_SHOT = ("hero", "Cellar showing a Steam library on a Mac")
+SHOTS = [
+    ("library", "Your Steam library, on your Mac",
+     "Sign in once and Cellar lists the Windows games you own, with what is known about each."),
+    ("game", "One button, and a sentence saying what it does",
+     "Each game has a page with its state and a single next step: Install, Set up or Play."),
+    ("installing", "Cellar does the setting up",
+     "It downloads the game from your own account and prepares everything it needs. You can "
+     "watch, or go and do something else."),
+    ("playing", "Then it&rsquo;s just the game",
+     "The game opens in its own window, under its own name in the Dock, and quits cleanly."),
+]
+TOUR_VIDEO = ("tour", "From signing in to playing, in about a minute.")
+IMAGE_EXTS = (".png", ".jpg")
+
+
+def image_size(path):
+    """(width, height) of a PNG or JPEG, from its header, so every <img> reserves its space."""
+    with open(path, "rb") as f:
+        data = f.read(1 << 16)
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+    i = 2
+    while i + 9 < len(data) and data[:2] == b"\xff\xd8":
+        if data[i] != 0xFF:
+            break
+        marker, length = data[i + 1], int.from_bytes(data[i + 2:i + 4], "big")
+        if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+            return int.from_bytes(data[i + 7:i + 9], "big"), int.from_bytes(data[i + 5:i + 7], "big")
+        i += 2 + length
+    sys.exit(f"error: {path}: not a PNG or JPEG whose size can be read")
+
+
+def find_media():
+    """The captures present in MEDIA: {id: (filename, (w, h))}, plus the video as {"tour": {...}}."""
+    found = {}
+    for ident in [HERO_SHOT[0]] + [sid for sid, _t, _c in SHOTS] + [TOUR_VIDEO[0] + "-poster"]:
+        for ext in IMAGE_EXTS:
+            path = os.path.join(MEDIA, ident + ext)
+            if os.path.exists(path):
+                found[ident] = (ident + ext, image_size(path))
+                break
+    vid = TOUR_VIDEO[0]
+    parts = [os.path.exists(os.path.join(MEDIA, f"{vid}.mp4")), os.path.exists(os.path.join(MEDIA, f"{vid}.vtt")),
+             f"{vid}-poster" in found]
+    if any(parts) and not all(parts):
+        sys.exit(f"error: {MEDIA}: the video needs {vid}.mp4, {vid}.vtt (captions) and {vid}-poster.jpg together")
+    if all(parts):
+        found[vid] = {"src": f"{vid}.mp4", "captions": f"{vid}.vtt", "poster": found.pop(f"{vid}-poster")}
+    else:
+        found.pop(f"{vid}-poster", None)
+    return found
+
+
+def tour_section(media):
+    """The "See it work" section, or nothing when there is no capture to show."""
+    n = html.escape
+    shots = [(sid, t, c) for sid, t, c in SHOTS if sid in media]
+    video = media.get(TOUR_VIDEO[0])
+    if not shots and not video:
+        return ""
+    vid_html = ""
+    if video:
+        (pw, ph) = video["poster"][1]
+        vid_html = (f'<figure class="tour-video"><video controls playsinline preload="none" width="{pw}" height="{ph}"'
+                    f' poster="media/{n(video["poster"][0])}" aria-describedby="tour-cap">'
+                    f'<source src="media/{n(video["src"])}" type="video/mp4">'
+                    f'<track kind="captions" src="media/{n(video["captions"])}" srclang="en" label="English" default>'
+                    f'</video><figcaption id="tour-cap">{TOUR_VIDEO[1]}</figcaption></figure>')
+    items = "".join(
+        f'<li class="shot"><figure><img loading="lazy" decoding="async" src="media/{n(media[sid][0])}"'
+        f' width="{media[sid][1][0]}" height="{media[sid][1][1]}" alt="Cellar: {n(html.unescape(title))}">'
+        f'<figcaption><h3>{title}</h3><p>{caption}</p></figcaption></figure></li>'
+        for sid, title, caption in shots)
+    return f'''
+  <section class="block" id="tour" aria-labelledby="tour-h">
+    <div class="section-head"><p class="kicker">See it work</p>
+      <h2 id="tour-h">From your library to playing.</h2>
+      <p>Real screenshots of Cellar on a Mac, nothing staged.</p></div>
+    {vid_html}<ol class="shots">{items}</ol>
+  </section>'''
+
 
 STEPS = [
     ("Install Cellar", "Open the download and drag Cellar to Applications. It sets up what it needs the "
@@ -767,8 +893,8 @@ STEPS = [
     (your_stores("Sign in to your stores", "Sign in to Steam"),
      f"{stores_phrase('or')}, with your own account. Once{your_stores(' per store', '')}; you can "
      "also skip it and do it later."),
-    ("Pick a game and play", "Choose a game you own, install it, and press Play. Cellar picks the runner "
-     "and backend from the game's profile."),
+    ("Pick a game and play", "Choose a game you own, press Install, then Play. Cellar sets the game up "
+     "the way it is known to run best."),
 ]
 
 
@@ -794,9 +920,56 @@ def card(g):
         <h3>{n(g['name'])}</h3>
         <div><span class="chip {n(g['store'])}">{n(store)}</span></div>
         <dl class="facts">{dl}</dl>
-        <a class="more" href="{REPO}/blob/main/{n(g['profile'])}">Read the profile<span class="sr-only"> for {n(g['name'])}</span></a>
+        <a class="more" href="{REPO}/blob/main/{n(g['profile'])}">Technical details<span class="sr-only"> for {n(g['name'])}</span></a>
       </div>
     </li>'''
+
+
+GAMES_CAP = 10  # cards the home page shows before "Show all games" (Kenneth, 2026-11-03)
+
+
+def games_block(games, cap=None):
+    """The searchable games list: the whole of games.html, and the short version on the home page.
+
+    One component in both places. With `cap`, at most that many matching cards show, and a link
+    under them opens games.html with the same search and filters; without JavaScript the first
+    `cap` cards show and the link opens the full list."""
+    n = html.escape
+    total = len(games)
+    stores_present = [k for k in STORES if any(g["store"] == k for g in games)]
+    statuses_present = [k for k in STATUS if any(g["status"] == k for g in games)]
+    store_opts = [] if len(stores_present) < 2 else [("all", "All stores", total)] + [
+        (k, STORES[k], sum(1 for g in games if g["store"] == k)) for k in stores_present]
+    status_opts = [("all", "Any status", total)] + [
+        (k, STATUS[k][0], sum(1 for g in games if g["status"] == k)) for k in statuses_present]
+    cards = "".join(card(g) for g in games)
+    legend = "".join(
+        f'<li>{icon(cls, cls)}<span><b>{label}</b> — {meaning}</span></li>'
+        for _k, (label, cls, meaning) in STATUS.items())
+    capped = cap is not None and total > cap
+    shown = min(total, cap) if capped else total
+    count = f"Showing {shown} of {total} games" if capped else f"Showing all {total} games"
+    cap_attr = f' data-cap="{cap}"' if capped else ""
+    more = (f'\n    <p class="more-games"><a class="btn btn-ghost-dark" id="more" href="games.html">'
+            f'Show all {total} games</a></p>') if capped else ""
+    return f'''<div class="toolbar" role="search" aria-label="Filter games">
+      <div class="search">{icon("search")}<label class="sr-only" for="q">Search games</label>
+        <input id="q" type="search" placeholder="Search {total} games" autocomplete="off"></div>
+      {seg("store", "Store", store_opts) if store_opts else ""}
+      {seg("status", "Status", status_opts)}
+    </div>
+    <p class="count" id="count" role="status" aria-live="polite">{count}</p>
+    <ul class="grid" id="grid"{cap_attr}>{cards}
+    </ul>
+    <div class="empty" id="empty" hidden><p>No games match those filters.</p>
+      <button class="btn btn-primary btn-small" id="reset" type="button">Show all games</button></div>{more}
+    <ul class="legend">{legend}</ul>'''
+
+
+DONT_SEE = f'''<div class="callout"><h3>Don&rsquo;t see your game?</h3>
+      <p>Each game is one small text file saying where it comes from, how it starts and what you saw
+      when you played it. <a href="{REPO}/blob/main/CONTRIBUTING.md">Add one</a>, or read
+      <a href="faq.html#games">how this list works</a>.</p></div>'''
 
 
 def seg(key, label, options):
@@ -813,13 +986,7 @@ def render_index(games, release):
     n = html.escape
     total = len(games)
     playable = sum(1 for g in games if g["status"] == "playable")
-    stores_present = [k for k in STORES if any(g["store"] == k for g in games)]
-    statuses_present = [k for k in STATUS if any(g["status"] == k for g in games)]
-    store_opts = [] if len(stores_present) < 2 else [("all", "All stores", total)] + [
-        (k, STORES[k], sum(1 for g in games if g["store"] == k)) for k in stores_present]
-    status_opts = [("all", "Any status", total)] + [
-        (k, STATUS[k][0], sum(1 for g in games if g["status"] == k)) for k in statuses_present]
-
+    media = find_media()
     covers = [g for g in games if g["portrait"]][:3]
     shelf = "".join(
         f'<div class="cover c{i + 1}"><img src="{n(g["portrait"])}" alt="" width="600" height="900"'
@@ -829,15 +996,18 @@ def render_index(games, release):
         f'<li class="feature"><div class="ic">{icon(ic)}</div><h3>{title}</h3><p>{body}</p></li>'
         for ic, title, body in FEATURES)
     steps = "".join(f"<li><h3>{title}</h3><p>{body}</p></li>" for title, body in STEPS)
-    cards = "".join(card(g) for g in games)
-    legend = "".join(
-        f'<li>{icon(cls, cls)}<span><b>{label}</b> — {meaning}</span></li>'
-        for _k, (label, cls, meaning) in STATUS.items())
-
     teaser_ids = ["what-is-cellar", "which-macs-does-it-work-on",
                   "macos-says-cellar-can-t-be-opened", "what-about-games-with-anti-cheat"]
     teaser = "".join(qa_html(q, a) for _t, _anchor, _l, qs in FAQ_SECTIONS for q, a in qs
                      if slugify(q) in teaser_ids)
+
+    if HERO_SHOT[0] in media:
+        file, (w, h) = media[HERO_SHOT[0]]
+        hero_visual = (f'<div class="hero-shot"><img src="media/{n(file)}" width="{w}" height="{h}"'
+                       f' alt="{n(HERO_SHOT[1])}"></div>')
+    else:
+        hero_visual = (f'<div class="shelf" aria-hidden="true">{shelf}<img class="appicon" src="icon.png"'
+                       ' alt="" width="256" height="256"></div>')
 
     release_line = (f'Version {n(release["version"])} · <a href="{n(release["notes"])}">what&rsquo;s new</a>'
                     if release else f'<a href="{RELEASES}">All releases</a>')
@@ -851,17 +1021,17 @@ def render_index(games, release):
     }).replace("<", "\\u003c")
 
     return f'''{head("Cellar — Windows games on your Mac",
-                 "Cellar runs the Windows games you own on Apple Silicon Macs: Wine with Apple's "
-                 f"D3DMetal, per-game profiles, and your own {stores_phrase()} {your_stores('accounts', 'account')}. "
-                 "Free and open source.", "index.html")}
+                 "Cellar plays the Windows games you own on Apple Silicon Macs, straight from your "
+                 f"own {stores_phrase()} {your_stores('accounts', 'account')}. One button to install, "
+                 "one to play. Free and open source.", "index.html")}
 {topbar("home", release)}
 <main id="main">
 <section class="hero" aria-labelledby="hero-h"><div class="wrap">
   <div>
     <p class="eyebrow">Free and open source · For Apple Silicon</p>
     <h1 id="hero-h">Your Windows games, on your Mac.</h1>
-    <p class="lede">Cellar runs the Windows games you already own on Apple Silicon. It sets up Wine and
-    Apple&rsquo;s D3DMetal for each game, {your_stores("signs in to your stores once", "signs in to Steam once")}, and gets out of the way.</p>
+    <p class="lede">Cellar plays the Windows games you already own on Apple Silicon. {your_stores("Sign in to your stores once", "Sign in to Steam once")},
+    pick a game, press Play. Cellar sets everything up and then gets out of the way.</p>
     <div class="ctas">
       <a class="btn btn-light btn-big" href="{n(download_href(release))}">{icon("download")}<span class="lines">Download for Mac<small>{n(download_detail(release))}</small></span></a>
       <a class="btn btn-ghost btn-big" href="#games">See supported games</a>
@@ -869,22 +1039,22 @@ def render_index(games, release):
     <p class="fine">{release_line} · Cellar isn&rsquo;t notarised by Apple, so macOS asks once:
     <a href="faq.html#macos-says-cellar-can-t-be-opened">how to open Cellar the first time</a></p>{checksum_line(release)}
   </div>
-  <div class="shelf" aria-hidden="true">{shelf}<img class="appicon" src="icon.png" alt="" width="256" height="256"></div>
+  {hero_visual}
 </div></section>
 
 <div class="wrap">
   <dl class="stats">
-    <div><dt class="sr-only">Game profiles</dt><dd style="margin:0"><b>{total}</b><span>game profiles</span></dd></div>
+    <div><dt class="sr-only">Games set up</dt><dd style="margin:0"><b>{total}</b><span>games set up</span></dd></div>
     <div><dt class="sr-only">Confirmed playable</dt><dd style="margin:0"><b>{playable}</b><span>confirmed playable</span></dd></div>
     <div><dt class="sr-only">Stores</dt><dd style="margin:0"><b>{len(OFFERED) if len(OFFERED) > 1 else stores_phrase()}</b><span>{"stores: " + stores_phrase() if len(OFFERED) > 1 else "your own library"}</span></dd></div>
     <div><dt class="sr-only">Price</dt><dd style="margin:0"><b>Free</b><span>GPL-3.0, no telemetry</span></dd></div>
   </dl>
-
+{tour_section(media)}
   <section class="block" id="features" aria-labelledby="features-h">
     <div class="section-head"><p class="kicker">Features</p>
       <h2 id="features-h">Everything a game needs, set up for you.</h2>
-      <p>Cellar is to the Mac what Proton is to Linux: the Windows game runs much as it does on a PC,
-      and your Mac stays a Mac.</p></div>
+      <p>Cellar is to the Mac what Proton is to Linux: the Windows game runs much as it does on a
+      PC, with nothing for you to configure.</p></div>
     <ul class="features">{features}</ul>
   </section>
 
@@ -896,37 +1066,22 @@ def render_index(games, release):
 
   <section class="block" id="games" aria-labelledby="games-h">
     <div class="section-head"><p class="kicker">Supported games</p>
-      <h2 id="games-h">What has a profile today.</h2>
-      <p>Every card comes straight from a profile in the repository, so this list can&rsquo;t claim more
-      than the profile does. A game without one may still run — the list is what has been written
-      down, not the limit.</p></div>
-    <div class="toolbar" role="search" aria-label="Filter games">
-      <div class="search">{icon("search")}<label class="sr-only" for="q">Search games</label>
-        <input id="q" type="search" placeholder="Search games" autocomplete="off"></div>
-      {seg("store", "Store", store_opts) if store_opts else ""}
-      {seg("status", "Status", status_opts)}
-    </div>
-    <p class="count" id="count" role="status" aria-live="polite">Showing all {total} games</p>
-    <ul class="grid" id="grid">{cards}
-    </ul>
-    <div class="empty" id="empty" hidden><p>No games match those filters.</p>
-      <button class="btn btn-primary btn-small" id="reset" type="button">Show all games</button></div>
-    <ul class="legend">{legend}</ul>
-    <div class="callout"><h3>Don&rsquo;t see your game?</h3>
-      <p>A game is one small profile file: its store, its executable and graphics API, and what you saw
-      when you ran it. <a href="{REPO}/blob/main/CONTRIBUTING.md">Add one</a>, or read
-      <a href="faq.html#games">how this list works</a>.</p></div>
+      <h2 id="games-h">The games Cellar knows today.</h2>
+      <p>Each card says exactly what is known about a game, and nothing more: <b>Playable</b> means
+      someone played it on a named Mac. Search all {total} here, or
+      <a href="games.html">see the full list</a>.</p></div>
+    {games_block(games, GAMES_CAP)}
   </section>
 
   <section class="block" id="requirements" aria-labelledby="req-h">
     <div class="section-head"><p class="kicker">Requirements</p>
       <h2 id="req-h">What your Mac needs.</h2>
-      <p>Open Cellar, or run <code>cellar doctor</code>, and it tells you what is missing before
-      anything fails.</p></div>
+      <p>Open Cellar and it tells you what is missing before anything fails, and offers to fix
+      it.</p></div>
     <ul class="reqs">
       <li><b>Apple Silicon</b><span>M1 or later. Intel Macs are not supported.</span></li>
       <li><b>macOS {MIN_MACOS} or later</b><span>Every M1 Mac can run it; Software Update has it.</span></li>
-      <li><b>Rosetta 2</b><span>Wine runs as an Intel app under Rosetta; macOS installs it on request.</span></li>
+      <li><b>Rosetta 2</b><span>Apple&rsquo;s own translator for Intel apps. Cellar asks macOS to install it when it&rsquo;s missing.</span></li>
       <li><b>A game you own</b><span>On {stores_phrase("or")}, from your own account.</span></li>
     </ul>
   </section>
@@ -960,23 +1115,32 @@ def render_index(games, release):
 FAQ_SECTIONS = [
     ("Getting started", "start", "What Cellar is, and what it needs from your Mac.", [
         ("What is Cellar?",
-         "<p>Cellar runs <b>Windows games on Apple Silicon Macs</b>. For each game it builds a "
-         "<i>bottle</i> — a small, self-contained Windows environment — from Wine plus a "
-         "graphics-translation layer that turns the game's Direct3D calls into Metal. The game runs "
-         "much as it does on a PC. Your Mac does not become one.</p>"
+         "<p>Cellar plays <b>Windows games on Apple Silicon Macs</b>. You sign in to "
+         f"{stores_phrase('or')}, pick a game you own and press Play. Cellar installs it, gives it "
+         "its own space on your Mac and sets up what it needs, and the game runs much as it does on "
+         "a PC. Your Mac does not become one.</p>"
          "<p>It is the same idea as Valve's Proton on Linux, aimed at macOS, and it is free and "
          "open source under GPL-3.0.</p>"),
+        ("What's under the hood?",
+         "<p>For the curious: each game gets a <i>bottle</i>, a small self-contained Windows "
+         "environment built on <a href=\"https://www.winehq.org/\">Wine</a>. Wine answers the "
+         "Windows calls a game makes, as it makes them. A graphics layer — Apple's D3DMetal, or "
+         "DXVK on MoltenVK — turns the game's Direct3D into Metal on the Apple GPU. Wine itself "
+         "runs as an Intel app under Rosetta 2.</p>"
+         "<p>What each game needs is written down in a <i>profile</i>, one small file per game in "
+         f"the <a href=\"{REPO}/tree/main/profiles\">open profile database</a>: which graphics "
+         "layer to use and which to fall back to, and the fixes it is known to need. If you prefer "
+         "a terminal, the <code>cellar</code> command-line tool does everything the app does.</p>"),
         ("Do I need a Windows licence, Boot Camp, or a virtual machine?",
          "<p>None of the three. Wine is not an emulator and not a virtual machine — it answers the "
          "Windows API calls a game makes, as it makes them. There is no Windows install to "
          "maintain and no licence to buy.</p>"),
         ("Which Macs does it work on?",
          f"<p><b>Apple Silicon only</b> (M1 and later), on macOS {MIN_MACOS} or newer — the newest "
-         "macOS every M1 Mac can run, so no Apple Silicon Mac is left out. Cellar's Wine runners are x86 builds that run under Rosetta 2, "
-         "with the graphics work handed to Metal on the Apple GPU — so an Intel Mac is out of "
-         "scope.</p>"
-         "<p>Open the app, or run <code>cellar doctor</code>, and it will tell you what your "
-         "machine is missing rather than failing later for an unclear reason.</p>"),
+         "macOS every M1 Mac can run, so no Apple Silicon Mac is left out. The graphics work runs "
+         "on the Apple GPU, so an Intel Mac is out of scope.</p>"
+         "<p>Open the app and it tells you what your Mac is missing, rather than failing later "
+         "for an unclear reason.</p>"),
         ("How do I install it?",
          "<p>Download the DMG, drag Cellar to Applications, and open it. On first launch it "
          "introduces itself, asks once for the folders where Windows games keep their saves, and "
@@ -1083,8 +1247,8 @@ FAQ_SECTIONS = [
          "every time one changes.</p>"),
         ("What about games with anti-cheat?",
          "<p>Competitive games with kernel-level anti-cheat generally do not run, and Cellar will "
-         "not make them. It <b>never circumvents DRM or anti-cheat</b> — protection runs through "
-         "the translation layer untouched, exactly as the publisher shipped it. Where a profile "
+         "not make them. It <b>never circumvents DRM or anti-cheat</b> — protection runs "
+         "untouched, exactly as the publisher shipped it. Where Cellar "
          "knows of an anti-cheat problem it says so plainly, rather than letting you discover it "
          "after a 60&nbsp;GB download.</p>"),
         ("Does the store's client have to be running while I play?",
@@ -1309,13 +1473,41 @@ def render_faq(games, release):
     <div class="callout"><h3>Still stuck?</h3>
       <p>Open an issue on <a href="{REPO}/issues">GitHub</a> with your Mac, your macOS version, the
       game, and the log from the run that failed — that is usually enough to spot it. Or browse the
-      <a href="index.html#games">{len(games)} profiled games</a>.</p></div>
+      <a href="games.html">{len(games)} games Cellar knows</a>.</p></div>
   </div>
 </div>
 {closing_band(release)}
 </main>
 {site_footer(games)}
 {scripts(THEME_JS, FAQ_JS)}
+</body></html>
+'''
+
+
+def render_games(games, release):
+    playable = sum(1 for g in games if g["status"] == "playable")
+    return f'''{head("Games — Cellar",
+                 f"The {len(games)} Windows games Cellar knows how to set up on a Mac, and what is "
+                 "known about each: playable, experimental or untested.", "games.html")}
+{topbar("games", release)}
+<main id="main">
+<div class="page-head"><div class="wrap">
+  <h1>Games</h1>
+  <p>{len(games)} Windows games Cellar knows how to set up, {playable} of them confirmed playable.
+  Each card says exactly what is known about the game, and nothing more. A game that isn&rsquo;t
+  here may still run — this is what has been written down, not the limit.</p>
+</div></div>
+<div class="wrap">
+  <section class="block games-page" id="games" aria-labelledby="all-h">
+    <h2 class="sr-only" id="all-h">All games</h2>
+    {games_block(games)}
+    {DONT_SEE}
+  </section>
+</div>
+{closing_band(release)}
+</main>
+{site_footer(games)}
+{scripts(THEME_JS, GAMES_JS)}
 </body></html>
 '''
 
@@ -1354,7 +1546,20 @@ def main():
     if not os.path.exists(icon_png):
         sys.exit("error: app/Resources/AppIcon.png is missing; the site uses it as its icon")
     shutil.copyfile(icon_png, os.path.join(OUT, "icon.png"))
+    media_out = os.path.join(OUT, "media")
+    if os.path.isdir(media_out):
+        shutil.rmtree(media_out)
+    used = find_media()
+    if used:
+        os.makedirs(media_out)
+        files = [v[0] for k, v in used.items() if k != TOUR_VIDEO[0]]
+        if TOUR_VIDEO[0] in used:
+            v = used[TOUR_VIDEO[0]]
+            files += [v["src"], v["captions"], v["poster"][0]]
+        for file in files:
+            shutil.copyfile(os.path.join(MEDIA, file), os.path.join(media_out, file))
     write("index.html", render_index(games, release))
+    write("games.html", render_games(games, release))
     write("faq.html", render_faq(games, release))
     write("404.html", render_404(games, release))
     write("robots.txt", f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}sitemap.xml\n")
@@ -1362,12 +1567,14 @@ def main():
           '<?xml version="1.0" encoding="UTF-8"?>\n'
           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
           f"  <url><loc>{SITE_URL}</loc></url>\n"
+          f"  <url><loc>{SITE_URL}games.html</loc></url>\n"
           f"  <url><loc>{SITE_URL}faq.html</loc></url>\n"
           "</urlset>\n")
     write(".nojekyll", "")
     answers = sum(len(questions) for _t, _a, _l, questions in FAQ_SECTIONS)
     parser = "fallback parser" if tomllib is None or os.environ.get("CELLAR_TOML_FALLBACK") == "1" else "tomllib"
     print(f"Wrote {OUT}/index.html — {len(games)} games ({parser})")
+    print(f"Wrote {OUT}/games.html — {len(games)} games")
     print(f"Wrote {OUT}/faq.html — {len(FAQ_SECTIONS)} sections, {answers} answers")
     print("Download: " + (f"{release['version']} → {release['url']}" if release
                           else f"{RELEASES}/latest (no release resolved)"))

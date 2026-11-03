@@ -11,6 +11,10 @@ Fails (exit 1) on:
     lang or <title>, template text that leaked into the page ({…}), or copy implying a game
     can come from no store, or that names a store the site does not offer yet (gen-site.py's
     OFFERED; the first release is Steam only) outside a game card's own profile facts
+  - a technical word (Wine, bottle, runner, D3DMetal, profile…) in the player-facing copy of the
+    home, games or 404 page (docs/DESIGN.md §2; the FAQ explains them, and the footer credits Wine)
+  - a <video> without a poster and an English captions <track>, or a screenshot or video in
+    media/ larger than MEDIA_LIMITS
   - a game card whose cover has no <img> (every game ships real cover art; the generated
     placeholder is only what shows if the image fails to load)
   - any palette pair in gen-site.py's CONTRAST table under its WCAG 2.2 AA ratio
@@ -33,6 +37,14 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# docs/DESIGN.md §2: a player never reads the plumbing. Checked on the pages a player lands on;
+# faq.html has a question that explains these words, and the footer's credit names Wine.
+PLAIN_PAGES = ("index.html", "games.html", "404.html")
+JARGON = re.compile(r"\b(wine|bottles?|wineprefix|prefix(es)?|runners?|d3dmetal|dxvk|moltenvk|"
+                    r"profiles?|manifests?|depots?)\b", re.I)
+# Bytes per file in media/, so a capture can't make the page slow to open (skills/web.md: Fast).
+MEDIA_LIMITS = {".png": 600_000, ".jpg": 600_000, ".mp4": 15_000_000, ".vtt": 50_000}
+
 
 def load_generator():
     spec = importlib.util.spec_from_file_location("gen_site", os.path.join(ROOT, "pages", "gen-site.py"))
@@ -50,6 +62,7 @@ class Page(html.parser.HTMLParser):
         self.ids, self.links, self.headings, self.problems = [], [], [], []
         self.labels_for, self.inputs = set(), []
         self.lang = None
+        self.videos = []       # [line, has poster, has English captions]
         self.title = ""
         self._in = []          # open element stack
         self._button = None    # [attrs, text] of the button being read
@@ -57,6 +70,8 @@ class Page(html.parser.HTMLParser):
         self.covers = []       # [line, cover src or None] per game card's .art
         self._art = None       # stack depth of the .art being read
         self._card = None      # stack depth of the game card being read
+        self.plain = False     # hold the copy to PLAIN_PAGES' rule
+        self._exempt = None    # stack depth of a .legal credit or a card's profile facts
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -69,6 +84,19 @@ class Page(html.parser.HTMLParser):
             self._raw += 1
             if tag == "script" and a.get("src"):
                 self.links.append((a["src"], line, "script"))
+        classes = (a.get("class") or "").split()
+        if self._exempt is None and ("legal" in classes or "facts" in classes):
+            self._exempt = len(self._in)
+        if tag == "video":
+            self._video = [line, bool(a.get("poster")), False]
+            self.videos.append(self._video)
+            if a.get("poster"):
+                self.links.append((a["poster"], line, "img"))
+        if tag == "track" and a.get("kind") == "captions" and a.get("srclang") == "en":
+            if getattr(self, "_video", None):
+                self._video[2] = True
+        if tag in ("source", "track") and a.get("src"):
+            self.links.append((a["src"], line, "img"))
         if tag == "a" and "href" in a:
             self.links.append((a["href"], line, "a"))
         if tag == "link" and a.get("rel") in ("icon", "apple-touch-icon", "stylesheet"):
@@ -117,6 +145,8 @@ class Page(html.parser.HTMLParser):
             self._art = None
         if self._card is not None and len(self._in) <= self._card:
             self._card = None
+        if self._exempt is not None and len(self._in) <= self._exempt:
+            self._exempt = None
 
     def handle_data(self, data):
         if self._raw:
@@ -135,6 +165,10 @@ class Page(html.parser.HTMLParser):
             for name in self.HIDDEN:
                 if re.search(rf"\b{re.escape(name)}\b", data, re.I):
                     self.problems.append(f"line {self.getpos()[0]}: names {name}, a store the site doesn't offer yet: {data.strip()[:60]!r}")
+        if self.plain and self._exempt is None:
+            m = JARGON.search(data)
+            if m:
+                self.problems.append(f"line {self.getpos()[0]}: says {m.group(0)!r} to a player (docs/DESIGN.md §2): {data.strip()[:60]!r}")
         if "{" in data or "}" in data:
             self.problems.append(f"line {self.getpos()[0]}: template text leaked into the page: {data.strip()[:60]!r}")
 
@@ -196,6 +230,7 @@ def main():
     parsed, problems, external, covers = {}, [], set(), set()
     for path in pages:
         p = Page()
+        p.plain = os.path.basename(path) in PLAIN_PAGES
         with open(path, encoding="utf-8") as f:
             p.feed(f.read())
         parsed[os.path.basename(path)] = p
@@ -226,6 +261,9 @@ def main():
                 problems.append(f"{where}: line {line}: a game card has no cover image")
             elif urllib.parse.urlsplit(src).scheme in ("http", "https"):
                 covers.add(src)
+        for line, poster, captions in p.videos:
+            if not poster or not captions:
+                problems.append(f"{where}: line {line}: <video> needs a poster and an English captions <track>")
         for a, line in p.inputs:
             if a.get("id") not in p.labels_for and not a.get("aria-label") and not a.get("aria-labelledby"):
                 problems.append(f"{where}: line {line}: <input> has no label")
@@ -261,6 +299,14 @@ def main():
                 ids = {i for i, _l in parsed[target].ids} if target in parsed else set()
                 if u.fragment not in ids:
                     problems.append(f"{where}: line {line}: {href} — no #{u.fragment} in {target}")
+
+    for path in sorted(glob.glob(os.path.join(site, "media", "*"))):
+        ext = os.path.splitext(path)[1].lower()
+        size = os.path.getsize(path)
+        if ext not in MEDIA_LIMITS:
+            problems.append(f"media/{os.path.basename(path)}: not a {', '.join(sorted(MEDIA_LIMITS))} file")
+        elif size > MEDIA_LIMITS[ext]:
+            problems.append(f"media/{os.path.basename(path)}: {size:,} bytes, over the {MEDIA_LIMITS[ext]:,} limit")
 
     for what, fg, bg, minimum in gen.CONTRAST:
         ratio = contrast(fg, bg)
