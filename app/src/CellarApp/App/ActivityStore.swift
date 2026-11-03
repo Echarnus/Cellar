@@ -37,6 +37,11 @@ final class ActivityStore {
     private(set) var installProgress: InstallProgress?
     /// The game being installed, so only its page draws the bar.
     private(set) var installingSlug: String?
+    /// The game whose removal is being measured before its confirmation appears. Walking a 36 GB
+    /// Steam library takes a few seconds, and a menu item that appears to do nothing for that long
+    /// reads as broken. Here rather than on the page, because the library's right-click menu can
+    /// start it too (`GameActions`).
+    var measuringRemoval: String?
 
     /// A launch does not end when the game starts: `cellar launch` stays alive for the whole session
     /// so it can close the layer afterwards. Without this distinction the app spends a two-hour play
