@@ -29,9 +29,11 @@ that happens one level down and is never in the way.
 
 ## 2. Plain words: never the plumbing
 
-- A player never reads **wine, bottle, prefix, runner, D3DMetal, DXVK, profile, manifest, depot or
+- A player never reads **wine, prefix, runner, D3DMetal, DXVK, profile, manifest, depot or
   log** on a player screen (delivery checklist **P2**). Technical Details is the one exception,
-  because it exists to show those things.
+  because it exists to show those things. **"Bottle" is the exception that is allowed**: it is the
+  Cellar wordplay (a cellar keeps bottles; each game gets its own), and the launch screen already
+  says "Preparing the bottle" (Kenneth, 2026-11-03).
 - **"wine" never appears as the name of anything a player can see**, including the Dock tooltip,
   ⌘-Tab, the menu bar and Force Quit. Every process Cellar starts for a game shows the game's
   name: the game itself, the store's stub (`PlayGTAV.exe`), and a publisher launcher (the Rockstar
@@ -101,6 +103,15 @@ that happens one level down and is never in the way.
 
 Kenneth's rule, and the player's: **no manual steps.** No Terminal, no re-running jobs, no
 copying files. If something can break, Cellar notices it and repairs it, and says so in one line.
+
+## 6a. Sponsoring never gets in the way
+
+Kenneth's rule (2026-11-03): Cellar is free and **nothing is ever behind a payment** — no feature,
+no game, no update. Sponsoring buys test Macs, and the site's sponsor page says exactly what it
+bought. In the app it is asked about **once**: after the first run is over and a game has been
+played, never in front of the tour or the folder ask, and never while there is nowhere to give
+(`SponsorInvite`, `SponsorInviteTests`). Closing it by any route counts as the answer. After that it
+lives only in the app menu (*Support Cellar…*) and Settings › About.
 
 ## 7. How a change is checked against this page
 

@@ -25,6 +25,7 @@ public enum GameActivity: Equatable, Sendable {
     public var isDownloading: Bool {
         guard case .working(let progress) = self else { return false }
         return progress?.phase == .downloading || progress?.phase == .updating
+            || progress?.phase == .checkingDownload
     }
 
     /// One short phrase for the sidebar and the status chip: "Downloading 34%", "Installing",
@@ -41,6 +42,8 @@ public enum GameActivity: Equatable, Sendable {
             switch progress?.phase {
             case .downloading:
                 return percent.map { String(localized: "Downloading \($0)") } ?? String(localized: "Downloading")
+            case .checkingDownload:
+                return percent.map { String(localized: "Checking \($0)") } ?? String(localized: "Checking")
             case .updating:
                 return percent.map { String(localized: "Updating \($0)") } ?? String(localized: "Updating")
             case .updateCheck:

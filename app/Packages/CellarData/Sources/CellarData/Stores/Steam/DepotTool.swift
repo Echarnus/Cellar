@@ -17,6 +17,12 @@ public enum DepotTool {
     /// asset must never reach the disk as an executable: the download is checked before unzipping.
     static let downloadSHA256 = "60e80c7c496f3f9a079cd3c62036b35d088c27bc0149baf38f009eb57a52f6a5"
 
+    /// How many chunks a game download has in flight at once. DepotDownloader's default is 8, sized
+    /// for a modest line; Steam's own client keeps more going, and DepotDownloader itself goes to 25
+    /// when a local cache serves it. 16 keeps a fast connection busy without crowding a slow one
+    /// (#309). Only game downloads take it — the sign-in and ownership probes fetch no chunks.
+    static let concurrentChunks = 16
+
     public static var root: URL { Paths.appSupport.appendingPathComponent("tools/depotdownloader", isDirectory: true) }
     public static var binary: URL { root.appendingPathComponent("DepotDownloader") }
 
@@ -96,6 +102,7 @@ public enum DepotTool {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var args = ["-app", "\(appID)", "-os", "windows", "-osarch", "64", "-dir", directory.path]
         args += credentials.arguments
+        args += ["-max-downloads", "\(concurrentChunks)"]
         if let depot { args += ["-depot", "\(depot)"] }
         args += extraArgs
 

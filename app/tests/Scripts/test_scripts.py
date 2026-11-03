@@ -5,6 +5,7 @@
 A gate nobody tested is a gate that either lets everything through or blocks the next honest PR, so
 both are exercised here on the shapes they meet in CI. Standard library only, like the scripts.
 """
+import html
 import importlib.util
 import json
 import os
@@ -465,3 +466,95 @@ class MacRequirementsSiteTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raised:
             self.site.load_games()
         self.assertIn("[mac]", str(raised.exception))
+
+
+class HomePageTests(unittest.TestCase):
+    """The home page (#313): placeholders until captures exist, and the launch steps
+    it quotes are the app's own words."""
+
+    @classmethod
+    def setUpClass(cls):
+        path = os.path.join(os.path.dirname(ROOT), "pages", "gen-site.py")
+        spec = importlib.util.spec_from_file_location("gen_site", path)
+        cls.site = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.site)
+
+    def test_the_launch_steps_are_the_apps_own_words(self):
+        # A rename in LaunchStage.swift must reach the site, or the page shows steps the app never does.
+        swift = os.path.join(ROOT, "Packages", "CellarDomain", "Sources", "CellarDomain", "Launch", "LaunchStage.swift")
+        with open(swift, encoding="utf-8") as handle:
+            source = handle.read()
+        game = self.site.LAUNCH_GAME
+        for title, _detail in self.site.LAUNCH_STAGES:
+            pattern = title.replace(game, "\\(context.game)").replace("Steam", "\\(context.store.displayName)")
+            self.assertIn(f'"{pattern}"', source, f"{title!r} is not a LaunchStage title")
+
+    def test_every_capture_slot_says_coming_soon_until_it_is_captured(self):
+        empty = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, empty)
+        original = self.site.MEDIA
+        self.site.MEDIA = empty
+        self.addCleanup(setattr, self.site, "MEDIA", original)
+        page = self.site.render_index(self.site.load_games(), None)
+        self.assertEqual(page.count("Screenshot coming soon</span>"), 1 + len(self.site.SHOTS))
+        self.assertIn("Video coming soon", page)
+        self.assertNotIn("<video", page)
+
+    def test_a_capture_replaces_its_placeholder(self):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder)
+        png = (b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (1600).to_bytes(4, "big") + (1000).to_bytes(4, "big")
+               + b"\x08\x02\x00\x00\x00")
+        with open(os.path.join(folder, "library.png"), "wb") as f:
+            f.write(png)
+        original = self.site.MEDIA
+        self.site.MEDIA = folder
+        self.addCleanup(setattr, self.site, "MEDIA", original)
+        page = self.site.render_index(self.site.load_games(), None)
+        self.assertIn('src="media/library.png" width="1600" height="1000"', page)
+        self.assertEqual(page.count("Screenshot coming soon</span>"), len(self.site.SHOTS))
+
+    def test_sponsoring_never_shows_a_button_that_leads_nowhere(self):
+        # #299: until there is a payment account, both pages say so instead of a dead button, and
+        # the home page only points at the sponsor page (one switch: SPONSOR_LINKS).
+        self.assertEqual(self.site.SPONSOR_LINKS, [])
+        games = self.site.load_games()
+        for page in (self.site.render_index(games, None), self.site.render_sponsor(games, None)):
+            self.assertIn("Sponsoring Opens Soon", page)
+            self.assertNotIn('href=""', page)
+        self.assertIn('href="sponsor.html"', self.site.render_index(games, None))
+
+    def test_sponsor_page_shows_the_payment_links_once_they_exist(self):
+        links = [("Sponsor on GitHub", "https://github.com/sponsors/example")]
+        original = self.site.SPONSOR_LINKS
+        self.site.SPONSOR_LINKS = links
+        self.addCleanup(setattr, self.site, "SPONSOR_LINKS", original)
+        page = self.site.render_sponsor(self.site.load_games(), None)
+        self.assertIn('href="https://github.com/sponsors/example"', page)
+        self.assertNotIn("Sponsoring Opens Soon", page)
+        self.assertIn("Nothing is locked", page)
+
+    def test_every_test_mac_bought_is_listed(self):
+        original = self.site.TEST_MACS_BOUGHT
+        self.site.TEST_MACS_BOUGHT = [("MacBook Air", "M1", "€430", "2026-12")]
+        self.addCleanup(setattr, self.site, "TEST_MACS_BOUGHT", original)
+        page = self.site.render_sponsor(self.site.load_games(), None)
+        self.assertIn("<td>MacBook Air</td><td>M1</td><td>€430</td><td>2026-12</td>", page)
+        self.assertNotIn("Nothing yet.", page)
+
+    def test_every_game_has_a_page_the_list_links_to(self):
+        # docs/SITE-DESIGN.md §11-12: a page per game, so "<game> on Mac" finds it.
+        games = self.site.load_games()
+        for g in games:
+            self.assertIn(f'href="games/{g["slug"]}.html"', self.site.card(g))
+            page = self.site.render_game(g, games, None)
+            self.assertEqual(page.count("<h1"), 1)
+            self.assertIn(f"{html.escape(g['name'])} on Mac</h1>", page)
+            self.assertIn('"@type": "VideoGame"', page)
+            self.assertIn(g["mac_min"], page)
+
+    def test_an_untested_game_says_so_on_its_page(self):
+        games = self.site.load_games()
+        untested = next(g for g in games if g["status"] == "untested")
+        page = self.site.render_game(untested, games, None)
+        self.assertIn("nobody has confirmed it plays yet", page)

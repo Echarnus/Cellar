@@ -115,13 +115,16 @@ public enum GameUpdates {
         // DepotDownloader prints a percentage per file it writes, so the first one is the moment the
         // copy on disk stops being the old build.
         var touched = false
+        // One bar across every depot the update touches (#309).
+        var bar = DepotDownloadProgress(phase: .updating)
+        let directory = plan.depotGameDir
         do {
             try withoutActuallyEscaping(progress) { report in
                 try withoutActuallyEscaping(phase) { phase in
-                    try DepotTool.fetch(appID: appID, into: plan.depotGameDir, credentials: credentials) { line in
-                        if let fraction = DepotProgress.fraction(in: line) {
-                            touched = true
-                            phase(InstallProgress(.updating, fraction: fraction))
+                    try DepotTool.fetch(appID: appID, into: directory, credentials: credentials) { line in
+                        if DepotProgress.fraction(in: line) != nil { touched = true }
+                        if let now = bar.read(line, size: { DepotManifests.totalSize(in: directory, depot: $0, manifest: $1) }) {
+                            phase(now)
                         }
                         report(line)
                     }

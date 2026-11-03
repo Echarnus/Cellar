@@ -22,6 +22,9 @@ public enum InstallPhase: String, Sendable, CaseIterable {
     case clientUpdate
     /// Fetching the game's files.
     case downloading
+    /// Checking the files a stopped download left on disk, so only what is missing is fetched (#309).
+    /// Measured: the files checked count toward the game's bar.
+    case checkingDownload
     /// Running the game's own installer (GOG).
     case installing
     /// Asking Steam whether a game Cellar downloaded has a newer build. No denominator.
@@ -37,6 +40,7 @@ public enum InstallPhase: String, Sendable, CaseIterable {
         case .client:      return String(localized: "Installing \(store.displayName) into the bottle")
         case .clientUpdate: return String(localized: "Updating \(store.displayName)")
         case .downloading: return String(localized: "Downloading \(game)")
+        case .checkingDownload: return String(localized: "Checking what's already downloaded")
         case .installing:  return String(localized: "Installing \(game)")
         case .updateCheck: return String(localized: "Checking for a newer version")
         case .updating:    return String(localized: "Updating \(game)")
@@ -60,6 +64,8 @@ public enum InstallPhase: String, Sendable, CaseIterable {
             return String(localized: "Its first start fetches the full client — once, for every \(store.displayName) game.")
         case .downloading:
             return String(localized: "Straight from your library. You can keep using your Mac.")
+        case .checkingDownload:
+            return String(localized: "Picking up where it stopped. Nothing downloads twice.")
         case .installing:
             return String(localized: "The installer runs with no window, so this bar is the progress.")
         case .updateCheck:
