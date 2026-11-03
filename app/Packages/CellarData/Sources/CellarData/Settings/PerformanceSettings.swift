@@ -2,7 +2,7 @@ import CellarDomain
 import Foundation
 
 public enum PerformanceSettings {
-    public enum Source: String { case cellarDefault = "default", profile, bottle }
+    public enum Source: String { case cellarDefault = "default", everyGame = "every game", profile, bottle }
 
     public struct Entry: Equatable {
         public let setting: PerformanceSetting
@@ -28,15 +28,19 @@ public enum PerformanceSettings {
         public var metalHUD: Bool { value(.metalHUD) == "true" }
     }
 
-    /// Layers, later wins: Cellar's default → the profile's switches → the profile's `[env]` → the
-    /// bottle's switches → the bottle's `[env]`. The bottle beats the profile outright, so a player
+    /// Layers, later wins: Cellar's default → the player's every-game choice in Settings
+    /// (`CellarSettings`) → the profile's switches → the profile's `[env]` → the bottle's switches →
+    /// the bottle's `[env]`. A profile beats the every-game choice because it speaks for one game
+    /// (Planet Coaster 2 needs what it sets); the bottle is the player choosing for this game. The bottle beats the profile outright, so a player
     /// can turn off what a profile (or a hand-edited copy of one) turned on; within a layer, a raw
     /// `[env]` variable is the more specific statement and wins over that layer's switch.
-    public static func resolve(profileFields: [String: String], profileEnv: [String: String],
+    public static func resolve(everyGame: [String: String] = [:],
+                               profileFields: [String: String], profileEnv: [String: String],
                                bottleFields: [String: String], bottleEnv: [String: String]) -> Resolved {
         var env = ["WINEDEBUG": "-all"]
         var values: [PerformanceSetting: (String, Source)] = [:]
-        for (fields, raw, source) in [(profileFields, profileEnv, Source.profile),
+        for (fields, raw, source) in [(everyGame, [:], Source.everyGame),
+                                      (profileFields, profileEnv, Source.profile),
                                       (bottleFields, bottleEnv, Source.bottle)] {
             for setting in PerformanceSetting.allCases {
                 // A value that doesn't parse is ignored rather than fatal: the earlier layer stands.

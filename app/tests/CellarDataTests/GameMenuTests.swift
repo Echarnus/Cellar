@@ -81,7 +81,6 @@ struct GameMenuTests {
     func noSecondInstall(_ store: GameStore) {
         for installed in [true, false] {
             let main = GameMenu(game: game(store: store, gameInstalled: installed)).main.flatMap { $0 }
-            #expect(!main.contains(.installThroughClient))
             #expect(!main.contains(.repair))
             #expect(!main.contains(.openClient))
         }
@@ -141,14 +140,12 @@ struct GameMenuTests {
         #expect(!main.contains(.moveToDrive))
     }
 
-    @Test("Steam's own client is only offered where the game has one")
-    func steamClientOnlyWhereThereIsOne() {
-        let none = GameMenu(game: game(clientInstalled: false, needsLiveSession: false)).allItems
-        #expect(!none.contains(.openClient))
-        #expect(!none.contains(.installThroughClient))
-        let some = GameMenu(game: game()).allItems
-        #expect(some.contains(.openClient))
-        #expect(some.contains(.installThroughClient))
+    @Test("Troubleshooting never hands a Steam game to Steam's own window", arguments: [true, false])
+    func noSteamClientEntries(clientInstalled: Bool) {
+        let items = GameMenu(game: game(clientInstalled: clientInstalled, needsLiveSession: clientInstalled)).allItems
+        #expect(!items.contains(.openClient))
+        #expect(!items.map { $0.title(for: game()) }.contains { $0.contains("Steam app") })
+        #expect(GameMenu(game: game()).troubleshooting.first == [.repair])
     }
 
     @Test("Updates are checked from Troubleshooting, and only for a game Cellar keeps current")

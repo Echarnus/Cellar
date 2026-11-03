@@ -11,6 +11,11 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #267 | GTA V's Rockstar launcher said "wine" in the Dock | `DockShimTests.swift` › `launcherWearsTheGamesName` |
+| #267 | The uninstall dialog showed a Terminal command and bottle names | `RemovalSummaryTests.swift` › `plainWords` |
+| #267 | The sidebar said "Sign in" to a signed-in player while loading | `SidebarAccountTests.swift` › `loading` |
+| #267 | The library filter's segments changed width with the selection | `EqualSegmentedPickerTests.swift` › `stableAcrossSelection` |
+| #272 | Free-to-play games the player never added showed in the library | `SteamOwnershipCheckTests.swift` › `claimedFreeIsNotOwned` |
 | #244 | Steam's error reporter opened over Fallout Shelter: Wine on macOS dropped the packet-priority message Steam's networking asks for | `recvtos-test.c` › `real_packet` |
 | #246 | Skyrim closed at once: the settings files its launcher writes were never made | `FirstRunFilesTests.swift` › `playWritesThemFirst` |
 | #246 | Skyrim's downloaded copy never reached Steam's library while another game's Steam was open | `SteamLibraryEntryOrderTests.swift` › `registersAfterTheHandOverAndBeforeTheClient` |

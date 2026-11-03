@@ -67,7 +67,7 @@ struct LaunchSplashView: View {
             LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.82)],
                            startPoint: .top, endPoint: .bottom)
             HStack(alignment: .bottom, spacing: 14) {
-                GameCover(game: game, width: 62, showsBadge: false)
+                GameCover(game: game, width: 62)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(game.name)
                         .font(.system(.title2, design: .rounded).weight(.bold))
@@ -135,7 +135,7 @@ struct LaunchSplashView: View {
                 // maintainers after the wrong problem.
                 if runner.attempt > 0 {
                     Button("Report that it didn't start…") { CompatibilityPrompt.preview(game, outcome: .didNotStart) }
-                        .buttonStyle(.link).font(.caption)
+                        .buttonStyle(.hoverLink).font(.caption)
                 }
             }
         }

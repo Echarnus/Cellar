@@ -20,6 +20,10 @@ struct LibraryView: View {
             Group {
                 if let game = lib.current {
                     GameDetailView(game: game, runner: runner, downloads: downloads) { lib.refresh() }.id(game.slug)
+                } else if !lib.hasLoaded {
+                    ProgressView().controlSize(.regular)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(.background)
                 } else { EmptyState() }
             }.frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -131,7 +135,7 @@ struct LibraryView: View {
                 .accessibilityLabel("Search games")
             if !lib.query.text.isEmpty {
                 Button { lib.query.text = "" } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.borderless).foregroundStyle(.secondary).help("Clear search")
+                    .buttonStyle(.hoverBorderless).foregroundStyle(.secondary).help("Clear search")
                     .accessibilityLabel("Clear search")
                     .help("Clear search")
             }
@@ -166,11 +170,15 @@ struct LibraryView: View {
 
     private var stateFilter: some View {
         HStack(spacing: 6) {
-            Picker("", selection: $lib.query.filter) {
-                ForEach(LibraryViewModel.Filter.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented).labelsHidden()
-            .accessibilityLabel("Filter by readiness")
+            // Equal-width segments: SwiftUI's segmented picker sizes each to its label, so the
+            // control appeared to shift whenever the selection moved.
+            EqualSegmentedPicker(
+                LibraryViewModel.Filter.allCases.map { String(localized: String.LocalizationValue($0.rawValue)) },
+                selection: Binding(
+                    get: { LibraryViewModel.Filter.allCases.firstIndex(of: lib.query.filter) ?? 0 },
+                    set: { lib.query.filter = LibraryViewModel.Filter.allCases[$0] }),
+                accessibilityLabel: String(localized: "Filter by readiness"))
+            .frame(maxWidth: .infinity)
             Menu {
                 Picker("Sort by", selection: $lib.query.sort) {
                     ForEach(LibraryViewModel.Sort.allCases) { Text($0.rawValue).tag($0) }
@@ -180,6 +188,7 @@ struct LibraryView: View {
                 Image(systemName: "arrow.up.arrow.down")
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .hoverHighlight(.backdrop)
             .help(lib.query.sort == .name ? Text("Sort by name") : Text("Sort by most recently played"))
             .accessibilityLabel(lib.query.sort == .name ? Text("Sort, currently by name") : Text("Sort, currently by most recently played"))
         }
@@ -196,12 +205,24 @@ struct LibraryView: View {
                                        activity: downloads.activity(for: game.slug))
                                 .contentShape(Rectangle())
                                 .onTapGesture { lib.selected = game.slug }
+                                // Right-click, as in Steam's library and every Mac sidebar: the
+                                // game's one big action and its settings, without opening the page.
+                                .contextMenu { contextMenu(for: game) }
                         }
                     } header: {
                         StoreSectionHeader(store: section.store, count: section.games.count, guessed: section.guessed)
                     }
                 }
-                if lib.filtered.isEmpty { emptyLibrary }
+                if !lib.hasLoaded {
+                    // Nothing is known until the first read lands: say so, rather than a "Sign in"
+                    // that would be wrong for a second for everyone who is signed in.
+                    VStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Loading your library").font(.callout).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity).padding(.top, 24)
+                    .accessibilityElement(children: .combine)
+                } else if lib.filtered.isEmpty { emptyLibrary }
                 withheldNotice
             }
             .padding(8)
@@ -217,6 +238,24 @@ struct LibraryView: View {
             default: break
             }
         }
+    }
+
+    @ViewBuilder private func contextMenu(for game: GameSummary) -> some View {
+        Button {
+            lib.selected = game.slug
+            GamePrimaryAction.perform(game, runner: runner, downloads: downloads) { lib.refresh() }
+        } label: {
+            Label(GamePrimaryAction.title(game, downloads: downloads), systemImage: game.actionSymbol)
+        }
+        .disabled(!GamePrimaryAction.isAvailable(game, runner: runner, downloads: downloads))
+        Divider()
+        Button {
+            lib.selected = game.slug
+            TechnicalDetailsWindow.presentSettings(game: game)
+        } label: {
+            Label(String(localized: "Settings…"), systemImage: "slider.horizontal.3")
+        }
+        .disabled(!game.bottleExists)
     }
 
     /// Games are being withheld because a store hasn't been asked yet — say so, in the library,
@@ -243,7 +282,7 @@ struct LibraryView: View {
                 Button("Sign in") {
                     NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
                 }
-                .buttonStyle(.bordered).controlSize(.small)
+                .buttonStyle(.hoverBordered).controlSize(.small)
             }
             .padding(.horizontal, 10).padding(.bottom, 10)
         }
@@ -261,8 +300,8 @@ struct LibraryView: View {
                 if lib.isFiltered {
                     Text("Nothing in your library fits this search and these filters.")
                         .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    Button("Clear filters") { lib.clearFilters() }
-                        .buttonStyle(.bordered).controlSize(.small)
+                    Button("Clear Filters") { lib.clearFilters() }
+                        .buttonStyle(.hoverBordered).controlSize(.small)
                 }
             case .checking(let sentence):
                 // Signed in, answers still coming: the one state that must never read as "sign in".
@@ -274,12 +313,12 @@ struct LibraryView: View {
                 Text("Your library hasn't been checked yet").font(.callout.weight(.semibold))
                 Text("You're signed in. Cellar lists a game once its store confirms you own it.")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                checkLibraryButton("Check now").buttonStyle(.borderedProminent)
+                checkLibraryButton("Check Now").buttonStyle(.hoverProminent)
             case .nothingOwned:
                 Text("Nothing here yet.").font(.callout.weight(.semibold))
                 Text("Signed in, but none of the games Cellar supports are in your library.")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                checkLibraryButton("Check again").buttonStyle(.bordered)
+                checkLibraryButton("Check Again").buttonStyle(.hoverBordered)
             case .signIn:
                 // Which store is actually missing decides the sentence. Telling a GOG-only player
                 // to scan a Steam QR code names the wrong problem *and* the wrong fix.
@@ -289,7 +328,7 @@ struct LibraryView: View {
                 Button("Sign in") {
                     NotificationCenter.default.post(name: .cellarOpenAccounts, object: nil)
                 }
-                .buttonStyle(.borderedProminent).controlSize(.small)
+                .buttonStyle(.hoverProminent).controlSize(.small)
                 if !lib.withheld.isEmpty {
                     (lib.withheld.count == 1 ? Text("1 supported game is waiting behind it.")
                         : Text("\(lib.withheld.count) supported games are waiting behind it."))
@@ -303,7 +342,7 @@ struct LibraryView: View {
     private static let checkingTitle = String(localized: "Checking your library")
 
     private var emptyState: StoreLibrary.EmptyLibrary {
-        // The sidebar's own "Check now" is a check in progress too.
+        // The sidebar's own "Check Now" is a check in progress too.
         let ownCheck = runner.busy && runner.busyTitle == Self.checkingTitle
             ? String(localized: "Asking your stores which games you own…") : nil
         return StoreLibrary.emptyLibrary(

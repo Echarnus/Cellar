@@ -59,8 +59,10 @@ enum UninstallConfirmation {
             return
         }
 
-        alert.messageText = title(for: removal, game: game)
-        alert.informativeText = body(for: removal)
+        alert.messageText = removal.question
+        alert.informativeText = removal.playerSummary
+        // The game's own cover, not Cellar's keg: the question is about this game.
+        if let icon = GameAlertIcon.image(for: game) { alert.icon = icon }
         alert.addButton(withTitle: removal.scope == .bottle ? String(localized: "Remove") : String(localized: "Uninstall"))
         alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons[0].hasDestructiveAction = true
@@ -70,43 +72,5 @@ enum UninstallConfirmation {
         alert.buttons[1].keyEquivalent = "\r"
 
         if alert.runModal() == .alertFirstButtonReturn { confirmed() }
-    }
-
-    private static func title(for removal: RemovalPlan, game: GameSummary) -> String {
-        switch removal.scope {
-        case .bottle:
-            return String(localized: "Remove \(game.name) completely?")
-        case .game:
-            return removal.removesGameFiles
-                ? String(localized: "Uninstall \(game.name)?")
-                : String(localized: "Clean up what's left of \(game.name)?")
-        }
-    }
-
-    /// What goes, what stays, and anything the player should expect afterwards — the same three
-    /// sections the CLI prints, in as few lines as an alert can carry.
-    private static func body(for removal: RemovalPlan) -> String {
-        var lines: [String] = []
-        lines.append(removal.removesGameFiles || removal.scope == .bottle
-            ? String(localized: "Deletes \(removal.totalSizeDescription):")
-            : String(localized: "\(removal.name) isn't installed. Deletes \(removal.totalSizeDescription) of leftovers:"))
-        for item in removal.items.prefix(5) {
-            lines.append(item.kind == .steamShortcut
-                ? "• \(item.label)"
-                : "• \(item.label) — \(ByteSize.describe(item.bytes))")
-        }
-        if removal.items.count > 5 {
-            lines.append(String(localized: "• and \(removal.items.count - 5) more"))
-        }
-        if !removal.kept.isEmpty {
-            lines.append("")
-            lines.append(String(localized: "Keeps:"))
-            for line in removal.kept { lines.append("• \(line)") }
-        }
-        for warning in removal.warnings {
-            lines.append("")
-            lines.append(warning)
-        }
-        return lines.joined(separator: "\n")
     }
 }

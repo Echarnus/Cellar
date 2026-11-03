@@ -371,6 +371,10 @@ enum IT {
         switch DepotTool.access(appID: game.appID, credentials: credentials) {
         case .available:
             return nil
+        case .claimedFree:
+            // Steam granted its free-on-demand licence during the check, so the depot downloads;
+            // the library still won't list the game until the player adds it (#272).
+            return nil
         case .unavailable:
             // Free-to-play is not the same as already-owned: it still has to be in the library.
             return "this Steam account has no licence for app \(game.appID) — "

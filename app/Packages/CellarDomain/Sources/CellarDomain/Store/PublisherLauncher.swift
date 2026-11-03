@@ -56,4 +56,13 @@ public enum PublisherLauncher: String, CaseIterable, Sendable {
             ]
         }
     }
+
+    /// The launcher's executables that can put a window — and so a Dock tile — on screen. A launch
+    /// names them after the game (`DockShim`), so the player sees "Grand Theft Auto V" in the Dock
+    /// rather than "wine" while the launcher signs them in (Kenneth, #266). Matched by file name.
+    public var windowedExecutables: [String] {
+        switch self {
+        case .rockstar: return ["Launcher.exe", "LauncherPatcher.exe", "SocialClubHelper.exe"]
+        }
+    }
 }

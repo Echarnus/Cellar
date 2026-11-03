@@ -16,7 +16,6 @@ struct SidebarRow: View {
     var body: some View {
         HStack(spacing: 11) {
             GameCover(game: game, width: 34)
-                .padding(.trailing, 4)   // room for the badge that overhangs the cover
             VStack(alignment: .leading, spacing: 2) {
                 Text(game.name).lineLimit(1).font(.callout.weight(.medium))
                 StatusPill(game: game, activity: activity, compact: true)

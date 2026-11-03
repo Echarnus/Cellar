@@ -25,7 +25,7 @@ struct DownloadRow: View {
             Button(action: onCancel) {
                 Image(systemName: "xmark.circle.fill")
             }
-            .buttonStyle(.borderless).foregroundStyle(.secondary)
+            .buttonStyle(.hoverBorderless).foregroundStyle(.secondary)
             .help(isRunning ? Text("Stop downloading \(name)") : Text("Take \(name) out of the queue"))
             .accessibilityLabel(isRunning ? Text("Stop downloading \(name)") : Text("Take \(name) out of the queue"))
         }

@@ -68,6 +68,7 @@ public enum Game {
         let profileBackend = fields["backend"] ?? "d3dmetal"
         let bottleFields = BottleConfig.fields(bottleFile)
         let performance = PerformanceSettings.resolve(
+            everyGame: CellarSettings.performance(),
             profileFields: fields, profileEnv: ProfileStore.env(ref),
             bottleFields: bottleFields, bottleEnv: BottleConfig.env(bottleFile))
         // The same game with the bottle's say over the switched-off workarounds taken away: what a

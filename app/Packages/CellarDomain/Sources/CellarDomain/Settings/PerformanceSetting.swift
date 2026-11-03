@@ -73,6 +73,28 @@ public enum PerformanceSetting: String, CaseIterable, Sendable {
         }
     }
 
+    /// The switch's name where a player sees it: a game's page and Settings.
+    public var displayTitle: String {
+        switch self {
+        case .retina:           return String(localized: "Retina resolution")
+        case .metalFXUpscaling: return String(localized: "MetalFX upscaling")
+        case .metalHUD:         return String(localized: "Show frame rate")
+        case .metalValidation:  return String(localized: "Metal validation")
+        case .wineDebug:        return String(localized: "Wine debug logging")
+        }
+    }
+
+    /// One sentence under the switch: what it buys and what it costs, in a player's words.
+    public var tradeOff: String {
+        switch self {
+        case .retina:           return String(localized: "Renders at your display's full pixel density. Sharper, and up to four times the work for the GPU.")
+        case .metalFXUpscaling: return String(localized: "Appears as DLSS in the game's own settings: renders smaller and upscales. Faster, slightly softer.")
+        case .metalHUD:         return String(localized: "Metal's overlay with frames per second and frame time. Costs next to nothing.")
+        case .metalValidation:  return String(localized: "Checks every graphics call. Slower, but it stops some games crashing on D3DMetal.")
+        case .wineDebug:        return String(localized: "Records what Wine does. Only for chasing a bug: it slows the game.")
+        }
+    }
+
     /// The canonical spelling of `value`, or an error naming what this setting accepts.
     public func normalise(_ value: String) throws -> String {
         let trimmed = value.trimmingCharacters(in: .whitespaces)

@@ -22,8 +22,11 @@ final class LibraryViewModel {
     var steam: SteamSignInState { snapshot.steam }
     var hasConnectedStore: Bool { snapshot.hasConnectedStore }
     var signInReason: String { snapshot.signInReason }
+    /// Whether the library has been read once. Until it has, nothing is known — not the games, not
+    /// the sign-in — and the sidebar says it is loading rather than "Sign in" (Kenneth, #266).
+    private(set) var hasLoaded = false
     /// The account button at the foot of the sidebar.
-    var account: AccountSummary { snapshot.account }
+    var account: AccountSummary { hasLoaded ? snapshot.account : .loading }
 
     /// The search field, the filters and the sort — bound straight to their controls.
     var query = LibraryQuery(sort: Sort(rawValue: UserDefaults.standard.string(forKey: LibraryViewModel.sortKey) ?? "") ?? .name) {
@@ -91,11 +94,26 @@ final class LibraryViewModel {
         }
     }
 
+    /// The Steam account's picture, fetched in the background once per run when it is missing or a
+    /// week old (`SteamAvatar`), then the library re-read so the account button shows it.
+    private func fetchAvatarIfNeeded() {
+        guard !avatarFetched, steam.isUsable, let account = steam.accountName,
+              SteamAvatar.isStale(for: account) else { return }
+        avatarFetched = true
+        Task {
+            let fetched = await Task.detached(priority: .utility) { SteamAvatar.refreshIfStale() }.value
+            if fetched != nil, fetched != snapshot.steamAvatar { refresh() }
+        }
+    }
+
+    @ObservationIgnored private var avatarFetched = false
     @ObservationIgnored private var reading = false
     @ObservationIgnored private var readAgain = false
 
     private func apply(_ snapshot: LibrarySnapshot) {
         self.snapshot = snapshot
+        hasLoaded = true
+        fetchAvatarIfNeeded()
         // What the sidebar just decided, on record: a reload that "does nothing" is otherwise
         // indistinguishable from one that ran and read a signed-out Steam.
         CellarLog.debug(.app, "Library refreshed: \(games.count) shown, \(withheld.count) withheld, \(hasConnectedStore ? "a store connected" : "no store connected") — \(SteamAccount.diagnosis)")

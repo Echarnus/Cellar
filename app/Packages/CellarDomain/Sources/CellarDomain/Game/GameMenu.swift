@@ -23,7 +23,6 @@ public struct GameMenu: Sendable, Equatable {
         // Troubleshooting.
         case repair
         case openClient
-        case installThroughClient
         case reapplyClientSettings
         case checkForUpdates
         case saveProfile
@@ -48,13 +47,12 @@ public struct GameMenu: Sendable, Equatable {
             case .uninstall:             return String(localized: "Uninstall \(game.name)…")
             case .repair:                return String(localized: "Repair \(game.name)")
             case .openClient:            return String(localized: "Open \(store)")
-            case .installThroughClient:  return String(localized: "Install with the \(store) app instead")
-            case .reapplyClientSettings: return String(localized: "Fix \(store) settings")
-            case .checkForUpdates:       return String(localized: "Check for updates")
+            case .reapplyClientSettings: return String(localized: "Fix \(store) Settings")
+            case .checkForUpdates:       return String(localized: "Check for Updates")
             case .saveProfile:           return String(localized: "Save Game Settings As…")
             case .technicalDetails:      return String(localized: "Technical Details…")
             case .saveDiagnostics:       return String(localized: "Save Diagnostics Report…")
-            case .showLogs:              return String(localized: "Show logs in Finder")
+            case .showLogs:              return String(localized: "Show Logs in Finder")
             case .removeEverything:      return String(localized: "Remove \(game.name) Completely…")
             }
         }
@@ -86,22 +84,13 @@ public struct GameMenu: Sendable, Equatable {
 
         main = [everyday, storage, removal].filter { !$0.isEmpty }
 
-        // Fixes, store by store. Installing stays the page's one big button; only Steam keeps a
-        // second route, and only here, because its own client is the fallback when a download fails.
+        // Fixes, store by store. Installing stays the page's one big button, and Steam gets no second
+        // route: "Open Steam" and "Install with the Steam app instead" put Steam's own window in front
+        // of a player who came to Cellar so they wouldn't have to drive it (Kenneth, #266). Battle.net
+        // keeps its client, because signing in there is the only way in.
         var fixes: [Item] = []
         if game.bottleExists { fixes.append(.repair) }
-        switch game.store {
-        case .steam:
-            // A game with no live-session DRM gets no Steam client in its bottle, so the client's own
-            // actions only exist where there is (or will be) one.
-            if game.needsLiveSession || game.clientInstalled {
-                fixes += [.openClient, .installThroughClient]
-            }
-        case .battlenet:
-            fixes += [.openClient, .reapplyClientSettings]
-        case .gog:
-            break
-        }
+        if game.store == .battlenet { fixes += [.openClient, .reapplyClientSettings] }
         if game.update != nil { fixes.append(.checkForUpdates) }
 
         var details: [Item] = [.technicalDetails, .saveDiagnostics, .showLogs]

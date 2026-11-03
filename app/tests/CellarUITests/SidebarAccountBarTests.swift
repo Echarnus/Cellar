@@ -1,6 +1,7 @@
 import CellarDomain
 import Testing
 import SwiftUI
+import AppKit
 import Foundation
 @testable import CellarUI
 
@@ -69,11 +70,44 @@ struct SidebarAccountBarTests {
         #expect(avatar.filter(Self.isOrange).count > 10, "no orange badge on an expired sign-in")
     }
 
+    @Test("Loading draws neither the accent invitation nor the orange warning", arguments: [false, true])
+    func loadingIsNeutral(dark: Bool) {
+        let avatar = avatarPixels(render(.loading, dark ? .dark : .light))
+        #expect(!avatar.contains(where: Self.isOrange))
+        #expect(avatar.filter(Self.isBlue).count < 10, "the loading bar looks like a sign-in invitation")
+    }
+
+    @Test("With a Steam picture, the avatar is that picture, not the generic person")
+    func steamPictureShows() throws {
+        // A solid red square stands in for the player's picture: easy to find in the pixels.
+        let size = 32
+        let rep = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
+                                                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        // Written byte by byte: setColor(_:atX:y:) silently does nothing for a colour from another colour space.
+        let bytes = try #require(rep.bitmapData)
+        for row in 0..<size {
+            for x in 0..<size {
+                let p = bytes + row * rep.bytesPerRow + x * 4
+                p[0] = 255; p[1] = 0; p[2] = 0; p[3] = 255
+            }
+        }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("avatar-\(UUID().uuidString).png")
+        try #require(rep.representation(using: .png, properties: [:])).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let account = AccountSummary(connected: [.steam], steam: .signedIn(account: "kenneth", days: 1, aging: false),
+                                     avatar: file)
+        #expect(account.avatar == file)
+        let red = avatarPixels(render(account)).filter { $0.r > 0.6 && $0.r - $0.g > 0.4 && $0.r - $0.b > 0.4 }
+        #expect(red.count > 100, "the Steam picture isn't drawn in the avatar (\(red.count) red pixels)")
+    }
+
     @Test("draw the account bar in every state, light and dark")
     func drawSheet() throws {
         for scheme in [ColorScheme.light, .dark] {
             let sheet = VStack(alignment: .leading, spacing: 0) {
-                ForEach([("Signed out", Self.signedOut), ("Signed in", Self.connected),
+                ForEach([("Loading", AccountSummary.loading), ("Signed out", Self.signedOut), ("Signed in", Self.connected),
                          ("Steam expired", Self.expired)], id: \.0) { label, account in
                     Text(label).font(.caption2).foregroundStyle(.secondary)
                         .padding(.horizontal, 12).padding(.top, 10)
@@ -83,7 +117,7 @@ struct SidebarAccountBarTests {
             }
             .frame(width: Self.barSize.width, alignment: .leading)
             .environment(\.colorScheme, scheme)
-            let bitmap = Snapshot.render(sheet, size: CGSize(width: Self.barSize.width, height: 240), scale: 2,
+            let bitmap = Snapshot.render(sheet, size: CGSize(width: Self.barSize.width, height: 310), scale: 2,
                                          background: scheme == .dark ? Color(white: 0.13) : Color(white: 0.97))
             let data = try #require(bitmap.pngData(), "the account bar rendered no PNG data")
             let url = ContactSheetTests.outputDirectory

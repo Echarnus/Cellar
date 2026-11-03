@@ -1,5 +1,7 @@
 import CellarDomain
 import SwiftUI
+import AppKit
+import ImageIO
 
 /// The foot of the sidebar: who you are signed in as, and Settings.
 ///
@@ -32,13 +34,16 @@ public struct SidebarAccountBar: View {
                     avatar
                     VStack(alignment: .leading, spacing: 1) {
                         Text(account.title)
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(account.tone == .signedOut ? Color.accentColor : .primary)
+                            .font(.callout.weight(account.tone == .loading ? .regular : .semibold))
+                            .foregroundStyle(account.tone == .signedOut ? Color.accentColor
+                                             : account.tone == .loading ? .secondary : .primary)
                             .lineLimit(1).truncationMode(.tail)
-                        Text(account.detail)
-                            .font(.caption)
-                            .foregroundStyle(account.tone == .needsAttention ? Color.orange : .secondary)
-                            .lineLimit(1).truncationMode(.tail)
+                        if !account.detail.isEmpty {
+                            Text(account.detail)
+                                .font(.caption)
+                                .foregroundStyle(account.tone == .needsAttention ? Color.orange : .secondary)
+                                .lineLimit(1).truncationMode(.tail)
+                        }
                     }
                     Spacer(minLength: 0)
                 }
@@ -48,7 +53,8 @@ public struct SidebarAccountBar: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .onHover { hovering = $0 }
+            .disabled(account.tone == .loading)
+            .onHover { hovering = $0 && account.tone != .loading }
             .help("Accounts — sign in to Steam, GOG and Battle.net (⌘⇧A)")
             .accessibilityElement(children: .combine)
             .accessibilityHint("Opens Accounts")
@@ -58,7 +64,7 @@ public struct SidebarAccountBar: View {
                     .frame(width: 26, height: 26)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.hoverBorderless)
             .foregroundStyle(.secondary)
             .help("Settings (⌘,)")
             .accessibilityLabel("Settings")
@@ -66,14 +72,29 @@ public struct SidebarAccountBar: View {
         .padding(.horizontal, 8).padding(.vertical, 6)
     }
 
-    /// A filled person once someone is signed in, an outlined one with a plus while nobody is — and
-    /// an orange badge when Steam needs signing in again, so the trouble shows before the words do.
+    /// The account's own Steam picture when Cellar has it; otherwise a filled person once someone is
+    /// signed in, an outlined one with a plus while nobody is, and a neutral placeholder while
+    /// Cellar is still finding out. An orange badge marks a Steam sign-in that needs renewing, so the trouble
+    /// shows before the words do.
     private var avatar: some View {
         ZStack(alignment: .bottomTrailing) {
-            Image(systemName: account.tone == .signedOut ? "person.crop.circle.badge.plus" : "person.crop.circle.fill")
-                .font(.system(size: 24))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(account.tone == .signedOut ? Color.accentColor : .secondary)
+            if account.tone == .loading {
+                // A placeholder the shape of the avatar, as a Mac list shows before its content
+                // arrives: neutral, so it can't be read as signed in or signed out.
+                Circle().fill(.quaternary).frame(width: 24, height: 24)
+            } else if let picture = Self.picture(at: account.avatar) {
+                Image(decorative: picture, scale: 1)
+                    .resizable().interpolation(.high).aspectRatio(contentMode: .fill)
+                    .frame(width: 26, height: 26)
+                    .clipShape(Circle())
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+                    .frame(width: 28, height: 28)
+            } else {
+                Image(systemName: account.tone == .signedOut ? "person.crop.circle.badge.plus" : "person.crop.circle.fill")
+                    .font(.system(size: 24))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(account.tone == .signedOut ? Color.accentColor : .secondary)
+            }
             if account.tone == .needsAttention {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(.system(size: 11))
@@ -83,5 +104,12 @@ public struct SidebarAccountBar: View {
         }
         .frame(width: 28, height: 28)
         .accessibilityHidden(true)
+    }
+
+    /// The Steam picture, decoded now as a bitmap: an `NSImage` decodes lazily, and a lazily decoded
+    /// image can come out blank when the view is drawn straight into a graphics context.
+    private static func picture(at file: URL?) -> CGImage? {
+        guard let file, let source = CGImageSourceCreateWithURL(file as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
     }
 }

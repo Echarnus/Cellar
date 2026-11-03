@@ -176,7 +176,14 @@ public struct GamePlan {
     }
 
     private func launchEnv(over env: [String: String]) -> [String: String] {
-        let exe = launchExe.map { [($0 as NSString).lastPathComponent] } ?? []
+        // Every program of this launch that can show a window wears the game's name: the game, the
+        // stub a store starts it through, and a publisher launcher in between. Anything left out
+        // is called "wine" in the Dock, which no player should ever read (#266).
+        var exe = launchExe.map { [($0 as NSString).lastPathComponent] } ?? []
+        if !exe.isEmpty {
+            if let startExe { exe.append((startExe as NSString).lastPathComponent) }
+            exe += publisherLauncher?.windowedExecutables ?? []
+        }
         var result = DockShim.environment(naming: name, executables: exe)
         for (key, value) in env { result[key] = value }
         return result

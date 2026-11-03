@@ -1,5 +1,7 @@
 # Skill: UX & UI in Cellar
 
+> Start with [`docs/DESIGN.md`](../docs/DESIGN.md): the principles and product rules this guide applies.
+
 **The interface is the product.** Cellar's job is to make a Windows game start on a Mac, and the
 only way anyone experiences that job being done is the app in front of them. A change that works but
 looks or reads like a developer tool has not landed. Hold every user-visible change to the standard

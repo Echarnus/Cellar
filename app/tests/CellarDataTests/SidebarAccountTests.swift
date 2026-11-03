@@ -48,6 +48,27 @@ struct SidebarAccountTests {
         #expect(summary.detail == "Steam sign-in expired")
     }
 
+    @Test("Before the library is read the button says it is loading, never \"Sign in\"")
+    func loading() {
+        let summary = AccountSummary.loading
+        #expect(summary.tone == .loading)
+        #expect(summary.title != "Sign in")
+        #expect(summary.detail.isEmpty)
+        #expect(summary.avatar == nil)
+    }
+
+    @Test("The Steam picture rides with the Steam account name, and nowhere else")
+    func avatar() {
+        let picture = URL(fileURLWithPath: "/tmp/steam-avatar-kenneth.jpg")
+        let steam = SteamSignInState.signedIn(account: "kenneth", days: 3, aging: false)
+        #expect(AccountSummary(connected: [.steam], steam: steam, offered: all, avatar: picture).avatar == picture)
+        #expect(AccountSummary(connected: [], steam: .signedOut, offered: all, avatar: picture).avatar == nil)
+        #expect(AccountSummary(connected: [.gog], steam: .signedOut, offered: all, avatar: picture).avatar == nil)
+        let snapshot = LibrarySnapshot(games: [], withheld: [], steam: steam, hasConnectedStore: true,
+                                       gogSignedIn: false, connectedStores: [.steam], steamAvatar: picture)
+        #expect(snapshot.account.avatar == picture)
+    }
+
     @Test("The snapshot's account summary is built from the snapshot's own stores")
     func snapshotAccount() {
         let snapshot = LibrarySnapshot(games: [], withheld: [], steam: .signedOut,

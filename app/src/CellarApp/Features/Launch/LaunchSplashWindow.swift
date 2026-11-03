@@ -23,7 +23,7 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
 
     /// Show the launch window for `game`, following `runner`. Presenting twice reuses the window
     /// rather than stacking two of them — Play is disabled while a launch runs, but a second
-    /// "Show progress" must not open a second copy.
+    /// "Show Progress" must not open a second copy.
     /// `onFinished` runs when a launch started from this window ends — a retry on another backend —
     /// so the page behind it can pick up what changed.
     static func present(game: GameSummary, runner: ActivityStore, onFinished: @escaping @MainActor () -> Void = {}) {
@@ -60,7 +60,7 @@ final class LaunchSplashWindow: NSObject, NSWindowDelegate {
         window.center()
         window.contentView = NSHostingView(rootView: LaunchSplashView(
             game: game, runner: runner, onFinished: onFinished,
-            onDismiss: { [weak self] in self?.close() }))
+            onDismiss: { [weak self] in self?.close() }).buttonStyle(.hoverAutomatic))
         window.delegate = self
         self.window = window
         window.makeKeyAndOrderFront(nil)
