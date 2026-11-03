@@ -451,7 +451,8 @@ class MacRequirementsSiteTests(unittest.TestCase):
         self.assertIn(games[0]["mac_rec"], html)
 
     def test_a_profile_without_mac_fails_the_build(self):
-        source = open(self.profiles()[0], encoding="utf-8").read()
+        with open(self.profiles()[0], encoding="utf-8") as handle:
+            source = handle.read()
         without = source.split("\n[mac]")[0] + "\n"
         tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp)
