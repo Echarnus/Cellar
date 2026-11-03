@@ -558,3 +558,13 @@ class HomePageTests(unittest.TestCase):
         untested = next(g for g in games if g["status"] == "untested")
         page = self.site.render_game(untested, games, None)
         self.assertIn("nobody has confirmed it plays yet", page)
+
+    def test_the_home_page_shows_ten_games_and_the_games_page_all(self):
+        # Kenneth, 2026-11-03: one component, ten on the home page, every game on games.html.
+        games = self.site.load_games()
+        home = self.site.render_index(games, None)
+        self.assertEqual(home.count('class="card"'), self.site.GAMES_CAP)
+        self.assertIn('action="games.html"', home)
+        self.assertIn(f'href="games.html">See all {len(games)} games', home)
+        self.assertNotIn("GAMES_JS", home)
+        self.assertEqual(self.site.render_games(games, None).count('class="card"'), len(games))

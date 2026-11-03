@@ -463,7 +463,6 @@ dl.spec div{display:grid;gap:2px 24px;padding:12px 0;border-bottom:1px solid var
 .facts dt{color:var(--muted)}
 .facts dd{margin:0;overflow-wrap:anywhere}
 .card .more{margin-top:auto;font-size:.8rem;min-height:44px;display:inline-flex;align-items:center}
-.no-js .grid[data-cap]>.card:nth-child(n+11){display:none}
 .more-games{text-align:center;margin:40px 0 0}
 .games-page{padding-top:32px}
 .empty{text-align:center;color:var(--muted);padding:40px 0}
@@ -562,12 +561,12 @@ GAMES_JS = """
   var cards=[].slice.call(document.querySelectorAll('#grid .card'));
   var q=document.getElementById('q'), count=document.getElementById('count'), empty=document.getElementById('empty');
   var state={store:'all',status:'all'};
-  var grid=document.getElementById('grid'), cap=parseInt(grid.dataset.cap||'0',10), more=document.getElementById('more');
+  // The home page's search box opens this page with ?q=; filters can be linked the same way.
   var params=new URLSearchParams(location.search);
-  if(!cap){ q.value=params.get('q')||'';
-    ['store','status'].forEach(function(k){var v=params.get(k); if(!v) return;
-      var g=document.querySelector('.seg[data-key="'+k+'"]'); if(!g||!g.querySelector('[data-value="'+v+'"]')) return;
-      state[k]=v; [].forEach.call(g.querySelectorAll('button'),function(x){x.setAttribute('aria-pressed',String(x.dataset.value===v));});});}
+  q.value=params.get('q')||'';
+  ['store','status'].forEach(function(k){var v=params.get(k); if(!v) return;
+    var g=document.querySelector('.seg[data-key="'+k+'"]'); if(!g||!g.querySelector('[data-value="'+v+'"]')) return;
+    state[k]=v; [].forEach.call(g.querySelectorAll('button'),function(x){x.setAttribute('aria-pressed',String(x.dataset.value===v));});});
   function apply(){
     var term=(q.value||'').trim().toLowerCase(), matched=0, shown=0;
     cards.forEach(function(c){
@@ -575,18 +574,9 @@ GAMES_JS = """
         &&(state.store==='all'||c.dataset.store===state.store)
         &&(state.status==='all'||c.dataset.status===state.status);
       if(ok) matched++;
-      var show=ok&&(!cap||matched<=cap);
-      c.hidden=!show; if(show) shown++;});
-    var all=!term&&state.store==='all'&&state.status==='all';
+      c.hidden=!ok; if(ok) shown++;});
     count.textContent=shown===cards.length? 'Showing all '+cards.length+' games'
-      : all||shown===matched? 'Showing '+shown+' of '+cards.length+' games'
-      : 'Showing '+shown+' of '+matched+' matching games';
-    if(more){
-      var p=new URLSearchParams(); if(term) p.set('q',q.value.trim());
-      if(state.store!=='all') p.set('store',state.store); if(state.status!=='all') p.set('status',state.status);
-      more.href='games.html'+(p.toString()?'?'+p.toString():'');
-      more.hidden=matched<=cap;
-      more.textContent=all? 'Show all '+cards.length+' games' : 'Show all '+matched+' matching games';}
+      : 'Showing '+shown+' of '+cards.length+' games';
     empty.hidden=matched>0;}
   [].forEach.call(document.querySelectorAll('.seg'),function(group){
     group.addEventListener('click',function(e){
@@ -1131,12 +1121,22 @@ GAMES_CAP = 10  # cards the home page shows before "Show all games" (Kenneth, 20
 
 
 def games_block(games, cap=None):
-    """The searchable games list: the whole of games.html, and the short version on the home page.
+    """The games list: one component, in two places (Kenneth, 2026-11-03).
 
-    One component in both places. With `cap`, at most that many matching cards show, and a link
-    under them opens games.html with the same search and filters; without JavaScript the first
-    `cap` cards show and the link opens the full list."""
+    games.html shows every game with search and filters. The home page passes `cap` and gets exactly
+    that many cards, no filters, a search box that opens games.html with the search filled in, and a
+    link to the full list. Nothing beyond the cap is even in the page."""
     total = len(games)
+    if cap is not None and total > cap:
+        cards = "".join(card(g) for g in games[:cap])
+        return f'''<form class="toolbar" role="search" action="games.html" method="get" aria-label="Search all games">
+      <div class="search">{icon("search")}<label class="sr-only" for="q">Search all {total} games</label>
+        <input id="q" name="q" type="search" placeholder="Search all {total} games" autocomplete="off"></div>
+      <button class="btn btn-ghost" type="submit">Search</button>
+    </form>
+    <ul class="grid" id="grid">{cards}
+    </ul>
+    <p class="more-games"><a class="chev" href="games.html">See all {total} games</a></p>'''
     stores_present = [k for k in STORES if any(g["store"] == k for g in games)]
     statuses_present = [k for k in STATUS if any(g["status"] == k for g in games)]
     store_opts = [] if len(stores_present) < 2 else [("all", "All stores", total)] + [
@@ -1147,23 +1147,17 @@ def games_block(games, cap=None):
     legend = "".join(
         f'<li>{icon(cls, cls)}<span><b>{label}</b> — {meaning}</span></li>'
         for _k, (label, cls, meaning) in STATUS.items())
-    capped = cap is not None and total > cap
-    shown = min(total, cap) if capped else total
-    count = f"Showing {shown} of {total} games" if capped else f"Showing all {total} games"
-    cap_attr = f' data-cap="{cap}"' if capped else ""
-    more = (f'\n    <p class="more-games"><a class="btn btn-ghost-dark" id="more" href="games.html">'
-            f'Show all {total} games</a></p>') if capped else ""
     return f'''<div class="toolbar" role="search" aria-label="Filter games">
       <div class="search">{icon("search")}<label class="sr-only" for="q">Search games</label>
         <input id="q" type="search" placeholder="Search {total} games" autocomplete="off"></div>
       {seg("store", "Store", store_opts) if store_opts else ""}
       {seg("status", "Status", status_opts)}
     </div>
-    <p class="count" id="count" role="status" aria-live="polite">{count}</p>
-    <ul class="grid" id="grid"{cap_attr}>{cards}
+    <p class="count" id="count" role="status" aria-live="polite">Showing all {total} games</p>
+    <ul class="grid" id="grid">{cards}
     </ul>
     <div class="empty" id="empty" hidden><p>No games match those filters.</p>
-      <button class="btn btn-primary btn-small" id="reset" type="button">Show all games</button></div>{more}
+      <button class="btn btn-primary btn-small" id="reset" type="button">Show all games</button></div>
     <ul class="legend">{legend}</ul>'''
 
 
@@ -1277,7 +1271,7 @@ def render_index(games, release):
 {closing_band(release)}
 </main>
 {site_footer(games)}
-{scripts(THEME_JS, GAMES_JS)}
+{scripts(THEME_JS)}
 </body></html>
 '''
 
