@@ -1,0 +1,60 @@
+# Cellar game profile — Sekiro: Shadows Die Twice
+#
+# FromSoftware's 2019 action game. Windows only, 64-bit, DirectX 11, single-player with no anti-
+# cheat and no third-party DRM. Facts below are from SteamDB's info and config pages, read
+# 2026-11-03. ProtonDB and Steam Deck ratings are from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "sekiro-shadows-die-twice"
+name          = "Sekiro: Shadows Die Twice"
+developer     = "FromSoftware"
+publisher     = "Activision"
+steam_appid   = 814380
+engine        = "Dantelion"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2019-03-22"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steamworks (no third-party DRM listed)"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 11, which Cellar has two ways to run, so it can offer the second if the first does not start."
+protondb                    = "platinum"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 814380
+# Steam's launch option is sekiro.exe at the top of the folder (SteamDB config).
+install_dir = "Sekiro"
+exe         = "sekiro.exe"
+
+[acceptance]
+# What `cellar verify sekiro-shadows-die-twice` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts sekiro.exe beside a running Steam and it survives the watch.
+# - dock: the Dock says Sekiro: Shadows Die Twice, never wine or sekiro.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks run untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"

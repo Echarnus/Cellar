@@ -1,0 +1,71 @@
+# Cellar game profile — Grand Theft Auto IV: The Complete Edition
+#
+# Rockstar's 2008 Liberty City game with both episodes (The Lost and Damned, The Ballad of Gay
+# Tony), re-released on Steam in 2020 as the Complete Edition. Windows only, 32-bit, DirectX 9. Like
+# every Rockstar game on Steam it starts through the Rockstar Games Launcher: Cellar starts Steam's
+# stub, which hands off to the launcher, which signs the player in to a Rockstar Games account and
+# then starts the game. Cellar's setup installs the launcher (RockstarLauncher.swift). Facts below
+# are from SteamDB's info and config pages, read 2026-11-03. ProtonDB and Steam Deck ratings are
+# from the same day.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "grand-theft-auto-iv"
+name          = "Grand Theft Auto IV: The Complete Edition"
+developer     = "Rockstar North"
+publisher     = "Rockstar Games"
+steam_appid   = 12210
+engine        = "RAGE"
+graphics_api  = "DirectX 9"
+architecture  = "x86"
+released      = "2008-12-02"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steamworks + Rockstar Games Launcher (needs a Rockstar Games account)"
+needs_live_session          = true
+requires_account            = "Steam + Rockstar Games account"
+online                      = "single-player only; the old multiplayer is not part of the Complete Edition"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. DirectX 9, which Cellar has two ways to run, so it can offer the second if the first does not start. It starts through the Rockstar Games Launcher, which Cellar sets up; the first Play opens its window to sign in to a Rockstar Games account, the step most often reported failing on a Mac."
+protondb                    = "gold"
+evidence_checked            = "2026-11-03"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# D3DMetal only translates DirectX 11 and 12. DXVK covers DirectX 9 (many Windows players run GTA IV
+# on DXVK by choice); WineD3D is the slow, forgiving fallback the launch window offers once.
+backend           = "dxvk"
+fallback_backend  = "wined3d"
+
+[env]
+
+[install]
+method             = "windows-steam-in-bottle"
+steam_appid        = 12210
+# Steam's launch option is GTAIV/PlayGTAIV.exe (SteamDB config): the stub, started beside the game's
+# own GTAIV.exe in the same folder, which is what Cellar watches.
+install_dir        = "Grand Theft Auto IV"
+exe                = "GTAIV/GTAIV.exe"
+start_exe          = "PlayGTAIV.exe"
+publisher_launcher = "rockstar"
+
+[acceptance]
+# What `cellar verify grand-theft-auto-iv` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts PlayGTAIV.exe beside a running Steam, the Rockstar Games Launcher
+#   signs in (the first time it waits for the player), and GTAIV.exe comes up and survives the watch.
+# - dlc: both episodes are part of the Complete Edition; the game's menu offers them.
+# - dock: the Dock says Grand Theft Auto IV: The Complete Edition, never wine, PlayGTAIV or Launcher.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steamworks and the Rockstar Games Launcher run untouched inside the layer. Only ever used with a
+# copy the player owns.
+drm_circumvention = "never"
