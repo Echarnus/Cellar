@@ -376,10 +376,14 @@ struct VerifyRunTests {
             finished.signal()
         }
         let start = Date()
-        while !ProcessWatch.isRunning(exeName), Date().timeIntervalSince(start) < 20 {
+        // As long as a launch itself waits for a game to appear (40 s) plus verify's set-up, not
+        // 20 s: on the slower release runner the fake game came up later than that, and a stop
+        // was then asked of a run that hadn't started (v0.6.4's build, 2026-11-05). `try #require`
+        // ends the test there, so a game that never starts is one clear failure, not a cascade.
+        while !ProcessWatch.isRunning(exeName), Date().timeIntervalSince(start) < 60 {
             Thread.sleep(forTimeInterval: 0.2)
         }
-        #expect(ProcessWatch.isRunning(exeName), "the fake game started")
+        try #require(ProcessWatch.isRunning(exeName), "the fake game started")
         Thread.sleep(forTimeInterval: 2)
         FakeWine.reset()
 
