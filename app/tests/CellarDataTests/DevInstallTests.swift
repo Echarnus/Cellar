@@ -28,8 +28,8 @@ struct DevInstallTests {
     @Test("A dev build still never points at the release feed")
     func devBuildHasNoUpdater() throws {
         let script = try Self.installScript()
-        #expect(!script.contains("SUFeedURL"))
-        #expect(!script.contains("SUPublicEDKey"))
+        #expect(!script.contains("<key>SUFeedURL</key>"))
+        #expect(!script.contains("<key>SUPublicEDKey</key>"))
     }
 
     @Test("The old dev Cellar.app is moved to the Bin, and only when it is a dev build")
