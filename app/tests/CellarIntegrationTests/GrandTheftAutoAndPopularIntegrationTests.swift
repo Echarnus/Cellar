@@ -29,6 +29,8 @@ struct GrandTheftAutoAndPopularIntegrationTests {
         ("satisfactory", 526870),
         ("lethal-company", 1966720),
         ("schedule-i", 3164500),
+        // Theme Hospital (#325), released on Steam 2026-11-05.
+        ("theme-hospital", 2229820),
     ]
 
     @Test("Each reaches the library as an untested Steam game with its Steam cover")

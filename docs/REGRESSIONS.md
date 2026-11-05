@@ -11,6 +11,7 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #325 | A game started in Cellar's folder instead of its own, so one that opens its files by relative path (Theme Hospital's DOSBox and its settings) found none of them | `LaunchLifecycleTests.swift` › `gameStartsInItsOwnFolder`, `alongsideStartsInItsOwnFolder` |
 | #310 | Skyrim opened in a small titled window instead of full screen | `DisplayIniTests.swift` › `skyrimFileIsFixed` |
 | #310 | Skyrim, GTA V, Stardew Valley and The Witcher 3 showed Metal's frame-rate overlay to every player | `DisplayIniTests.swift` › `noProfileShowsTheOverlay` |
 | #309 | A game with DLC depots filled the download bar to 100% once per depot (Dark Souls III looked like it downloaded three times) | `DepotDownloadProgressTests.swift` › `oneBarAcrossDepots` |

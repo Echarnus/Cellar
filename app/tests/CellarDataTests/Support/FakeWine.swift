@@ -22,6 +22,8 @@ enum FakeWine {
         let tool: String
         let arguments: [String]
         let environment: [String: String]
+        /// The folder Wine was started in — the game's working directory (#325).
+        var directory: String = ""
     }
 
     static var log: URL { TestHome.ensure().appendingPathComponent("fake-wine-calls.log") }
@@ -51,14 +53,18 @@ enum FakeWine {
             let lines = block.components(separatedBy: "\n")
             var arguments: [String] = []
             var environment: [String: String] = [:]
+            var directory = ""
             for line in lines.dropFirst() {
                 if line.hasPrefix("arg=") {
                     arguments.append(String(line.dropFirst(4)))
+                } else if line.hasPrefix("cwd=") {
+                    directory = String(line.dropFirst(4))
                 } else if let equals = line.firstIndex(of: "=") {
                     environment[String(line[..<equals])] = String(line[line.index(after: equals)...])
                 }
             }
-            return Call(tool: lines.first ?? "", arguments: arguments, environment: environment)
+            return Call(tool: lines.first ?? "", arguments: arguments, environment: environment,
+                        directory: directory)
         }
     }
 
@@ -74,6 +80,7 @@ enum FakeWine {
         {
           echo "--- call \(tool)"
           for arg in "$@"; do echo "arg=$arg"; done
+          echo "cwd=$(pwd -P)"
           env | grep -E '^(WINE|LANG=|LC_ALL=|GRAPHICS_BACKEND=|CELLAR_|FIXTURE_|CLAUDE_|ANTHROPIC_|GITHUB_|AWS_|SSH_AUTH_SOCK=)'
         } >> '\(log.path)'
         case "$1" in

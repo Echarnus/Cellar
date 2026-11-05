@@ -703,7 +703,9 @@ public extension SteamBottle {
             cleanup: { ProcessWatch.kill([watched, started.lastPathComponent, "crash_reporter.exe"]) },
             start: {
                 attemptBegan = Date()
-                try runner.spawn([started.path] + arguments, extraEnv: env, log: log, bundledLoader: bundledLoader)
+                // In the started program's own folder, as Steam starts it (#325).
+                try runner.spawn([started.path] + arguments, extraEnv: env, log: log, bundledLoader: bundledLoader,
+                                 directory: started.deletingLastPathComponent())
             },
             isUp: { ProcessWatch.isRunning(watched) },
             keepWaiting: keepWaiting,

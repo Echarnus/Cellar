@@ -1,0 +1,85 @@
+# Cellar game profile — Theme Hospital
+#
+# Bullfrog's 1997 hospital builder, released on Steam by Electronic Arts on 2026-11-05. It is the
+# original DOS game in a DOSBox wrapper: Steam's only launch option is DOSBOX/Theme Hospital.exe,
+# started in the DOSBOX folder (SteamDB config, read 2026-11-05). Windows only on Steam; the store
+# page asks for Windows 10, a DirectX 9.0c card and 2 GB of memory, and for acceptance of EA's user
+# agreement, but names no EA app.
+#
+# Cellar starts the program in its own folder, as Steam does (#325): DOSBox reads its settings
+# from the folder it starts in, and without them it opens to an empty DOS prompt.
+#
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "theme-hospital"
+name          = "Theme Hospital"
+developer     = "Bullfrog Productions"
+publisher     = "Electronic Arts"
+steam_appid   = 2229820
+engine        = "DOSBox"
+graphics_api  = "DOS, drawn by DOSBox"
+architecture  = "x86"
+released      = "2026-11-05"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none (single-player only)"
+drm                         = "Steam"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. The 1997 DOS game, run by the DOSBox that comes with it on Steam, so it draws in 2D and asks little of any Mac. Electronic Arts asks you to accept its user agreement the first time."
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+# DOSBox draws a 2D DOS screen through SDL, with OpenGL or DirectDraw. D3DMetal and DXVK only
+# translate Direct3D, so Wine's own renderer (WineD3D) is the one that serves both. There is
+# deliberately no fallback that could never start it.
+backend           = "wined3d"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 2229820
+# Steam's launch option is DOSBOX/Theme Hospital.exe, in the DOSBOX folder (SteamDB config).
+install_dir = "Theme Hospital"
+exe         = "DOSBOX/Theme Hospital.exe"
+
+[art]
+# A 2026 release: art only under the hashed store_item_assets path (SteamDB info page).
+art_portrait = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/2229820/29dbd2af8c3f31730f12f959b55833917fa42a5a/library_capsule.jpg"
+art_hero     = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/2229820/8a447f44ac3087c3c7d3b6b0a1fcdc2125554cc3/library_hero.jpg"
+
+[acceptance]
+# What `cellar verify theme-hospital` will hold this game to.
+# Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts DOSBOX/Theme Hospital.exe beside a running Steam, in its own
+#   folder, and it survives the watch. A DOS prompt instead of the game is a fail (visual).
+# - dock: the Dock says Theme Hospital, never wine, DOSBox or Steam.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+
+[legal]
+# Steam runs untouched inside the layer. Only ever used with a copy the player owns.
+drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read 2026-11-05: a DirectX 9.0c card and 2 GB of memory, the same for minimum and recommended"
+pc_gpu_minimum         = "DirectX 9 card with Shader Model 3"
+pc_memory_minimum      = 2
+pc_gpu_recommended     = "DirectX 9 card with Shader Model 3"
+pc_memory_recommended  = 2
+mac_minimum            = "M1"
+mac_memory_minimum     = 8
+mac_recommended        = "M1"
+mac_memory_recommended = 8
+requirements_checked   = "2026-11-05"
