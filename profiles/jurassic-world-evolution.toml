@@ -1,0 +1,81 @@
+# Cellar game profile — Jurassic World Evolution
+#
+# Frontier's 2018 park builder on its COBRA engine, the engine Planet Coaster 2 and Planet Zoo run on.
+# Windows only on Steam, 64-bit, DirectX 11 (like Planet Zoo, so D3DMetal leads and DXVK can take
+# over). Denuvo Anti-Tamper per SteamDB: DRM, not anti-cheat; it runs untouched but wants a running
+# Steam. Facts are from SteamDB's info and config pages and the Steam store page, read 2026-11-05.
+# CodeWeavers rates it "Runs Great" in CrossOver 25.0.1 on macOS; AppleGamingWiki has no Wine report.
+# Cellar's own wineserver (the overlapped-write fix that brought PC2's online features back, #261)
+# ships with the WineForge runner, so this game gets it without a line here.
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "jurassic-world-evolution"
+name          = "Jurassic World Evolution"
+developer     = "Frontier Developments"
+publisher     = "Frontier Developments"
+steam_appid   = 648350
+engine        = "COBRA"
+graphics_api  = "DirectX 11"
+architecture  = "x86-64"
+released      = "2018-06-12"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "Steamworks + Denuvo Anti-Tamper"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Mac players report it running well through CrossOver."
+mac_reports                 = "runs"
+protondb                    = "gold"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-05"
+
+[runner]
+id              = "wineforge"
+windows_version = "win10"
+
+[graphics]
+backend           = "d3dmetal"
+fallback_backend  = "dxvk"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 648350
+# SteamDB config: installdir "Jurassic World Evolution", default launch option JWE.exe at its root.
+# The other two options (Nero.Win64.release/profile.exe) are Frontier's build variants, not the game.
+install_dir = "Jurassic World Evolution"
+exe         = "JWE.exe"
+
+[acceptance]
+# What `cellar verify jurassic-world-evolution` will hold this game to. Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts JWE.exe beside a running Steam and it survives the watch.
+# - dlc: owned DLC packs show in the game when the account owns them.
+# - dock: the Dock says Jurassic World Evolution, never wine or JWE.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+# Frontier's crash reporter is already one of the signs `cellar verify` watches for (CrashSigns).
+# After the first run: save_paths once the run shows where it writes saves.
+
+[legal]
+drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read directly"
+pc_gpu_minimum         = "GeForce GTX 1050"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1060"
+pc_memory_recommended  = 12
+mac_minimum            = "M2"
+mac_memory_minimum     = 16
+mac_recommended        = "M5"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-05"
