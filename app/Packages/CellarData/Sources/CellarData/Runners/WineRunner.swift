@@ -199,17 +199,22 @@ public struct WineRunner {
     /// `bundledLoader` starts the game from its own `.app` (`GameApp`): a copy of this runner's
     /// loader inside the bundle is what runs — so macOS sees the game's bundle — with `argv[0]`
     /// naming the runner's own loader, which is where Wine looks for the rest of itself.
+    ///
+    /// `directory` is the folder the program starts in, as Steam's own launch does. Without it the
+    /// game inherits Cellar's, and a game that opens its files by relative path finds none of them:
+    /// Theme Hospital's DOSBox reads its `.conf` from the folder it starts in (#325).
     public func spawn(_ args: [String], extraEnv: [String: String] = [:], log: URL? = nil,
-                      bundledLoader: GameApp.Start? = nil) throws {
+                      bundledLoader: GameApp.Start? = nil, directory: URL? = nil) throws {
         if let bundledLoader {
             var env = environment(extra: extraEnv)
             for (key, value) in bundledLoader.environment { env[key] = value }
-            try spawnBundled(bundledLoader, args, environment: env, log: log)
+            try spawnBundled(bundledLoader, args, environment: env, log: log, directory: directory)
             return
         }
         let process = Process()
         process.executableURL = binary
         process.arguments = args
+        if let directory { process.currentDirectoryURL = directory }
         process.environment = environment(extra: extraEnv)
         if let log {
             try FileManager.default.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -228,7 +233,7 @@ public struct WineRunner {
     /// through `posix_spawn` directly — set up the way `Process` does it (signals reset, no stray
     /// descriptors inherited) — and is reaped in the background so it never lingers as a zombie.
     private func spawnBundled(_ start: GameApp.Start, _ args: [String], environment: [String: String],
-                              log: URL?) throws {
+                              log: URL?, directory: URL?) throws {
         let executable = start.executable
         let output = log?.path ?? "/dev/null"
         if let log {
@@ -242,6 +247,7 @@ public struct WineRunner {
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
         posix_spawn_file_actions_addopen(&actions, 1, output, O_WRONLY | O_APPEND, 0)
         posix_spawn_file_actions_adddup2(&actions, 1, 2)
+        if let directory { posix_spawn_file_actions_addchdir_np(&actions, directory.path) }
 
         var attributes: posix_spawnattr_t? = nil
         posix_spawnattr_init(&attributes)

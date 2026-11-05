@@ -76,6 +76,59 @@ struct LaunchLifecycleTests {
         #expect(call.environment["WINEDEBUG"] == "-all")
     }
 
+    @Test("A game starts in its own folder, as Steam starts it: Theme Hospital's DOSBox reads its settings from there (#325)")
+    func gameStartsInItsOwnFolder() throws {
+        let install = try FakeWine.install()
+        let exeName = "CellarFixture-\(UUID().uuidString.prefix(8)).exe"
+        let plan = try TestHome.plan("""
+        [game]
+        name  = "Folder Fixture"
+        store = "steam"
+
+        [compatibility]
+        needs_live_session = false
+        status             = "untested"
+
+        [runner]
+        id = "\(install.spec.id)"
+
+        [install]
+        steam_appid = "480"
+
+        [launch]
+        exe = "DOSBOX/\(exeName)"
+        """, slug: "working-folder")
+        try TestHome.installFakeGame(into: plan, at: "DOSBOX/\(exeName)")
+        let exe = try #require(plan.directLaunchExe)
+        try FakeWine.keepAlive(exe, seconds: 3)
+        defer {
+            ProcessWatch.kill([exeName])
+            try? FileManager.default.removeItem(at: plan.prefix)
+        }
+        FakeWine.reset()
+
+        _ = try Game.launch(plan, checkUpdates: false)
+
+        let call = try #require(FakeWine.calls().last(where: { $0.tool == "wine" && $0.arguments.first == exe.path }),
+                                "Wine was never asked to run the game's exe")
+        // Both sides normalised the same way: the shell reports /private/var, Foundation drops /private.
+        let started = URL(fileURLWithPath: call.directory).resolvingSymlinksInPath().path
+        #expect(started == exe.deletingLastPathComponent().resolvingSymlinksInPath().path,
+                "the game started in \(call.directory), not its own DOSBOX folder")
+    }
+
+    @Test("The route beside Steam starts the program in its own folder too (#325)")
+    func alongsideStartsInItsOwnFolder() throws {
+        // Starting this route needs a signed-in Windows Steam, which no hermetic test has.
+        let source = try String(contentsOf: Repo.source("CellarData/Stores/Steam/SteamBottle.swift"),
+                                encoding: .utf8)
+        let spawn = try #require(source.range(of: "try runner.spawn([started.path] + arguments"),
+                                 "the launch beside Steam moved; point this test at it")
+        let call = source[spawn.lowerBound...].prefix(260)
+        #expect(call.contains("directory: started.deletingLastPathComponent()"),
+                "a game started beside Steam must start in its own folder, as Steam starts it")
+    }
+
     @Test("Quitting the game takes the layer down: Cellar waits the game out, then stops the wineserver")
     func quittingShutsTheLayerDown() throws {
         let (plan, _, exeName) = try storeFreeGame(seconds: 5)

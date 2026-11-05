@@ -266,7 +266,8 @@ public enum Game {
         CellarLog.debug(.launch, "Starting \(exe.lastPathComponent) directly; Wine output → "
             + wineLog.lastPathComponent, subject: plan.slug)
         try wine.spawn([exe.path] + plan.displayArguments, extraEnv: env, log: wineLog,
-                       bundledLoader: GameApp.prepare(for: plan, runner: wine))
+                       bundledLoader: GameApp.prepare(for: plan, runner: wine),
+                       directory: exe.deletingLastPathComponent())
     }
 
     /// Block until the player quits, then take the whole layer down — see `LaunchGame`.
