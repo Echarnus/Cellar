@@ -3,17 +3,19 @@ import Foundation
 import Testing
 @testable import CellarData
 
-/// The Steam token lives in the keychain between DepotDownloader runs (#82).
+/// The Steam token lives in Cellar's own private file between DepotDownloader runs (#82), and never
+/// in the keychain, whose prompts came back with every new build of `cellar` (#330).
 ///
 /// These drive the vault with real DepotDownloader store bytes (`SteamSignInTests.store`), real
 /// Steam-shaped tokens (`SteamClientSessionTests.jwt`) and real files in a scratch folder — only the
-/// keychain is replaced, by memory, so a test can never touch the player's sign-in. The properties
+/// vault (and the keychain an older Cellar used) is replaced, by memory, so a test can never touch
+/// the player's sign-in. The properties
 /// pinned are the ones a bug here would cost: the token is never lost, never left on disk once the
 /// keychain has it, and the app can still say who is signed in without reading it.
 @Suite(.serialized)
 struct SteamTokenVaultTests {
 
-    /// The keychain, in memory. Counts reads of the secret, so a test can prove a path never made one.
+    /// The vault, in memory. Counts reads of the secret, so a test can prove a path never made one.
     /// `@unchecked Sendable` because the vault's storage closures are `@Sendable`: the suite is
     /// serialized, so only one test ever touches a `Memory` at a time.
     final class Memory: @unchecked Sendable {
@@ -44,11 +46,16 @@ struct SteamTokenVaultTests {
         let memory = Memory()
         let dir = TestHome.scratch("vault")
         let saved = SteamTokenVault.storage
+        let savedLegacy = SteamTokenVault.legacy
         SteamTokenVault.storage = memory.storage
+        SteamTokenVault.legacy = nil
         SteamTokenVault.indexFileOverride = dir.appendingPathComponent("steam-token-index.json")
+        SteamTokenVault.storeFileOverride = dir.appendingPathComponent("steam-token-store.json")
         defer {
             SteamTokenVault.storage = saved
+            SteamTokenVault.legacy = savedLegacy
             SteamTokenVault.indexFileOverride = nil
+            SteamTokenVault.storeFileOverride = nil
             SteamTokenVault.forcedEnabled = nil
         }
         try body(memory, dir)
@@ -66,7 +73,7 @@ struct SteamTokenVaultTests {
 
     // MARK: - Sealing
 
-    @Test("Sealing moves the store into the keychain and takes it off the disk")
+    @Test("Sealing moves the store into the vault and takes it off the disk")
     func sealMovesToKeychain() throws {
         try withVault { memory, dir in
             let file = try storeFile(in: dir)
@@ -97,7 +104,7 @@ struct SteamTokenVaultTests {
         }
     }
 
-    @Test("Saying who is signed in never reads the keychain — the app draws Accounts from this")
+    @Test("Saying who is signed in never reads the vault — the app draws Accounts from this")
     func namesWithoutKeychainRead() throws {
         try withVault { memory, dir in
             SteamTokenVault.seal(files: [try storeFile(in: dir)])
@@ -196,7 +203,7 @@ struct SteamTokenVaultTests {
         }
     }
 
-    @Test("Signing out empties the keychain item and the index")
+    @Test("Signing out empties the vault and the index")
     func forget() throws {
         try withVault { memory, dir in
             SteamTokenVault.forcedEnabled = true
@@ -256,5 +263,126 @@ struct SteamTokenVaultTests {
         #expect(Reset.isRelocated)
         #expect(!SteamTokenVault.isEnabled)
         #expect(SteamTokenVault.begin() == nil, "no lease, no restore, no seal")
+    }
+
+    // MARK: - No keychain (#330)
+
+    /// The keychain an older Cellar sealed into, in memory. Counts every touch, because the bug was a
+    /// prompt — and the only keychain call that can never prompt is one that is not made.
+    final class LegacyMemory: @unchecked Sendable {
+        var value: String?
+        var readableWithoutPrompt = true
+        var touches = 0
+
+        var keychain: SteamTokenVault.LegacyKeychain {
+            SteamTokenVault.LegacyKeychain(
+                exists: { [self] in touches += 1; return value != nil },
+                loadWithoutPrompt: { [self] in touches += 1; return readableWithoutPrompt ? value : nil },
+                removeWithoutPrompt: { [self] in touches += 1; if readableWithoutPrompt { value = nil } })
+        }
+    }
+
+    @Test("The vault is Cellar's own 0600 file, out of backups — not the keychain")
+    func vaultIsAPrivateFile() throws {
+        try withVault { _, dir in
+            SteamTokenVault.storage = .file
+            let file = try storeFile(in: dir)
+            let bytes = try Data(contentsOf: file)
+            SteamTokenVault.seal(files: [file])
+
+            #expect(!FileManager.default.fileExists(atPath: file.path))
+            #expect(PrivateFiles.mode(of: SteamTokenVault.storeFile) == 0o600)
+            let excluded = try SteamTokenVault.storeFile.resourceValues(forKeys: [.isExcludedFromBackupKey])
+            #expect(excluded.isExcludedFromBackup == true)
+            #expect(SteamTokenVault.refreshToken(for: "player") == Self.token)
+
+            SteamTokenVault.restore(files: [])
+            #expect(try Data(contentsOf: file) == bytes, "restored byte for byte")
+
+            try SteamTokenVault.forget()
+            #expect(!FileManager.default.fileExists(atPath: SteamTokenVault.storeFile.path))
+        }
+    }
+
+    @Test("A token an older Cellar left in the keychain moves to the file once, without a prompt")
+    func migratesOnce() throws {
+        try withVault { memory, dir in
+            let legacy = LegacyMemory()
+            legacy.value = "sealed-by-0.6.4"
+            SteamTokenVault.legacy = legacy.keychain
+
+            SteamTokenVault.migrateFromKeychain()
+            #expect(memory.value == "sealed-by-0.6.4", "moved into the vault")
+            #expect(legacy.value == nil, "and taken out of the keychain")
+            #expect(FileManager.default.fileExists(atPath: SteamTokenVault.migrationMarker.path))
+
+            legacy.touches = 0
+            SteamTokenVault.migrateFromKeychain()
+            #expect(legacy.touches == 0, "looked at once, never again")
+        }
+    }
+
+    @Test("A keychain item that would prompt is left alone, and asked about only once")
+    func promptingItemIsLeftAlone() throws {
+        try withVault { memory, dir in
+            let legacy = LegacyMemory()
+            legacy.value = "needs-a-prompt"
+            legacy.readableWithoutPrompt = false
+            SteamTokenVault.legacy = legacy.keychain
+
+            SteamTokenVault.migrateFromKeychain()
+            #expect(memory.value == nil, "nothing to restore: Steam asks for one fresh sign-in")
+            legacy.touches = 0
+            _ = SteamTokenVault.refreshToken(for: "Player")
+            SteamTokenVault.migrateFromKeychain()
+            #expect(legacy.touches == 0)
+        }
+    }
+
+    @Test("A launch, a sign-in check and a DepotDownloader run never touch the keychain (#330)")
+    func launchPathNeverTouchesKeychain() throws {
+        try withVault { memory, dir in
+            SteamTokenVault.forcedEnabled = true
+            let legacy = LegacyMemory()
+            SteamTokenVault.legacy = legacy.keychain
+            SteamTokenVault.migrateFromKeychain()   // the one look, on the first run after updating
+            legacy.touches = 0
+
+            // What a run does around DepotDownloader (seal, restore, seal), and what a launch and
+            // the Accounts panel read. `begin()`/`end()` are these plus a lease, and would search
+            // the real isolated storage, so they are not called from a test.
+            let file = try storeFile(in: dir)
+            SteamTokenVault.seal(files: [file])
+            _ = SteamTokenVault.sealedAccounts
+            _ = SteamTokenVault.claims(for: "Player")
+            _ = SteamTokenVault.refreshToken(for: "Player")
+            SteamTokenVault.restore(files: [])
+            SteamTokenVault.seal(files: [file])
+            #expect(memory.value != nil)
+            #expect(legacy.touches == 0)
+        }
+    }
+
+    @Test("Steam's code calls only keychain functions that cannot prompt (#330)")
+    func steamSourcesNeverReadTheKeychain() throws {
+        // `get`/`set`/`remove` on the login keychain are what put "cellar wants to use your
+        // confidential information" on screen whenever `cellar`'s signature changed. Steam's code,
+        // the use cases, the CLI and the app may use none of them.
+        let roots = [Repo.source("CellarData/Stores/Steam"), Repo.source("CellarData/UseCases"),
+                     Repo.app.appendingPathComponent("src")]
+        let forbidden = ["Keychain.get(", "Keychain.set(", "Keychain.remove(", "SecItemCopyMatching", "SecItemAdd"]
+        var offenders: [String] = []
+        for root in roots {
+            let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
+                .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
+            #expect(!files.isEmpty, "\(root.path) has Swift sources")
+            for file in files {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                for call in forbidden where text.contains(call) {
+                    offenders.append("\(file.lastPathComponent): \(call)")
+                }
+            }
+        }
+        #expect(offenders.isEmpty, "\(offenders)")
     }
 }

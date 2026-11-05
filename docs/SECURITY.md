@@ -11,7 +11,7 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
 | What | Where | Protection |
 |---|---|---|
 | GOG OAuth access + refresh token | Login keychain, service `it.clercq.cellar.gog` | `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, labelled "Cellar — GOG sign-in". Read by the CLI only; the app asks `Keychain.contains` (attributes, no secret, no prompt). |
-| Steam refresh token | Login keychain, service `it.clercq.cellar.steam`, between DepotDownloader runs (`SteamTokenVault`) | Restored to DepotDownloader's `account.config` (`0600`, out of backups) only while a run holds a lease, sealed back by the last run to end, deleted only once the keychain returns the exact bytes. A `0600` index beside it names the account and the token's public claims, so the app never reads the item. |
+| Steam refresh token | Cellar's own file `shared/steam-token-store.json`, between DepotDownloader runs (`SteamTokenVault`). **Not the keychain** (#330, Kenneth's call 2026-11-05: the keychain prompted after every new build of the ad-hoc signed CLI) | `0600`, excluded from backups, never logged — the protection DepotDownloader's own file has. Restored to DepotDownloader's `account.config` (`0600`, out of backups) only while a run holds a lease, sealed back by the last run to end, deleted only once the vault file returns the exact bytes. A `0600` index beside it names the account and the token's public claims, so the app never reads the token. A token Cellar ≤ 0.6.4 left in the login keychain is moved over once, only if that needs no prompt, and the keychain is never looked at again. |
 | Steam refresh token, DPAPI-wrapped | Each Steam bottle's `local.vdf` (`ConnectCache`) | `0600`, excluded from backups. The blob is recoverable by anyone holding the file — it is Wine's DPAPI — so it is treated as the token itself and taken back out on sign-out and reset. |
 | Steam access token (only while reading the library) | Memory of the `cellar` process for one request (`SteamOwnedGames`) | Traded for the refresh token at `api.steampowered.com`, then used once to list the library. Both go to curl as a form body on stdin, never argv, a file or a log; nothing is kept. (#288) |
 | Steam account name + dates | `shared/steam-account.json` | `0600` (`PrivateFiles.write`). Not a secret, but it says whose library this is. |
@@ -46,8 +46,13 @@ Apple's Keychain Services guidance: the least permissive accessibility class tha
 
 - **The Steam token is on disk while DepotDownloader runs**, because that is the only place the tool
   reads it. If a run is killed, it stays there (private, out of backups) until the next run ends.
-  `CELLAR_STEAM_TOKEN_VAULT=0` turns sealing off, for diagnosing a keychain problem.
-- **An ad-hoc signed CLI asks for keychain access after each update.** The item trusts the binary
+  `CELLAR_STEAM_TOKEN_VAULT=0` turns sealing off.
+- **The Steam token is a file, not a keychain item (#330).** Anyone who can read the player's files
+  as the player can read it, just as they could read DepotDownloader's own store. Accepted by
+  Kenneth (2026-11-05) to end the keychain prompts; it moves back to the keychain only once the CLI
+  has a stable (Developer ID) signature, and then under a test that the launch path still never
+  prompts (`SteamTokenVaultTests` › `steamSourcesNeverReadTheKeychain`).
+- **An ad-hoc signed CLI asks for keychain access after each update** (now GOG only). The item trusts the binary
   that wrote it, and an ad-hoc signature changes with every build. A Developer ID signature fixes
   this for releases. A build from source (`install-app.sh`) is signed with the Mac's own
   "Apple Development" identity when there is one (`Scripts/local-sign-identity.sh`), with the fixed

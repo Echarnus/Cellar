@@ -99,6 +99,45 @@ public enum Keychain {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Read a secret only if that can be done without asking the player — `nil` instead of the
+    /// "cellar wants to use your confidential information" prompt. For a one-time migration out of
+    /// the keychain (#330), where a prompt is exactly what is being got rid of.
+    ///
+    /// Two switches, because the login keychain is file-based and older than the flag the
+    /// data-protection keychain honours: `kSecUseAuthenticationUIFail` on the query, and the
+    /// process-wide "no user interaction" for the length of the call.
+    static func getWithoutPrompt(account: String, service: String) -> String? {
+        var query = query(account: account, service: service)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        var item: CFTypeRef?
+        let status = withoutInteraction { SecItemCopyMatching(query as CFDictionary, &item) }
+        guard status == errSecSuccess, let data = item as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// Remove an item only if that needs no prompt. True when nothing is left.
+    @discardableResult
+    static func removeWithoutPrompt(account: String?, service: String) -> Bool {
+        var query = query(account: account, service: service)
+        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        for _ in 0..<64 {
+            let status = withoutInteraction { SecItemDelete(query as CFDictionary) }
+            if status == errSecItemNotFound { return true }
+            guard status == errSecSuccess else { return false }
+        }
+        return false
+    }
+
+    private static func withoutInteraction(_ body: () -> OSStatus) -> OSStatus {
+        var allowed: DarwinBoolean = true
+        SecKeychainGetUserInteractionAllowed(&allowed)
+        SecKeychainSetUserInteractionAllowed(false)
+        defer { SecKeychainSetUserInteractionAllowed(allowed.boolValue) }
+        return body()
+    }
+
     static func contains(account: String, service: String) -> Bool {
         var query = query(account: account, service: service)
         query[kSecReturnAttributes as String] = true
