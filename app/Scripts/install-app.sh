@@ -1,5 +1,7 @@
 #!/bin/sh
-# Build CellarApp and install it as ~/Applications/Cellar.app (the native "Steam-like" front-end).
+# Build CellarApp and install it as ~/Applications/Cellar Dev.app (the native "Steam-like" front-end).
+# "Cellar Dev", not "Cellar": a build from source never updates itself, so it must never pass for the
+# release in /Applications, which does. Same bundle identifier, so both share one set of data.
 # Also installs the matching `cellar` CLI into ~/.local/bin, which the app drives for every action.
 set -e
 cd "$(dirname "$0")/.."
@@ -49,7 +51,20 @@ install_file() {
 VERSION="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' Packages/CellarData/Sources/CellarData/Core/CellarVersion.swift)"
 VERSION="${VERSION:-0.0.0}-dev"
 
-APP="$HOME/Applications/Cellar.app"
+APP="$HOME/Applications/Cellar Dev.app"
+# Before #338 this script installed as ~/Applications/Cellar.app, which Spotlight and Launchpad
+# showed beside the release as a second "Cellar" that never updated. Move such a copy to the Bin,
+# but only when its version says it is one of ours ("-dev"): the release can live there too
+# (InstallLocation's fallback for a non-admin account), and that copy is never touched.
+OLD="$HOME/Applications/Cellar.app"
+case "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$OLD/Contents/Info.plist" 2>/dev/null || true)" in
+  *-dev)
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$OLD" 2>/dev/null || true
+    mkdir -p "$HOME/.Trash"
+    mv "$OLD" "$HOME/.Trash/Cellar (old dev build) $(date +%Y%m%d-%H%M%S).app"
+    echo "Moved the old dev build at $OLD to the Bin; local builds are now Cellar Dev."
+    ;;
+esac
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/CellarApp"
@@ -63,7 +78,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0"><dict>
   <key>CFBundleExecutable</key><string>CellarApp</string>
   <key>CFBundleIdentifier</key><string>it.clercq.cellar.app</string>
-  <key>CFBundleName</key><string>Cellar</string>
+  <key>CFBundleName</key><string>Cellar Dev</string>
+  <key>CFBundleDisplayName</key><string>Cellar Dev</string>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleLocalizations</key><array><string>en</string><string>nl</string></array>
   <key>CFBundleGetInfoString</key><string>Cellar — run Windows games on Apple Silicon via Wine + D3DMetal.</string>
