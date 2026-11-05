@@ -77,6 +77,9 @@ public enum ProcessWatch {
     ///   - stage: coarse step reporting for the app's launch window; a retry legitimately goes back
     ///     to `.starting`, which is what makes a second attempt visible rather than a stall.
     ///   - game: the game's name, for the words the player reads.
+    ///   - attemptLog: where this attempt's Wine output goes. Its last lines are copied into
+    ///     Cellar's log whenever an attempt fails, so "never appeared" comes with what Wine said
+    ///     (#334: eight silent attempts, and nothing anywhere to say why).
     ///
     /// A game that closes as it starts is *described*, never diagnosed: Cellar sees a process go
     /// away, not why. Skyrim's eight exits on 2026-11-01 (exit code 54, then 0xC0000005) were all
@@ -91,8 +94,14 @@ public enum ProcessWatch {
                                       keepWaiting: () -> Bool = { true },
                                       diedStarting: (Int) -> Void = { _ in },
                                       game: String = "The game",
+                                      attemptLog: URL? = nil,
                                       progress: (String) -> Void = { _ in },
                                       stage: (LaunchStage) -> Void = { _ in }) throws {
+        func logWhatWineSaid(_ attempt: Int) {
+            guard let attemptLog else { return }
+            CellarLog.warn(.launch, "Attempt \(attempt), \(attemptLog.lastPathComponent): "
+                + attemptLogSummary(attemptLog))
+        }
         var everAppeared = false
         for attempt in 1...max(1, attempts) {
             cleanup()
@@ -113,6 +122,7 @@ public enum ProcessWatch {
                 progress("Attempt \(attempt): the game didn't start; retrying…")
                 CellarLog.warn(.launch, "Start attempt \(attempt) of \(attempts): the game's process "
                     + "never appeared within \(appearSeconds)s. Retrying.")
+                logWhatWineSaid(attempt)
                 continue
             }
 
@@ -133,10 +143,22 @@ public enum ProcessWatch {
             progress(closedAsItStarted(attempt: attempt, within: settleSeconds))
             CellarLog.warn(.launch, "Start attempt \(attempt) of \(attempts): the game appeared and then "
                 + "closed within \(settleSeconds)s. Cleaning up and retrying.")
+            logWhatWineSaid(attempt)
             if attempt < attempts { diedStarting(attempt) }
         }
         CellarLog.error(.launch, "Gave up: the game would not stay up after \(attempts) attempts.")
         throw CellarError.ioFailure(gaveUp(game: game, attempts: attempts, appeared: everAppeared))
+    }
+
+    /// The last lines of one attempt's Wine output, for Cellar's log — or that there were none,
+    /// which is itself the finding: Wine never got as far as loading the game.
+    static func attemptLogSummary(_ log: URL, lines: Int = 15) -> String {
+        guard let data = FileManager.default.contents(atPath: log.path), !data.isEmpty else {
+            return "Wine wrote nothing."
+        }
+        let tail = String(decoding: data.suffix(16_384), as: UTF8.self)
+            .split(whereSeparator: \.isNewline).suffix(lines)
+        return "Wine's last lines:\n" + tail.joined(separator: "\n")
     }
 
     /// What the player reads when an attempt came up and then went away. It says what was seen,
