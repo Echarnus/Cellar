@@ -111,7 +111,9 @@ struct LaunchLifecycleTests {
 
         let call = try #require(FakeWine.calls().last(where: { $0.tool == "wine" && $0.arguments.first == exe.path }),
                                 "Wine was never asked to run the game's exe")
-        #expect(call.directory == exe.deletingLastPathComponent().resolvingSymlinksInPath().path,
+        // Both sides normalised the same way: the shell reports /private/var, Foundation drops /private.
+        let started = URL(fileURLWithPath: call.directory).resolvingSymlinksInPath().path
+        #expect(started == exe.deletingLastPathComponent().resolvingSymlinksInPath().path,
                 "the game started in \(call.directory), not its own DOSBOX folder")
     }
 
