@@ -35,7 +35,8 @@ The full guide is [`skills/swift.md`](../../../skills/swift.md); read it. Key ru
   App/Edit/Window, ⌘Q); bridge menu/button → window via the `.cellarOpenSettings` `Notification`.
   **Never start a process from a view body** (or a lazy property one reads): `waitUntilExit()`
   spins the run loop mid-update, and on macOS 27 the window then silently never redraws. Use
-  `Shell.locate`, not `Shell.which`.
+  `Shell.locate`, not `Shell.which`. In a `static let` a body reads it crashes outright ("trying to
+  lock recursively", #340): read machine facts with `sysctlbyname`, not a process.
 - **Verify** (not by reading the diff): build clean → `swift run cellar selftest` → for GUI, `sh
   app/Scripts/install-app.sh` and launch and exercise the path.
 

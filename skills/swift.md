@@ -83,6 +83,9 @@ executable can't use a `@main` App scene). That host has sharp edges we've alrea
   macOS 27 doing that mid-update leaves the hosting view unable to apply *any* later change: no
   crash, no log, the window just keeps its first render (the library logged "4 shown" and drew
   "Sign in"). Resolve paths with `Shell.locate` (file system only); do real work in actions.
+  A `static let` a body reads is worse: it initialises inside `dispatch_once`, the spun run loop
+  re-enters the body, the body reaches the same `dispatch_once` and libdispatch traps ("trying to
+  lock recursively", #340). Read machine facts with a system call (`sysctlbyname`), not a process.
 - **No `.animation(value:)` / `.transition` on the detail pane, and no `NavigationSplitView`.** Both
   trigger a **fatal AttributeGraph precondition cycle** (Abort trap 6) on launch under
   `NSHostingView`. Use **`HSplitView`**. Only *local* animation is safe (e.g. a row's hover state).

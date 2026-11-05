@@ -3,14 +3,30 @@ import Foundation
 
 /// Detects whether the host Mac is ready to translate Windows games, and powers `cellar doctor`.
 public enum SystemEnvironment {
-    public static var isAppleSilicon: Bool {
-        Shell.run("/usr/sbin/sysctl", ["-n", "hw.optional.arm64"])
-            .stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1"
-    }
+    // Both read with `sysctlbyname`, not by running `sysctl`: a system call starts no process and
+    // never spins the run loop, so `thisMac` below is safe to reach from a view body (#340).
+    public static var isAppleSilicon: Bool { sysctlInt("hw.optional.arm64") == 1 }
 
     public static var chipBrand: String {
-        Shell.run("/usr/sbin/sysctl", ["-n", "machdep.cpu.brand_string"])
-            .stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        (sysctlString("machdep.cpu.brand_string") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// A string `sysctl` value, such as `machdep.cpu.brand_string`, or nil when this Mac has none.
+    static func sysctlString(_ name: String) -> String? {
+        var size = 0
+        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
+        return String(decoding: buffer.prefix { $0 != 0 }, as: UTF8.self)
+    }
+
+    /// An integer `sysctl` value, such as `hw.optional.arm64`, or nil when this Mac has none (an
+    /// Intel Mac has no `hw.optional.arm64` at all).
+    static func sysctlInt(_ name: String) -> Int? {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
+        return Int(value)
     }
 
     public static var macOSVersion: OperatingSystemVersion {
@@ -281,6 +297,11 @@ public enum SystemEnvironment {
 extension SystemEnvironment {
     /// This Mac's chip and memory, for comparing with a game's `MacRequirements`. Read once: neither
     /// changes while Cellar runs.
+    ///
+    /// A game's page reads this from its view body, and a `static let` initialises inside
+    /// `dispatch_once`. So nothing here may start a process: `Shell.run` spins the main run loop,
+    /// SwiftUI re-enters the body, reaches this `dispatch_once` again and libdispatch traps
+    /// ("trying to lock recursively", #340). `SystemEnvironmentTests` holds it to that.
     public static let thisMac: MacRequirements.ThisMac = MacRequirements.ThisMac(
         chip: MacChip(chipBrand),
         memoryGB: Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824))
