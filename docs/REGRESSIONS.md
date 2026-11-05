@@ -11,6 +11,7 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #332 | Opening a game's page crashed the app: reading this Mac's chip started `sysctl`, whose wait let the page redraw inside a one-time initialiser | `ThisMacTests.swift` › `readsWithoutTheRunLoop`, `watchCatchesAProcess` |
 | #325 | A game started in Cellar's folder instead of its own, so one that opens its files by relative path (Theme Hospital's DOSBox and its settings) found none of them | `LaunchLifecycleTests.swift` › `gameStartsInItsOwnFolder`, `alongsideStartsInItsOwnFolder` |
 | #310 | Skyrim opened in a small titled window instead of full screen | `DisplayIniTests.swift` › `skyrimFileIsFixed` |
 | #310 | Skyrim, GTA V, Stardew Valley and The Witcher 3 showed Metal's frame-rate overlay to every player | `DisplayIniTests.swift` › `noProfileShowsTheOverlay` |
