@@ -47,3 +47,6 @@ for what only a real game shows.
 | #270 | A second Ctrl-C (or SIGTERM after SIGINT) during `cellar verify` left the bottle's Steam and wineserver running and the report saying "still running" | `VerificationTests.swift` › `stoppedAtOnce` |
 | #273 | Even one Ctrl-C ended `cellar verify` at once: the CLI's process-wide stop re-raised the signal before verify's own teardown ran, leaving Steam and wineserver running | `ChildProcessesTests.swift` › `leaveStopToCommand` |
 | #258 | `cellar verify` passed a failed Frontier account call | `VerificationTests.swift` › `onlineErrorsFailGameOnline` |
+| #334 | Play started Assetto Corsa beside a Steam that was running but had never signed in (an earlier client's logon in the shared log was taken for its own), so the game never appeared | `RunningSteamSignInTests.swift` › `earlierClientsLogonIsNotThisOnes` |
+| #334 | A start attempt that never came up left nothing to read: Wine ran with `-all` and the game log was empty | `RunningSteamSignInTests.swift` › `attemptLogSummary` |
+| #334 | A DLC depot without a licence made the update check say "this account doesn't own it" | `RunningSteamSignInTests.swift` › `dlcDepotIsNotTheGame` |

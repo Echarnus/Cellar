@@ -323,11 +323,22 @@ public enum DepotTool {
         var access: Access? { if case .answer(let access) = self { return access }; return nil }
     }
 
+    /// Whether a DepotDownloader line says the **app** is not on this account.
+    ///
+    /// It prints the same words for each depot it has no licence for — a DLC the player never
+    /// bought, a soundtrack — and those say nothing about the game: Assetto Corsa's update check
+    /// read one as "Steam says this account doesn't own it" every time (#334). Only the `App …`
+    /// line is the verdict.
+    static func appIsUnavailable(_ line: String) -> Bool {
+        let text = line.trimmingCharacters(in: .whitespaces)
+        return text.hasPrefix("App ") && text.contains("is not available from this account")
+    }
+
     static func probeVerdict(in line: String) -> ProbeVerdict? {
         // Printed before "Using app branch", so it settles the question first.
         if line.contains("Obtained FreeOnDemand license") {
             return .answer(.claimedFree)
-        } else if line.contains("is not available from this account") {
+        } else if appIsUnavailable(line) {
             return .answer(.unavailable)
         } else if line.contains("Processing depot") || line.contains("Got manifest request code")
                     || line.contains("Using app branch") {
