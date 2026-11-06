@@ -51,21 +51,29 @@ struct LibraryRecheckTests {
     @Test("A pull asks once, when it passes the threshold, and again only after the list comes to rest")
     func pullFiresOncePerGesture() {
         var pull = PullToRefresh()
-        #expect(!pull.update(overscroll: 8), "the bounce at the top of a short list is not a request")
-        #expect(!pull.update(overscroll: PullToRefresh.threshold - 1))
-        #expect(pull.update(overscroll: PullToRefresh.threshold), "past the threshold: ask")
-        #expect(!pull.update(overscroll: PullToRefresh.threshold + 30), "still the same pull")
-        #expect(!pull.update(overscroll: 20))
-        #expect(!pull.update(overscroll: 0), "back at rest")
+        let asked1 = pull.update(overscroll: 8)
+        #expect(!asked1, "the bounce at the top of a short list is not a request")
+        let asked2 = pull.update(overscroll: PullToRefresh.threshold - 1)
+        #expect(!asked2)
+        let asked3 = pull.update(overscroll: PullToRefresh.threshold)
+        #expect(asked3, "past the threshold: ask")
+        let asked4 = pull.update(overscroll: PullToRefresh.threshold + 30)
+        #expect(!asked4, "still the same pull")
+        let asked5 = pull.update(overscroll: 20)
+        #expect(!asked5)
+        let asked6 = pull.update(overscroll: 0)
+        #expect(!asked6, "back at rest")
         #expect(pull.progress == 0)
-        #expect(pull.update(overscroll: PullToRefresh.threshold + 5), "a new pull asks again")
+        let asked7 = pull.update(overscroll: PullToRefresh.threshold + 5)
+        #expect(asked7, "a new pull asks again")
     }
 
     @Test("Scrolling down the list is never a pull")
     func scrollingIsNotAPull() {
         var pull = PullToRefresh()
         for offset in stride(from: 0.0, through: -800, by: -40) {
-            #expect(!pull.update(overscroll: offset))
+            let asked = pull.update(overscroll: offset)
+            #expect(!asked)
         }
         #expect(pull.distance == 0)
     }
