@@ -360,6 +360,23 @@ extension SteamClientSession {
         return UInt64(text.utf8.distance(from: text.utf8.startIndex, to: lineEnd))
     }
 
+    /// When the running client wrote its first line: the first `[yyyy-MM-dd HH:mm:ss]` stamp of its
+    /// own stretch of the log, in the Mac's time zone, as Steam writes it. Nil when it wrote none.
+    static func runningClientStart(inConnectionLog text: String, timeZone: TimeZone = .current) -> Date? {
+        let utf8 = text.utf8
+        let start = utf8.index(utf8.startIndex, offsetBy: Int(currentSessionOffset(inConnectionLog: text)))
+        let own = String(text[start...])
+        guard let regex = try? NSRegularExpression(pattern: #"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]"#,
+                                                   options: .anchorsMatchLines),
+              let match = regex.firstMatch(in: own, range: NSRange(own.startIndex..., in: own)),
+              let stamp = Range(match.range(at: 1), in: own) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: String(own[stamp]))
+    }
+
     /// The running client's verdict: its own stretch of the log, read as `logonResult` reads one.
     static func runningClientLogon(inConnectionLog text: String) -> LogonResult? {
         let utf8 = text.utf8

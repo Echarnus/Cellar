@@ -76,6 +76,51 @@ struct SteamClientStartTests {
                                               running: { true }, ready: { false }, sleep: { _ in })
     }
 
+    // MARK: - The runner the client runs on (2026-11-06)
+
+    /// Theme Hospital's bottle runs WineD3D. Steam's browser found no Direct3D 11 it could use
+    /// there, never drew its page, never ran its sign-in, and the launch sat on "Opening Steam".
+
+    func wineForgeInstall(named name: String) throws -> RunnerInstall {
+        TestHome.ensure()
+        let root = TestHome.scratch(name)
+        let external = root.appendingPathComponent("wine/lib/d3dmetal/external", isDirectory: true)
+        try FileManager.default.createDirectory(at: external, withIntermediateDirectories: true)
+        try Data().write(to: external.appendingPathComponent("libd3dshared.dylib"))
+        return RunnerInstall(spec: RunnerCatalog.wineforge, root: root,
+                             wineBinary: root.appendingPathComponent("wine/bin/wine"))
+    }
+
+    @Test("A WineD3D game's Steam runs on D3DMetal, in the same bottle and language")
+    func wined3dClientRunsOnD3DMetal() throws {
+        let install = try wineForgeInstall(named: "runner-client-backend")
+        let prefix = TestHome.scratch("bottle-wined3d")
+        let game = WineRunner(install: install, prefix: prefix, backend: .wined3d, language: .dutch)
+        let client = SteamBottle.clientRunner(game)
+        #expect(client.backend == .d3dmetal)
+        #expect(client.prefix == prefix)
+        #expect(client.language == .dutch)
+        #expect(client.environment()["GRAPHICS_BACKEND"] == "d3dmetal")
+        #expect(game.environment()["GRAPHICS_BACKEND"] == nil, "the game itself keeps WineD3D")
+    }
+
+    @Test("Every other backend's Steam runs as the game does", arguments: [GraphicsBackend.d3dmetal, .dxvk, .dxmt])
+    func otherBackendsUnchanged(_ backend: GraphicsBackend) throws {
+        let install = try wineForgeInstall(named: "runner-client-\(backend.rawValue)")
+        let game = WineRunner(install: install, prefix: TestHome.scratch("bottle-\(backend.rawValue)"), backend: backend)
+        #expect(SteamBottle.clientRunner(game).backend == backend)
+    }
+
+    @Test("Without D3DMetal on disk there is nothing better to give the client, so it stays as it was")
+    func noD3DMetalNoSwitch() throws {
+        TestHome.ensure()
+        let root = TestHome.scratch("runner-no-d3dmetal")
+        let install = RunnerInstall(spec: RunnerCatalog.wineforge, root: root,
+                                    wineBinary: root.appendingPathComponent("wine/bin/wine"))
+        let game = WineRunner(install: install, prefix: TestHome.scratch("bottle-plain"), backend: .wined3d)
+        #expect(SteamBottle.clientRunner(game).backend == .wined3d)
+    }
+
     // MARK: - The test harness itself
 
     @Test("The fake Wine is never written through a link into a real runner")

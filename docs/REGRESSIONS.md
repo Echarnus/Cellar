@@ -55,3 +55,6 @@ for what only a real game shows.
 | #334 | Play started Assetto Corsa beside a Steam that was running but had never signed in (an earlier client's logon in the shared log was taken for its own), so the game never appeared | `RunningSteamSignInTests.swift` › `earlierClientsLogonIsNotThisOnes` |
 | #334 | A start attempt that never came up left nothing to read: Wine ran with `-all` and the game log was empty | `RunningSteamSignInTests.swift` › `attemptLogSummary` |
 | #334 | A DLC depot without a licence made the update check say "this account doesn't own it" | `RunningSteamSignInTests.swift` › `dlcDepotIsNotTheGame` |
+| #349 | Theme Hospital (WineD3D) sat on "Opening Steam": Steam's browser had no Direct3D 11 under WineD3D, never drew its page, never signed in | `SteamClientStartTests.swift` › `wined3dClientRunsOnD3DMetal` |
+| #349 | A Steam left running signed out by a cancelled launch made the next Play wait 90 s on it before restarting it | `RunningSteamSignInTests.swift` › `staleSignedOutClientIsRestarted` |
+| #349 | "Your Steam sign-in is kept" was shown while the library said Steam had turned the sign-in down | `RunningSteamSignInTests.swift` › `failureWordingFollowsTheSignIn` |
