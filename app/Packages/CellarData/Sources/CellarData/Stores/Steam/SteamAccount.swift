@@ -319,6 +319,9 @@ public enum SteamAccount {
     /// Called with every line of every DepotDownloader run.
     public static func note(_ line: String) {
         if let reason = rejection(in: line) {
+            // Steam's own words, so the next refusal says why in the log instead of only
+            // "DepotDownloader exited 1" (#345). The line names a reason, never a token.
+            CellarLog.warn(.account, "Steam refused the saved sign-in: \(line.trimmingCharacters(in: .whitespaces))")
             guard var record else { return }
             record.rejectedAt = Date()
             record.rejectionReason = reason

@@ -92,17 +92,21 @@ struct LibraryView: View {
         }
     }
 
-    /// Which games are the player's, asked of the stores (#343). Every launch asks once, at once
+    /// Which games are the player's, asked of the stores (#343). Every launch checks at once
     /// (Kenneth: "should be checked at startup"), so a game bought, or added by an update, since
-    /// the last run shows without anyone asking. After that, every half hour when the answers are a
+    /// the last run shows without anyone asking — but asks Steam only when its answers are over an
+    /// hour old (#345: asking at every launch got the sign-in refused). After that, every half hour when the answers are a
     /// day old or a game Cellar now knows has none. Quietly, beside whatever else runs; a pull on
     /// the sidebar asks in the open (`checkLibrary`).
     private func keepOwnershipCurrent() async {
         while !Task.isCancelled {
-            var due = !Self.askedThisLaunch
-            if !due {
-                due = await Task.detached(priority: .utility, operation: { StoreLibrary.steamNeedsRefresh }).value
-            }
+            // A launch asks only when the answers are over an hour old (#345): each ask trades the
+            // Steam sign-in, and asking at every launch got it refused.
+            let launch = !Self.askedThisLaunch
+            let due = await Task.detached(priority: .utility, operation: {
+                launch ? StoreLibrary.steamLaunchCheckDue : StoreLibrary.steamNeedsRefresh
+            }).value
+            if launch, !due { Self.askedThisLaunch = true }
             if due, lib.hasConnectedStore, !runner.busy {
                 Self.askedThisLaunch = true
                 if await runner.runBeside(.refreshLibrary) == 0 { lib.refresh() }
