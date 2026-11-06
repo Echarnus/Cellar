@@ -85,6 +85,12 @@ struct LibraryView: View {
                 lastDatabaseCheck = Date()
                 if await runner.runBeside(.updateProfiles(quiet: true)) == 0 { lib.refresh() }
             }
+            // The Steam library, the same quiet way: once a day, and at once when a game Cellar
+            // now knows (a profile an update brought) has never been asked about (#343).
+            if !runner.busy,
+               await Task.detached(priority: .utility, operation: { StoreLibrary.steamNeedsRefresh }).value {
+                if await runner.runBeside(.refreshLibrary) == 0 { lib.refresh() }
+            }
             try? await Task.sleep(for: .seconds(30 * 60))
         }
     }
