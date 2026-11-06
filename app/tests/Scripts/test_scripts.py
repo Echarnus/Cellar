@@ -304,6 +304,47 @@ class RegressionLedgerTests(unittest.TestCase):
                 self.assertIn(pattern, handle.read(), f"{name} has no {func}: {row.strip()}")
 
 
+class MakeDmgRetryTests(unittest.TestCase):
+    """`make-dmg.sh` rides out a busy disk-image helper instead of failing the release (#347)."""
+
+    SCRIPT = os.path.join(ROOT, "Scripts", "make-dmg.sh")
+
+    def _run(self, failures):
+        with open(self.SCRIPT, encoding="utf-8") as handle:
+            source = handle.read()
+        start = source.index("retry_hdiutil() {")
+        function = source[start:source.index("\n}\n", start) + 3]
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = os.path.join(tmp, "hdiutil")
+            count = os.path.join(tmp, "count")
+            with open(fake, "w", encoding="utf-8") as handle:
+                handle.write(f"""#!/bin/sh
+n=$(cat "{count}" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "{count}"
+[ "$n" -gt {failures} ] || {{ echo "hdiutil: create failed - Resource busy" >&2; exit 1; }}
+""")
+            os.chmod(fake, 0o755)
+            script = "sleep() { :; }\n" + function + "retry_hdiutil create -ov x.dmg\n"
+            result = subprocess.run(["sh", "-c", script], env={**os.environ, "PATH": f"{tmp}:{os.environ['PATH']}"},
+                                    capture_output=True, text=True)
+            with open(count, encoding="utf-8") as handle:
+                return result.returncode, int(handle.read())
+
+    def test_busy_disk_is_retried(self):
+        self.assertEqual(self._run(failures=2), (0, 3))
+
+    def test_gives_up_eventually(self):
+        code, calls = self._run(failures=99)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(calls, 5)
+
+    def test_create_and_convert_use_it(self):
+        with open(self.SCRIPT, encoding="utf-8") as handle:
+            source = handle.read()
+        self.assertIn("retry_hdiutil create ", source)
+        self.assertIn("retry_hdiutil convert ", source)
+        self.assertNotIn("\nhdiutil create ", source)
+
+
 class CloseReleaseIssueTests(unittest.TestCase):
     """The release workflow closes the issue that asked for the release (0.4.1 and 0.4.2 stayed open)."""
 

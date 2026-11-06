@@ -11,6 +11,7 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #347 | The 0.6.8 release stopped after every test passed: building the installer disk image hit a busy disk once (`hdiutil: Resource busy`) | `test_scripts.py` › `test_busy_disk_is_retried` |
 | #345 | Steam refused the saved sign-in minutes after signing in: 0.6.7 traded it for Steam's library list at every launch, often several times within seconds | `LibraryRecheckTests.swift` › `launchAsksOnlyWhenAnHourOld`, `asksMomentsApartReuseTheAnswer`, `appUsesTheLaunchRule` |
 | #330 | macOS kept asking to let `cellar` use the Steam sign-in in the keychain, after every new build of the CLI | `SteamTokenVaultTests.swift` › `launchPathNeverTouchesKeychain`, `steamSourcesNeverReadTheKeychain`, `migratesOnce` |
 | #332 | Opening a game's page crashed the app: reading this Mac's chip started `sysctl`, whose wait let the page redraw inside a one-time initialiser | `ThisMacTests.swift` › `readsWithoutTheRunLoop`, `watchCatchesAProcess` |
