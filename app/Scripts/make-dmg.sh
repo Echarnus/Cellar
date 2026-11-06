@@ -85,8 +85,19 @@ cp "$APP/Contents/Resources/AppIcon.icns" "$STAGE/.VolumeIcon.icns"
 # on, and it mounts on every macOS Cellar supports. Sized with headroom for Finder's .DS_Store.
 RW="$TMP/rw.dmg"
 SIZE_MB=$(( $(du -sm "$STAGE" | cut -f1) + 32 ))
-hdiutil create -volname "$VOLNAME" -srcfolder "$STAGE" -fs HFS+ -format UDRW -size "${SIZE_MB}m" \
-  -ov "$RW" >/dev/null
+# hdiutil now and then fails with "Resource busy" while macOS's disk-image helper is still holding
+# the last image (#347: it stopped the 0.6.8 release). It is transient, so give it a few tries.
+retry_hdiutil() {
+  tries=0
+  until hdiutil "$@" >/dev/null; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 5 ] || { echo "hdiutil $1 failed $tries times"; return 1; }
+    echo "hdiutil $1 failed; trying again in $((tries * 5))s"
+    sleep $((tries * 5))
+  done
+}
+retry_hdiutil create -volname "$VOLNAME" -srcfolder "$STAGE" -fs HFS+ -format UDRW -size "${SIZE_MB}m" \
+  -ov "$RW"
 # Not -nobrowse: Finder has to see the volume to lay its window out.
 MOUNT="$(hdiutil attach "$RW" -readwrite -noverify -noautoopen \
   | awk -F '\t' '/\/Volumes\// { print $NF; exit }')"
@@ -164,7 +175,7 @@ MOUNT=""
 # --- The read-only, compressed image players download ------------------------------------------
 # ULMO (LZMA) is the smallest format macOS mounts natively, from 10.15 — Cellar needs 13.
 rm -f "$DMG"
-hdiutil convert "$RW" -format ULMO -o "$DMG" >/dev/null
+retry_hdiutil convert "$RW" -format ULMO -ov -o "$DMG"
 
 # Signed and notarised only when there is a Developer ID to do it with (Scripts/sign-app.sh).
 IDENTITY="${CELLAR_SIGN_IDENTITY:--}"
