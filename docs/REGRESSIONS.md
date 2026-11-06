@@ -12,6 +12,8 @@ for what only a real game shows.
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
 | #330 | macOS kept asking to let `cellar` use the Steam sign-in in the keychain, after every new build of the CLI | `SteamTokenVaultTests.swift` › `launchPathNeverTouchesKeychain`, `steamSourcesNeverReadTheKeychain`, `migratesOnce` |
+| #332 | Opening a game's page crashed the app: reading this Mac's chip started `sysctl`, whose wait let the page redraw inside a one-time initialiser | `ThisMacTests.swift` › `readsWithoutTheRunLoop`, `watchCatchesAProcess` |
+| #343 | A game added by an update (Theme Hospital, in 0.6.5) never showed in the library: Steam was only asked again at sign-in | `LibraryRecheckTests.swift` › `newProfileIsAskedAbout`, `appAsksWhenDue`, `pullFiresOncePerGesture` |
 | #325 | A game started in Cellar's folder instead of its own, so one that opens its files by relative path (Theme Hospital's DOSBox and its settings) found none of them | `LaunchLifecycleTests.swift` › `gameStartsInItsOwnFolder`, `alongsideStartsInItsOwnFolder` |
 | #310 | Skyrim opened in a small titled window instead of full screen | `DisplayIniTests.swift` › `skyrimFileIsFixed` |
 | #310 | Skyrim, GTA V, Stardew Valley and The Witcher 3 showed Metal's frame-rate overlay to every player | `DisplayIniTests.swift` › `noProfileShowsTheOverlay` |
@@ -48,3 +50,6 @@ for what only a real game shows.
 | #270 | A second Ctrl-C (or SIGTERM after SIGINT) during `cellar verify` left the bottle's Steam and wineserver running and the report saying "still running" | `VerificationTests.swift` › `stoppedAtOnce` |
 | #273 | Even one Ctrl-C ended `cellar verify` at once: the CLI's process-wide stop re-raised the signal before verify's own teardown ran, leaving Steam and wineserver running | `ChildProcessesTests.swift` › `leaveStopToCommand` |
 | #258 | `cellar verify` passed a failed Frontier account call | `VerificationTests.swift` › `onlineErrorsFailGameOnline` |
+| #334 | Play started Assetto Corsa beside a Steam that was running but had never signed in (an earlier client's logon in the shared log was taken for its own), so the game never appeared | `RunningSteamSignInTests.swift` › `earlierClientsLogonIsNotThisOnes` |
+| #334 | A start attempt that never came up left nothing to read: Wine ran with `-all` and the game log was empty | `RunningSteamSignInTests.swift` › `attemptLogSummary` |
+| #334 | A DLC depot without a licence made the update check say "this account doesn't own it" | `RunningSteamSignInTests.swift` › `dlcDepotIsNotTheGame` |

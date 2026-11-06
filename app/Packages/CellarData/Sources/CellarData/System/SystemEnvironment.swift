@@ -8,9 +8,20 @@ public enum SystemEnvironment {
             .stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1"
     }
 
+    /// "Apple M2 Pro". Read with `sysctlbyname`, not by starting `sysctl`: a game page reads it
+    /// while it draws, and `Shell.run`'s `waitUntilExit` spins the run loop, which let SwiftUI draw
+    /// the page again inside `thisMac`'s one-time initialiser and crashed the app (#332).
     public static var chipBrand: String {
-        Shell.run("/usr/sbin/sysctl", ["-n", "machdep.cpu.brand_string"])
-            .stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        sysctlString("machdep.cpu.brand_string") ?? ""
+    }
+
+    /// A string-valued sysctl, read in-process. Nil when the name doesn't exist on this Mac.
+    static func sysctlString(_ name: String) -> String? {
+        var size = 0
+        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+        var bytes = [CChar](repeating: 0, count: size)
+        guard sysctlbyname(name, &bytes, &size, nil, 0) == 0 else { return nil }
+        return String(cString: bytes).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public static var macOSVersion: OperatingSystemVersion {
@@ -280,8 +291,13 @@ public enum SystemEnvironment {
 
 extension SystemEnvironment {
     /// This Mac's chip and memory, for comparing with a game's `MacRequirements`. Read once: neither
-    /// changes while Cellar runs.
-    public static let thisMac: MacRequirements.ThisMac = MacRequirements.ThisMac(
-        chip: MacChip(chipBrand),
-        memoryGB: Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824))
+    /// changes while Cellar runs. A game page reads it while it draws, so reading it must never
+    /// start a process or spin the run loop (#332): `readThisMac()` is tested for exactly that.
+    public static let thisMac: MacRequirements.ThisMac = readThisMac()
+
+    static func readThisMac() -> MacRequirements.ThisMac {
+        MacRequirements.ThisMac(
+            chip: MacChip(chipBrand),
+            memoryGB: Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824))
+    }
 }

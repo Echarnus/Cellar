@@ -144,15 +144,22 @@ public enum Reset {
     /// The identifier every Cellar.app carries, whatever its file is called.
     static let appIdentifier = "it.clercq.cellar.app"
 
-    /// Where a Cellar.app may be: next to the generated launchers (where `install-app.sh` puts it),
-    /// in /Applications (where the DMG puts it), or wherever this process is running from. Each one
+    /// What a build from source is called (`install-app.sh`): not "Cellar", so it is never mistaken
+    /// for the release, which updates itself where a dev build does not.
+    static let devAppName = "Cellar Dev.app"
+
+    /// Where a Cellar.app may be: next to the generated launchers (where a release moved there, or
+    /// `install-app.sh`'s Cellar Dev.app, lives), in /Applications (where the DMG puts it), or
+    /// wherever this process is running from. Each one
     /// is only counted if its Info.plist says it *is* Cellar — never by file name alone.
     ///
     /// A relocated Cellar (`CELLAR_HOME` / `CELLAR_APPLICATIONS_DIR`, which tests and throwaway
     /// installs use) only ever looks inside its own applications folder, so it can never plan to
     /// remove the player's real copy.
     static var cellarApps: [URL] {
-        var candidates = [AppBundle.applicationsDirectory.appendingPathComponent("Cellar.app", isDirectory: true)]
+        var candidates = ["Cellar.app", devAppName].map {
+            AppBundle.applicationsDirectory.appendingPathComponent($0, isDirectory: true)
+        }
         if !isRelocated {
             candidates.append(URL(fileURLWithPath: "/Applications/Cellar.app", isDirectory: true))
             if Bundle.main.bundleURL.pathExtension == "app" { candidates.append(Bundle.main.bundleURL) }

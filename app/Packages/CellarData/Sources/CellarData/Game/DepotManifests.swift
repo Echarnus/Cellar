@@ -117,7 +117,7 @@ public enum DepotManifests {
             } else if let manifest = Self.number(after: "Manifest ", in: text), text.hasPrefix("Manifest "),
                       let current {
                 manifests[current] = manifest
-            } else if text.contains("is not available from this account") {
+            } else if DepotTool.appIsUnavailable(text) {
                 failure = "Steam says this account doesn't own it"
             } else if text.contains("Access token was rejected") {
                 failure = "your Steam sign-in has expired"

@@ -267,7 +267,9 @@ The chain of trust is an **EdDSA key**, not Apple code signing (there is no Deve
 - `app/Resources/sparkle-public-key` holds the public half. `app/Scripts/package.sh` writes it into
   Info.plist as `SUPublicEDKey`, with `SUFeedURL`, and only when the file exists — before that, a
   release simply ships with updates switched off. `app/Scripts/install-app.sh` never writes either, so a
-  build from source never replaces itself with a release.
+  build from source never replaces itself with a release. It installs as **Cellar Dev**
+  (`~/Applications/Cellar Dev.app`) so it is never mistaken for the release beside it: a dev copy
+  called "Cellar" is the one Spotlight opened, and it never showed the update that was waiting (#338).
 - The private half lives in the maintainer's login keychain and in the `SPARKLE_ED_PRIVATE_KEY`
   secret of the `release` environment (not a repository secret, so no PR run can read it), and
   nowhere else. `app/Scripts/make-appcast.sh <version> <notes.md>` signs the

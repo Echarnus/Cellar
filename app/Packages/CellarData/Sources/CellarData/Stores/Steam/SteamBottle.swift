@@ -494,18 +494,8 @@ public enum SteamBottle {
         // Warm the client first: launching the game into a not-yet-ready Steam makes the D3DMetal
         // race fire almost every time. Start Steam silently (tray only) with the game's env, wait
         // for it to come up, then drive the game into the warm client.
-        if !isRunning(in: runner.prefix) {
-            stage(.client)
-            progress("Starting Steam (silent) and waiting for it to be ready…")
-            let mark = connectionLogMark(in: runner.prefix)
-            try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
-            try waitForClientToComeUp(prefix: runner.prefix, game: game)
-            if expectsSignIn {
-                try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
-                                       gameEnv: gameEnv, progress: progress, stage: stage)
-            }
-            Thread.sleep(forTimeInterval: 6) // let login settle
-        }
+        try bringUpClient(runner: runner, showHUD: showHUD, gameEnv: gameEnv, game: game,
+                          expectsSignIn: expectsSignIn, progress: progress, stage: stage)
 
         var everAppeared = false
         for attempt in 1...attempts {
@@ -645,24 +635,16 @@ public extension SteamBottle {
                                 progress: (String) -> Void = { _ in },
                                 stage: (LaunchStage) -> Void = { _ in }) throws {
         SteamDRM.markAppDirectory(exe.deletingLastPathComponent(), appID: appID)
-        if !isRunning(in: runner.prefix) {
-            stage(.client)
-            progress("Starting Steam (silent) and waiting for it to be ready…")
-            let mark = connectionLogMark(in: runner.prefix)
-            try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
-            try waitForClientToComeUp(prefix: runner.prefix, game: game)
-            if expectsSignIn {
-                try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
-                                       gameEnv: gameEnv, progress: progress, stage: stage)
-            }
-            Thread.sleep(forTimeInterval: 6)   // let the sign-in settle before the game asks
-        }
+        try bringUpClient(runner: runner, showHUD: showHUD, gameEnv: gameEnv, game: game,
+                          expectsSignIn: expectsSignIn, progress: progress, stage: stage)
         func environment(_ gameEnv: [String: String]) -> [String: String] {
             var env = WineRunner.d3dMetalEnv(showHUD: showHUD)
             for (key, value) in gameEnv { env[key] = value }
             // What steam_api looks at when a game was not started by the client.
             env["SteamAppId"] = "\(appID)"
             env["SteamGameId"] = "\(appID)"
+            // Wine's own errors, so a game that never comes up leaves a reason in its log (#334).
+            env["WINEDEBUG"] = startupWineDebug(env["WINEDEBUG"])
             return env
         }
         var env = environment(gameEnv)
@@ -703,6 +685,9 @@ public extension SteamBottle {
             cleanup: { ProcessWatch.kill([watched, started.lastPathComponent, "crash_reporter.exe"]) },
             start: {
                 attemptBegan = Date()
+                CellarLog.debug(.launch, "Starting \(started.lastPathComponent) in \(started.deletingLastPathComponent().path)"
+                    + (arguments.isEmpty ? "" : " with \(arguments.joined(separator: " "))")
+                    + ", WINEDEBUG=\(env["WINEDEBUG"] ?? "unset"), watching for \(watched); output in \(log.lastPathComponent).")
                 // In the started program's own folder, as Steam starts it (#325).
                 try runner.spawn([started.path] + arguments, extraEnv: env, log: log, bundledLoader: bundledLoader,
                                  directory: started.deletingLastPathComponent())
@@ -713,9 +698,21 @@ public extension SteamBottle {
                 if let restored = fallback.diedStarting(progress: progress) { env = environment(restored) }
             },
             game: game,
+            attemptLog: log,
             progress: progress,
             stage: stage)
         fallback.stayedUp()
+    }
+
+    /// `WINEDEBUG` for a game Cellar starts itself: whatever the profile asked for, plus Wine's
+    /// error lines for loading DLLs and unhandled exceptions. Those are the lines that say why a
+    /// process never appeared, and they cost nothing while the game runs: they are only written
+    /// when something has already gone wrong. Everything else stays as quiet as `-all` kept it.
+    internal static func startupWineDebug(_ current: String?) -> String {
+        let channels = "err+module,err+seh"
+        guard let current, !current.isEmpty else { return "-all," + channels }
+        if current.contains(channels) { return current }
+        return current + "," + channels
     }
 
     /// How long a launch through a publisher launcher waits for the game: long enough to sign in to
@@ -841,6 +838,74 @@ public extension SteamBottle {
         return vdf.text
     }
 
+    /// Have this bottle's client up **and signed in** before a game is started beside it or
+    /// through it.
+    ///
+    /// A cold start waits for the logon as it always has. A client that is already running is not
+    /// taken on trust any more: on 2026-11-05 a Steam whose window process hung never logged on,
+    /// the launch that started it was cancelled, and the next Play saw "Steam is running" and sent
+    /// Assetto Corsa to a client still at `[U:1:0]` — eight silent attempts and no window (#334).
+    /// So the running client's own stretch of the connection log is read, and one that has not
+    /// signed in is waited for, then restarted, exactly as a cold start would be.
+    internal static func bringUpClient(runner: WineRunner, showHUD: Bool, gameEnv: [String: String],
+                              game: String, expectsSignIn: Bool,
+                              progress: (String) -> Void, stage: (LaunchStage) -> Void) throws {
+        guard isRunning(in: runner.prefix) else {
+            stage(.client)
+            progress("Starting Steam (silent) and waiting for it to be ready…")
+            let mark = connectionLogMark(in: runner.prefix)
+            try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
+            try waitForClientToComeUp(prefix: runner.prefix, game: game)
+            if expectsSignIn {
+                try waitForClientLogon(runner: runner, since: mark, game: game, showHUD: showHUD,
+                                       gameEnv: gameEnv, progress: progress, stage: stage)
+            }
+            CellarLog.info(.session, "Steam started for \(game)" + (expectsSignIn ? " and signed in." : "."))
+            Thread.sleep(forTimeInterval: 6)   // let the sign-in settle before the game asks
+            return
+        }
+        let session = runningSession(in: runner.prefix)
+        switch reusedClientAction(session.logon) {
+        case .useIt:
+            CellarLog.info(.session, "Steam is already running in this bottle and signed in; \(game) uses it.")
+        case .waitForLogon:
+            CellarLog.warn(.session, "Steam is already running in this bottle but has not signed in "
+                + "(\(session.logon.map(String.init(describing:)) ?? "no logon in its connection log yet")). "
+                + "Waiting for it before \(game) starts, and restarting it if it stays silent.")
+            stage(.client)
+            progress("Steam is open but not signed in yet — waiting for it before \(game) starts…")
+            try waitForClientLogon(runner: runner, since: session.offset, game: game, showHUD: showHUD,
+                                   gameEnv: gameEnv, timeout: reusedClientLogonTimeout,
+                                   progress: progress, stage: stage)
+            CellarLog.info(.session, "Steam signed in; starting \(game).")
+            Thread.sleep(forTimeInterval: 6)
+        }
+    }
+
+    /// How long a client that is already up gets to sign in before it is restarted. Shorter than a
+    /// cold start's wait: it has had its head start, and a logon lands 20–40 s after Steam starts.
+    internal static let reusedClientLogonTimeout: TimeInterval = 90
+
+    /// What to do with a client found already running, from its own logon so far.
+    internal enum ReusedClient: Equatable {
+        case useIt
+        case waitForLogon
+    }
+
+    internal static func reusedClientAction(_ logon: SteamClientSession.LogonResult?) -> ReusedClient {
+        logon == .loggedOn ? .useIt : .waitForLogon
+    }
+
+    /// The running client's own stretch of the connection log: where it begins, and how its logon
+    /// went so far.
+    internal static func runningSession(in prefix: URL) -> (offset: UInt64, logon: SteamClientSession.LogonResult?) {
+        let log = logsDirectory(in: prefix).appendingPathComponent("connection_log.txt")
+        guard let data = FileManager.default.contents(atPath: log.path) else { return (0, nil) }
+        let text = String(decoding: data, as: UTF8.self)
+        return (SteamClientSession.currentSessionOffset(inConnectionLog: text),
+                SteamClientSession.runningClientLogon(inConnectionLog: text))
+    }
+
     /// How far `connection_log.txt` has got, so a logon can be read from what Steam writes after it.
     static func connectionLogMark(in prefix: URL) -> UInt64 {
         let log = logsDirectory(in: prefix).appendingPathComponent("connection_log.txt")
@@ -887,7 +952,8 @@ public extension SteamBottle {
                 }
             },
             restart: {
-                progress("Steam hasn't signed in within \(Int(timeout / 60)) minutes, so Cellar is restarting it once…")
+                progress("Steam hasn't signed in within \(waitWords(timeout)), so Cellar is restarting it once…")
+                CellarLog.warn(.session, "Steam wrote no logon within \(Int(timeout)) s; restarting it once for \(game).")
                 shutdown(runner: runner)
                 mark = connectionLogMark(in: runner.prefix)
                 try startClientForGame(runner: runner, showHUD: showHUD, gameEnv: gameEnv)
@@ -906,6 +972,11 @@ public extension SteamBottle {
                                         progress: progress)
             },
             game: game)
+    }
+
+    /// "90 seconds", "3 minutes": how long a logon wait was, in the words the player reads.
+    internal static func waitWords(_ timeout: TimeInterval) -> String {
+        timeout < 120 ? "\(Int(timeout)) seconds" : "\(Int(timeout / 60)) minutes"
     }
 
     /// What one wait for the client's logon ended in.

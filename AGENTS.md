@@ -62,7 +62,7 @@ sh Scripts/test.sh --steam        # + tier D: a real Steam game (Fallout Shelter
 swift run cellar doctor           # sanity-check the machine
 swift build -c release            # release build (what CI and the app installer use)
 swift run cellar selftest         # in-repo smoke test
-sh Scripts/install-app.sh         # build + install ~/Applications/Cellar.app
+sh Scripts/install-app.sh         # build + install ~/Applications/Cellar Dev.app
 sh Scripts/build-dock-shim.sh     # build the Dock shim into app/.build/ (needed by `swift run cellar`)
 
 # The site: run from the checkout root.

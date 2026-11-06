@@ -344,4 +344,26 @@ extension SteamClientSession {
               let result = Range(match.range(at: 1), in: text) else { return nil }
         return text[result] == "OK" ? .loggedOn : .refused(String(text[result]))
     }
+
+    /// What Steam writes as the last line of a client's run in `connection_log.txt`.
+    static let sessionEndMarker = "Log session ended"
+
+    /// Where the running client's own stretch of `connection_log.txt` begins, as a byte offset:
+    /// just after the last client's "Log session ended", or the start of the file.
+    ///
+    /// The install is shared, so the log holds every earlier client's logons too — Skyrim's signed
+    /// in at 20:30, and the Steam left open for Assetto Corsa at 20:33 never did, yet "the last
+    /// logon in the log" said OK (#334). Only what this run wrote says whether it is signed in.
+    static func currentSessionOffset(inConnectionLog text: String) -> UInt64 {
+        guard let end = text.range(of: sessionEndMarker, options: .backwards) else { return 0 }
+        let lineEnd = text[end.upperBound...].firstIndex(of: "\n").map { text.index(after: $0) } ?? text.endIndex
+        return UInt64(text.utf8.distance(from: text.utf8.startIndex, to: lineEnd))
+    }
+
+    /// The running client's verdict: its own stretch of the log, read as `logonResult` reads one.
+    static func runningClientLogon(inConnectionLog text: String) -> LogonResult? {
+        let utf8 = text.utf8
+        let start = utf8.index(utf8.startIndex, offsetBy: Int(currentSessionOffset(inConnectionLog: text)))
+        return logonResult(inConnectionLog: String(text[start...]))
+    }
 }

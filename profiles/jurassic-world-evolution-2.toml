@@ -1,0 +1,84 @@
+# Cellar game profile — Jurassic World Evolution 2
+#
+# Frontier's 2021 sequel on its COBRA engine. Windows only on Steam, 64-bit, DirectX 12 only, the
+# same step Planet Coaster 2 took. Denuvo Anti-Tamper per SteamDB: DRM, not anti-cheat; it runs
+# untouched but wants a running Steam. Facts are from SteamDB's info and config pages and the Steam
+# store page, read 2026-11-05.
+# Mac reports: CodeWeavers rates it "Runs Great" in CrossOver 26.2. An older Game Porting Toolkit
+# report (Apple Developer Forums, December 2024) had it crash at launch for want of D3D12 tiled
+# resources, which is why it runs on the newer D3DMetal that Planet Coaster 2 needed, not D3DMetal 3.
+# PC2's validation-layer workaround (metal_validation) is PC2's own finding and is not copied here
+# until a run shows this game needs it. Cellar's own wineserver (#261) ships with the WineForge runner.
+# Not yet run on a Mac by Cellar; status says untested until `cellar verify` passes (issue 203).
+
+[game]
+slug          = "jurassic-world-evolution-2"
+name          = "Jurassic World Evolution 2"
+developer     = "Frontier Developments"
+publisher     = "Frontier Developments"
+steam_appid   = 1244460
+engine        = "COBRA"
+graphics_api  = "DirectX 12"
+architecture  = "x86-64"
+released      = "2021-11-09"
+store         = "steam"
+
+[compatibility]
+anticheat                   = "none"
+drm                         = "Steamworks + Denuvo Anti-Tamper"
+needs_live_session          = true
+requires_account            = "Steam"
+online                      = "single-player only"
+status                      = "untested"
+notes                       = "Not yet launched under Cellar. Mac players report it running well through CrossOver; an earlier report had it closing at start on older Mac graphics, which Cellar avoids by using the newer graphics Planet Coaster 2 needed."
+mac_reports                 = "runs"
+protondb                    = "gold"
+steam_deck                  = "verified"
+evidence_checked            = "2026-11-05"
+
+[runner]
+id              = "wineforge-d3dmetal4"
+windows_version = "win10"
+
+[graphics]
+# DirectX 12 only: DXVK and DXMT stop at DX11 and no VKD3D-Proton build ships with the runners, so
+# there is deliberately no fallback_backend that could never start it (as for Hogwarts Legacy).
+backend           = "d3dmetal"
+
+[env]
+
+[install]
+method      = "windows-steam-in-bottle"
+steam_appid = 1244460
+# SteamDB config: installdir "Jurassic World Evolution 2", default launch option JWE2.exe at its root.
+# Galileo.* and JWE2.release/profile.exe are Frontier's build variants, not the game players start.
+install_dir = "Jurassic World Evolution 2"
+exe         = "JWE2.exe"
+
+[acceptance]
+# What `cellar verify jurassic-world-evolution-2` will hold this game to. Nothing here has been run yet.
+# - signed-in, steam-online: the bottle's Steam is the player's, online, with no sign-in prompt.
+# - launch, stays-up: Play starts JWE2.exe beside a running Steam and it survives the watch. A crash
+#   at start inside D3DMetal is the tiled-resources report above: record it, don't hide it.
+# - dlc: owned DLC packs show in the game when the account owns them.
+# - dock: the Dock says Jurassic World Evolution 2, never wine or JWE2.
+# - clean-exit, settings-match, real-install-untouched: the baseline every game gets.
+# After the first run: save_paths once the run shows where it writes saves.
+
+[legal]
+drm_circumvention = "never"
+
+[mac]
+# The Mac this game needs, and the Mac it is best on (docs/MAC-REQUIREMENTS.md). The PC cards and
+# memory are the publisher's own requirements; the Mac lines are what Cellar's rule maps them to
+# (MacRequirements.derive), and MacRequirementsTests fails if they drift from it.
+pc_requirements_source = "Steam store page, read directly"
+pc_gpu_minimum         = "GeForce GTX 1050 Ti"
+pc_memory_minimum      = 8
+pc_gpu_recommended     = "GeForce GTX 1070"
+pc_memory_recommended  = 12
+mac_minimum            = "M3"
+mac_memory_minimum     = 16
+mac_recommended        = "M4 Pro"
+mac_memory_recommended = 24
+requirements_checked   = "2026-11-05"
