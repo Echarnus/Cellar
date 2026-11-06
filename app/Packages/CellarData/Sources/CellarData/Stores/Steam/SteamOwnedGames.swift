@@ -24,7 +24,12 @@ public enum SteamOwnedGames {
         guard let refresh = DepotTool.refreshToken(for: account),
               let steamID = SteamClientSession.claims(ofToken: refresh)?.steamID else { return nil }
         do {
-            let token = try accessToken(Downloader.json(tokenURL, body: tokenForm(refresh: refresh, steamID: steamID)))
+            let traded = try Downloader.json(tokenURL, body: tokenForm(refresh: refresh, steamID: steamID))
+            if renewedRefreshToken(traded) {
+                CellarLog.warn(.account, "Steam replaced the sign-in while Cellar read your library; "
+                    + "the one Cellar keeps may stop working.")
+            }
+            let token = accessToken(traded)
             guard let token else { return nil }
             return appIDs(inResponse: try Downloader.json(ownedURL, body: ownedForm(access: token, steamID: steamID)))
         } catch {
@@ -45,6 +50,14 @@ public enum SteamOwnedGames {
          // Free games count once they've been played; a free licence nobody used does not.
          "include_played_free_games": "true", "include_free_sub": "false",
          "include_appinfo": "false", "skip_unvetted_apps": "false"]
+    }
+
+    /// Whether Steam answered the trade with a new refresh token — which would mean the one Cellar
+    /// keeps has just been replaced. Cellar never asks for that (no `renewal_type`), so it is logged
+    /// if it ever happens: it would explain a sign-in refused right after a library check (#345).
+    static func renewedRefreshToken(_ response: [String: Any]) -> Bool {
+        guard let token = (response["response"] as? [String: Any])?["refresh_token"] as? String else { return false }
+        return !token.isEmpty
     }
 
     static func accessToken(_ response: [String: Any]) -> String? {

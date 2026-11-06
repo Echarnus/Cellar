@@ -1,15 +1,25 @@
 import CellarDomain
 import Foundation
 
-/// Keeps Steam's refresh token in the keychain whenever DepotDownloader is not running (#82).
+/// Keeps Steam's refresh token out of DepotDownloader's file whenever DepotDownloader is not
+/// running (#82), in a private file of Cellar's own (#330).
 ///
 /// DepotDownloader keeps the token in its own `account.config`, and only reads it from there. So
 /// the file has to exist while the tool runs — but not a moment longer. Around every run:
 ///
-/// - **restore** (before): if the file is gone and the keychain holds it, the file is written back,
+/// - **restore** (before): if the file is gone and the vault holds it, the file is written back,
 ///   `0600`, where DepotDownloader left it;
-/// - **seal** (after the *last* run ends): the file's bytes go into the keychain, are read back to
+/// - **seal** (after the *last* run ends): the file's bytes go into the vault, are read back to
 ///   prove they landed, and only then is the file deleted.
+///
+/// **The vault is a file, not the keychain (#330).** It used to be the login keychain. An item there
+/// trusts the exact code signature that created it, and `cellar` is ad-hoc signed: every build — a
+/// plain `swift build` in a verify, every update — is a new signature, so macOS asked "cellar wants
+/// to use your confidential information" again and again, on the launches that needed the token.
+/// Kenneth chose a `0600` file, out of backups, over that prompt (2026-11-05): the protection
+/// DepotDownloader's own file has, and never a prompt. A token an older Cellar left in the keychain
+/// is moved out once, only if that needs no prompt (`migrateFromKeychain`); one that would prompt is
+/// left alone, and Steam asks for one fresh sign-in instead.
 ///
 /// Concurrency is real: the app and the CLI check ownership of a whole library side by side. So
 /// every run holds a **lease** (a file named for its pid) for its whole life, taken and dropped under
@@ -17,14 +27,14 @@ import Foundation
 /// has died is ignored, so a killed `cellar` cannot keep the token on disk forever — the next run
 /// that ends seals it.
 ///
-/// Failure always leaves the token *usable*, never lost: a keychain that will not take the bytes
-/// (locked, denied) leaves the file where it was (still `0600` and out of backups); a keychain that
-/// will not give them back leaves the index saying who is signed in, and the warning in the log.
+/// Failure always leaves the token *usable*, never lost: a vault that will not take the bytes (a
+/// full disk) leaves the file where it was (still `0600` and out of backups); a vault that will not
+/// give them back leaves the index saying who is signed in, and the warning in the log.
 ///
-/// The app never reads the keychain item. It needs only *who* is signed in and whether that
-/// session is one the bottle's client would accept, so a seal also writes a small index — account
-/// names and the token's public claims (Steam ID, audience, expiry), never the token — to a `0600`
-/// file beside Steam's sign-in record.
+/// The app never reads the vault. It needs only *who* is signed in and whether that session is one
+/// the bottle's client would accept, so a seal also writes a small index — account names and the
+/// token's public claims (Steam ID, audience, expiry), never the token — to a `0600` file beside
+/// Steam's sign-in record.
 public enum SteamTokenVault {
 
     // MARK: - What is kept
@@ -36,7 +46,7 @@ public enum SteamTokenVault {
         var modified: Date
     }
 
-    /// What the app may read without the keychain: who holds a token, and what that token says
+    /// What the app may read without the vault: who holds a token, and what that token says
     /// about itself in public. Never a token.
     struct Index: Codable, Equatable {
         struct Account: Codable, Equatable {
@@ -47,27 +57,89 @@ public enum SteamTokenVault {
         var sealedAt: Date
     }
 
-    /// Where the keychain half is kept. A seam so tests use memory, not the player's keychain.
+    /// Where the sealed half is kept. A seam so tests use memory.
     struct Storage: Sendable {
         var save: @Sendable (String) throws -> Void
         var load: @Sendable () -> String?
         var exists: @Sendable () -> Bool
         var remove: @Sendable () throws -> Void
 
-        static let keychainAccount = "depotdownloader-account-store"
-
-        static let keychain = Storage(
-            save: { try Keychain.set($0, account: keychainAccount, store: .steam) },
-            load: { Keychain.get(account: keychainAccount, store: .steam) },
-            exists: { Keychain.contains(account: keychainAccount, store: .steam) },
-            remove: { try Keychain.remove(account: keychainAccount, store: .steam) })
+        /// A `0600` file, out of backups, in Cellar's shared folder. Never the keychain (#330).
+        static let file = Storage(
+            save: { text in
+                let url = SteamTokenVault.storeFile
+                try PrivateFiles.write(Data(text.utf8), to: url)
+                PrivateFiles.excludeFromBackup(url)
+            },
+            load: { try? String(contentsOf: SteamTokenVault.storeFile, encoding: .utf8) },
+            exists: { FileManager.default.fileExists(atPath: SteamTokenVault.storeFile.path) },
+            remove: {
+                let url = SteamTokenVault.storeFile
+                guard FileManager.default.fileExists(atPath: url.path) else { return }
+                try FileManager.default.removeItem(at: url)
+            })
     }
 
-    nonisolated(unsafe) static var storage = Storage.keychain
+    nonisolated(unsafe) static var storage = Storage.file
+
+    static var storeFile: URL { storeFileOverride ?? Paths.shared.appendingPathComponent("steam-token-store.json") }
+    /// Set by tests, so the vault and its migration marker are scratch files.
+    nonisolated(unsafe) static var storeFileOverride: URL?
+
+    // MARK: - The keychain item an older Cellar left (looked at once, never prompted for)
+
+    /// Where Cellar up to 0.6.4 sealed the token. Only ever touched in ways that cannot prompt:
+    /// attributes (`contains`), and reads and deletes with user interaction switched off.
+    struct LegacyKeychain: Sendable {
+        var exists: @Sendable () -> Bool
+        var loadWithoutPrompt: @Sendable () -> String?
+        var removeWithoutPrompt: @Sendable () -> Void
+
+        static let account = "depotdownloader-account-store"
+
+        static let login = LegacyKeychain(
+            exists: { Keychain.contains(account: account, store: .steam) },
+            loadWithoutPrompt: { Keychain.getWithoutPrompt(account: account, service: Keychain.service(for: .steam)) },
+            removeWithoutPrompt: { Keychain.removeWithoutPrompt(account: nil, service: Keychain.service(for: .steam)) })
+    }
+
+    /// The login keychain on a real install; nothing for a relocated Cellar (a test, a throwaway
+    /// install), whose keychain item would be the player's real one.
+    nonisolated(unsafe) static var legacy: LegacyKeychain? = Reset.isRelocated ? nil : .login
+
+    /// Written once the keychain has been looked at, so it is looked at once — never again on any
+    /// later launch, sign-in or install.
+    static var migrationMarker: URL {
+        storeFile.deletingLastPathComponent().appendingPathComponent(".steam-token-keychain-checked")
+    }
+
+    /// Move a token an older Cellar sealed into the keychain into the vault file — once, and without
+    /// a prompt or not at all. A keychain that would ask is left alone: one fresh Steam sign-in beats
+    /// a prompt on every launch. The marker makes this the last time the keychain is touched.
+    static func migrateFromKeychain() {
+        guard let legacy, !FileManager.default.fileExists(atPath: migrationMarker.path) else { return }
+        defer { try? PrivateFiles.write(Data(), to: migrationMarker) }
+        guard legacy.exists() else { return }
+        if !storage.exists() {
+            guard let text = legacy.loadWithoutPrompt() else {
+                CellarLog.warn(.account, "The Steam sign-in an older Cellar kept in the keychain could not "
+                    + "be read without a prompt, so it is left there; Steam will ask you to sign in once more.")
+                return
+            }
+            do {
+                try storage.save(text)
+            } catch {
+                CellarLog.warn(.account, "Could not move the Steam sign-in out of the keychain: \(CellarLog.describe(error))")
+                return
+            }
+            CellarLog.info(.account, "Moved the Steam sign-in out of the keychain into Cellar's private file.")
+        }
+        legacy.removeWithoutPrompt()
+    }
 
     /// On, unless switched off with `CELLAR_STEAM_TOKEN_VAULT=0`. Off by default for a relocated
     /// Cellar (`CELLAR_HOME`): a test or a throwaway install must not move the player's real token
-    /// into the keychain behind an index it keeps somewhere else.
+    /// into a vault behind an index it keeps somewhere else.
     static var isEnabled: Bool {
         if let forced = forcedEnabled { return forced }
         switch ProcessInfo.processInfo.environment["CELLAR_STEAM_TOKEN_VAULT"]?.lowercased() {
@@ -106,9 +178,10 @@ public enum SteamTokenVault {
 
     // MARK: - The token (what only a DepotDownloader run, or a hand-over, reads)
 
-    /// The sealed token for `account`, from the keychain. Nil when nothing is sealed.
+    /// The sealed token for `account`, from the vault. Nil when nothing is sealed.
     static func refreshToken(for account: String) -> String? {
-        entries()?.sorted { $0.modified > $1.modified }
+        migrateFromKeychain()
+        return entries()?.sorted { $0.modified > $1.modified }
             .lazy.compactMap { DepotAccountStore.refreshToken(for: account, inCompressed: $0.data) }.first
     }
 
@@ -145,6 +218,7 @@ public enum SteamTokenVault {
         return withLock {
             try? FileManager.default.createDirectory(at: leaseDirectory, withIntermediateDirectories: true)
             PrivateFiles.restrict(directory: leaseDirectory)
+            migrateFromKeychain()
             let lease = leaseDirectory.appendingPathComponent("\(getpid())-\(UUID().uuidString)")
             FileManager.default.createFile(atPath: lease.path, contents: nil)
             restore(files: DepotTool.storedSessionFiles)
@@ -157,20 +231,19 @@ public enum SteamTokenVault {
     ///
     /// The index goes once the files are back: while they are on disk *they* say who is signed in,
     /// and an index left beside them would keep naming an account Steam may revoke during this run.
-    /// It stays when the keychain would not hand the token over, because the sign-in still exists.
+    /// It stays when the vault would not hand the token over, because the sign-in still exists.
     static func restore(files present: [URL]) {
         guard present.isEmpty else {
             try? FileManager.default.removeItem(at: indexFile)
             return
         }
         guard storage.exists() else {
-            // Nothing sealed: an index without a keychain item names a session that is not there.
+            // Nothing sealed: an index without a vault names a session that is not there.
             try? FileManager.default.removeItem(at: indexFile)
             return
         }
         guard let entries = entries() else {
-            CellarLog.warn(.account, "The keychain would not hand back the Steam sign-in, so this run "
-                + "goes without it. If a keychain prompt was denied, allow Cellar in Keychain Access.")
+            CellarLog.warn(.account, "Cellar's Steam sign-in file could not be read, so this run goes without it.")
             return
         }
         var restored = true
@@ -187,8 +260,8 @@ public enum SteamTokenVault {
         if restored { try? FileManager.default.removeItem(at: indexFile) }
     }
 
-    /// Move the store files into the keychain. The files are deleted only once the keychain has
-    /// given back exactly what was put in.
+    /// Move the store files into the vault. The files are deleted only once the vault has given back
+    /// exactly what was put in.
     static func seal(files: [URL], now: Date = Date()) {
         guard !files.isEmpty else { return }
         let entries = files.compactMap { url -> Entry? in
@@ -204,12 +277,12 @@ public enum SteamTokenVault {
             try storage.save(text)
         } catch {
             CellarLog.warn(.account, "Kept the Steam sign-in in DepotDownloader's file (private, not "
-                + "backed up): the keychain did not take it — \(CellarLog.describe(error))")
+                + "backed up): Cellar's own file did not take it — \(CellarLog.describe(error))")
             return
         }
         guard storage.load() == text else {
-            CellarLog.warn(.account, "Kept the Steam sign-in in DepotDownloader's file: the keychain "
-                + "did not give back what was saved.")
+            CellarLog.warn(.account, "Kept the Steam sign-in in DepotDownloader's file: Cellar's own "
+                + "file did not give back what was saved.")
             return
         }
         let index = Index(accounts: makeAccounts(entries), sealedAt: now)
@@ -231,16 +304,18 @@ public enum SteamTokenVault {
         return accounts
     }
 
-    /// Sign-out and reset: the keychain item and the index, whatever state they are in.
+    /// Sign-out and reset: the vault, the index, and a keychain item an older Cellar left, whatever
+    /// state they are in. The keychain item goes only if that needs no prompt.
     static func forget() throws {
         try? FileManager.default.removeItem(at: indexFile)
-        // A relocated Cellar's sign-out is not the player's: the keychain item is the real one.
-        guard isEnabled || !Reset.isRelocated else { return }
+        legacy?.removeWithoutPrompt()
         try storage.remove()
     }
 
     /// Whether anything is sealed — what a reset lists, without reading the token.
-    static var isSealed: Bool { storage.exists() || FileManager.default.fileExists(atPath: indexFile.path) }
+    static var isSealed: Bool {
+        storage.exists() || FileManager.default.fileExists(atPath: indexFile.path) || (legacy?.exists() ?? false)
+    }
 
     // MARK: - Leases and the lock
 

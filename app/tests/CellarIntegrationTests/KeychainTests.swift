@@ -68,38 +68,16 @@ struct KeychainTests {
         }
     }
 
-    @Test("The Steam token store survives a real keychain seal and restore byte for byte (#82)")
-    func steamVaultRoundTrip() throws {
-        let service = Self.service + ".steam"
-        let saved = SteamTokenVault.storage
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cellar-vault-it-\(UUID().uuidString)", isDirectory: true)
-        SteamTokenVault.storage = SteamTokenVault.Storage(
-            save: { try Keychain.set($0, account: "store", service: service, label: "Cellar test vault") },
-            load: { Keychain.get(account: "store", service: service) },
-            exists: { Keychain.contains(account: "store", service: service) },
-            remove: { try Keychain.remove(account: nil, service: service) })
-        SteamTokenVault.indexFileOverride = dir.appendingPathComponent("index.json")
-        defer {
-            try? Keychain.remove(account: nil, service: service)
-            SteamTokenVault.storage = saved
-            SteamTokenVault.indexFileOverride = nil
-            try? FileManager.default.removeItem(at: dir)
-        }
-
-        // Binary, like DepotDownloader's deflated protobuf: every byte value, several KB.
-        let bytes = Data((0..<6000).map { UInt8(truncatingIfNeeded: $0 &* 31) })
-        let file = dir.appendingPathComponent("IsolatedStorage/x/account.config")
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try bytes.write(to: file)
-
-        SteamTokenVault.seal(files: [file])
-        #expect(!FileManager.default.fileExists(atPath: file.path), "sealed: off the disk")
-        #expect(Keychain.contains(account: "store", service: service))
-
-        SteamTokenVault.restore(files: [])
-        #expect(try Data(contentsOf: file) == bytes, "restored exactly")
-        #expect(PrivateFiles.mode(of: file) == 0o600)
+    @Test("A Steam token an older Cellar sealed into the real keychain is read back with no prompt (#330)")
+    func steamLegacyReadWithoutPrompt() throws {
+        let service = Self.service + ".steam-legacy"
+        defer { try? Keychain.remove(account: nil, service: service) }
+        try Keychain.set("sealed-by-0.6.4", account: "store", service: service, label: "Cellar test vault")
+        // Created by this very binary, so it is readable without a prompt — the case an update of a
+        // signed build hits. Then removed the same way, leaving nothing behind.
+        #expect(Keychain.getWithoutPrompt(account: "store", service: service) == "sealed-by-0.6.4")
+        #expect(Keychain.removeWithoutPrompt(account: nil, service: service))
+        #expect(!Keychain.contains(account: "store", service: service))
     }
 
     static func count(account: String) -> Int {

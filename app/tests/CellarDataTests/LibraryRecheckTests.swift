@@ -77,4 +77,50 @@ struct LibraryRecheckTests {
         }
         #expect(pull.distance == 0)
     }
+
+    // MARK: - Asking too often got the sign-in refused (#345)
+
+    @Test("A launch asks Steam only when the answers are over an hour old, or a game has none")
+    func launchAsksOnlyWhenAnHourOld() {
+        let fresh = cache(["2229820": .owned], age: 10 * 60)
+        #expect(!StoreLibrary.steamLaunchCheckDue(cache: fresh, profileAppIDs: [2229820]),
+                "0.6.7 asked at every launch: dozens of times a day, and Steam refused the sign-in")
+        let hourOld = cache(["2229820": .owned], age: StoreLibrary.launchCheckInterval + 60)
+        #expect(StoreLibrary.steamLaunchCheckDue(cache: hourOld, profileAppIDs: [2229820]))
+        #expect(StoreLibrary.steamLaunchCheckDue(cache: fresh, profileAppIDs: [2229820, 1172470]),
+                "a game added by an update is still asked about at once (#343)")
+        #expect(StoreLibrary.steamLaunchCheckDue(cache: nil, profileAppIDs: [2229820]))
+    }
+
+    @Test("Asks moments apart reuse the answer instead of trading the sign-in again")
+    func asksMomentsApartReuseTheAnswer() {
+        let apps: [String: Ownership] = ["2229820": .owned, "1172470": .notOwned]
+        let now = cache(apps, age: 20)
+        #expect(StoreLibrary.justAsked(now, account: "PLAYER", appIDs: [2229820, 1172470]) == apps,
+                "the app, the CLI and a pull asked within seconds of each other")
+        #expect(StoreLibrary.justAsked(now, account: "someone-else", appIDs: [2229820]) == nil,
+                "another account's answers are never this account's")
+        #expect(StoreLibrary.justAsked(now, account: "player", appIDs: [2229820, 999]) == nil,
+                "a game with no answer is asked about")
+        let older = cache(apps, age: StoreLibrary.minimumAskGap + 5)
+        #expect(StoreLibrary.justAsked(older, account: "player", appIDs: [2229820]) == nil)
+    }
+
+    @Test("The app's launch check uses the hourly rule, not the old ask-every-launch")
+    func appUsesTheLaunchRule() throws {
+        let source = try String(contentsOf: Repo.app.appendingPathComponent(
+            "src/CellarApp/Features/Library/LibraryView.swift"), encoding: .utf8)
+        let loop = try #require(source.range(of: "private func keepOwnershipCurrent()"))
+        let body = source[loop.lowerBound...].prefix(1400)
+        #expect(body.contains("StoreLibrary.steamLaunchCheckDue"))
+        #expect(!body.contains("var due = !Self.askedThisLaunch"), "asking at every launch is what broke the sign-in")
+    }
+
+    @Test("A library check that would replace the sign-in is noticed, and the refusal is logged in Steam's words")
+    func renewalAndRefusalAreVisible() {
+        #expect(SteamOwnedGames.renewedRefreshToken(["response": ["access_token": "a", "refresh_token": "r"]]))
+        #expect(!SteamOwnedGames.renewedRefreshToken(["response": ["access_token": "a"]]))
+        #expect(!SteamOwnedGames.renewedRefreshToken(["response": ["access_token": "a", "refresh_token": ""]]))
+        #expect(SteamAccount.rejection(in: "Access token was rejected (AccessDenied).") == "accessdenied")
+    }
 }

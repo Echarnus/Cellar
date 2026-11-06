@@ -46,7 +46,7 @@ struct SteamCommand: ParsableCommand {
             No Steam mobile app? Use --password: sign in with your account name and password, and
             type the code Steam emails you or the one from your authenticator when it asks. The
             password goes straight to Steam and is never stored; only Steam's session is kept, in
-            the keychain. When stdin is not a terminal, the account name and the password are read
+            a private file. When stdin is not a terminal, the account name and the password are read
             as its first two lines, and each code as one more line after Cellar asks for it.
 
             This one sign-in is what tells Cellar which games you own and lets it download them.

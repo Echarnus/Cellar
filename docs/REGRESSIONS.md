@@ -11,6 +11,8 @@ for what only a real game shows.
 
 | Fixed in | What broke | Kept fixed by |
 |---|---|---|
+| #345 | Steam refused the saved sign-in minutes after signing in: 0.6.7 traded it for Steam's library list at every launch, often several times within seconds | `LibraryRecheckTests.swift` › `launchAsksOnlyWhenAnHourOld`, `asksMomentsApartReuseTheAnswer`, `appUsesTheLaunchRule` |
+| #330 | macOS kept asking to let `cellar` use the Steam sign-in in the keychain, after every new build of the CLI | `SteamTokenVaultTests.swift` › `launchPathNeverTouchesKeychain`, `steamSourcesNeverReadTheKeychain`, `migratesOnce` |
 | #332 | Opening a game's page crashed the app: reading this Mac's chip started `sysctl`, whose wait let the page redraw inside a one-time initialiser | `ThisMacTests.swift` › `readsWithoutTheRunLoop`, `watchCatchesAProcess` |
 | #343 | A game added by an update (Theme Hospital, in 0.6.5) never showed in the library: Steam was only asked again at sign-in | `LibraryRecheckTests.swift` › `newProfileIsAskedAbout`, `appAsksWhenDue`, `pullFiresOncePerGesture` |
 | #325 | A game started in Cellar's folder instead of its own, so one that opens its files by relative path (Theme Hospital's DOSBox and its settings) found none of them | `LaunchLifecycleTests.swift` › `gameStartsInItsOwnFolder`, `alongsideStartsInItsOwnFolder` |

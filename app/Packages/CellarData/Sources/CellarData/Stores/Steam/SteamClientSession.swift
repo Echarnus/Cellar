@@ -177,8 +177,8 @@ extension SteamClientSession {
         var localConfig: String?
         var loginUsers: String?
         var config: String?
-        /// The token's public claims when the token itself is sealed in the keychain
-        /// (`SteamTokenVault`) — so deciding never needs the keychain, only handing over does.
+        /// The token's public claims when the token itself is sealed in the vault file
+        /// (`SteamTokenVault`) — so deciding never needs the token, only handing over does.
         var tokenClaims: Claims? = nil
     }
 
@@ -242,7 +242,7 @@ extension SteamClientSession {
     }
 
     /// Reads the token only while it is on disk, and its public claims otherwise, so the library and
-    /// the launch decide from the same facts without a keychain read: a session the client would
+    /// the launch decide from the same facts without a token read: a session the client would
     /// refuse is never promised on a game's page.
     static func snapshot(prefix: URL, steamDirectory: URL, wineUser: String) -> Snapshot {
         let state = SteamAccount.state
@@ -264,8 +264,8 @@ extension SteamClientSession {
         let s = snapshot(prefix: prefix, steamDirectory: steamDirectory, wineUser: wineUser)
         let decision = readiness(s, now: now)
         guard decision == .canHandOver, let account = s.cellarAccount else { return decision }
-        // The token itself is read only now, about to be used — from the keychain when sealed. A
-        // keychain that refuses is not a hand-over, so it must not be reported as one.
+        // The token itself is read only now, about to be used — from the vault file when sealed. A
+        // vault that refuses is not a hand-over, so it must not be reported as one.
         guard let token = s.token ?? DepotTool.refreshToken(for: account),
               let claims = claims(ofToken: token),
               let protected = protectedToken(token, account: account, wineUser: wineUser)

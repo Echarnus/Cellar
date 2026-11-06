@@ -11,7 +11,7 @@ import Foundation
 /// installing it — reuses that one session silently.
 ///
 /// DepotDownloader obtains the token from Steam and keeps it in its own account store, which
-/// `SteamTokenVault` moves into the keychain whenever the tool is not running. Cellar records only
+/// `SteamTokenVault` moves into a private file of its own whenever the tool is not running. Cellar records only
 /// *who* signed in and *when*, so the Accounts screen can say something true without reading it.
 public enum SteamAccount {
 
@@ -116,7 +116,7 @@ public enum SteamAccount {
         let holdsAccount = record.map { DepotTool.storedAccountNames.contains($0.accountName.lowercased()) }
         let found = stores.isEmpty
             ? (SteamTokenVault.sealedAccounts != nil
-                ? "token sealed in the keychain"
+                ? "token sealed in Cellar's private file"
                 : "no token store under " + DepotTool.sessionSearchRoots.map(\.path).joined(separator: ", "))
             : "token store at " + stores.map(\.path).joined(separator: ", ")
                 + (holdsAccount.map { $0 ? " (holds this account)" : " (does NOT hold this account)" } ?? "")
@@ -319,6 +319,9 @@ public enum SteamAccount {
     /// Called with every line of every DepotDownloader run.
     public static func note(_ line: String) {
         if let reason = rejection(in: line) {
+            // Steam's own words, so the next refusal says why in the log instead of only
+            // "DepotDownloader exited 1" (#345). The line names a reason, never a token.
+            CellarLog.warn(.account, "Steam refused the saved sign-in: \(line.trimmingCharacters(in: .whitespaces))")
             guard var record else { return }
             record.rejectedAt = Date()
             record.rejectionReason = reason

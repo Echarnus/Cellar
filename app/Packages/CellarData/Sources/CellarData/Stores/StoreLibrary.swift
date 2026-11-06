@@ -158,6 +158,38 @@ public enum StoreLibrary {
         return profileAppIDs.contains { cache.apps["\($0)"] == nil }
     }
 
+    /// Whether a fresh launch of the app should ask Steam (#345). Every launch looks, but asks only
+    /// when the answers are over an hour old, or due anyway (`steamNeedsRefresh`). 0.6.7 asked at
+    /// every launch, and Kenneth's app was started dozens of times a day: each ask trades the
+    /// sign-in for a short-lived pass (`SteamOwnedGames`), and his sign-in was refused by Steam
+    /// minutes after such a burst — three times in one morning.
+    public static var steamLaunchCheckDue: Bool {
+        guard SteamAccount.isSignedIn else { return false }
+        return steamLaunchCheckDue(cache: loadSteamCache(), profileAppIDs: steamAppIDsInProfiles())
+    }
+
+    /// How old the answers must be before a launch asks again.
+    public static let launchCheckInterval: TimeInterval = 60 * 60
+
+    static func steamLaunchCheckDue(cache: SteamCache?, profileAppIDs: Set<Int>, now: Date = Date()) -> Bool {
+        guard let cache else { return true }
+        if now.timeIntervalSince(cache.checkedAt) > launchCheckInterval { return true }
+        return steamNeedsRefresh(cache: cache, profileAppIDs: profileAppIDs, now: now)
+    }
+
+    /// The shortest gap between two real asks, a pull included. The app, its CLI and a second
+    /// window used to ask two or three times within seconds of each other; within this gap the
+    /// answer just given is the answer (#345).
+    static let minimumAskGap: TimeInterval = 2 * 60
+
+    /// The cached answers, when they are for `account`, cover every game, and are moments old.
+    static func justAsked(_ cache: SteamCache?, account: String, appIDs: Set<Int>, now: Date = Date()) -> [String: Ownership]? {
+        guard let cache, cache.account.caseInsensitiveCompare(account) == .orderedSame,
+              now.timeIntervalSince(cache.checkedAt) < minimumAskGap,
+              appIDs.allSatisfy({ cache.apps["\($0)"] != nil }) else { return nil }
+        return cache.apps
+    }
+
     /// Ask Steam, for every app id Cellar has a profile for, whether this account may download it.
     ///
     /// One question per game, because Steam offers no way to ask about several at once without a
@@ -178,6 +210,10 @@ public enum StoreLibrary {
         guard !appIDs.isEmpty else { return [:] }
 
         let cached = loadSteamCache()
+        if let answers = justAsked(cached, account: account, appIDs: appIDs) {
+            CellarLog.info(.account, "Steam was asked about your library moments ago; using that answer.")
+            return answers
+        }
         let total = appIDs.count
         progress(steamCheckProgress(total: total, answered: 0))
 

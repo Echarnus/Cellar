@@ -434,8 +434,8 @@ public enum DepotTool {
     /// The accounts DepotDownloader holds a token for, with when each store was last written —
     /// newest store first. Names only; the one reader of a token is `refreshToken(for:)`.
     ///
-    /// Between runs the store is sealed in the keychain (`SteamTokenVault`) and only its index — the
-    /// names, never the token — is on disk, so that is read instead. No keychain access: this is
+    /// Between runs the store is sealed in Cellar's private file (`SteamTokenVault`) and only its index — the
+    /// names, never the token — is on disk, so that is read instead. No token read: this is
     /// what the app draws Accounts from.
     static var storedAccounts: [(names: [String], modified: Date)] {
         let files = storedSessionFiles.map { file in
@@ -451,7 +451,7 @@ public enum DepotTool {
     /// handing the Windows client in a bottle the same session (`SteamClientSession`) — and never
     /// written anywhere but that client's encrypted `local.vdf` entry.
     ///
-    /// From the store file while one is on disk, otherwise from the keychain (`SteamTokenVault`) —
+    /// From the store file while one is on disk, otherwise from the vault file (`SteamTokenVault`) —
     /// which is why it is called only where the token is about to be used, never to draw a screen.
     static func refreshToken(for account: String) -> String? {
         refreshTokenOnDisk(for: account) ?? SteamTokenVault.refreshToken(for: account)
@@ -573,8 +573,8 @@ public enum DepotTool {
     }
 
     private static func runInheritingIO(args: [String]) throws {
-        // The token goes back on disk for the run and into the keychain after it (#82); the
-        // tightening covers the stretch in between, and every run where the keychain says no.
+        // The token goes back on disk for the run and into the vault file after it (#82); the
+        // tightening covers the stretch in between, and every run where the vault says no.
         let lease = SteamTokenVault.begin()
         defer { protectStoredSessions(); lease?.end() }
         let p = try process(args)

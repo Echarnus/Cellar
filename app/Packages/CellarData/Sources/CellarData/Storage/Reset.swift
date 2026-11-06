@@ -97,7 +97,7 @@ public enum Reset {
             let strays = steamTokenStoresOutsideCellar
             if !strays.isEmpty || SteamTokenVault.isSealed {
                 items.append(Item(target: .storeCredentials(.steam),
-                                  title: "Your Steam sign-in token (in your keychain, or DepotDownloader's file)",
+                                  title: "Your Steam sign-in token (in Cellar's private file, or DepotDownloader's)",
                                   cost: "one QR scan", bytes: strays.reduce(0) { $0 + size(of: $1) }))
             }
             if GOGAuth.isSignedIn || GOGAuth.cachedUsername != nil {
