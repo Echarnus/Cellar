@@ -411,10 +411,26 @@ public enum SteamBottle {
     public static func launchClient(runner: WineRunner, extraArgs: [String] = [], showHUD: Bool = false,
                                     gameEnv: [String: String] = [:],
                                     dock: DockPresence = .visible) throws {
+        let runner = clientRunner(runner)
         if let language = runner.language { setLanguage(language, runner: runner) }
         let start = clientStart(runner: runner, extraArgs: extraArgs, showHUD: showHUD, gameEnv: gameEnv, dock: dock)
         try runner.spawn(start.arguments, extraEnv: start.environment,
                          log: Paths.logs.appendingPathComponent("steam-\(runner.prefix.lastPathComponent).log"))
+    }
+
+    /// The runner Steam's own client runs on, which is not always the game's.
+    ///
+    /// Steam's whole interface is a Chromium browser (`steamwebhelper.exe`), and its sign-in is a
+    /// script in that browser: no page, no `User.StartLogin`, no logon. Chromium draws through
+    /// Direct3D 11, and WineD3D gives it none it can use on a Mac — its software fallback then asks
+    /// for Vulkan 1.1 and fails too. So in a WineD3D bottle the browser never showed a page, Steam
+    /// sat signed out at `[U:1:0]`, and Theme Hospital waited on "Opening Steam" until Cellar gave
+    /// up (2026-11-06). Every bottle whose client signed in ran it on D3DMetal (or DXVK), so a
+    /// WineD3D game's client runs on D3DMetal. A game Cellar starts beside the client keeps its own
+    /// backend: only the client's environment changes.
+    static func clientRunner(_ runner: WineRunner) -> WineRunner {
+        guard runner.backend == .wined3d, let install = runner.install, install.hasD3DMetal else { return runner }
+        return WineRunner(install: install, prefix: runner.prefix, backend: .d3dmetal, language: runner.language)
     }
 
     /// The arguments and extra environment `launchClient` starts the client with.
@@ -850,7 +866,7 @@ public extension SteamBottle {
     internal static func bringUpClient(runner: WineRunner, showHUD: Bool, gameEnv: [String: String],
                               game: String, expectsSignIn: Bool,
                               progress: (String) -> Void, stage: (LaunchStage) -> Void) throws {
-        guard isRunning(in: runner.prefix) else {
+        func coldStart() throws {
             stage(.client)
             progress("Starting Steam (silent) and waiting for it to be ready…")
             let mark = connectionLogMark(in: runner.prefix)
@@ -862,12 +878,23 @@ public extension SteamBottle {
             }
             CellarLog.info(.session, "Steam started for \(game)" + (expectsSignIn ? " and signed in." : "."))
             Thread.sleep(forTimeInterval: 6)   // let the sign-in settle before the game asks
-            return
         }
+        guard isRunning(in: runner.prefix) else { return try coldStart() }
         let session = runningSession(in: runner.prefix)
-        switch reusedClientAction(session.logon) {
+        switch reusedClientAction(session.logon, startedAt: session.startedAt) {
         case .useIt:
             CellarLog.info(.session, "Steam is already running in this bottle and signed in; \(game) uses it.")
+        case .restart:
+            // Left behind signed out — a launch that was cancelled while Steam was starting leaves
+            // its client running, and on 2026-11-06 the next Play waited 90 s on it for nothing.
+            // It has had longer than any logon takes, so it is started afresh at once.
+            CellarLog.warn(.session, "Steam has been running in this bottle since "
+                + "\(session.startedAt.map { "\($0)" } ?? "earlier") without signing in; "
+                + "restarting it now for \(game) instead of waiting on it.")
+            stage(.client)
+            progress("Steam was left open without signing in, so Cellar is starting it again…")
+            shutdown(runner: runner)
+            try coldStart()
         case .waitForLogon:
             CellarLog.warn(.session, "Steam is already running in this bottle but has not signed in "
                 + "(\(session.logon.map(String.init(describing:)) ?? "no logon in its connection log yet")). "
@@ -890,19 +917,26 @@ public extension SteamBottle {
     internal enum ReusedClient: Equatable {
         case useIt
         case waitForLogon
+        /// Up for longer than a logon ever takes and still signed out: it is not going to.
+        case restart
     }
 
-    internal static func reusedClientAction(_ logon: SteamClientSession.LogonResult?) -> ReusedClient {
-        logon == .loggedOn ? .useIt : .waitForLogon
+    internal static func reusedClientAction(_ logon: SteamClientSession.LogonResult?, startedAt: Date? = nil,
+                                            now: Date = Date()) -> ReusedClient {
+        if logon == .loggedOn { return .useIt }
+        if logon == nil, let startedAt, now.timeIntervalSince(startedAt) > reusedClientLogonTimeout { return .restart }
+        return .waitForLogon
     }
 
-    /// The running client's own stretch of the connection log: where it begins, and how its logon
-    /// went so far.
-    internal static func runningSession(in prefix: URL) -> (offset: UInt64, logon: SteamClientSession.LogonResult?) {
+    /// The running client's own stretch of the connection log: where it begins, when the client
+    /// wrote its first line, and how its logon went so far.
+    internal static func runningSession(in prefix: URL)
+        -> (offset: UInt64, startedAt: Date?, logon: SteamClientSession.LogonResult?) {
         let log = logsDirectory(in: prefix).appendingPathComponent("connection_log.txt")
-        guard let data = FileManager.default.contents(atPath: log.path) else { return (0, nil) }
+        guard let data = FileManager.default.contents(atPath: log.path) else { return (0, nil, nil) }
         let text = String(decoding: data, as: UTF8.self)
         return (SteamClientSession.currentSessionOffset(inConnectionLog: text),
+                SteamClientSession.runningClientStart(inConnectionLog: text),
                 SteamClientSession.runningClientLogon(inConnectionLog: text))
     }
 
@@ -1029,15 +1063,18 @@ public extension SteamBottle {
         }
         CellarLog.error(.session, "Steam never signed in for \(game); nothing in its connection log after a restart.")
         stop()
-        throw clientDidNotSignIn(game: game)
+        throw clientDidNotSignIn(game: game, signInRefused: SteamAccount.record?.isRejected ?? false)
     }
 
-    /// The error for a client that started but never answered a sign-in. It is not the player's
-    /// sign-in — that is kept — so it does not ask them to sign in again.
-    static func clientDidNotSignIn(game: String) -> CellarError {
-        CellarError.ioFailure(
-            "Steam started but never signed in, even after a restart, so \(game) wasn't started. "
-            + "Your Steam sign-in is kept. Press Play to try again; if it happens again, Show logs has what Steam said.")
+    /// The error for a client that started but never answered a sign-in. That is not the player's
+    /// sign-in, so it does not ask them to sign in again — unless Steam has meanwhile turned that
+    /// sign-in down, when "your sign-in is kept" would contradict the library saying it expired.
+    static func clientDidNotSignIn(game: String, signInRefused: Bool = false) -> CellarError {
+        let next = signInRefused
+            ? "Steam has also turned down the sign-in you gave Cellar, so sign in again in Settings (⌘⇧A), then press Play."
+            : "Your Steam sign-in is kept. Press Play to try again; if it happens again, Show logs has what Steam said."
+        return CellarError.ioFailure(
+            "Steam started but never signed in, even after a restart, so \(game) wasn't started. " + next)
     }
 
     /// Take the handed-over session back and put the sign-in step on screen, so `waitForClientSignIn`

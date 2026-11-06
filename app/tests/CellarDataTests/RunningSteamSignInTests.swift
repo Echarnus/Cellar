@@ -95,6 +95,48 @@ struct RunningSteamSignInTests {
         #expect(session.logon == nil)
     }
 
+    // MARK: - A Steam left behind signed out (2026-11-06)
+
+    /// Theme Hospital: a launch cancelled while Steam was starting left its client running at
+    /// `[U:1:0]`, and the next Play, seventeen minutes later, waited 90 s on it before restarting it.
+
+    static let utc = TimeZone(identifier: "UTC")!
+
+    @Test("The running Steam's start is the first stamp of its own stretch, not an earlier client's")
+    func runningClientStart() throws {
+        let start = try #require(SteamClientSession.runningClientStart(inConnectionLog: Self.skyrimThenStuck,
+                                                                        timeZone: Self.utc))
+        var expected = DateComponents(year: 2026, month: 11, day: 5, hour: 20, minute: 33, second: 13)
+        expected.timeZone = Self.utc
+        #expect(start == Calendar(identifier: .gregorian).date(from: expected))
+        #expect(SteamClientSession.runningClientStart(inConnectionLog: "") == nil)
+    }
+
+    @Test("A Steam signed out for longer than any logon takes is restarted at once, not waited on")
+    func staleSignedOutClientIsRestarted() {
+        let started = Date(timeIntervalSince1970: 1_000_000)
+        let later = started.addingTimeInterval(17 * 60)
+        #expect(SteamBottle.reusedClientAction(nil, startedAt: started, now: later) == .restart)
+        // One that only just started still gets its wait: a logon lands 20–40 s in.
+        #expect(SteamBottle.reusedClientAction(nil, startedAt: started, now: started.addingTimeInterval(30))
+                == .waitForLogon)
+        // No stamp to go by: wait, as before.
+        #expect(SteamBottle.reusedClientAction(nil, startedAt: nil, now: later) == .waitForLogon)
+        // Signed in is used however long it has been up; a refusal still takes the refusal path.
+        #expect(SteamBottle.reusedClientAction(.loggedOn, startedAt: started, now: later) == .useIt)
+        #expect(SteamBottle.reusedClientAction(.refused("AccessDenied"), startedAt: started, now: later)
+                == .waitForLogon)
+    }
+
+    @Test("When Steam has turned the sign-in down, the failure doesn't also say the sign-in is kept")
+    func failureWordingFollowsTheSignIn() {
+        let kept = "\(SteamBottle.clientDidNotSignIn(game: "Theme Hospital"))"
+        #expect(kept.contains("Your Steam sign-in is kept"))
+        let refused = "\(SteamBottle.clientDidNotSignIn(game: "Theme Hospital", signInRefused: true))"
+        #expect(!refused.contains("is kept"))
+        #expect(refused.contains("sign in again in Settings"))
+    }
+
     @Test("The restart message says seconds for a short wait and minutes for a long one")
     func waitWording() {
         #expect(SteamBottle.waitWords(SteamBottle.reusedClientLogonTimeout) == "90 seconds")
