@@ -322,7 +322,7 @@ class MakeDmgRetryTests(unittest.TestCase):
 n=$(cat "{count}" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "{count}"
 [ "$n" -gt {failures} ] || {{ echo "hdiutil: create failed - Resource busy" >&2; exit 1; }}
 """)
-            os.chmod(fake, 0o755)
+            os.chmod(fake, 0o700)
             script = "sleep() { :; }\n" + function + "retry_hdiutil create -ov x.dmg\n"
             result = subprocess.run(["sh", "-c", script], env={**os.environ, "PATH": f"{tmp}:{os.environ['PATH']}"},
                                     capture_output=True, text=True)
