@@ -28,7 +28,9 @@ jobs:
           - name: macos-27
             image: xcode-27
     runs-on: ${{ matrix.image }}
-    timeout-minutes: 30
+    # The suite with coverage alone takes about 23 minutes on these runners (#347: a PR was cancelled
+    # at 30 with every test passed), so the build, the suite and the self-test need more than 30.
+    timeout-minutes: 45
     # The Swift package and everything that builds it live in app/ (#133).
     defaults:
       run:
