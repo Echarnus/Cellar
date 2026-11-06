@@ -31,10 +31,13 @@ struct LibraryView: View {
         // No Refresh button: the library reads itself whenever its answer can have changed —
         // opening, coming back to Cellar (AppDelegate), anything Cellar ran finishing, an account
         // change (LibraryViewModel.accountsChanged), and a quiet timer. `LibraryRefresh` decides.
+        // Asking the stores what is owned happens at every launch and when due
+        // (`keepOwnershipCurrent`), and whenever the player pulls the sidebar down.
         .onAppear { lib.refreshIfDue(.opened) }
         .onChange(of: runner.busy) { _, busy in if !busy { lib.refreshIfDue(.actionFinished) } }
         .task { await keepLibraryCurrent() }
         .task { await keepGamesCurrent() }
+        .task { await keepOwnershipCurrent() }
         .onReceive(NotificationCenter.default.publisher(for: .cellarFocusSearch)) { _ in
             searchFocused = true
         }
@@ -88,6 +91,38 @@ struct LibraryView: View {
             try? await Task.sleep(for: .seconds(30 * 60))
         }
     }
+
+    /// Which games are the player's, asked of the stores (#343). Every launch asks once, at once
+    /// (Kenneth: "should be checked at startup"), so a game bought, or added by an update, since
+    /// the last run shows without anyone asking. After that, every half hour when the answers are a
+    /// day old or a game Cellar now knows has none. Quietly, beside whatever else runs; a pull on
+    /// the sidebar asks in the open (`checkLibrary`).
+    private func keepOwnershipCurrent() async {
+        while !Task.isCancelled {
+            var due = !Self.askedThisLaunch
+            if !due {
+                due = await Task.detached(priority: .utility, operation: { StoreLibrary.steamNeedsRefresh }).value
+            }
+            if due, lib.hasConnectedStore, !runner.busy {
+                Self.askedThisLaunch = true
+                if await runner.runBeside(.refreshLibrary) == 0 { lib.refresh() }
+            }
+            try? await Task.sleep(for: .seconds(Self.askedThisLaunch ? 30 * 60 : 5))
+        }
+    }
+
+    /// Whether this run of the app has asked the stores yet. Static: the window can close and
+    /// reopen, the app launch is what counts.
+    @MainActor private static var askedThisLaunch = false
+
+    /// Ask the stores again, where the player can see it: what a pull on the sidebar does.
+    private func checkLibrary() {
+        guard !runner.busy else { return }
+        runner.run(.refreshLibrary, title: Self.checkingTitle, then: { lib.refresh() })
+    }
+
+    /// Whether the stores are being asked right now, from a pull or Check Now.
+    private var isCheckingLibrary: Bool { runner.busy && runner.busyTitle == Self.checkingTitle }
 
     // MARK: - Sidebar
 
@@ -197,6 +232,7 @@ struct LibraryView: View {
 
     private var libraryList: some View {
         ScrollView {
+            pullIndicator
             LazyVStack(alignment: .leading, spacing: 3, pinnedViews: [.sectionHeaders]) {
                 ForEach(lib.sections, id: \.id) { section in
                     Section {
@@ -227,6 +263,13 @@ struct LibraryView: View {
                 withheldNotice
             }
             .padding(8)
+        }
+        // Pull down past the top to ask the stores again (Kenneth: "No refresh button. Drag to
+        // refresh."). The overscroll is how far the content sits below its resting place.
+        .onScrollGeometryChange(for: Double.self) { geometry in
+            Double(-(geometry.contentOffset.y + geometry.contentInsets.top))
+        } action: { _, overscroll in
+            if pull.update(overscroll: overscroll) { checkLibrary() }
         }
         // The keyboard reaches the list: click in it (or Tab to it) and ↑/↓ walk the games, the
         // way every Mac sidebar works. Return then presses Play — it is the default button.
@@ -352,13 +395,35 @@ struct LibraryView: View {
 
     private var emptyState: StoreLibrary.EmptyLibrary {
         // The sidebar's own "Check Now" is a check in progress too.
-        let ownCheck = runner.busy && runner.busyTitle == Self.checkingTitle
+        let ownCheck = isCheckingLibrary
             ? String(localized: "Asking your stores which games you own…") : nil
         return StoreLibrary.emptyLibrary(
             hasGames: !lib.games.isEmpty,
             checking: lib.checking ?? ownCheck,
             hasConnectedStore: lib.hasConnectedStore,
             uncheckedWithheld: lib.withheld.filter(StoreLibrary.isUnchecked).count)
+    }
+
+    @State private var pull = PullToRefresh()
+
+    /// Above the first game: an arrow that fills in as the list is pulled, then the check itself.
+    /// Takes no room at rest, so the list starts where it always did.
+    @ViewBuilder private var pullIndicator: some View {
+        if isCheckingLibrary {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Checking your library").font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity).padding(.top, 6)
+            .accessibilityElement(children: .combine)
+        } else if pull.distance > 0 {
+            Image(systemName: pull.progress >= 1 ? "arrow.clockwise.circle.fill" : "arrow.down.circle")
+                .font(.title3).foregroundStyle(.secondary)
+                .opacity(pull.progress)
+                .frame(maxWidth: .infinity)
+                .frame(height: 0).offset(y: -pull.distance / 2)
+                .accessibilityHidden(true)
+        }
     }
 
     private func checkLibraryButton(_ title: String) -> some View {

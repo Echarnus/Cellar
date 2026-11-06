@@ -142,11 +142,20 @@ public enum StoreLibrary {
         return cache.apps["\(appID)"] ?? .unknown("Cellar hasn't checked this game yet.")
     }
 
-    /// Whether the cached answers are old enough to be worth re-asking.
+    /// Whether Steam should be asked again: the answers are a day old, or a game Cellar has a
+    /// profile for has no answer at all. The app asks by itself when this is true
+    /// (`LibraryView.keepGamesCurrent`), so a game added by an update is not hidden until the
+    /// player thinks of signing in again (#343: Theme Hospital, added in 0.6.5, never appeared).
     public static var steamNeedsRefresh: Bool {
         guard SteamAccount.isSignedIn else { return false }
-        guard let cache = loadSteamCache() else { return true }
-        return Date().timeIntervalSince(cache.checkedAt) > cacheLifetime
+        return steamNeedsRefresh(cache: loadSteamCache(), profileAppIDs: steamAppIDsInProfiles())
+    }
+
+    /// The rule behind `steamNeedsRefresh`, kept pure so it is tested without Steam.
+    static func steamNeedsRefresh(cache: SteamCache?, profileAppIDs: Set<Int>, now: Date = Date()) -> Bool {
+        guard let cache else { return true }
+        if now.timeIntervalSince(cache.checkedAt) > cacheLifetime { return true }
+        return profileAppIDs.contains { cache.apps["\($0)"] == nil }
     }
 
     /// Ask Steam, for every app id Cellar has a profile for, whether this account may download it.

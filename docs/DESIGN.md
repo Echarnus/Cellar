@@ -89,6 +89,10 @@ that happens one level down and is never in the way.
 - **Title-style capitalization** for buttons, menu items and window titles ("Check for Updates",
   "Show Logs in Finder"). Use sentence case for labels, descriptions and alerts' informative text.
   An item that opens a window or asks something more ends in "…".
+- **No Refresh button.** The library keeps itself current, and asks the stores what the player
+  owns at every launch (#343). To ask again by hand, the player pulls the sidebar down, the way a
+  list refreshes on the iPhone (`PullToRefresh`, Kenneth 2026-11-06: "No refresh button. Drag to
+  refresh.").
 - Settings apply as they change: no Save or Done button. Window-level settings live in Settings
   (⌘,), and per-game overrides on the game's page. A setting a player wants for every game (Retina,
   MetalFX, frame rate) is offered in Settings as well as per game (#266).
