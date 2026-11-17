@@ -28,14 +28,23 @@ public enum RunnerManager {
             progress("\(spec.displayName) already installed.")
             return RunnerInstall(spec: spec, root: dest, wineBinary: bin)
         }
+        guard !spec.artifacts.isEmpty else {
+            throw CellarError.invalidArgument(
+                "\(RunnerOverrides.file.path) names no usable files for \(spec.displayName). Cellar's log says what is wrong with it.")
+        }
         CellarLog.info(.runner, "Installing runner \(spec.displayName) "
             + "(\(spec.artifacts.count) artifact(s) to download).", subject: spec.id)
 
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
         for (index, artifact) in spec.artifacts.enumerated() {
             let ext = artifact.kind == .wineserver ? "bin" : artifact.url.hasSuffix(".dmg") ? "dmg" : "tar.xz"
-            let archive = Paths.cache.appendingPathComponent("\(spec.id)-\(index).\(ext)")
-            if !fm.fileExists(atPath: archive.path) {
+            // The player's own file is read where it is, and stays there.
+            let local = artifact.isLocal
+            let archive = local ? URL(fileURLWithPath: artifact.url)
+                : Paths.cache.appendingPathComponent("\(spec.id)-\(index).\(ext)")
+            if local {
+                progress("Using \(archive.path)")
+            } else if !fm.fileExists(atPath: archive.path) {
                 progress("Downloading \(artifact.url)")
                 CellarLog.debug(.runner, "Downloading \(artifact.url)", subject: spec.id)
                 try Downloader.fetch(artifact.url, to: archive)
@@ -43,12 +52,19 @@ public enum RunnerManager {
                 progress("Using cached \(archive.lastPathComponent)")
             }
             // Fresh or cached, nothing is unpacked until it is the exact file this build pinned.
-            try Checksum.verify(archive, sha256: artifact.sha256, what: artifact.url)
+            if local {
+                guard try Checksum.sha256(of: archive) == artifact.sha256 else {
+                    throw CellarError.ioFailure("\(archive.path) isn't the file \(RunnerOverrides.file.lastPathComponent) "
+                        + "names: its SHA-256 is different. Nothing was installed.")
+                }
+            } else {
+                try Checksum.verify(archive, sha256: artifact.sha256, what: artifact.url)
+            }
 
             if artifact.kind == .wineserver {
                 progress("Installing Cellar's wineserver…")
                 try placeWineserver(archive, in: dest)
-                try? fm.removeItem(at: archive)
+                if !local { try? fm.removeItem(at: archive) }
                 continue
             }
 
@@ -59,7 +75,7 @@ public enum RunnerManager {
                 try Archive.withMountedDMG(archive) { mount in
                     try fm.copyItem(at: mount.appendingPathComponent(artifact.payloadPath), to: target)
                 }
-                try? fm.removeItem(at: archive)
+                if !local { try? fm.removeItem(at: archive) }
                 continue
             }
 
@@ -94,7 +110,7 @@ public enum RunnerManager {
                 }
             }
             try? fm.removeItem(at: staging)
-            try? fm.removeItem(at: archive)
+            if !local { try? fm.removeItem(at: archive) }
         }
 
         guard let bin = locateWineBinary(in: dest, name: spec.wineBinaryName) else {

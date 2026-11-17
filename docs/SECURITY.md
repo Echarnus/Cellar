@@ -77,6 +77,7 @@ the player's rights, the way it would on Windows.
 | Area | Status | How |
 |---|---|---|
 | Downloaded runners + DepotDownloader | ✅ | Pinned SHA-256 per file (`RunnerArtifact.sha256`, `DepotTool.downloadSHA256`), checked fresh *and* cached, before anything is unpacked or made executable (`Checksum`). Bumping a pin is a reviewed PR. SDL is pinned the same way in `app/Scripts/build-sdl.sh`. (#120) |
+| Runner files of the player's own | ✅ | `runner-artifacts.json` in Cellar's folder names, per catalog runner, the files to install it from instead of the catalog's downloads: an absolute path or an `https://` URL, each with its SHA-256 (`RunnerOverrides`). A local file is checked against its SHA-256 before it is unpacked and is never deleted; the list replaces the catalog's whole, and a mistake in the file installs nothing rather than falling back to a download. Repair uses the same files. |
 | Steam / Battle.net installers | Accepted risk | The vendors' own moving "latest" files on their HTTPS CDNs; they cannot be pinned. They run inside the bottle, not on the Mac side. |
 | Transport | ✅ | Every `curl` is HTTPS-only, redirects included (`Downloader.httpsOnly`). (#121) |
 | Secrets on command lines | ✅ | Tokens and refresh tokens go to curl on stdin (`--config -`), never argv, which every process can read. DepotDownloader never gets a password on argv. Cellar's own command lines are logged redacted, fail-closed. (#121) |
