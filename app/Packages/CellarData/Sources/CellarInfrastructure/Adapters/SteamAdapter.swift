@@ -172,7 +172,7 @@ public struct SteamAdapter: StoreAdapter {
                                             start: plan.directStartExe,
                                             publisherLauncher: plan.publisherLauncher,
                                             workaround: plan.launchWorkaround,
-                                            arguments: plan.displayArguments,
+                                            arguments: plan.gameArguments,
                                             progress: progress, stage: stage)
             return .steamAlongside(exeName: exe.lastPathComponent, appID: appID)
         }

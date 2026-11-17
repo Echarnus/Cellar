@@ -105,6 +105,15 @@ struct DisplayModeTests {
         #expect(plan.displayArguments == ["-windowed"])
     }
 
+    @Test("A profile's exe_args go first on the game's command line, then the display mode's switch")
+    func exeArgsComeFirst() throws {
+        let with = try plan(engine: "Unreal Engine 5", extra: #"exe_args = "-first -second""#)
+        #expect(with.exeArguments == ["-first", "-second"])
+        #expect(with.gameArguments == ["-first", "-second", "-windowed"])
+        let none = try plan(engine: "Unreal Engine 5")
+        #expect(none.exeArguments == [] && none.gameArguments == ["-windowed"])
+    }
+
     @Test("A game started through a publisher launcher is not: the launcher drops the arguments")
     func publisherLauncherDropsIt() throws {
         let plan = try plan(engine: "Unreal Engine 4", extra: #"publisher_launcher = "rockstar""#)
@@ -172,7 +181,7 @@ struct DisplayModeTests {
                                 encoding: .utf8)
         let call = try #require(source.range(of: "SteamBottle.launchAlongside("), "the launch route moved")
         let arguments = source[call.lowerBound...].prefix(1200)
-        #expect(arguments.contains("arguments: plan.displayArguments"),
+        #expect(arguments.contains("arguments: plan.gameArguments"),
                 "a game Cellar starts beside Steam would ignore the player's full screen or window choice")
     }
 }
