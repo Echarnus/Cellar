@@ -39,6 +39,26 @@ struct DockShimTests {
         #expect(DockShim.environment(naming: "", executables: [], library: library).isEmpty)
     }
 
+    @Test("--frame-log reaches the game's launch environment, and nothing does without it")
+    func frameLogIsForOneLaunch() throws {
+        var plan = try TestHome.plan("""
+        [game]
+        name  = "Assetto Corsa"
+        store = "steam"
+
+        [install]
+        steam_appid = "244210"
+
+        [launch]
+        exe = "acs.exe"
+        """, slug: "frame-log")
+        #expect(plan.launchEnv["CELLAR_FRAME_LOG"] == nil)
+        plan.frameLogDirectory = "/tmp/frames"
+        #expect(plan.launchEnv["CELLAR_FRAME_LOG"] == "/tmp/frames")
+        #expect(plan.env["CELLAR_FRAME_LOG"] == nil, "a client opened on its own is not this launch")
+        #expect(ProfileStore.deniedEnvPrefixes.contains { "CELLAR_FRAME_LOG".hasPrefix($0) }, "only Cellar sets it")
+    }
+
     @Test("A launch carries the game's name and exe; the profile's own variables still win")
     func launchEnvNamesTheGame() throws {
         let shim = TestHome.scratch("dock-shim").appendingPathComponent("cellar-dock-shim.dylib")

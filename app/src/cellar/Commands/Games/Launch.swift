@@ -26,6 +26,10 @@ struct Launch: ParsableCommand {
             help: "Use this graphics backend (d3dmetal, dxvk, dxmt, vkd3d, wined3d). If the game comes up, Cellar keeps using it for this game.")
     var backend: String?
 
+    @Option(name: .customLong("frame-log"),
+            help: "Record the time of every frame of this launch into this folder (frames-<pid>.txt, one file per process), for 1% low measurements. A game that a store client already running starts does not get it: quit the client first.")
+    var frameLog: String?
+
     @Flag(name: .customLong("no-wait"), help: "Return immediately after launch instead of waiting for the game to exit and closing the layer.")
     var noWait = false
 
@@ -66,6 +70,13 @@ struct Launch: ParsableCommand {
         var plan = try Game.plan(slug: slug)
         let chosenBackend = try backend.map(BackendCommand.backend)
         if let chosenBackend { plan.backend = chosenBackend.rawValue }
+        if let frameLog {
+            guard !frameLog.isEmpty else { throw CellarError.invalidArgument("--frame-log needs a folder.") }
+            // Absolute, because the game runs from its own folder; made here, because the shim only opens files.
+            let folder = URL(fileURLWithPath: frameLog).standardizedFileURL
+            if !printEnv { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+            plan.frameLogDirectory = folder.path
+        }
 
         if printEnv {
             guard let wine = Game.wineRunner(plan) else {
@@ -73,7 +84,7 @@ struct Launch: ParsableCommand {
                     "Runner '\(plan.runnerID)' isn't installed. Run: cellar setup --profile \(slug)")
             }
             var extra = WineRunner.d3dMetalEnv(showHUD: hud)
-            for (key, value) in plan.env { extra[key] = value }
+            for (key, value) in plan.launchEnv { extra[key] = value }
             for (key, value) in wine.environment(extra: extra).sorted(by: { $0.key < $1.key }) {
                 print("\(key)=\(value)")
             }
