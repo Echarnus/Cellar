@@ -30,6 +30,10 @@ struct Launch: ParsableCommand {
             help: "Record the time of every frame of this launch into this folder (frames-<pid>.txt, one file per process), for 1% low measurements. A game that a store client already running starts does not get it: quit the client first.")
     var frameLog: String?
 
+    @Flag(name: .customLong("display-sync"),
+          help: "Pace this launch's frames to the display's refresh rate (steady frame times, less GPU work and heat); like --frame-log, a game started by an already-running store client does not get it.")
+    var displaySync = false
+
     @Flag(name: .customLong("no-wait"), help: "Return immediately after launch instead of waiting for the game to exit and closing the layer.")
     var noWait = false
 
@@ -77,6 +81,8 @@ struct Launch: ParsableCommand {
             if !printEnv { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
             plan.frameLogDirectory = folder.path
         }
+
+        plan.displaySync = displaySync
 
         if printEnv {
             guard let wine = Game.wineRunner(plan) else {

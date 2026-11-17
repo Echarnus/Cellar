@@ -11,10 +11,14 @@
  * (n = nextDrawable, p = present). Lines are buffered and written every 256 events, so a killed
  * process loses at most that many. Part of the dock shim's library because that library is already
  * inserted into every Wine process Cellar starts for a game.
+ *
+ * CELLAR_DISPLAY_SYNC (`cellar launch --display-sync`) is separate: it sets displaySyncEnabled on
+ * the layer at each nextDrawable, so frames are paced to the display, with or without a log.
  */
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <mach/mach_time.h>
+#include <objc/message.h>
 #include <objc/runtime.h>
 #include <os/lock.h>
 #include <stdio.h>
@@ -55,7 +59,14 @@ static next_fn original_next;
 static present_fn original_present;
 static present_at_fn original_present_at, original_present_after;
 
-static id frametime_next(id self, SEL cmd) { note('n'); return original_next(self, cmd); }
+/* Pace frames to the display: AC's own frame cap and VSYNC do not hold under Wine + D3DMetal. */
+static int display_sync;
+static id frametime_next(id self, SEL cmd)
+{
+    if (display_sync) ((void (*)(id, SEL, signed char))objc_msgSend)(self, sel_registerName("setDisplaySyncEnabled:"), 1);
+    note('n');
+    return original_next(self, cmd);
+}
 static void frametime_present(id self, SEL cmd) { note('p'); original_present(self, cmd); }
 static void frametime_present_at(id self, SEL cmd, double t) { note('p'); original_present_at(self, cmd, t); }
 static void frametime_present_after(id self, SEL cmd, double t) { note('p'); original_present_after(self, cmd, t); }
@@ -71,15 +82,20 @@ __attribute__((constructor))
 static void cellar_frametime_init(void)
 {
     const char *dir = getenv("CELLAR_FRAME_LOG");
-    if (!dir || !*dir) return;
+    const char *sync = getenv("CELLAR_DISPLAY_SYNC");
+    display_sync = sync && *sync && strcmp(sync, "0") != 0;
+    int logging = dir && *dir;
+    if (!logging && !display_sync) return;
     if (!dlopen("/System/Library/Frameworks/QuartzCore.framework/QuartzCore", RTLD_LAZY)) return;
-    char path[1024];
-    if (snprintf(path, sizeof path, "%s/frames-%d.txt", dir, getpid()) >= (int)sizeof path) return;
-    log_fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0644);
-    if (log_fd < 0) return;
-    mach_timebase_info(&timebase);
-    atexit(flush_log);
+    if (logging) {
+        char path[1024];
+        if (snprintf(path, sizeof path, "%s/frames-%d.txt", dir, getpid()) < (int)sizeof path)
+            log_fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0644);
+        mach_timebase_info(&timebase);
+        atexit(flush_log);
+    }
     hook("CAMetalLayer", "nextDrawable", (IMP)frametime_next, &original_next);
+    if (log_fd < 0) return;
     hook("CAMetalDrawable", "present", (IMP)frametime_present, &original_present);
     hook("CAMetalDrawable", "presentAtTime:", (IMP)frametime_present_at, &original_present_at);
     hook("CAMetalDrawable", "presentAfterMinimumDuration:", (IMP)frametime_present_after, &original_present_after);

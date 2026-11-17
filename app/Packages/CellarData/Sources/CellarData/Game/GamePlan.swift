@@ -67,6 +67,10 @@ public struct GamePlan {
     /// `CELLAR_` prefix — and not in `env`, so a store client opened on its own never gets it.
     public var frameLogDirectory: String? = nil
     static let frameLogVariable = "CELLAR_FRAME_LOG"
+    /// `cellar launch --display-sync`: the shim paces this launch's frames to the display. Same
+    /// rules as `frameLogDirectory`: one launch, never in `env`.
+    public var displaySync = false
+    static let displaySyncVariable = "CELLAR_DISPLAY_SYNC"
     /// `online_hosts`: the servers the game itself talks to (`css-api.zaonce.net` for Planet Coaster
     /// 2), which `cellar verify` expects the game's own process to connect to. Not the addresses
     /// `network_check` probes from the bottle: those prove the bottle can reach a server, and only
@@ -231,6 +235,7 @@ public struct GamePlan {
         var result = DockShim.environment(naming: name, executables: exe)
         for (key, value) in env { result[key] = value }
         if let frameLogDirectory { result[Self.frameLogVariable] = frameLogDirectory }
+        if displaySync { result[Self.displaySyncVariable] = "1" }
         return result
     }
 

@@ -59,6 +59,26 @@ struct DockShimTests {
         #expect(ProfileStore.deniedEnvPrefixes.contains { "CELLAR_FRAME_LOG".hasPrefix($0) }, "only Cellar sets it")
     }
 
+    @Test("--display-sync reaches the game's launch environment, and nothing does without it")
+    func displaySyncIsForOneLaunch() throws {
+        var plan = try TestHome.plan("""
+        [game]
+        name  = "Assetto Corsa"
+        store = "steam"
+
+        [install]
+        steam_appid = "244210"
+
+        [launch]
+        exe = "acs.exe"
+        """, slug: "display-sync")
+        #expect(plan.launchEnv["CELLAR_DISPLAY_SYNC"] == nil)
+        plan.displaySync = true
+        #expect(plan.launchEnv["CELLAR_DISPLAY_SYNC"] == "1")
+        #expect(plan.env["CELLAR_DISPLAY_SYNC"] == nil, "a client opened on its own is not this launch")
+        #expect(ProfileStore.deniedEnvPrefixes.contains { "CELLAR_DISPLAY_SYNC".hasPrefix($0) }, "only Cellar sets it")
+    }
+
     @Test("A launch carries the game's name and exe; the profile's own variables still win")
     func launchEnvNamesTheGame() throws {
         let shim = TestHome.scratch("dock-shim").appendingPathComponent("cellar-dock-shim.dylib")
