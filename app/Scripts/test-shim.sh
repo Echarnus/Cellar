@@ -26,3 +26,6 @@ CELLAR_TEST_SHIM_LOADED=1 "$OUT/recvtos-shim"
 if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
   CELLAR_TEST_SHIM_LOADED=1 /usr/bin/arch -x86_64 "$OUT/recvtos-shim"
 fi
+# The BC1/BC3 mip codec the mip fix uses (Shim/cellar-bc.c).
+/usr/bin/xcrun clang -Wall -Wextra -o "$OUT/test-bc" Shim/test-bc.c Shim/cellar-bc.c
+"$OUT/test-bc"
