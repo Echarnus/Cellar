@@ -7,11 +7,11 @@ import IOKit.hid
 /// Wine processes, and those end with a SIGKILL — a crash, `wineserver -k`, the sweep after it — so
 /// that close never runs. A Thrustmaster keeps playing an effect uploaded as infinite, and a Fanatec
 /// base keeps the last force it was sent: the motor goes on pushing with nothing left to stop it.
-/// So once a bottle's Wine is gone (`WineRunner.shutDown`), Cellar sends the stop the driver would
-/// have sent.
+/// So when the game exits (`LaunchGame.waitForExitThenShutDown`), and again once the bottle's Wine
+/// is gone (`WineRunner.shutDown`), Cellar sends the stop the driver would have sent.
 extension CellarSDL {
     /// Stop every force on the Fanatec and Thrustmaster wheels Cellar's SDL drives. For the moment
-    /// a bottle's Wine has gone: a game in another bottle loses its force feedback too, which is
+    /// a game has exited or a bottle's Wine has gone: a game in another bottle loses its force feedback too, which is
     /// the price of a motor never being left running. Costs one HID listing when nothing is attached.
     public static func stopWheels() {
         guard shouldStopWheels(environment: ProcessInfo.processInfo.environment) else { return }
