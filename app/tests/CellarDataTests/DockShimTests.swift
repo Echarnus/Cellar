@@ -116,6 +116,8 @@ struct DockShimTests {
         let start = SteamBottle.clientStart(runner: runner, extraArgs: game.extraArgs, showHUD: false,
                                             gameEnv: ["CELLAR_APP_NAME": "Planet Coaster 2"], dock: game.dock)
         #expect(start.arguments.last == "-silent")
+        #expect(start.arguments.contains("-cef-disable-gpu"), "Steam's web helper crash-loops under Wine without it")
+        #expect(start.arguments.contains("-no-cef-sandbox"))
         #expect(start.environment["DYLD_INSERT_LIBRARIES"] == shim.path)
         let hidden = Set((start.environment["CELLAR_DOCK_HIDE"] ?? "").split(separator: ",").map(String.init))
         for client in GameStore.steam.descriptor.clientProcessNames {
