@@ -149,6 +149,26 @@ struct LaunchLifecycleTests {
                 "the bottle's wineserver was never asked to stop")
     }
 
+    @Test("A wheel is stopped the moment the game is gone, before the layer is taken down")
+    func quittingStopsTheWheelFirst() throws {
+        let (plan, _, exeName) = try storeFreeGame(seconds: 5)
+        defer {
+            ProcessWatch.kill([exeName])
+            try? FileManager.default.removeItem(at: plan.prefix)
+        }
+        let route = try Game.launch(plan, checkUpdates: false)
+        FakeWine.reset()
+
+        var gameWasGone: Bool?, layerWasUp: Bool?
+        LaunchGame(plan).waitForExitThenShutDown(route, stopWheels: {
+            gameWasGone = !ProcessWatch.isRunning(exeName)
+            layerWasUp = !FakeWine.calls().contains { $0.tool == "wineserver" }
+        })
+
+        #expect(gameWasGone == true, "the wheel must not be stopped under a running game")
+        #expect(layerWasUp == true, "the stop must not wait for the wineserver to go")
+    }
+
     @Test("A Wine process that outlives its bottle's wineserver is stopped, and nothing else is")
     func leftoversAreSwept() throws {
         let install = try FakeWine.install()
