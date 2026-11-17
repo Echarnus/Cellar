@@ -75,6 +75,50 @@ struct SupplyChainTests {
         #expect(Downloader.httpsOnly == ["--proto", "=https", "--proto-redir", "=https"])
     }
 
+    @Test("A signature is taken only from the signer and identifier asked for")
+    func codeSignature() throws {
+        let ls = URL(fileURLWithPath: "/bin/ls")
+        #expect(CodeSignature.satisfies(ls, #"identifier "com.apple.ls" and anchor apple"#))
+        #expect(!CodeSignature.satisfies(ls, try #require(CodeSignature.d3dMetal["D3DMetal.framework"])))
+        let unsigned = FileManager.default.temporaryDirectory.appendingPathComponent("cellar-unsigned-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: unsigned) }
+        try Data("not a program".utf8).write(to: unsigned)
+        #expect(!CodeSignature.satisfies(unsigned, "anchor apple"))
+    }
+
+    @Test("Every D3DMetal a runner unpacks must be Apple's, wherever the archive keeps it, and one must be there")
+    func d3dMetalIsApples() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("cellar-d3dmetal-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: root) }
+        // The two layouts in the catalog: WineForge's and the wrapper's Frameworks.
+        let places = ["wine/lib/d3dmetal/external", "Frameworks/renderer/d3dmetal"]
+        for place in places {
+            let dir = root.appendingPathComponent(place)
+            try fm.createDirectory(at: dir.appendingPathComponent("D3DMetal.framework"), withIntermediateDirectories: true)
+            try Data().write(to: dir.appendingPathComponent("libd3dshared.dylib"))
+        }
+        var asked: [String] = []
+        try CodeSignature.requireAppleD3DMetal(under: root, expected: true) { file, requirement in
+            #expect(requirement == CodeSignature.d3dMetal[file.lastPathComponent])
+            asked.append(file.path)
+            return true
+        }
+        #expect(asked.count == 4 && places.allSatisfy { place in asked.filter { $0.contains(place) }.count == 2 })
+        for bad in asked {
+            #expect(throws: CellarError.self) {
+                try CodeSignature.requireAppleD3DMetal(under: root, expected: true) { file, _ in file.path != bad }
+            }
+        }
+        // For real: these stand-ins are signed by nobody.
+        #expect(throws: CellarError.self) { try CodeSignature.requireAppleD3DMetal(under: root, expected: true) }
+
+        let empty = root.appendingPathComponent("empty")
+        try fm.createDirectory(at: empty, withIntermediateDirectories: true)
+        #expect(throws: CellarError.self) { try CodeSignature.requireAppleD3DMetal(under: empty, expected: true) }
+        try CodeSignature.requireAppleD3DMetal(under: empty, expected: false)
+    }
+
     // MARK: - Launchers
 
     @Test("A launcher script quotes every word, so a name or slug can never become a command")

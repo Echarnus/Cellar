@@ -129,5 +129,8 @@ public enum RunnerCatalog {
 
     public static let all = [wineforge, wineforgeD3DMetal4, sikarugir, gptk]
     public static let defaultID = wineforge.id
-    public static func spec(forID id: String) -> RunnerSpec? { all.first { $0.id == id } }
+    /// The runner `id`, installed from the player's own files where `runner-artifacts.json` names some.
+    public static func spec(forID id: String) -> RunnerSpec? {
+        all.first { $0.id == id }.map { RunnerOverrides.applied(to: $0) }
+    }
 }

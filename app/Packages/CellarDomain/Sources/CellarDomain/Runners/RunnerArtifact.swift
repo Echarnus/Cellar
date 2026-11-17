@@ -2,7 +2,7 @@ import Foundation
 
 /// One downloadable artifact of a runner and where its payload lands inside the runner root.
 public struct RunnerArtifact: Sendable {
-    public enum Kind: Sendable {
+    public enum Kind: String, Sendable {
         /// A Wine engine tarball. `payloadPath` is the directory inside the archive that holds
         /// `bin/wine` (e.g. `wswine.bundle`); it is moved to `<runner>/wine`.
         case wineEngine
@@ -23,7 +23,10 @@ public struct RunnerArtifact: Sendable {
         case wineserver
     }
     public let kind: Kind
+    /// Where the file comes from: an `https://` URL, or an absolute path for a file the player
+    /// supplies themselves (`RunnerOverrides`).
     public let url: String
+    public var isLocal: Bool { url.hasPrefix("/") }
     public let payloadPath: String
     /// The SHA-256 of the file at `url`, lowercase hex. Pinned because the file is somebody
     /// else's GitHub release asset, which its owner can replace at any time, and what is inside runs
