@@ -130,4 +130,57 @@ struct CellarSDLTests {
         CellarSDL.applyStrength(nil, to: &empty)
         #expect(empty.isEmpty)
     }
+
+    // MARK: - Stopping the motor after a session
+
+    @Test("A Thrustmaster is sent its driver's stop for every slot, then its close, at its own length")
+    func thrustmasterStop() throws {
+        let t300 = try #require(CellarSDL.stopReports(vendorID: 0x044F, productID: 0xB66E, fanatecReportID: 0))
+        #expect(t300.reportID == 0x60)
+        #expect(t300.reports.count == 17)
+        #expect(t300.reports.allSatisfy { $0.count == 64 && $0[0] == 0x60 }, "report ID, then 63 bytes")
+        #expect(Array(t300.reports[0].prefix(4)) == [0x60, 0x00, 0x01, 0x89])
+        #expect(Array(t300.reports[15].prefix(4)) == [0x60, 0x00, 0x10, 0x89])
+        #expect(Array(t300.reports[16].prefix(3)) == [0x60, 0x01, 0x00])
+        #expect(t300.reports[16].dropFirst(3).allSatisfy { $0 == 0 })
+
+        let ps4 = try #require(CellarSDL.stopReports(vendorID: 0x044F, productID: 0xB66D, fanatecReportID: 0))
+        #expect(ps4.reports.allSatisfy { $0.count == 32 }, "PS4 mode takes 31-byte commands")
+
+        let t248 = try #require(CellarSDL.stopReports(vendorID: 0x044F, productID: 0xB696, fanatecReportID: 0))
+        #expect(t248.reports.count == 18)
+        #expect(Array(t248.reports[16].prefix(3)) == [0x60, 0x01, 0x05], "a T300's successors close in two steps")
+        #expect(Array(t248.reports[17].prefix(3)) == [0x60, 0x01, 0x00])
+
+        #expect(CellarSDL.stopReports(vendorID: 0x044F, productID: 0xB65D, fanatecReportID: 0) == nil,
+                "a wheel still in generic mode was never driven")
+        #expect(CellarSDL.stopReports(vendorID: 0x044F, productID: 0xB677, fanatecReportID: 0) == nil, "a T150")
+        #expect(CellarSDL.stopReports(vendorID: 0x046D, productID: 0xC24F, fanatecReportID: 0) == nil,
+                "SDL's own Logitech driver is not Cellar's to second-guess")
+    }
+
+    @Test("A Fanatec base gets every slot disabled, then its stop-all, with its report ID first")
+    func fanatecStop() throws {
+        let csl = try #require(CellarSDL.stopReports(vendorID: 0x0EB7, productID: 0x0020, fanatecReportID: 1))
+        #expect(csl.reportID == 1)
+        #expect(csl.reports == [
+            [0x01, 0x03, 0x08, 0, 0, 0, 0, 0], [0x01, 0x13, 0x0B, 0, 0, 0, 0, 0],
+            [0x01, 0x23, 0x0C, 0, 0, 0, 0, 0xFF], [0x01, 0x33, 0x0C, 0, 0, 0, 0, 0xFF],
+            [0x01, 0x43, 0x0C, 0, 0, 0, 0, 0xFF], [0x01, 0xF3, 0, 0, 0, 0, 0, 0],
+        ])
+        let bare = try #require(CellarSDL.stopReports(vendorID: 0x0EB7, productID: 0x0E03, fanatecReportID: 0))
+        #expect(bare.reportID == 0 && bare.reports.last == [0xF3, 0, 0, 0, 0, 0, 0], "no report IDs: the command alone")
+        #expect(CellarSDL.stopReports(vendorID: 0x0EB7, productID: 0x6204, fanatecReportID: 1) == nil, "pedals")
+    }
+
+    @Test("The wheels are left alone with CELLAR_FFB_DISABLE, and by a relocated Cellar such as a test run")
+    func whenToStop() {
+        #expect(CellarSDL.shouldStopWheels(environment: [:]))
+        #expect(!CellarSDL.shouldStopWheels(environment: ["CELLAR_FFB_DISABLE": "1"]))
+        #expect(CellarSDL.shouldStopWheels(environment: ["CELLAR_FFB_DISABLE": "0"]))
+        #expect(CellarSDL.shouldStopWheels(environment: ["CELLAR_FFB_DISABLE": "FALSE"]))
+        #expect(!CellarSDL.shouldStopWheels(environment: ["CELLAR_HOME": "/tmp/cellar-tests"]))
+        #expect(!CellarSDL.shouldStopWheels(environment: ProcessInfo.processInfo.environment),
+                "this test run must never reach a real wheel")
+    }
 }

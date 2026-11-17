@@ -404,6 +404,12 @@ public struct WineRunner {
             CellarLog.warn(.session, "Stopped \(swept.count) Wine process(es) that outlived \(bottle)'s "
                 + "wineserver: \(swept.map { "\($0)" }.joined(separator: ", ")).")
         }
+        // Wine went down with a SIGKILL, so Cellar's SDL never stopped a wheel's motor itself.
+        if waitForServerToStop(within: 2) {
+            CellarSDL.stopWheels()
+        } else {
+            CellarLog.info(.session, "Left the wheels as they are: Wine is still up in \(bottle).")
+        }
         return swept
     }
 
