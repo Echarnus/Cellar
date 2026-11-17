@@ -535,7 +535,7 @@ shape, for the T300 family (T300 RS, T300 Ferrari Edition, TX, T248, TS-XW, TS-P
   another protocol, and is left alone. The model table is `CellarThrustmaster_SwitchValue`, tested.
 - **Safety.** The cap (`CELLAR_FFB_MAX_PERCENT`, default 100: a belt-driven base is not a
   direct-drive one) goes through the wheel's own gain, multiplied with the game's, so every effect
-  is scaled by it. Closing the haptic stops each effect still playing and closes the wheel's force
+  is scaled by it; the game's autocenter strength is scaled by it too. Closing the haptic stops each effect still playing and closes the wheel's force
   feedback.
 - `app/Shim/sdl/tests/test_thrustmaster.c` checks every packet against the layouts above, the open and
   close sequence per model, updates sent only on change, expiry, the cap, and stop-on-close.
