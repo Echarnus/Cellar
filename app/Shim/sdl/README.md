@@ -31,4 +31,6 @@ Rules, because this library runs inside every game's Wine process:
 - Code ported from a GPL driver (Linux `hid-*`) keeps that driver's licence on the file it lands in,
   and `THIRD_PARTY_LICENSES.md` says so before the patch ships.
 - Force feedback is a motor: a driver caps its output (`CELLAR_FFB_MAX_PERCENT`) and stops every
-  effect when the device closes.
+  effect when the device closes. Wine's processes usually end with a SIGKILL, so that close may never run:
+  `CellarSDL.stopWheels` sends the same stop from Cellar once the bottle is shut down, and a new driver's
+  stop bytes go there too.

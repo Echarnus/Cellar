@@ -181,6 +181,21 @@ public enum Wheels {
     /// The sim-racing hardware connected now. Matches joysticks and pads only, never a keyboard,
     /// so it does not trigger macOS's Input Monitoring prompt.
     public static func connected() -> [Device] {
+        var seen = Set<String>()
+        return controllerDevices().compactMap { device -> Device? in
+            let vendorID = intProperty(device, kIOHIDVendorIDKey)
+            let productID = intProperty(device, kIOHIDProductIDKey)
+            let product = IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String ?? ""
+            guard let found = classify(vendorID: vendorID, productID: productID, product: product) else { return nil }
+            // One base can expose several HID interfaces; list it once.
+            guard seen.insert("\(vendorID):\(productID)").inserted else { return nil }
+            return found
+        }
+        .sorted { ($0.vendor.rawValue, $0.name) < ($1.vendor.rawValue, $1.name) }
+    }
+
+    /// Every joystick, gamepad and multi-axis controller attached: the HID devices behind `connected`.
+    static func controllerDevices() -> Set<IOHIDDevice> {
         let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
         let usages = [kHIDUsage_GD_Joystick, kHIDUsage_GD_GamePad, kHIDUsage_GD_MultiAxisController]
         let matching = usages.map {
@@ -195,20 +210,10 @@ public enum Wheels {
             devices = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> ?? []
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         }
-        var seen = Set<String>()
-        return devices.compactMap { device -> Device? in
-            let vendorID = intProperty(device, kIOHIDVendorIDKey)
-            let productID = intProperty(device, kIOHIDProductIDKey)
-            let product = IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String ?? ""
-            guard let found = classify(vendorID: vendorID, productID: productID, product: product) else { return nil }
-            // One base can expose several HID interfaces; list it once.
-            guard seen.insert("\(vendorID):\(productID)").inserted else { return nil }
-            return found
-        }
-        .sorted { ($0.vendor.rawValue, $0.name) < ($1.vendor.rawValue, $1.name) }
+        return devices
     }
 
-    private static func intProperty(_ device: IOHIDDevice, _ key: String) -> Int {
+    static func intProperty(_ device: IOHIDDevice, _ key: String) -> Int {
         (IOHIDDeviceGetProperty(device, key as CFString) as? NSNumber)?.intValue ?? 0
     }
 }

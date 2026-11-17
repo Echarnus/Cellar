@@ -537,6 +537,15 @@ shape, for the T300 family (T300 RS, T300 Ferrari Edition, TX, T248, TS-XW, TS-P
   direct-drive one) goes through the wheel's own gain, multiplied with the game's, so every effect
   is scaled by it. Closing the haptic stops each effect still playing and closes the wheel's force
   feedback.
+- **After the game.** SDL lives in the bottle's Wine processes, and Wine ends with a SIGKILL (a crash,
+  `wineserver -k`, the sweep), so the drivers' close never runs: a Thrustmaster keeps playing an
+  effect uploaded as infinite, a Fanatec base keeps the last force it was sent. So
+  `WineRunner.shutDown`, once the bottle's wineserver is gone (it waits up to 2 s more, and logs
+  when it gives up), calls `CellarSDL.stopWheels`: to each attached wheel the drivers take it sends
+  the drivers' own stop (a Thrustmaster: stop for all 16 slots, then its close sequence; a Fanatec
+  base: its five slots off, then stop-all). Every shutdown path goes through it. A game still
+  playing in another bottle loses its force feedback too: a motor left running is the worse
+  failure. Not with `CELLAR_FFB_DISABLE` set, and not from a relocated Cellar (`CELLAR_HOME`).
 - `app/Shim/sdl/tests/test_thrustmaster.c` checks every packet against the layouts above, the open and
   close sequence per model, updates sent only on change, expiry, the cap, and stop-on-close.
 
