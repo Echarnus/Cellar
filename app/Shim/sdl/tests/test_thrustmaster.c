@@ -219,7 +219,7 @@ static void test_gain_never_exceeds_cap(void) {
     CHECK(CellarThrustmaster_SetGain(d, 50) && IS(r.cmds[2], 0x02, 0x3f));
     CHECK(CellarThrustmaster_SetGain(d, 0) && IS(r.cmds[3], 0x02, 0x00));
     CHECK(CellarThrustmaster_SetAutocenter(d, 100));
-    CHECK(IS(r.cmds[4], 0x08, 0x04, 0x01, 0x00) && IS(r.cmds[5], 0x08, 0x03, 0xff, 0xff));
+    CHECK(IS(r.cmds[4], 0x08, 0x04, 0x01, 0x00) && IS(r.cmds[5], 0x08, 0x03, 0xff, 0x7f)); /* capped at 50%, too */
     CellarThrustmaster_Destroy(d);
 }
 static void test_destroy_stops_everything(void) {

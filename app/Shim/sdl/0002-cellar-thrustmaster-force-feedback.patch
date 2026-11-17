@@ -892,7 +892,7 @@ diff -ruN a/src/haptic/darwin/SDL_cellar_thrustmaster.c b/src/haptic/darwin/SDL_
 +bool CellarThrustmaster_SetAutocenter(CellarThrustmaster *dev, int autocenter)
 +{
 +    bool ok;
-+    Uint32 value = (Uint32)0xffff * (Uint32)(autocenter < 0 ? 0 : (autocenter > 100 ? 100 : autocenter)) / 100;
++    Uint32 value = (Uint32)0xffff * (Uint32)(autocenter < 0 ? 0 : (autocenter > 100 ? 100 : autocenter)) / 100 * (Uint32)dev->max_percent / 100;
 +    SDL_LockMutex(dev->mutex);
 +    dev->buffer[0] = 0x08;
 +    dev->buffer[1] = 0x04;
