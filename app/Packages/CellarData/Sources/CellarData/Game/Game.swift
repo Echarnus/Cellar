@@ -129,7 +129,8 @@ public enum Game {
             onlineErrors: (fields["online_errors"] ?? "").split(separator: " ").map(String.init),
             firstRunFiles: FirstRunFiles.parse(fields["first_run_files"]),
             displaySwitchFile: DisplaySwitchFile.parse(fields["display_switch_file"]),
-            displayIni: DisplayIni.parse(fields["display_ini"])
+            displayIni: DisplayIni.parse(fields["display_ini"]),
+            exeArguments: (fields["exe_args"] ?? "").split(separator: " ").map(String.init)
         )
     }
 
@@ -265,7 +266,7 @@ public enum Game {
         let wineLog = Paths.logs.appendingPathComponent("game-\(plan.slug).log")
         CellarLog.debug(.launch, "Starting \(exe.lastPathComponent) directly; Wine output → "
             + wineLog.lastPathComponent, subject: plan.slug)
-        try wine.spawn([exe.path] + plan.displayArguments, extraEnv: env, log: wineLog,
+        try wine.spawn([exe.path] + plan.gameArguments, extraEnv: env, log: wineLog,
                        bundledLoader: GameApp.prepare(for: plan, runner: wine),
                        directory: exe.deletingLastPathComponent())
     }
