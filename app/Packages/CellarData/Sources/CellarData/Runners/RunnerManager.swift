@@ -20,6 +20,12 @@ public enum RunnerManager {
     /// Install a runner (idempotent — returns the existing install if already present).
     @discardableResult
     public static func install(_ spec: RunnerSpec, progress: (String) -> Void = { _ in }) throws -> RunnerInstall {
+        try install(spec, progress: progress, signed: CodeSignature.satisfies)
+    }
+
+    /// The same, with the signature check passed in: a test has no Apple-signed D3DMetal to unpack.
+    static func install(_ spec: RunnerSpec, progress: (String) -> Void = { _ in },
+                        signed: (URL, String) -> Bool) throws -> RunnerInstall {
         try Paths.ensureBaseDirectories()
         let fm = FileManager.default
         let dest = Paths.runners.appendingPathComponent(spec.id, isDirectory: true)
@@ -118,6 +124,12 @@ public enum RunnerManager {
                 "Could not find '\(spec.wineBinaryName)' after installing \(spec.displayName).")
         }
         let install = RunnerInstall(spec: spec, root: dest, wineBinary: bin)
+        do {
+            try CodeSignature.requireAppleD3DMetal(under: dest, expected: spec.hasD3DMetal, satisfies: signed)
+        } catch {
+            try? fm.removeItem(at: dest)
+            throw error
+        }
         // Fresh from checksummed downloads: what every later Play checks the runner against.
         do {
             try RunnerIntegrity.record(install)

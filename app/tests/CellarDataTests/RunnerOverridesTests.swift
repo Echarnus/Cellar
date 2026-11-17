@@ -67,6 +67,10 @@ struct RunnerOverridesTests {
             try RunnerIntegrityTests.machO.write(to: bin.appendingPathComponent(name))
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: bin.appendingPathComponent(name).path)
         }
+        // Stand-ins for D3DMetal, which this runner is meant to have; the tests answer for their signature.
+        let d3dmetal = dir.appendingPathComponent("tree/wine/lib/d3dmetal/external", isDirectory: true)
+        try fm.createDirectory(at: d3dmetal.appendingPathComponent("D3DMetal.framework"), withIntermediateDirectories: true)
+        try Data().write(to: d3dmetal.appendingPathComponent("libd3dshared.dylib"))
         let tarball = dir.appendingPathComponent("wine.tar.xz")
         try #require(Shell.run("/usr/bin/tar", ["-cJf", tarball.path, "-C", dir.appendingPathComponent("tree").path, "wine"]).succeeded)
         let entry = ["kind": "wineEngine", "source": tarball.path, "payloadPath": "wine",
@@ -90,10 +94,16 @@ struct RunnerOverridesTests {
         cleanUp(Paths.runners.appendingPathComponent(Self.id))
         let tarball = try ownEngine(in: dir)
 
-        let install = try RunnerManager.install(try #require(RunnerCatalog.spec(forID: Self.id)))
+        let spec = try #require(RunnerCatalog.spec(forID: Self.id))
+        let install = try RunnerManager.install(spec, signed: { _, _ in true })
         #expect(FileManager.default.isExecutableFile(atPath: install.wineBinary.path))
         #expect(FileManager.default.fileExists(atPath: tarball.path), "the player's file is not Cellar's to delete")
         #expect(RunnerIntegrity.check(runnerID: Self.id) == .intact)
+
+        // The same files with nobody vouching for the D3DMetal in them: the runner is taken away again.
+        try FileManager.default.removeItem(at: install.root)
+        #expect(throws: CellarError.self) { try RunnerManager.install(spec) }
+        #expect(!FileManager.default.fileExists(atPath: install.root.path))
     }
 
     @Test("A file that isn't the one named is refused: nothing installed, nothing deleted, nothing downloaded")
