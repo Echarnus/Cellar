@@ -169,9 +169,15 @@ public enum RunnerIntegrity {
     }
 
     static func relativePath(_ file: URL, in root: URL) -> String {
-        let base = root.standardizedFileURL.path
-        let path = file.standardizedFileURL.path
-        return path.hasPrefix(base + "/") ? String(path.dropFirst(base.count + 1)) : path
+        // Cellar's folder may be a link to another disk: compare as spelled, then with links resolved
+        // (the file's own name kept, as it may itself be a link inside the runner).
+        let resolvedFile = file.deletingLastPathComponent().resolvingSymlinksInPath()
+            .appendingPathComponent(file.lastPathComponent)
+        for (base, path) in [(root, file), (root.resolvingSymlinksInPath(), resolvedFile)] {
+            let b = base.standardizedFileURL.path, p = path.standardizedFileURL.path
+            if p.hasPrefix(b + "/") { return String(p.dropFirst(b.count + 1)) }
+        }
+        return file.standardizedFileURL.path
     }
 
     static func isRegularFile(_ url: URL) -> Bool {
