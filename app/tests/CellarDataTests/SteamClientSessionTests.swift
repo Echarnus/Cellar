@@ -62,8 +62,10 @@ struct SteamClientSessionTests {
     // MARK: - The token and its key
 
     static func jwt(sub: String = "76561197960265728", aud: [String] = ["client", "web"],
-                    expires: Date = Date().addingTimeInterval(180 * 86400), per: Int? = 1) -> String {
+                    expires: Date = Date().addingTimeInterval(180 * 86400), per: Int? = 1,
+                    issued: Date? = nil) -> String {
         var payload: [String: Any] = ["iss": "steam", "sub": sub, "aud": aud, "exp": Int(expires.timeIntervalSince1970)]
+        if let issued { payload["iat"] = Int(issued.timeIntervalSince1970) }
         if let per { payload["per"] = per }
         func b64(_ d: Data) -> String {
             d.base64EncodedString().replacingOccurrences(of: "+", with: "-")
@@ -256,6 +258,29 @@ struct SteamClientSessionTests {
         // The shared install knows the account, but this bottle's own local.vdf doesn't: a second
         // Steam game's bottle still needs the session handed over.
         #expect(SteamClientSession.readiness(Self.snapshot(users: users)) == .canHandOver)
+    }
+
+    @Test("A bottle remembering an older session than Cellar's is handed the new one")
+    func staleRemembered() throws {
+        let key = SteamClientSession.connectCacheKey(account: "someaccount")
+        let local = "\"MachineUserConfigStore\"\n{\n\t\"Software\"\n\t{\n\t\t\"Valve\"\n\t\t{\n\t\t\t\"Steam\"\n\t\t\t{\n\t\t\t\t\"ConnectCache\"\n\t\t\t\t{\n\t\t\t\t\t\"\(key)\"\t\t\"00\"\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}\n"
+        let users = "\"users\"\n{\n\t\"76561197960265728\"\n\t{\n\t\t\"AccountName\"\t\t\"SomeAccount\"\n\t}\n}\n"
+        let night = Date().addingTimeInterval(-9 * 3600), morning = Date().addingTimeInterval(-3600)
+        // Steam's expiry dates don't follow issue order: the newer session can expire first.
+        let older = try #require(SteamClientSession.claims(ofToken: Self.jwt(expires: Date().addingTimeInterval(200 * 86400), issued: night)))
+        let newer = try #require(SteamClientSession.claims(ofToken: Self.jwt(expires: Date().addingTimeInterval(190 * 86400), issued: morning)))
+        func decide(_ token: String?, remembered: SteamClientSession.Claims?) -> SteamClientSession.Readiness {
+            var s = Self.snapshot(token: token, local: local, users: users)
+            s.rememberedClaims = remembered
+            return SteamClientSession.readiness(s)
+        }
+        #expect(decide(Self.jwt(expires: Date().addingTimeInterval(190 * 86400), issued: morning), remembered: older) == .canHandOver)
+        #expect(decide(Self.jwt(expires: Date().addingTimeInterval(200 * 86400), issued: night), remembered: newer) == .remembered,
+                "a client with a newer session than Cellar's keeps it")
+        #expect(decide(Self.jwt(issued: morning), remembered: nil) == .remembered, "an unreadable remembered session is left alone")
+        #expect(decide(Self.jwt(), remembered: older) == .remembered, "without issue dates nothing is replaced")
+        #expect(decide(Self.jwt(expires: Date().addingTimeInterval(600), issued: morning), remembered: older) == .remembered,
+                "a newer token the client couldn't use is not handed over")
     }
 
     @Test("Steam's verdict is read from connection_log.txt, the last logon winning")
