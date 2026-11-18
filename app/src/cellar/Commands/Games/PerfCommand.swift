@@ -194,7 +194,7 @@ struct PerfCommand: ParsableCommand {
                 measured = FrameStats.measure(text)
             } else {
                 measured = FrameStats.measure(FrameStats.Source.unifiedLog(seconds: seconds))
-                    ?? FrameStats.measure(FrameStats.Source.launchLogs(bottle: plan.bottleName, slug: slug,
+                    ?? FrameStats.measure(FrameStats.Source.launchLogs(bottle: plan.bottleName, slug: slug, exe: plan.launchExe,
                                                                        seconds: seconds))
             }
             guard let stats = measured else {
