@@ -4,7 +4,7 @@ import Foundation
 public struct RunnerSpec: Sendable {
     public let id: String            // Cellar id, e.g. "sikarugir"
     public let displayName: String
-    public let artifacts: [RunnerArtifact]
+    public var artifacts: [RunnerArtifact]
     public let wineBinaryName: String // "wine" (wow64 builds) or "wine64" (GPTK)
     public let hasD3DMetal: Bool
     public let license: String
