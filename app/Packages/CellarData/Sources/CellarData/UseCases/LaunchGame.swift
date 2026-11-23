@@ -167,8 +167,14 @@ public struct LaunchGame {
     ///
     /// `exited` is called the moment the game is gone, before the teardown starts: closing Steam
     /// takes seconds, and the player should not be told they are still playing while it does.
-    public func waitForExitThenShutDown(_ route: LaunchRoute, exited: () -> Void = {}) {
+    ///
+    /// A wheel is stopped at that moment too, not only once the bottle's Wine is gone
+    /// (`WineRunner.shutDown`, the backstop): only the game drives it, and a game that was killed
+    /// left its motor pushing for the 8 seconds Steam took to close.
+    public func waitForExitThenShutDown(_ route: LaunchRoute, exited: () -> Void = {},
+                                        stopWheels: () -> Void = CellarSDL.stopWheels) {
         let wine = Game.wineRunner(plan)
+        func gone() { exited(); stopWheels() }
         defer {
             Diagnostics.playSessionEnded(slug: plan.slug, name: plan.name,
                                          processNeedles: plan.gameProcessNeedles)
@@ -177,21 +183,21 @@ public struct LaunchGame {
         switch route {
         case .direct(let exeName):
             ProcessWatch.waitToExit([exeName])
-            exited()
+            gone()
             wine?.shutDown()
         case .steamAlongside(let exeName, _):
             // Steam was started for the game's DRM, so it goes when the game does — asked to quit
             // first, the same as on the client route, rather than only losing its wineserver.
             ProcessWatch.waitToExit([exeName])
-            exited()
+            gone()
             if let wine { SteamBottle.shutdown(runner: wine) }
         case .steam(let appID):
             SteamBottle.waitForGameExit(in: plan.prefix, appID: appID)
-            exited()
+            gone()
             if let wine { SteamBottle.shutdown(runner: wine) }
         case .battlenet:
             ProcessWatch.waitToExit(plan.gameProcessNeedles)
-            exited()
+            gone()
             if let wine { BattleNetBottle.shutdown(runner: wine) }
         }
     }
