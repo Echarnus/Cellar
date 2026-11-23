@@ -53,6 +53,10 @@ backend           = "dxvk"
 fallback_backend  = "d3dmetal"
 
 [env]
+# Custom Shaders Patch looks up acs.exe's functions and globals by name in acs.pdb. Wine 11's new
+# PDB reader leaves out public symbols (S_PUB32), so CSP stops with "Failed to tweak Assetto Corsa:
+# Can't find ..."; the old reader still loads them.
+WINE_DBGHELP_OLD_PDB = "1"
 
 [install]
 method      = "windows-steam-in-bottle"
