@@ -32,6 +32,8 @@ public enum SteamClientSession {
         var expires: Date
         /// `per`: whether Steam issued a persistent ("remember me") session.
         var persistent: Bool?
+        /// `iat`: when Steam issued it. Expiry dates don't follow issue order, so "which session is newer" asks this.
+        var issued: Date? = nil
 
         var isClientToken: Bool { audiences.contains("client") }
 
@@ -53,7 +55,8 @@ public enum SteamClientSession {
         else { return nil }
         let audiences = (json["aud"] as? [String]) ?? (json["aud"] as? String).map { [$0] } ?? []
         return Claims(steamID: sub, audiences: audiences, expires: Date(timeIntervalSince1970: exp),
-                      persistent: (json["per"] as? NSNumber).map(\.boolValue))
+                      persistent: (json["per"] as? NSNumber).map(\.boolValue),
+                      issued: (json["iat"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) })
     }
 
     /// `printf("%x", crc32(lowercased name)) + "1"` — the client's key for an account's token.
@@ -180,6 +183,9 @@ extension SteamClientSession {
         /// The token's public claims when the token itself is sealed in the vault file
         /// (`SteamTokenVault`) — so deciding never needs the token, only handing over does.
         var tokenClaims: Claims? = nil
+        /// The claims of the token this bottle's client remembers, when it can be read. A client left
+        /// with an older session than Cellar's (a sign-in Steam has since refused) must get the new one.
+        var rememberedClaims: Claims? = nil
     }
 
     static func readiness(_ s: Snapshot, now: Date = Date()) -> Readiness {
@@ -198,11 +204,14 @@ extension SteamClientSession {
         if let other = autoLoginAccount(users), other.caseInsensitiveCompare(account) != .orderedSame {
             return .unavailable(.otherAccount)
         }
+        let claims = s.token.flatMap(claims(ofToken:)) ?? s.tokenClaims
         if local?.block(at: connectCachePath)?.string(connectCacheKey(account: account)) != nil,
            users.map({ remembers($0, account: account) }) ?? false {
-            return .remembered
+            // Cellar's own session is newer: the client's is one Steam may already have refused.
+            let stale = s.rememberedClaims?.issued.flatMap { old in claims?.issued.map { $0 > old } } ?? false
+            if !stale || !(claims?.isUsable(at: now) ?? false) { return .remembered }
         }
-        guard let claims = s.token.flatMap(claims(ofToken:)) ?? s.tokenClaims, claims.isUsable(at: now) else {
+        guard let claims, claims.isUsable(at: now) else {
             return .unavailable(.tokenNotForClient)
         }
         return .canHandOver
@@ -254,7 +263,27 @@ extension SteamClientSession {
             localConfig: read(localConfig(in: prefix, wineUser: wineUser)),
             loginUsers: read(loginUsersFile(steamDirectory: steamDirectory)),
             config: read(configFile(steamDirectory: steamDirectory)),
-            tokenClaims: account.flatMap(SteamTokenVault.claims(for:)))
+            tokenClaims: account.flatMap(SteamTokenVault.claims(for:)),
+            rememberedClaims: account.flatMap { rememberedClaims(account: $0, prefix: prefix, wineUser: wineUser) })
+    }
+
+    /// The claims of the session this bottle's client remembers for `account`; nil when there is none
+    /// or it can't be read. Only the claims leave this function, never the token.
+    static func rememberedClaims(account: String, prefix: URL, wineUser: String) -> Claims? {
+        guard let text = try? String(contentsOf: localConfig(in: prefix, wineUser: wineUser), encoding: .utf8),
+              let hex = TextVDF.parse(text)?.block(at: connectCachePath)?.string(connectCacheKey(account: account)),
+              hex.count % 2 == 0
+        else { return nil }
+        var blob = Data(capacity: hex.count / 2)
+        var i = hex.startIndex
+        while i < hex.endIndex {
+            let j = hex.index(i, offsetBy: 2)
+            guard let byte = UInt8(hex[i..<j], radix: 16) else { return nil }
+            blob.append(byte); i = j
+        }
+        return WineDPAPI.unprotect(blob, user: wineUser, entropy: Data(account.lowercased().utf8))
+            .flatMap { String(data: $0, encoding: .utf8) }
+            .flatMap(claims(ofToken:))
     }
 
     /// Write the session into the bottle's `local.vdf` and the shared install's `loginusers.vdf` and
