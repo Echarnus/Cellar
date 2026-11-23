@@ -168,13 +168,19 @@ extension FrameStats {
 
         /// The launch logs Cellar wrote for this bottle and game, if they were written to within the
         /// last `seconds` — an older file is an earlier session, and its numbers would mislead.
-        public static func launchLogs(bottle: String, slug: String, seconds: Int, now: Date = Date()) -> String {
-            let names = ["steam-\(bottle).log", "battlenet-\(bottle).log", "game-\(slug).log"]
+        public static func launchLogs(bottle: String, slug: String, exe: String? = nil, seconds: Int,
+                                      now: Date = Date()) -> String {
+            // A game started beside the bottle's Steam logs under its exe's name (`SteamBottle.launchAlongside`).
+            let exeLog = exe.map { "game-\(URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent).log" }
+            let names = ["steam-\(bottle).log", "battlenet-\(bottle).log", "game-\(slug).log"] + (exeLog.map { [$0] } ?? [])
             return names.compactMap { name -> String? in
                 let url = Paths.logs.appendingPathComponent(name)
                 guard let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
                       now.timeIntervalSince(modified) <= Double(seconds),
-                      let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+                      let data = try? Data(contentsOf: url) else { return nil }
+                // Lossy: Wine writes some non-UTF-8 bytes into game logs, and a strict decode then
+                // dropped the whole file (ACC's log held 783 HUD lines that `perf measure` never saw).
+                let text = String(decoding: data, as: UTF8.self)
                 // One HUD line a second: the tail holds the window asked for, and old runs further up
                 // must not be chained into it.
                 let hud = text.split(whereSeparator: \.isNewline).filter { $0.contains("metal-HUD:") }

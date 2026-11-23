@@ -95,6 +95,23 @@ struct FrameStatsTests {
         #expect(stats.limit == .cpu)
     }
 
+    @Test("A game started beside Steam is read from its exe's log, and stray bytes don't drop the file")
+    func launchLogsBesideSteam() throws {
+        try FileManager.default.createDirectory(at: Paths.logs, withIntermediateDirectories: true)
+        let log = Paths.logs.appendingPathComponent("game-perftest-acs2.log")
+        defer { try? FileManager.default.removeItem(at: log) }
+        // Wine writes the odd non-UTF-8 byte into a game's log.
+        var data = Data("fixme:d3d: stray \u{FF}".utf8)
+        data.append(0xFF)
+        data.append(Data(("\n" + run(seconds: 3, interval: 16.7, gpu: 9).joined(separator: "\n") + "\n").utf8))
+        try data.write(to: log)
+        let text = FrameStats.Source.launchLogs(bottle: "perftest-bottle", slug: "perftest-game",
+                                                exe: "Binaries/Win64/perftest-acs2.exe", seconds: 60)
+        #expect(text.split(whereSeparator: \.isNewline).count == 3)
+        #expect(FrameStats.Source.launchLogs(bottle: "perftest-bottle", slug: "perftest-game", seconds: 60).isEmpty,
+                "without the exe, the slug's log is the only game log looked at")
+    }
+
     @Test("Too few frames to say anything is no answer, not a wrong one")
     func tooFewFrames() {
         #expect(FrameStats.measure(hud(0, 10, interval: 16, gpu: 8)) == nil)
