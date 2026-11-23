@@ -22,16 +22,25 @@ public enum SteamOwnedGames {
     /// never "owns nothing": the caller falls back to asking game by game.
     public static func appIDs(account: String) -> Set<Int>? {
         guard let refresh = DepotTool.refreshToken(for: account),
-              let steamID = SteamClientSession.claims(ofToken: refresh)?.steamID else { return nil }
+              let steamID = SteamClientSession.claims(ofToken: refresh)?.steamID else {
+            CellarLog.info(.account, "Steam's library list skipped: no readable saved sign-in")
+            return nil
+        }
         do {
             let traded = try Downloader.json(tokenURL, body: tokenForm(refresh: refresh, steamID: steamID))
             if renewedRefreshToken(traded) {
                 CellarLog.warn(.account, "Steam replaced the sign-in while Cellar read your library; "
                     + "the one Cellar keeps may stop working.")
             }
-            let token = accessToken(traded)
-            guard let token else { return nil }
-            return appIDs(inResponse: try Downloader.json(ownedURL, body: ownedForm(access: token, steamID: steamID)))
+            guard let token = accessToken(traded) else {
+                // Field names only, never values: the answer can hold tokens.
+                let fields = ((traded["response"] as? [String: Any])?.keys).map { $0.sorted() } ?? traded.keys.sorted()
+                CellarLog.info(.account, "Steam gave no access token for the library list (fields: \(fields))")
+                return nil
+            }
+            let ids = appIDs(inResponse: try Downloader.json(ownedURL, body: ownedForm(access: token, steamID: steamID)))
+            CellarLog.info(.account, "Steam's library list: \(ids.map { "\($0.count) games" } ?? "no answer")")
+            return ids
         } catch {
             // The message names a host and a status, never a token (Downloader.json).
             CellarLog.info(.account, "Steam's library list didn't answer: \(error.localizedDescription)")
