@@ -83,6 +83,9 @@ public struct GamePlan {
     /// `display_ini`: the game's own settings file, relative to the Windows user folder, where its
     /// full screen or window setting lives (Skyrim's `SkyrimPrefs.ini`). See `DisplayIni`.
     public var displayIni: String? = nil
+    /// `exe_args`: fixed switches for the game's exe (space-separated). Passed to the Windows
+    /// program only, never through a shell.
+    public var exeArguments: [String] = []
 
     public var prefix: URL { Paths.prefixes.appendingPathComponent(bottleName, isDirectory: true) }
     public var graphicsBackend: GraphicsBackend { GraphicsBackend(rawValue: backend) ?? .d3dmetal }
@@ -161,6 +164,9 @@ public struct GamePlan {
         guard canChooseDisplayMode, displaySwitchFile == nil, displayIni == nil else { return [] }
         return performance.displayMode.arguments(engine: facts.engine) ?? []
     }
+
+    /// Everything after the exe on its command line: the profile's own switches, then the display mode's.
+    public var gameArguments: [String] { exeArguments + displayArguments }
 
     /// True when this store-installed game can be launched without its store's client running.
     public var canLaunchStoreFree: Bool { !needsLiveSession && directLaunchExe != nil }
