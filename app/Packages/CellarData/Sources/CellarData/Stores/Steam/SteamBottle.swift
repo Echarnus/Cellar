@@ -11,10 +11,12 @@ public enum SteamBottle {
         "https://cdn.akamai.steamstatic.com/client/installer/SteamSetup.exe",
     ]
 
-    /// Launch flags. Deliberately empty: on Wine 10 the current client needs none, and the
-    /// `-allosarches -cef-force-32bit -no-cef-sandbox` folklore is a no-op (the 64-bit CEF is used
-    /// regardless — verified in webhelper.txt) or actively harmful.
-    static let launchFlags: [String] = []
+    /// Launch flags for the web helper (CEF 126). With the November 2026 client (build 1794536281)
+    /// under WineForge 0.6.0.4, its storage utility process crash-looped (breakpoint exceptions,
+    /// one winedbg per restart) and its GPU process failed (`GPU state invalid`): the UI never
+    /// loaded and Steam stayed logged off. Out of the sandbox and off the GPU it signed in at once
+    /// (M4, macOS 26.6); the GPU switches alone did not stop the crash loop.
+    static let launchFlags: [String] = ["-cef-disable-gpu", "-cef-disable-gpu-compositing", "-no-cef-sandbox"]
 
     /// The Windows executables that make up the client itself. `steamwebhelper.exe` is the CEF
     /// process that draws Steam's whole interface, and — verified with `lsappinfo` — the one that
