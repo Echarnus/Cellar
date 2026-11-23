@@ -62,6 +62,11 @@ public struct GamePlan {
     /// `env` as it would be with the profile's crash workarounds the player switched off put back
     /// (`PerformanceSettings.Resolved.crashWorkaroundsSwitchedOff`); nil when none were.
     public var workaroundEnv: [String: String]? = nil
+    /// `cellar launch --frame-log <dir>`: the folder the shim writes each frame's time into, for
+    /// this launch only (`Shim/cellar-frametime.c`). Not a profile setting — `[env]` refuses the
+    /// `CELLAR_` prefix — and not in `env`, so a store client opened on its own never gets it.
+    public var frameLogDirectory: String? = nil
+    static let frameLogVariable = "CELLAR_FRAME_LOG"
     /// `online_hosts`: the servers the game itself talks to (`css-api.zaonce.net` for Planet Coaster
     /// 2), which `cellar verify` expects the game's own process to connect to. Not the addresses
     /// `network_check` probes from the bottle: those prove the bottle can reach a server, and only
@@ -225,6 +230,7 @@ public struct GamePlan {
         }
         var result = DockShim.environment(naming: name, executables: exe)
         for (key, value) in env { result[key] = value }
+        if let frameLogDirectory { result[Self.frameLogVariable] = frameLogDirectory }
         return result
     }
 
