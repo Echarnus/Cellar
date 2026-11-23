@@ -224,4 +224,14 @@ final class RunnerIntegrityTests {
         #expect(InstallPhase.runtimeRepair.detail(store: .steam).contains("Your games and saves aren't touched"))
         #expect(GameActivity.working(InstallProgress(.runtimeRepair)).statusText == "Repairing")
     }
+
+    @Test("Through a linked Cellar folder, a runner's files are recorded relative to it, not by absolute path")
+    func linkedFolder() throws {
+        let real = TestHome.scratch("linked-real")
+        let link = TestHome.scratch("linked-alias")
+        try? FileManager.default.removeItem(at: link)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        #expect(RunnerIntegrity.relativePath(real.appendingPathComponent("wine/bin/wine"), in: link) == "wine/bin/wine")
+        #expect(RunnerIntegrity.relativePath(link.appendingPathComponent("wine/bin/wine"), in: link) == "wine/bin/wine")
+    }
 }
